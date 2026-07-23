@@ -1,0 +1,24 @@
+# Local Postgres fallback while no Supabase (EU/Frankfurt) project is wired up.
+# TODO(supabase): remove the need for this by setting DATABASE_URL/DIRECT_URL in .env
+# to the Supabase Cloud connection strings.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lokara-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lokara
+      POSTGRES_PASSWORD: lokara
+      POSTGRES_DB: lokara
+    ports:
+      - "54322:5432"
+    volumes:
+      - lokara-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lokara -d lokara"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  lokara-pgdata:

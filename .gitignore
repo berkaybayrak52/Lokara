@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# prisma generated client
+packages/db/generated/
+
+# pdf demo output
+packages/pdf/output/
+
+# test / coverage
+coverage/
+
+# playwright
+playwright-report/
+test-results/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
