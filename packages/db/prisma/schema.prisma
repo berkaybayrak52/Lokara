@@ -1,0 +1,170 @@
+// Lokara — M0 temporal core.
+// Principles (CLAUDE.md / docs/02-data-model.md):
+//   * every domain row carries accountId (isolation boundary; RLS backstop in migration SQL)
+//   * anything that changes during a period is a row with validFrom/validTo, never a scalar
+//   * money is integer cents, never floats
+//   * legally-relevant records (Statement) are immutable + versioned — new version, never overwrite
+// Full identity/RBAC (Membership, Role, Landlord, SelfUsePeriod, portal links) arrives at M5.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Identity stubs (minimal on purpose — full three-layer model is M5) ────────
+
+/// The login (one human). Global, not owned by any account. Supabase Auth maps onto this at M5.
+model Person {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+}
+
+/// The paying SaaS customer and the isolation boundary. NOT the German Mieter (that is Renter).
+model Account {
+  id        String       @id @default(cuid())
+  name      String
+  shape     AccountShape @default(SOLO)
+  createdAt DateTime     @default(now())
+
+  buildings  Building[]
+  renters    Renter[]
+  statements Statement[]
+}
+
+enum AccountShape {
+  SOLO
+  HAUSVERWALTUNG
+}
+
+// ── Temporal core: Building → Unit → Tenancy ─────────────────────────────────
+
+model Building {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id])
+  name       String
+  street     String
+  postalCode String
+  city       String
+  createdAt  DateTime @default(now())
+
+  units      Unit[]
+  statements Statement[]
+
+  @@index([accountId])
+}
+
+model Unit {
+  id          String   @id @default(cuid())
+  accountId   String
+  buildingId  String
+  building    Building @relation(fields: [buildingId], references: [id])
+  label       String
+  /// Wohnfläche in m² × 100 (integer — no floats anywhere near allocation math).
+  areaSqmX100 Int
+  createdAt   DateTime @default(now())
+
+  tenancies Tenancy[]
+
+  @@index([accountId])
+  @@index([buildingId])
+}
+
+/// A lease over a period. validTo = null means the tenancy is still running.
+/// Multiple renters per tenancy via TenancyParty (multi-party leases are an entry ticket).
+model Tenancy {
+  id                  String    @id @default(cuid())
+  accountId           String
+  unitId              String
+  unit                Unit      @relation(fields: [unitId], references: [id])
+  validFrom           DateTime
+  validTo             DateTime?
+  /// Kaltmiete in integer cents.
+  baseRentCents       Int
+  /// Monthly NK advance payment (Vorauszahlung) in integer cents.
+  advancePaymentCents Int
+  createdAt           DateTime  @default(now())
+
+  parties TenancyParty[]
+
+  @@index([accountId])
+  @@index([unitId])
+}
+
+/// The German Mieter — domain data, never called "tenant" (overloaded with multi-tenancy).
+/// Portal login (personId) arrives at M5.
+model Renter {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  legalName String
+  email     String?
+  createdAt DateTime @default(now())
+
+  tenancies TenancyParty[]
+
+  @@index([accountId])
+}
+
+model TenancyParty {
+  id        String  @id @default(cuid())
+  accountId String
+  tenancyId String
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id])
+  renterId  String
+  renter    Renter  @relation(fields: [renterId], references: [id])
+
+  @@unique([tenancyId, renterId])
+  @@index([accountId])
+}
+
+// ── Immutable statement pattern ───────────────────────────────────────────────
+
+/// A generated Abrechnung. IMMUTABLE: rows are never updated or deleted —
+/// a correction creates version n+1 and marks the predecessor SUPERSEDED
+/// (the only permitted status transition; enforced in app logic, GoBD/§147 AO).
+model Statement {
+  id          String          @id @default(cuid())
+  accountId   String
+  account     Account         @relation(fields: [accountId], references: [id])
+  buildingId  String
+  building    Building        @relation(fields: [buildingId], references: [id])
+  periodStart DateTime
+  periodEnd   DateTime
+  version     Int             @default(1)
+  status      StatementStatus @default(DRAFT)
+  totalCents  Int
+  /// SHA-256 of the rendered document, set when finalized (GoBD).
+  contentHash String?
+  createdAt   DateTime        @default(now())
+
+  @@unique([buildingId, periodStart, periodEnd, version])
+  @@index([accountId])
+}
+
+enum StatementStatus {
+  DRAFT
+  FINALIZED
+  SUPERSEDED
+}
+
+// ── Allocation keys (Umlageschlüssel) ─────────────────────────────────────────
+// Used from M1 by the per-period AllocationKeyAssignment — the key NEVER lives on
+// a cost row, so changing a key re-runs the calc without deleting entered data.
+
+enum AllocationKey {
+  AREA
+  PERSONS
+  CONSUMPTION
+  UNITS
+  DIRECT
+  MEA
+}

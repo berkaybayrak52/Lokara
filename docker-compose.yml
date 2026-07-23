@@ -14,6 +14,7 @@ services:
       - "54322:5432"
     volumes:
       - lokara-pgdata:/var/lib/postgresql/data
+      - ./packages/db/scripts/init-app-role.sql:/docker-entrypoint-initdb.d/10-init-app-role.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lokara -d lokara"]
       interval: 5s
