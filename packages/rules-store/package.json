@@ -1,0 +1,17 @@
+{
+  "name": "@lokara/rules-store",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Versioned legal rules/config with as-of law-date resolution. Legal numbers live here, never in code.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}
