@@ -1,0 +1,28 @@
+{
+  "name": "@lokara/web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Next.js App Router frontend. Calls apps/api over HTTP — never touches Prisma or the DB.",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@lokara/api": "workspace:*",
+    "@lokara/ui": "workspace:*",
+    "next": "^15.3.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.11",
+    "@types/node": "^22.15.34",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11"
+  }
+}

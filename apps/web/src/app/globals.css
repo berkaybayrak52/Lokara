@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@lokara/ui/tokens.css';
+
+/* Scan the shared UI package so its token utilities are generated. */
+@source '../../../../packages/ui/src';
