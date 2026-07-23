@@ -1,0 +1,23 @@
+{
+  "name": "@lokara/pdf",
+  "version": "0.0.1",
+  "private": true,
+  "description": "One shared HTML→PDF document service (Playwright/Chromium) behind NK, UVI, AfA, Anlage V, and contracts.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "demo": "tsx src/demo.ts",
+    "install-browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.53.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "vitest": "^3.2.4"
+  }
+}
