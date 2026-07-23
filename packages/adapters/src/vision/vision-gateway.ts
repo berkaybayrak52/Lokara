@@ -15,5 +15,8 @@ export interface ExtractedInvoiceFields {
 }
 
 export interface VisionGateway {
-  extractInvoice(document: { fileName: string; bytes: Uint8Array }): Promise<ExtractedInvoiceFields>;
+  extractInvoice(document: {
+    fileName: string;
+    bytes: Uint8Array;
+  }): Promise<ExtractedInvoiceFields>;
 }

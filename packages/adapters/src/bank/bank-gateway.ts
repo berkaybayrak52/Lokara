@@ -18,5 +18,9 @@ export interface BankTransaction {
 
 export interface BankGateway {
   /** Lists transactions for a connected bank account within [fromIso, toIso). */
-  listTransactions(bankAccountId: string, fromIso: string, toIso: string): Promise<BankTransaction[]>;
+  listTransactions(
+    bankAccountId: string,
+    fromIso: string,
+    toIso: string,
+  ): Promise<BankTransaction[]>;
 }

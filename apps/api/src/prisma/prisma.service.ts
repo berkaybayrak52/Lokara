@@ -1,5 +1,7 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@lokara/db';
+import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@lokara/db';
+import { PrismaClient } from '@lokara/db';
 
 /**
  * The only Prisma entry point in the codebase (apps/web never touches the DB).

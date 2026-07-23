@@ -16,7 +16,7 @@ describe('cents', () => {
 describe('formatEur', () => {
   it('formats German currency', () => {
     // Intl emits a non-breaking space before the € sign; normalize for comparison.
-    expect(formatEur(cents(120000)).replace(/ | /g, ' ')).toBe('1.200,00 €');
+    expect(formatEur(cents(120000)).replace(/[\u00A0\u202F]/g, ' ')).toBe('1.200,00 €');
   });
 });
 

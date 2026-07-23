@@ -57,6 +57,7 @@ decision you had to make that wasn't in the docs. Do NOT start M1 until I say so
 ---
 
 ## After M0
+
 - Review the scaffold, add your Supabase creds, confirm `pnpm dev` / `pnpm test`.
 - Then: **"Continue to M1"** → the `nk-engine`. The M1 DoD is the €1,200 golden fixture in
   `docs/03-nk-heating-engines.md` passing byte-for-byte. Insist the fixture exists and is green
@@ -65,6 +66,7 @@ decision you had to make that wasn't in the docs. Do NOT start M1 until I say so
   its milestone, point it back to `PLAN.md` — engines and correctness first.
 
 ## Tips for driving Claude Code on this project
+
 - One milestone per session; end each with "stop and summarize, don't start the next milestone."
 - When it proposes a vendor SDK inside an engine or domain module, reject it — that violates the
   adapter rule in `CLAUDE.md`.

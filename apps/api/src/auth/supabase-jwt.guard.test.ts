@@ -35,11 +35,9 @@ describe('verifySupabaseToken', () => {
   });
 
   it('accepts account_id from app_metadata (Supabase custom claims shape)', () => {
-    const token = jwt.sign(
-      { sub: 'per_1', app_metadata: { account_id: 'acc_2' } },
-      SECRET,
-      { algorithm: 'HS256' },
-    );
+    const token = jwt.sign({ sub: 'per_1', app_metadata: { account_id: 'acc_2' } }, SECRET, {
+      algorithm: 'HS256',
+    });
     expect(verifySupabaseToken(token, SECRET).accountId).toBe('acc_2');
   });
 });

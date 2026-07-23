@@ -1,8 +1,4 @@
-import type {
-  DemoSummaryResponse,
-  DevTokenResponse,
-  HealthResponse,
-} from '@lokara/api/contract';
+import type { DemoSummaryResponse, DevTokenResponse, HealthResponse } from '@lokara/api/contract';
 
 /**
  * The typed HTTP client for apps/api — the ONLY way the web app touches data.

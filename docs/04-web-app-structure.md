@@ -36,12 +36,14 @@ adapters and exposes them as HTTP endpoints; **`apps/web` calls that API and nev
 directly.** `packages/db` is imported by `apps/api` only.
 
 ## Routing & context (M3 + M5)
+
 - Owner / Employee / Tax-advisor: `/a/{accountId}/…`
 - Renter portal: `/renter/{tenancyId}/…`
 - Context is **in the URL**, never the session. The left-menu is derived live from the Person's
   relationships and is **navigation only** — every request re-authorizes independently (app + RLS).
 
 ## Pages for the pitch vertical slice (M3)
+
 Vermieter portal (`/a/{accountId}`), German labels:
 
 1. **Dashboard** — overview cards (buildings, open statements, deadlines). One-click "load demo scenario".
@@ -55,6 +57,7 @@ Vermieter portal (`/a/{accountId}`), German labels:
 7. **Beleg-Upload** (M4, canned) — upload a sample invoice → prefilled fields → confirm.
 
 ## UX requirements that are non-negotiable
+
 - **Autosave / no data loss on abort** — an entry-ticket requirement; objego lost users' data.
 - **Changing an allocation key never deletes entered data** — re-runs the calc only.
 - **Fast + stable**, no perceptible latency — the universal competitor pain point.
@@ -62,6 +65,7 @@ Vermieter portal (`/a/{accountId}`), German labels:
   or drop contrast for the sake of minimalism (see `docs/05-design-system.md`).
 
 ## State & data
+
 - The web app calls the **NestJS API** (`apps/api`) over HTTP; the API validates the Supabase JWT in a
   guard, sets the RLS context, and calls the engine packages. No DB access from `apps/web`.
 - Forms optimistic + autosave; long-running work (PDF, later OCR/bank) goes through API jobs (BullMQ from M6).
@@ -69,6 +73,7 @@ Vermieter portal (`/a/{accountId}`), German labels:
   launch-day native iOS/Android apps.
 
 ## Statement output
+
 The PDF service (`packages/pdf`) is **one shared service** behind NK, UVI, AfA dossier, Anlage V, and
 contracts. For M3 it renders the NK + heating/CO₂ statement with the `Rechtsstand MM/JJJJ` stamp and
 the "Tool, keine Rechts-/Steuerberatung" disclaimer.

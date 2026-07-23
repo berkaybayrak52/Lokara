@@ -7,7 +7,7 @@
 
 ## Pitch cutline (5-day target)
 
-For the **27.07 investor pitch** the app should be *mostly real* with **stubs where APIs cost money**
+For the **27.07 investor pitch** the app should be _mostly real_ with **stubs where APIs cost money**
 (finAPI, Vision/OCR, email, billing) and **seeded example scenarios** for the common cases
 (edge cases deferred). Concretely:
 

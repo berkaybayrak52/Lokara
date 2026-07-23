@@ -7,16 +7,17 @@
 
 ## Color palette
 
-| Token | Name | HEX | RGB | Role |
-|---|---|---|---|---|
-| `--color-ink` | Petrol Ink | `#18212A` | 24·33·42 | **Primary** — text, frames, dark surfaces |
-| `--color-green` | Lokara Grün | `#1A6558` | 26·101·88 | **Accent** — signals, highlights, primary actions |
-| `--color-forest` | Forest Deep | `#123F37` | — | Deep green — hover/pressed, dark accents |
-| `--color-mint` | Mint Tint | `#E7EFEB` | — | Soft tint — subtle backgrounds, selected states |
-| `--color-slate` | Slate | `#5C6A6B` | — | Muted text, borders, secondary labels |
-| `--color-paper` | Paper | `#FBFBFA` | — | App background / light surface |
+| Token            | Name        | HEX       | RGB       | Role                                              |
+| ---------------- | ----------- | --------- | --------- | ------------------------------------------------- |
+| `--color-ink`    | Petrol Ink  | `#18212A` | 24·33·42  | **Primary** — text, frames, dark surfaces         |
+| `--color-green`  | Lokara Grün | `#1A6558` | 26·101·88 | **Accent** — signals, highlights, primary actions |
+| `--color-forest` | Forest Deep | `#123F37` | —         | Deep green — hover/pressed, dark accents          |
+| `--color-mint`   | Mint Tint   | `#E7EFEB` | —         | Soft tint — subtle backgrounds, selected states   |
+| `--color-slate`  | Slate       | `#5C6A6B` | —         | Muted text, borders, secondary labels             |
+| `--color-paper`  | Paper       | `#FBFBFA` | —         | App background / light surface                    |
 
 ### Contrast guidance (WCAG AA)
+
 - Body text: Petrol Ink on Paper (very high contrast — safe).
 - **Slate is for secondary text only** — verify ≥4.5:1 on its background; never use it for primary
   body copy on Paper at small sizes.
@@ -25,10 +26,10 @@
 
 ## Typography
 
-| Role | Typeface | Usage |
-|---|---|---|
-| **Display** | **Montserrat** | Headlines, big numbers, section titles ("Räume mit klarer Struktur") |
-| **Text** | **Manrope** | Body, labels, UI elements, tables — "from business card to dashboard" |
+| Role        | Typeface       | Usage                                                                 |
+| ----------- | -------------- | --------------------------------------------------------------------- |
+| **Display** | **Montserrat** | Headlines, big numbers, section titles ("Räume mit klarer Struktur")  |
+| **Text**    | **Manrope**    | Body, labels, UI elements, tables — "from business card to dashboard" |
 
 Weights in use: **Regular 400, Medium 500, SemiBold 600, Bold 700** (SemiBold 600 is the workhorse
 emphasis weight in the brand board). Use system font fallbacks; load via `next/font` for performance.
@@ -36,11 +37,13 @@ emphasis weight in the brand board). Use system font fallbacks; load via `next/f
 - **Scalable type is a BFSG requirement** — use `rem`, respect user zoom, don't cap font scaling.
 
 ## The block motif ("Baustein-Motiv")
+
 The blocks in the icon are the heart of the brand: a **flexible grid of square modules**. Use sparingly
 as a pattern, divider, or graphic accent — always in **Petrol Ink + Lokara Grün**. Don't overuse; it's
 an accent, not a background texture on every screen.
 
 ## Logo usage
+
 - **Primary**: horizontal lockup (icon + "Lokara" wordmark) on light — the default.
 - **Invers**: white lockup on Petrol Ink.
 - **Icon / Bildmarke**: the window-with-blocks mark alone.
@@ -49,6 +52,7 @@ an accent, not a background texture on every screen.
   circle with the mark.
 
 ## Tailwind wiring (M0)
+
 Expose the tokens as CSS variables + Tailwind theme extension:
 
 ```js
@@ -63,16 +67,18 @@ colors: {
 }
 // fontFamily: { display: ['Montserrat', ...], sans: ['Manrope', ...] }
 ```
+
 No component uses a raw hex or an off-palette font — everything references a token
 (this is checkable and is part of the UI Definition of Done in `CLAUDE.md`).
 
 ## Look & feel / motion principles (the "Apple-like" bar)
 
-Tokens give structure; this section gives the *feel*. The target is **modern, minimal, calm,
+Tokens give structure; this section gives the _feel_. The target is **modern, minimal, calm,
 high-quality** — pleasing motion, generous space, nothing busy. Build to this from M3; reject UI that
 feels flat, cramped, or cluttered.
 
 ### Minimalism (the discipline, not just the aesthetic)
+
 - **One primary action per screen.** Exactly one filled Lokara-Grün button; everything else is
   secondary (ghost/outline) or tertiary (text link). If two things compete, one is wrong.
 - **Progressive disclosure.** Show the common path; hide advanced options behind "Mehr anzeigen",
@@ -83,6 +89,7 @@ feels flat, cramped, or cluttered.
   that fights the "7-to-70" goal. Reduce ornament, never clarity.
 
 ### Spacing & layout
+
 - **8px spacing scale** (4 / 8 / 12 / 16 / 24 / 32 / 48 / 64). Everything snaps to it.
 - **Generous whitespace** — err larger. Section padding ≥ 24px; card padding ≥ 16–24px.
 - **Constrain measure** — body/content columns ~640–760px max for readability; don't stretch text full-bleed.
@@ -90,6 +97,7 @@ feels flat, cramped, or cluttered.
   single very soft shadow for elevation (no heavy drop shadows, no double borders).
 
 ### Motion (Framer Motion)
+
 - **Fast and subtle.** Durations **150–250ms** for most UI (hovers ~120–150ms, page/section
   transitions ~250–300ms). If a user notices the duration, it's too slow.
 - **Easing:** ease-out for enters (`[0.16, 1, 0.3, 1]`-style), ease-in for exits. Never linear.
@@ -99,6 +107,7 @@ feels flat, cramped, or cluttered.
 - **60fps** — animate only `transform` and `opacity`; never animate layout/width/height/top/left.
 
 ### Interaction feel
+
 - Every interactive element has **hover, focus-visible, active, and disabled** states — visible, not subtle-to-invisible.
 - **Optimistic + instant feedback:** buttons show a pressed/loading state immediately; autosave shows a
   quiet "Gespeichert" confirmation, never a blocking spinner for small saves.
@@ -106,11 +115,13 @@ feels flat, cramped, or cluttered.
 - **Empty states are designed**, not blank — a short line + the one action that fills them.
 
 ### Reference bar (anchor the quality, don't copy)
+
 Apple system UI / apple.com, **Linear**, **Stripe Dashboard**, **Notion**. Calm color, strong
 typographic hierarchy, tight motion, lots of air. When a screen doesn't feel like it belongs next to
 these, it's not done.
 
 ## Accessibility checklist (every screen)
+
 - [ ] Contrast ≥ 4.5:1 for text (≥3:1 for large text / UI components).
 - [ ] Visible focus states on all interactive elements (keyboard nav works end to end).
 - [ ] Labels are explicit and always visible (no icon-only critical actions without a label/aria-label).

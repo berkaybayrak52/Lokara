@@ -1,10 +1,6 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import type { CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import type { Reflector } from '@nestjs/core';
 import jwt from 'jsonwebtoken';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import type { AuthContext } from './auth.types';

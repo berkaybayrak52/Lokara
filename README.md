@@ -1,9 +1,37 @@
-# Lokara — kickoff docs
+# Lokara
+
+## Running the app (M0 scaffold)
+
+```bash
+# prerequisites: Node >= 22, pnpm 10, Docker
+cp .env.example .env && cp .env.example packages/db/.env
+docker compose up -d                        # local Postgres fallback (TODO(supabase))
+pnpm install
+pnpm --filter @lokara/pdf install-browser   # Chromium for the PDF service (once)
+pnpm db:migrate                             # applies the one Prisma migration (incl. RLS)
+pnpm db:seed                                # loads the demo scenario (Musterstraße 12)
+pnpm dev                                    # web on :3000, api on :3001
+```
+
+Then open <http://localhost:3000> — the demo page shows the design tokens and live data
+fetched from the API through the auth guard.
+
+Other commands: `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm build` ·
+`pnpm --filter @lokara/pdf demo` (renders `packages/pdf/output/placeholder-statement.pdf`).
+
+> No Supabase project is wired yet. `.env.example` documents the Frankfurt placeholders;
+> until credentials exist, docker-compose Postgres + the dev-token endpoint
+> (`AUTH_DEV_TOKEN=true`) stand in. Search for `TODO(supabase)`.
+
+---
+
+# Kickoff docs
 
 The planning + spec set to bootstrap the **Lokara web app** with Claude Code (Fable 5).
 Put this whole folder at your repo root and open Claude Code there.
 
 ## Read order
+
 1. **`INITIAL-PROMPT.md`** — the exact first message to paste into Claude Code (kicks off M0).
 2. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + locked tech.
 3. **`PLAN.md`** — milestones M0→M10; the pitch cutline is **M0→M3 + a canned M4**.
@@ -19,6 +47,7 @@ Put this whole folder at your repo root and open Claude Code there.
    - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
 
 ## The one-paragraph version
+
 Build the money/legal math as **pure, golden-tested engine packages**; keep everything
 **immutable + versioned** and **`accountId`-scoped (app + RLS)**; **stub every paid API behind an
 adapter**; ship a **correct CO₂-compliant NK/heating statement to PDF** with seeded demo scenarios for
