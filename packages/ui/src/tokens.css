@@ -1,0 +1,20 @@
+/*
+ * Lokara design tokens — the single source for colors and type (docs/05).
+ * Tailwind v4 @theme: every value becomes a CSS variable AND a utility
+ * (bg-ink, text-slate, font-display, …). No component uses a raw hex.
+ *
+ * --font-montserrat / --font-manrope are provided by next/font in apps/web.
+ */
+@theme {
+  --color-*: initial;
+  --color-ink: #18212a; /* Petrol Ink — primary text, frames, dark surfaces */
+  --color-green: #1a6558; /* Lokara Grün — signals, highlights, primary actions */
+  --color-forest: #123f37; /* Forest Deep — hover/pressed, dark accents */
+  --color-mint: #e7efeb; /* Mint Tint — subtle backgrounds, selected states */
+  --color-slate: #5c6a6b; /* Slate — secondary text/labels only (≥4.5:1 checked) */
+  --color-paper: #fbfbfa; /* Paper — app background / light surface */
+  --color-white: #ffffff;
+
+  --font-display: var(--font-montserrat), 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-manrope), 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
