@@ -1,7 +1,8 @@
 {
   "name": "lokara",
   "private": true,
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "bun@1.3.14",
+  "workspaces": ["apps/*", "packages/*"],
   "engines": {
     "node": ">=22"
   },
@@ -13,8 +14,8 @@
     "typecheck": "turbo run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml,css}\"",
-    "db:migrate": "pnpm --filter @lokara/db migrate:dev",
-    "db:seed": "pnpm --filter @lokara/db seed"
+    "db:migrate": "bun run --filter @lokara/db migrate:dev",
+    "db:seed": "bun run --filter @lokara/db seed"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
@@ -25,16 +26,14 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.36.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@nestjs/core",
-      "@prisma/client",
-      "@prisma/engines",
-      "esbuild",
-      "playwright",
-      "prisma",
-      "sharp",
-      "unrs-resolver"
-    ]
-  }
+  "trustedDependencies": [
+    "@nestjs/core",
+    "@prisma/client",
+    "@prisma/engines",
+    "esbuild",
+    "playwright",
+    "prisma",
+    "sharp",
+    "unrs-resolver"
+  ]
 }
