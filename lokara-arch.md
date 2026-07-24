@@ -264,14 +264,15 @@ class SelfUseKind(enum.Enum):
 class SelfUsePeriod(Base):
     __tablename__ = "self_use_period"
     id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))   # every domain row is scoped
     unit_id: Mapped[str] = mapped_column(ForeignKey("unit.id"))
     sqm_x100: Mapped[int]                              # self-used m² × 100 — not a flag
     kind: Mapped[SelfUseKind] = mapped_column(default=SelfUseKind.OWNER_OCCUPIED)
     note: Mapped[str | None]
-    valid_from: Mapped[datetime]
-    valid_to: Mapped[datetime | None]
+    valid_from: Mapped[date]                           # day-granular DATE (validity, not a timestamp)
+    valid_to: Mapped[date | None]
     unit: Mapped["Unit"] = relationship(back_populates="self_use_periods")
-    __table_args__ = (Index("ix_self_use_unit", "unit_id"),)
+    __table_args__ = (Index("ix_self_use_unit", "unit_id"), Index("ix_self_use_account", "account_id"))
 # Unit gains the back-relation:  self_use_periods: Mapped[list["SelfUsePeriod"]] = relationship(...)
 ```
 

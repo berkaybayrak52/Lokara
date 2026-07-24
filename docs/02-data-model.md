@@ -3,6 +3,9 @@
 > Condensed from `lokara-arch.md` §2/§3/§8. That file has the full reasoning; this is the build spec.
 > **Principle:** anything that can change _during_ a period is a row with `validFrom/validTo`, never a
 > scalar. Money is integer **cents**. Every domain row carries **`accountId`**.
+> **Column types:** validity columns (`valid_from/valid_to`) are **day-granular `date`** — billing is
+> day-weighted and the engines' `Period` is over dates. Audit/event timestamps (`created_at`,
+> `invited_at`, `revoked_at`, delivery logs…) stay **`timestamptz`**.
 
 ## Identity: the three-layer model
 
@@ -139,6 +142,10 @@ class Renter(Base):
   the app must connect as a restricted role (e.g. `lokara_app`) for RLS to actually apply. Locally this
   is a second role via the docker init script; on Supabase it's the `DATABASE_URL` (app role, pooled)
   vs `DIRECT_URL` (migrations) split. Migrations may run as owner; **request traffic never does.**
+- **`FORCE ROW LEVEL SECURITY` binds the owner too.** With FORCE enabled, even the table owner is
+  subject to the policies — locally that's fine (migrations use a separate superuser). ⚠️ On Supabase
+  the migration role is a **non-superuser owner**, so FORCE binds it as well: **seed/admin flows there
+  must set the app context** (`app.account_id`) or use a role explicitly exempted. `TODO(supabase)`.
 
 ## Temporal core: Building → Unit → Tenancy
 
@@ -191,14 +198,15 @@ class SelfUseKind(enum.Enum): OWNER_OCCUPIED = "OWNER_OCCUPIED"; FREE_OF_CHARGE 
 class SelfUsePeriod(Base):
     __tablename__ = "self_use_period"
     id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))   # every domain row is scoped
     unit_id: Mapped[str] = mapped_column(ForeignKey("unit.id"))
     sqm_x100: Mapped[int]                              # self-used m² × 100 — an AREA, not a flag
     kind: Mapped[SelfUseKind] = mapped_column(default=SelfUseKind.OWNER_OCCUPIED)
     note: Mapped[str | None]
-    valid_from: Mapped[datetime]
-    valid_to: Mapped[datetime | None]
+    valid_from: Mapped[date]                           # validity is day-granular DATE (see principle)
+    valid_to: Mapped[date | None]
     unit: Mapped["Unit"] = relationship(back_populates="self_use_periods")
-    __table_args__ = (Index("ix_self_use_unit", "unit_id"),)
+    __table_args__ = (Index("ix_self_use_unit", "unit_id"), Index("ix_self_use_account", "account_id"))
 ```
 
 - Self-use is an **area with a period** (m²), not a boolean — covers partial cases (a rented room).
@@ -224,6 +232,9 @@ class AllocationKey(enum.Enum):
   immocloud). The key lives on a **per-period `AllocationKeyAssignment`**, never on the cost row —
   changing a key re-runs the calc and cascades into no stored data.
 - **Granularity:** NK allocates at **unit/tenancy** level; **AfA splits by m²** — two granularities on purpose.
+- **Rollout:** the `allocation_key` **PG enum type ships at M0/Phase B** (parity with the Prisma M0), but
+  the per-period **`AllocationKeyAssignment` table arrives with M3** plumbing — the enum exists before the
+  table that uses it.
 
 ## Two financial time-axes (never merge)
 
