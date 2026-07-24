@@ -1,9 +1,26 @@
 [project]
 name = "lokara-api"
 version = "0.1.0"
-description = "Lokara FastAPI backend (skeleton; FastAPI lands in Phase E)"
+description = "Lokara FastAPI backend — one HTTP/JSON API for web + mobile"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.34",
+  "pyjwt>=2.10",
+  "pydantic>=2.10",
+  "pydantic-settings>=2.7",
+  "lokara-domain",
+  "lokara-db",
+  "lokara-nk-engine",
+]
+
+[project.scripts]
+lokara-api = "lokara_api.main:run"
+
+[tool.uv.sources]
+lokara-domain = { workspace = true }
+lokara-db = { workspace = true }
+lokara-nk-engine = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -11,4 +28,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lokara_api"]
-

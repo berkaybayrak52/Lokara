@@ -28,6 +28,7 @@ dev = [
   "lokara-adapters",
   "lokara-db",
   "lokara-pdf",
+  "httpx2>=1.0",
 ]
 
 [tool.uv.sources]
