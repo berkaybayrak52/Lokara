@@ -116,7 +116,14 @@ files noted). **Carry them across; don't re-derive or lose them.**
   until each phase reaches parity, removed at Phase H.
 - **DoD:** both installs succeed; CI green on both lanes.
 
-### Phase B — DB: Prisma → SQLAlchemy + Alembic
+### Phase B — DB: Prisma → SQLAlchemy + Alembic — ✅ done
+> Built 2026-07-24 on `feat/py-migration` (after Phase C, per §7): 12 SQLAlchemy 2.0 models
+> (identity three-layer + temporal core + SelfUsePeriod), Alembic migration `0001` with FORCEd RLS
+> on all 11 tenant tables (USING + WITH CHECK; snake_case tables coexist with the Prisma ones until
+> Phase H). **The cross-account isolation test passes as the non-owner `lokara_app` role** and was
+> mutation-checked (disabling RLS makes it fail). CI's Python lane now runs it against a Postgres
+> service with `LOKARA_REQUIRE_DB=1`, so the gate can't silently skip. Validity columns are
+> day-granular `DATE` (matches the engines' `Period`); docs/02's sketch says datetime — deliberate.
 - `packages/db`: SQLAlchemy 2.0 models from `docs/02` (identity + temporal core + SelfUsePeriod + enums).
 - `alembic init`; first migration = temporal core; **port RLS policies** into Alembic `op.execute` SQL.
 - Local docker-compose Postgres fallback; config via `pydantic-settings`.
