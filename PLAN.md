@@ -61,7 +61,10 @@ trivial PDF renders.
 
 ---
 
-## M1 — NK / operating-cost engine (⭐ pitch core)
+## M1 — NK / operating-cost engine (⭐ pitch core) — ✅ built (Python, migration Phase C)
+
+> Built 2026-07-24 in `packages/nk-engine` (`lokara_nk_engine`): the €1,200 fixture passes
+> byte-exact; all keys incl. DIRECT/MEA; interim (<12 mo) and 18-month periods covered.
 
 **Goal:** the crown-jewel calculation, provably correct.
 
@@ -75,7 +78,10 @@ trivial PDF renders.
 
 ---
 
-## M2 — Heating + CO₂ engine
+## M2 — Heating + CO₂ engine — ✅ built (Python, migration Phase C)
+
+> Built 2026-07-24 in `packages/heating-engine` (`lokara_heating_engine`): §§7/8 + §9 + §9a +
+> degree days + CO₂ 10-step with `Rechtsstand` from the rules store. Golden fixtures green.
 
 - `packages/heating-engine` — pure. §§7/8 HKVO 30/70–50/50 split, §9 warm-water separation,
   §9a estimation, degree-day apportionment on renter change, **CO₂ 10-step model (CO2KostAufG)**

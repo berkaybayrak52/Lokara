@@ -122,7 +122,11 @@ files noted). **Carry them across; don't re-derive or lose them.**
 - Local docker-compose Postgres fallback; config via `pydantic-settings`.
 - **DoD:** `alembic upgrade head` clean; a cross-account read **fails** (RLS) in a test.
 
-### Phase C — Engines + rules-store + domain ⭐
+### Phase C — Engines + rules-store + domain ⭐ — ✅ done (done before Phase B, per §7)
+> Built 2026-07-24 on `feat/py-migration`: 67 pytest tests green, €1,200 fixture byte-exact
+> (60000/17852/18148/24000), mypy --strict clean, engines import only stdlib + `lokara-domain`.
+> Rule-value shapes live in `domain` (engines depend only on domain); Anlage-V lines deferred to M7.
+> Degree-day promille table is marked verify-before-production.
 - Port `domain` (dataclasses/Pydantic), `rules-store` (HKVO, CO₂ 10-step, Anlage-V lines + as-of dates).
 - `nk-engine`: day-weighted allocation, all keys incl. DIRECT/MEA, vacancy→landlord, largest-remainder
   rounding with `decimal.Decimal`.
