@@ -46,6 +46,9 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+# German legal/monetary text is part of the product: NBSP belongs in currency
+# strings, × and § in legal-formula comments.
+allowed-confusables = [" ", "×"]
 
 [tool.mypy]
 strict = true
