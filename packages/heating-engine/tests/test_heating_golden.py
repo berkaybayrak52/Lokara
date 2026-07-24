@@ -40,7 +40,9 @@ WW_FORMULA = WarmWaterFormula(
     cold_temp_c=Decimal(10),
     area_fallback_kwh_per_sqm_year=Decimal(32),
 )
-DEGREE_DAYS = DegreeDayTable(promille_by_month=(170, 150, 130, 80, 40, 15, 10, 10, 30, 80, 120, 165))
+DEGREE_DAYS = DegreeDayTable(
+    promille_by_month=(170, 150, 130, 80, 40, 15, 10, 10, 30, 80, 120, 165)
+)
 CO2_TABLE: Co2Table = (
     Co2Step(max_intensity_exclusive=Decimal(12), landlord_share_percent=0),
     Co2Step(max_intensity_exclusive=Decimal(17), landlord_share_percent=10),
@@ -162,7 +164,7 @@ class TestCo2TenStepSplit:
         assert int(co2.landlord_amount) == 6000  # 20 % of €300.00
         assert int(co2.renter_amount) == 24000
         assert co2.rechtsstand == "Rechtsstand 01/2023"
-        # Billable = 1,030,000 − 6,000 = 1,024,000 → WW pot 256,000 / heating pot 768,000.
+        # Billable = 1,030,000 - 6,000 = 1,024,000 → WW pot 256,000 / heating pot 768,000.
         rows = [
             (line.unit_id, int(line.heating_base), int(line.heating_consumption),
              int(line.ww_base), int(line.ww_consumption), int(line.total))
