@@ -6,23 +6,29 @@
 > · Expo (mobile) · Bun + Turborepo (TS) · uv (Python). The current scaffold in this repo may still be
 > the older TypeScript (NestJS/Prisma) code — it is **pending migration** toward these docs.
 
+**Works today (Phase A: Bun + uv toolchains; backend still TS until Phases B–E):**
+
 ```bash
-# prerequisites: Bun >= 1.1, Python >= 3.12 + uv, Docker
-cp .env.example .env && cp .env.example apps/api/.env
-docker compose up -d                        # local Postgres fallback (TODO(supabase))
-bun install                                 # TS workspace: web, mobile, ui
-uv sync                                     # Python workspace: api + engine packages
-uv run playwright install chromium          # Chromium for the PDF service (once)
-uv run alembic upgrade head                 # applies the one migration (incl. RLS)
-uv run python -m apps.api.seed              # loads the demo scenario (Musterstraße 12)
-bun dev                                     # web on :3000; uv run to start the api on :3001
+# prerequisites: Node >= 22, Bun >= 1.3, uv (Python 3.13 pinned via .python-version), Docker
+cp .env.example .env && cp .env.example packages/db/.env
+docker compose up -d                              # local Postgres fallback (TODO(supabase))
+bun install                                       # TS workspace (web + pre-migration TS backend)
+uv sync                                           # Python workspace (skeletons until Phase B+)
+bun run --filter @lokara/pdf install-browser      # Chromium for the PDF service (once)
+bun run db:migrate                                # applies the one Prisma migration (incl. RLS)
+bun run db:seed                                   # loads the demo scenario (Musterstraße 12)
+bun run dev                                       # web on :3000, api on :3001
 ```
 
 Then open <http://localhost:3000> — the demo page shows the design tokens and live data
-fetched from the API through the auth dependency.
+fetched from the API through the auth guard.
 
-Other commands: `bun test` · `pytest` · `bun lint` · `ruff check` · `mypy` · `bun run build` ·
-`uv run python -m packages.pdf.demo` (renders `packages/pdf/output/placeholder-statement.pdf`).
+Other commands: `bun run test` · `bun run lint` · `bun run typecheck` · `bun run build` ·
+`uv run pytest` · `uv run ruff check .` · `uv run mypy` ·
+`bun run --filter @lokara/pdf demo` (renders `packages/pdf/output/placeholder-statement.pdf`).
+
+**Target flow (arrives with the migration phases):** `uv run alembic upgrade head` (Phase B),
+`uv run python -m lokara_api.seed` + FastAPI on :3001 (Phase E), PDF via Playwright-Python (Phase D).
 
 > No Supabase project is wired yet. `.env.example` documents the Frankfurt placeholders;
 > until credentials exist, docker-compose Postgres + the dev-token endpoint
