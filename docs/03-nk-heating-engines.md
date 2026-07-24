@@ -11,7 +11,10 @@
   the sum of allocated shares reconciles to the input **to the cent**.
 - Output: a plain result object (shares per party + a reconciliation total) — the PDF layer formats it.
 - Every legal ratio/table (HKVO, CO₂ 10-step) comes from the **versioned rules store**, passed in as a
-  parameter with an as-of law date. Engines never hardcode a legal number.
+  parameter with an as-of law date. Engines never hardcode a legal number, and never import
+  `rules-store` — the caller resolves the values and passes them in; the value *shapes* live in `domain`.
+- **Anlage-V line mappings** also live in `rules-store`, but they're **tax-export data (M7)**, not engine
+  input — the NK/heating engines never see them.
 
 ---
 
@@ -59,7 +62,11 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
   (from rules store).
 - **§9** warm-water separation from heating.
 - **§9a** estimation when readings are missing.
-- **Degree-day (Gradtags) apportionment** on renter change mid-period.
+- **Degree-day (Gradtags) apportionment** on renter change mid-period. Apportionment basis:
+  **consumption** cost splits by **degree-days**; **base + warm-water** costs split by **days**.
+- ⚠️ **The degree-day promille table is a VDI convention, not a statute** — it carries a
+  **"verify before production"** marker in `rules-store` (with its `Rechtsstand`), unlike the HKVO
+  ratios and CO₂ table which are legally fixed.
 - External MDL (Messdienstleister) data feeds in through the meter adapter as normalized readings —
   the engine never knows the source.
 

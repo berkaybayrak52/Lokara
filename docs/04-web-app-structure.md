@@ -48,6 +48,11 @@ imports `db`, `adapters`, `ui`, or any vendor SDK. **`apps/api` (FastAPI)** wire
 adapters and exposes them as HTTP endpoints; **`apps/web` and `apps/mobile` call that API and never
 touch SQLAlchemy/DB directly.** `packages/db` is imported by `apps/api` only.
 
+**Rules-store direction:** the shapes of legal rule-values (ratios, tables) live in `domain`;
+`rules-store` **depends on `domain`** and supplies the data. Engines **do not import `rules-store`** —
+the caller (`apps/api`) resolves the values for the as-of law date and passes them in as parameters. So
+the graph is `domain ← rules-store`, `domain ← engines`, and `api → {rules-store, engines, domain}`.
+
 ## Feature-based structure (web + mobile)
 
 Inside each client app, organize **by feature, not by type** — a feature folder owns its components,
