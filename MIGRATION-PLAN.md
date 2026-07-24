@@ -146,7 +146,15 @@ files noted). **Carry them across; don't re-derive or lose them.**
 - `pdf`: Playwright-for-Python HTML→PDF; NK/heating template with `Rechtsstand` + disclaimer.
 - **DoD:** a stub txn flows through an adapter; a placeholder PDF renders.
 
-### Phase E — FastAPI backend
+### Phase E — FastAPI backend — ✅ done
+> Built 2026-07-24 on `feat/py-migration` (before Phase D — the API needed no adapters/PDF):
+> `uv run lokara-api` serves; **a JWT-auth'd `POST /calc/nk` returns the €1,200 fixture byte-exact
+> over HTTP** (60000/17852/18148/24000). HS256 auth dependency + dev-token (AUTH_DEV_TOKEN-gated,
+> `TODO(supabase)` markers), `account_session` verifies a live Membership under the RLS context
+> (403 without), guarded `/demo/summary` keeps the TS camelCase contract; demo seed ported to the
+> snake_case schema incl. the OWNER membership (`uv run lokara-seed-demo`). DB routes are sync
+> `def` (threadpool) so the blocking driver never stalls the event loop — async engine can land
+> later without changing the contract.
 - `apps/api`: FastAPI, per-domain routers; **auth dependency** verifies Supabase JWT, sets RLS context,
   yields a scoped session; Pydantic at every boundary; async discipline (no blocking calls in async).
 - **DoD:** `uv run` serves the API; a JWT-auth’d NK request returns the fixture's numbers.
@@ -199,6 +207,19 @@ files noted). **Carry them across; don't re-derive or lose them.**
 **Start now:** branch `feat/py-migration`, do Phases A–B (toolchain + DB), then **Phase C — the engines
 + the €1,200 pytest fixture — and gate on it.** The engines are the riskiest and highest-value part, so
 front-load them; once the numbers reconcile in Python, M3 and the rest are plumbing.
+
+## 8. Driving Claude Code (one phase per session)
+
+- **One phase per session.** End each with "stop and summarize, don't start the next phase."
+- **Gate the high-risk phases.** Demand the €1,200 pytest output at Phase C; demand the RLS isolation
+  test (a cross-account read blocked **as the `lokara_app` role**, plus a mutation check) at Phase B.
+  The pitch's credibility is the numbers and the tenant isolation.
+- **Reject vendor SDKs in engines/domain.** If it proposes one inside `packages/*-engine` or `domain`,
+  that violates the adapter rule in `CLAUDE.md` — vendor code belongs in `adapters` only.
+- **Keep it in sequence.** If it jumps ahead (native app, bank, contracts) before its phase/milestone,
+  point it back to `PLAN.md` / this file — engines and correctness first.
+- **Every new tenant table needs an RLS policy + a line in the isolation test.** A table without a
+  policy is a silent leak.
 
 ---
 
