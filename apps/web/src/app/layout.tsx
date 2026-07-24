@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Manrope, Montserrat } from 'next/font/google';
 import './globals.css';
+import { Providers } from './providers';
 
 // docs/05: Montserrat = display (headlines, big numbers), Manrope = text.
 const montserrat = Montserrat({
@@ -25,7 +26,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="de" className={`${montserrat.variable} ${manrope.variable}`}>
-      <body className="bg-paper font-sans text-ink antialiased">{children}</body>
+      <body className="bg-paper font-sans text-ink antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
