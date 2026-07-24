@@ -205,6 +205,12 @@ source = { editable = "packages/pdf" }
 name = "lokara-rules-store"
 version = "0.1.0"
 source = { editable = "packages/rules-store" }
+dependencies = [
+    { name = "lokara-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lokara-domain", editable = "packages/domain" }]
 
 [[package]]
 name = "mypy"
