@@ -71,3 +71,11 @@ class TestNkCalc:
         broken = {**FIXTURE_REQUEST, "costs": [{"costId": "x"}]}
         response = client.post("/calc/nk", json=broken, headers=_auth_header())
         assert response.status_code == 422
+
+    def test_cookie_transport_works_like_bearer(self, client: TestClient) -> None:
+        """Web sends the same JWT via the HttpOnly session cookie."""
+        token = create_dev_token(ApiSettings().supabase_jwt_secret)
+        client.cookies.set("lokara_access_token", token)
+        response = client.post("/calc/nk", json=FIXTURE_REQUEST)
+        assert response.status_code == 200
+        assert response.json()["totalCents"] == 120000

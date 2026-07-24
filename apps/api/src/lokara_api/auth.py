@@ -12,9 +12,13 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, Header, HTTPException
+from fastapi import Cookie, Depends, Header, HTTPException
 
 from .settings import ApiSettings
+
+# Web transport: the Next.js session route stores the JWT in this HttpOnly
+# cookie; mobile sends it as a Bearer header. Same token, same verification.
+ACCESS_TOKEN_COOKIE = "lokara_access_token"
 
 DEV_TOKEN_EXPIRES_IN_SECONDS = 60 * 60
 # Fixed demo identities — must match the lokara_db.seed demo scenario.
@@ -46,11 +50,17 @@ def verify_supabase_token(token: str, secret: str) -> AuthContext:
 
 def require_auth(
     authorization: Annotated[str | None, Header()] = None,
+    lokara_access_token: Annotated[str | None, Cookie(alias=ACCESS_TOKEN_COOKIE)] = None,
 ) -> AuthContext:
-    """FastAPI dependency: Bearer token → verified AuthContext."""
-    if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing bearer token")
-    token = authorization.removeprefix("Bearer ")
+    """FastAPI dependency: JWT via Bearer header (mobile) or HttpOnly cookie
+    (web) → verified AuthContext. One verification path for both transports;
+    the header wins if both are present."""
+    if authorization is not None and authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ")
+    elif lokara_access_token is not None:
+        token = lokara_access_token
+    else:
+        raise HTTPException(status_code=401, detail="Missing bearer token or session cookie")
     return verify_supabase_token(token, ApiSettings().supabase_jwt_secret)
 
 
