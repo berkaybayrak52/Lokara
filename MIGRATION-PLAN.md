@@ -159,7 +159,16 @@ files noted). **Carry them across; don't re-derive or lose them.**
   yields a scoped session; Pydantic at every boundary; async discipline (no blocking calls in async).
 - **DoD:** `uv run` serves the API; a JWT-auth’d NK request returns the fixture's numbers.
 
-### Phase F — Web on Bun + shadcn + data stack
+### Phase F — Web on Bun + shadcn + data stack — ✅ done
+> Built 2026-07-24 on `feat/py-migration` (before Phase D). shadcn-style kit in `packages/ui`
+> (Button/Card/Table on cva + Radix Slot; shadcn variables mapped to brand tokens per docs/05,
+> Tailwind v4 `@theme` — default palette never ships; no destructive variant until the brand board
+> gets a semantic red). `apps/web`: TanStack Query + Jotai + RHF/Zod; **`api.ts` interceptor** with
+> HttpOnly-cookie session (`/api/session` Next route mints it from the dev-token endpoint,
+> TODO(supabase) at M5), Zod-parsed responses, 401 → refresh once → replay once, concurrent 401s
+> share one in-flight refresh — 7 vitest tests pin that. FastAPI additionally accepts the JWT from
+> the `lokara_access_token` cookie (same verification as Bearer). **DoD verified headless:** the
+> demo page 401s, mints the cookie, replays, and renders the seeded Musterstraße-12 data live.
 - Move `apps/web` to Bun; init shadcn in `ui/` themed to brand tokens (overwrite defaults as needed).
 - Add TanStack Query + Jotai + RHF/Zod; shared **`api.ts` interceptor** (cookie JWT; 401 → refresh once
   → replay, no double-fire); feature-based folders.
