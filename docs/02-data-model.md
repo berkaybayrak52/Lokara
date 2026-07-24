@@ -9,6 +9,10 @@
 Do **not** put roles on the Account. Split identity into three layers so one Person can hold many
 roles across accounts at once.
 
+> Schema shown as **SQLAlchemy 2.0** declarative models (mapped against Supabase Postgres, migrated
+> with Alembic). String ids are cuid/uuid; `created_at` defaults server-side; RLS policies live in
+> `packages/db` alongside the models.
+
 1. **Person** — the login (one human). Global, not owned by any account. Maps onto Supabase Auth.
 2. **Account** — workspace + subscription + **isolation boundary** (_who pays_). Has a **shape**:
    `SOLO` or `HAUSVERWALTUNG` (a property of the account, not a personal role).
@@ -25,93 +29,101 @@ roles across accounts at once.
 Not peer roles: **Hausverwaltung** = an account _shape_; **Landlord (Vermieter)** = a _data entity_
 (the legal lessor on statements), separate from the person operating it.
 
-### Prisma (identity + relationships — verified: 9 models, 3 enums, no orphans)
+### SQLAlchemy 2.0 (identity + relationships — verified: 9 models, 3 enums, no orphans)
 
-```prisma
-// ── Layer 1: Identity — global ──
-model Person {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  name        String?
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
-  renterLinks Renter[]
-}
+```python
+import enum
+from datetime import datetime
+from sqlalchemy import ForeignKey, UniqueConstraint, Index, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 
-// ── Layer 2: Account — workspace + billing + isolation ──
-model Account {
-  id          String       @id @default(cuid())
-  name        String
-  shape       AccountShape @default(SOLO)
-  plan        Plan         @default(TRIAL)
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
-  landlords   Landlord[]
-  renters     Renter[]
-}
-enum AccountShape { SOLO HAUSVERWALTUNG }
-enum Plan { TRIAL SOLO_S SOLO_M SOLO_L TEAM PRO ENTERPRISE }
+class Base(DeclarativeBase): ...
 
-// ── Layer 3: Membership — Person → Account, carrying a Role ──
-model Membership {
-  id         String    @id @default(cuid())
-  personId   String
-  person     Person    @relation(fields: [personId], references: [id])
-  accountId  String
-  account    Account   @relation(fields: [accountId], references: [id])
-  role       Role
-  invitedAt  DateTime  @default(now())
-  acceptedAt DateTime?
-  revokedAt  DateTime?               // revoke, never hard-delete (audit)
-  buildings  BuildingAssignment[]    // only meaningful for EMPLOYEE
-  @@unique([personId, accountId])    // DECISION: one role per person per account (start strict)
-  @@index([accountId])
-}
-enum Role { OWNER EMPLOYEE TAX_ADVISOR }   // no RENTER by design
+class AccountShape(enum.Enum): SOLO = "SOLO"; HAUSVERWALTUNG = "HAUSVERWALTUNG"
+class Plan(enum.Enum):
+    TRIAL="TRIAL"; SOLO_S="SOLO_S"; SOLO_M="SOLO_M"; SOLO_L="SOLO_L"; TEAM="TEAM"; PRO="PRO"; ENTERPRISE="ENTERPRISE"
+class Role(enum.Enum): OWNER="OWNER"; EMPLOYEE="EMPLOYEE"; TAX_ADVISOR="TAX_ADVISOR"   # no RENTER by design
 
-model BuildingAssignment {
-  id           String     @id @default(cuid())
-  membershipId String
-  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  buildingId   String
-  building     Building   @relation(fields: [buildingId], references: [id])
-  @@unique([membershipId, buildingId])
-}
+# ── Layer 1: Identity — global ──
+class Person(Base):
+    __tablename__ = "person"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    email: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    memberships: Mapped[list["Membership"]] = relationship(back_populates="person")
+    renter_links: Mapped[list["Renter"]] = relationship(back_populates="person")
 
-// ── Vermieter: DATA entity (legal lessor), not a role ──
-model Landlord {
-  id        String     @id @default(cuid())
-  accountId String
-  account   Account    @relation(fields: [accountId], references: [id])
-  legalName String
-  address   String
-  buildings Building[]
-  @@index([accountId])
-}
+# ── Layer 2: Account — workspace + billing + isolation ──
+class Account(Base):
+    __tablename__ = "account"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    name: Mapped[str]
+    shape: Mapped[AccountShape] = mapped_column(default=AccountShape.SOLO)
+    plan: Mapped[Plan] = mapped_column(default=Plan.TRIAL)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    memberships: Mapped[list["Membership"]] = relationship(back_populates="account")
+    landlords: Mapped[list["Landlord"]] = relationship(back_populates="account")
+    renters: Mapped[list["Renter"]] = relationship(back_populates="account")
 
-// ── Mieter: domain entity; portal login OPTIONAL via personId ──
-model Renter {
-  id        String    @id @default(cuid())
-  accountId String
-  account   Account   @relation(fields: [accountId], references: [id])
-  legalName String
-  email     String?
-  personId  String?              // set = this renter can log into the portal
-  person    Person?   @relation(fields: [personId], references: [id])
-  tenancies Tenancy[]
-  @@index([accountId])
-  @@index([personId])
-}
+# ── Layer 3: Membership — Person → Account, carrying a Role ──
+class Membership(Base):
+    __tablename__ = "membership"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    person_id: Mapped[str] = mapped_column(ForeignKey("person.id"))
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    role: Mapped[Role]
+    invited_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    accepted_at: Mapped[datetime | None]
+    revoked_at: Mapped[datetime | None]                 # revoke, never hard-delete (audit)
+    person: Mapped["Person"] = relationship(back_populates="memberships")
+    account: Mapped["Account"] = relationship(back_populates="memberships")
+    buildings: Mapped[list["BuildingAssignment"]] = relationship()   # only meaningful for EMPLOYEE
+    __table_args__ = (
+        UniqueConstraint("person_id", "account_id"),    # DECISION: one role per person per account (start strict)
+        Index("ix_membership_account", "account_id"),
+    )
+
+class BuildingAssignment(Base):
+    __tablename__ = "building_assignment"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    membership_id: Mapped[str] = mapped_column(ForeignKey("membership.id", ondelete="CASCADE"))
+    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    __table_args__ = (UniqueConstraint("membership_id", "building_id"),)
+
+# ── Vermieter: DATA entity (legal lessor), not a role ──
+class Landlord(Base):
+    __tablename__ = "landlord"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    legal_name: Mapped[str]
+    address: Mapped[str]
+    account: Mapped["Account"] = relationship(back_populates="landlords")
+    buildings: Mapped[list["Building"]] = relationship()
+    __table_args__ = (Index("ix_landlord_account", "account_id"),)
+
+# ── Mieter: domain entity; portal login OPTIONAL via person_id ──
+class Renter(Base):
+    __tablename__ = "renter"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    legal_name: Mapped[str]
+    email: Mapped[str | None]
+    person_id: Mapped[str | None] = mapped_column(ForeignKey("person.id"))  # set = renter can log into the portal
+    account: Mapped["Account"] = relationship(back_populates="renters")
+    person: Mapped["Person | None"] = relationship(back_populates="renter_links")
+    tenancies: Mapped[list["Tenancy"]] = relationship()
+    __table_args__ = (Index("ix_renter_account", "account_id"), Index("ix_renter_person", "person_id"))
 ```
 
 ### Decisions the schema makes explicit
 
-1. `@@unique([personId, accountId])` — one role per person per account (relaxing later is trivial;
-   tightening after real data is not).
+1. `UniqueConstraint("person_id", "account_id")` — one role per person per account (relaxing later is
+   trivial; tightening after real data is not).
 2. `RENTER` is domain data (Tenancy-scoped), not a Membership role → no polymorphic nullable-scope table.
 3. `EMPLOYEE` with zero `BuildingAssignment` sees nothing (deny by default).
-4. Memberships are **revoked** (`revokedAt`), never deleted (GoBD + DSGVO).
-5. Every domain row carries `accountId` — that column **is** the isolation boundary.
+4. Memberships are **revoked** (`revoked_at`), never deleted (GoBD + DSGVO).
+5. Every domain row carries `account_id` — that column **is** the isolation boundary.
 6. `Person` is global; Supabase Auth owns credentials and maps onto Person.
 
 ### Portals & active context
@@ -142,19 +154,20 @@ A unit is in exactly one state at any moment:
 Only `SELF_USED` is stored; `RENTED` derives from tenancies; `VACANT` is the remainder — one source of
 truth per state so they can't drift.
 
-```prisma
-model SelfUsePeriod {
-  id        String      @id @default(cuid())
-  unitId    String
-  unit      Unit        @relation(fields: [unitId], references: [id])
-  sqmX100   Int         // self-used m² × 100 — an AREA, not a flag
-  kind      SelfUseKind @default(OWNER_OCCUPIED)
-  note      String?
-  validFrom DateTime
-  validTo   DateTime?
-  @@index([unitId])
-}
-enum SelfUseKind { OWNER_OCCUPIED FREE_OF_CHARGE }
+```python
+class SelfUseKind(enum.Enum): OWNER_OCCUPIED = "OWNER_OCCUPIED"; FREE_OF_CHARGE = "FREE_OF_CHARGE"
+
+class SelfUsePeriod(Base):
+    __tablename__ = "self_use_period"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    unit_id: Mapped[str] = mapped_column(ForeignKey("unit.id"))
+    sqm_x100: Mapped[int]                              # self-used m² × 100 — an AREA, not a flag
+    kind: Mapped[SelfUseKind] = mapped_column(default=SelfUseKind.OWNER_OCCUPIED)
+    note: Mapped[str | None]
+    valid_from: Mapped[datetime]
+    valid_to: Mapped[datetime | None]
+    unit: Mapped["Unit"] = relationship(back_populates="self_use_periods")
+    __table_args__ = (Index("ix_self_use_unit", "unit_id"),)
 ```
 
 - Self-use is an **area with a period** (m²), not a boolean — covers partial cases (a rented room).
@@ -165,15 +178,14 @@ enum SelfUseKind { OWNER_OCCUPIED FREE_OF_CHARGE }
 
 ## Allocation keys
 
-```prisma
-enum AllocationKey {
-  AREA         // Fläche
-  PERSONS      // Personen
-  CONSUMPTION  // Verbrauch (metered)
-  UNITS        // Einheiten
-  DIRECT       // Direktzuordnung — cost to exactly one unit/tenancy
-  MEA          // Miteigentumsanteil (WEG)
-}
+```python
+class AllocationKey(enum.Enum):
+    AREA = "AREA"                # Fläche
+    PERSONS = "PERSONS"          # Personen
+    CONSUMPTION = "CONSUMPTION"  # Verbrauch (metered)
+    UNITS = "UNITS"              # Einheiten
+    DIRECT = "DIRECT"            # Direktzuordnung — cost to exactly one unit/tenancy
+    MEA = "MEA"                  # Miteigentumsanteil (WEG)
 ```
 
 - **`DIRECT` is mandatory** (a repair inside flat 3 bypasses proportional allocation).

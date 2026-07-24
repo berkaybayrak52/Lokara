@@ -1,13 +1,14 @@
 # 03 — NK & heating/CO₂ engines (the crown jewel)
 
-> These are the product. **Pure packages, no framework/DB/vendor imports.** Deterministic,
-> cent-exact, golden-tested. Built at M1 (NK) and M2 (heating/CO₂), before any UI.
+> These are the product. **Pure Python packages, no web-framework/DB/vendor imports.** Deterministic,
+> cent-exact, golden-tested (pytest). Built at M1 (NK) and M2 (heating/CO₂), before any UI.
 
 ## Shared engine contract
 
-- Input: **normalized** value objects (no Prisma models, no vendor types). Adapters map DB → these.
-- Money: integer **cents**; intermediate math with `decimal.js`; **largest-remainder rounding** so the
-  sum of allocated shares reconciles to the input **to the cent**.
+- Input: **normalized** value objects — plain dataclasses / Pydantic models (no SQLAlchemy models, no
+  vendor types). Adapters map DB → these.
+- Money: integer **cents**; intermediate math with `decimal.Decimal`; **largest-remainder rounding** so
+  the sum of allocated shares reconciles to the input **to the cent**.
 - Output: a plain result object (shares per party + a reconciliation total) — the PDF layer formats it.
 - Every legal ratio/table (HKVO, CO₂ 10-step) comes from the **versioned rules store**, passed in as a
   parameter with an as-of law date. Engines never hardcode a legal number.
@@ -80,10 +81,10 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 
 ## Rounding & reconciliation (applies to both engines)
 
-1. Compute exact fractional shares with `decimal.js`.
+1. Compute exact fractional shares with `decimal.Decimal`.
 2. Floor each to cents.
 3. Distribute the leftover cents by **largest fractional remainder** (ties: stable order).
-4. Assert `sum(shares) === inputTotal` — fail loudly if not. No statement ships that doesn't reconcile.
+4. Assert `sum(shares) == input_total` — fail loudly if not. No statement ships that doesn't reconcile.
 
 ## Why this ordering (engines before UI)
 

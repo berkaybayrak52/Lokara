@@ -1,19 +1,22 @@
-# 04 — Web-app structure
+# 04 — App structure (web + mobile + API)
 
-> Next.js (App Router) + React + Tailwind + Framer Motion. Responsive, WCAG 2.1 AA / BFSG.
-> German UI copy; English code. This doc defines the monorepo layout and the M3 routes/pages.
+> **Frontend:** Next.js (App Router) + React + Tailwind + Framer Motion + shadcn/ui (web) and Expo /
+> React Native (mobile). **Backend:** FastAPI (Python). Responsive, WCAG 2.1 AA / BFSG. German UI copy;
+> English code. This doc defines the polyglot monorepo layout and the M3 routes/pages.
 
-## Monorepo layout (Turborepo + pnpm)
+## Polyglot monorepo layout (Bun + Turborepo for TS · uv for Python)
 
 ```
 lokara/
 ├─ apps/
-│  ├─ web/                     # Next.js App Router — FRONTEND ONLY, calls apps/api over HTTP
-│  └─ api/                     # NestJS — the standalone HTTP/JSON API (web + native consume it)
-│                              #   modules per domain, Supabase-JWT auth guard + RLS context,
-│                              #   Prisma lives here; BullMQ workers/webhooks added at M6
-├─ packages/
-│  ├─ nk-engine/               # M1 — pure NK allocation engine + golden fixtures
+│  ├─ web/                     # [TS] Next.js App Router — FRONTEND ONLY, calls apps/api over HTTP
+│  ├─ mobile/                  # [TS] Expo / React Native — FRONTEND ONLY, same API, shared patterns
+│  └─ api/                     # [PY] FastAPI — the standalone HTTP/JSON API (web + mobile consume it)
+│                              #   routers per domain (modular monolith), Supabase-JWT auth +
+│                              #   RLS context as FastAPI dependencies; SQLAlchemy/DB layer lives here;
+│                              #   Celery/Arq (Redis) workers/webhooks added at M6
+├─ packages/                   # [PY] pure backend packages (uv workspace)
+│  ├─ nk-engine/               # M1 — pure NK allocation engine + golden fixtures (pytest)
 │  ├─ heating-engine/          # M2 — heating + CO₂ engine + fixtures
 │  ├─ export-engine/           # M7 — Anlage V + DATEV (pure)
 │  ├─ afa-engine/              # M7 — depreciation (pure)
@@ -21,19 +24,29 @@ lokara/
 │  ├─ rules-store/             # versioned legal rules/config (HKVO, CO₂ table, Anlage-V lines…)
 │  ├─ domain/                  # normalized value objects shared by engines + adapters
 │  ├─ adapters/                # bank, vision, email, mdl, destatis, datev — ports + stubs
-│  ├─ db/                      # Prisma schema, migrations, RLS policies
-│  ├─ pdf/                     # HTML→PDF document service (Playwright)
-│  └─ ui/                      # design-system components (tokens from docs/05)
+│  ├─ db/                      # SQLAlchemy models, Alembic migrations, RLS policies
+│  └─ pdf/                     # HTML→PDF document service (Playwright for Python)
+├─ ui/                         # [TS] shadcn/ui components themed to the brand tokens (docs/05)
 ├─ CLAUDE.md
 ├─ PLAN.md
 ├─ lokara-arch.md
 └─ docs/
 ```
 
+> **Two workspaces, one repo.** The TS side (`apps/web`, `apps/mobile`, `ui`) is a **Bun + Turborepo**
+> workspace. The Python side (`apps/api`, `packages/*`) is a **uv** workspace. They meet only over the
+> HTTP API contract — never by importing each other's code.
+
 **Dependency rule:** `engine` packages depend only on `domain`. Nothing in `packages/*-engine`
-imports `db`, `adapters`, `ui`, or any vendor SDK. **`apps/api` (NestJS)** wires engines + db +
-adapters and exposes them as HTTP endpoints; **`apps/web` calls that API and never touches Prisma/DB
-directly.** `packages/db` is imported by `apps/api` only.
+imports `db`, `adapters`, `ui`, or any vendor SDK. **`apps/api` (FastAPI)** wires engines + db +
+adapters and exposes them as HTTP endpoints; **`apps/web` and `apps/mobile` call that API and never
+touch SQLAlchemy/DB directly.** `packages/db` is imported by `apps/api` only.
+
+## Feature-based structure (web + mobile)
+
+Inside each client app, organize **by feature, not by type** — a feature folder owns its components,
+hooks, state, and API calls (`features/nk-statement/…`, `features/tenancy/…`, `features/renter-portal/…`).
+Same convention on web and mobile so patterns transfer. This mirrors the backend's per-domain routers.
 
 ## Routing & context (M3 + M5)
 
@@ -66,9 +79,17 @@ Vermieter portal (`/a/{accountId}`), German labels:
 
 ## State & data
 
-- The web app calls the **NestJS API** (`apps/api`) over HTTP; the API validates the Supabase JWT in a
-  guard, sets the RLS context, and calls the engine packages. No DB access from `apps/web`.
-- Forms optimistic + autosave; long-running work (PDF, later OCR/bank) goes through API jobs (BullMQ from M6).
+- The web + mobile apps call the **FastAPI** service (`apps/api`) over HTTP; the API validates the
+  Supabase JWT in a **dependency**, sets the RLS context, and calls the engine packages. No DB access
+  from any client.
+- **Server state → TanStack Query** (caching, refetch, loading/error, request dedup so nothing
+  double-fires). **Client state → Jotai** (atomic). **Forms → React Hook Form + Zod.** Same libraries
+  on web and mobile.
+- **Auth in one `api.ts` interceptor:** web sends the JWT via HttpOnly cookie, mobile via Bearer from
+  secure storage. On a 401 the interceptor refreshes once, replays the failed requests, and never
+  double-fires. The auth hook layer is separate per platform (cookie vs secure storage).
+- Forms optimistic + autosave; long-running work (PDF, later OCR/bank) goes through API jobs
+  (Celery/Arq on Redis from M6).
 - All queries scoped by `accountId`; RLS is the backstop from M5. The same API endpoints serve the
   launch-day native iOS/Android apps.
 

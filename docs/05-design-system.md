@@ -71,6 +71,22 @@ colors: {
 No component uses a raw hex or an off-palette font — everything references a token
 (this is checkable and is part of the UI Definition of Done in `CLAUDE.md`).
 
+## Component layer — shadcn/ui (themed to these tokens)
+
+The web app's component kit is **shadcn/ui** (copy-in React components on Radix + Tailwind), living in
+the `ui/` workspace. shadcn is the base; the **brand tokens above are the theme** — never ship shadcn's
+default palette.
+
+- Map shadcn's CSS variables (`--background`, `--foreground`, `--primary`, `--muted`, `--accent`,
+  `--ring`…) onto the brand tokens: `--primary` → Lokara Grün, `--primary-foreground` → Paper,
+  `--background` → Paper, `--foreground` → Petrol Ink, `--muted` → Mint Tint, `--border`/`--ring` → Slate.
+- Set the shadcn radius to the brand's 8–12px and fonts to Montserrat (display) / Manrope (text).
+- It is fine to **overwrite** shadcn defaults to meet the brand board; the tokens win over shadcn's ships-with styling.
+- Every shadcn component still owes the **WCAG 2.1 AA / BFSG** checklist below (contrast, focus, scalable type).
+
+> Mobile (Expo/React Native) doesn't use shadcn (web-only). It shares the **same tokens + theme** through
+> a React Native theme object, so colors, type scale, and radii match across platforms.
+
 ## Look & feel / motion principles (the "Apple-like" bar)
 
 Tokens give structure; this section gives the _feel_. The target is **modern, minimal, calm,

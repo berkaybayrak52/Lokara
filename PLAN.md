@@ -2,12 +2,17 @@
 
 > Build **iteratively**. Each milestone has a Definition of Done (DoD). Do not start a milestone
 > before the previous one's DoD is met. **Engines + golden fixtures always come before UI.**
-> Canonical dates from `lokara-arch.md`: MVP freeze **23.07**, pitch **27.07**, web-only focus until
-> **25.07**, public launch **~08.09** (web + native iOS/Android together).
+> Canonical dates from `lokara-arch.md`: pitch **06.08**, public launch **~08.09** (web + native
+> iOS/Android together). (Earlier freeze/web-only dates of 23.07/25.07 are now historical.)
+>
+> **Status:** **M0 is built** — on the **interim TypeScript stack** (NestJS + Prisma), before the v4
+> architecture change. M1→M3 for the pitch are **not built yet**. **Decision: migrate M0 to Python now
+> (`MIGRATION-PLAN.md` Phases A–F), then build M1→M3 in Python** — so the crown-jewel engines are built
+> once, and the pitch runs on the target stack. The TS M0 stays on `main` as a fallback.
 
-## Pitch cutline (5-day target)
+## Pitch cutline (target: 06.08)
 
-For the **27.07 investor pitch** the app should be _mostly real_ with **stubs where APIs cost money**
+For the **06.08 investor pitch** the app should be _mostly real_ with **stubs where APIs cost money**
 (finAPI, Vision/OCR, email, billing) and **seeded example scenarios** for the common cases
 (edge cases deferred). Concretely:
 
@@ -19,24 +24,39 @@ Everything from **M5 onward is the full-foundation build after the pitch**, stag
 
 ---
 
-## M0 — Foundations & scaffolding
+## M0 — Foundations & scaffolding — ✅ built (interim TS stack)
+
+> **What exists today:** M0 was completed on the **interim TypeScript stack** (NestJS + Prisma + pnpm),
+> before the v4 change. The spec below is the **target (Python/FastAPI)** shape M0 takes after the
+> migration (`MIGRATION-PLAN.md` Phases A–F re-establish it). So M0's *intent* is done; its *stack* is
+> pending migration.
+>
+> **Decision: migrate M0 to Python now, then build M1→M3 in Python.** Run `MIGRATION-PLAN.md` Phases
+> A–F first (re-establish M0's foundations on FastAPI/SQLAlchemy/Bun/shadcn), then build M1→M3 on that
+> stack — Phase C *is* where the M1 (NK) and M2 (heating/CO₂) engines get built for real. Rationale: the
+> crown-jewel engines aren't written yet, so building them once in Python avoids double work and the
+> pitch runs on the target stack. Keep the TS M0 on `main` as a fallback; the golden fixtures are the
+> spec and don't change.
 
 **Goal:** an empty but correct skeleton everything else hangs off.
 
-- Turborepo + pnpm; **`apps/web` (Next.js) + `apps/api` (NestJS)** + `packages/*` layout
+- Polyglot monorepo: **Bun + Turborepo** (TS) + **uv** (Python). **`apps/web` (Next.js) +
+  `apps/mobile` (Expo, skeleton) + `apps/api` (FastAPI)** + `packages/*` layout
   (see `docs/04-web-app-structure.md`).
-- TypeScript `strict`; ESLint/Prettier; Vitest as the test runner; Turbo pipelines; CI.
-- Tailwind wired to the **design tokens** from `docs/05-design-system.md` (colors, Montserrat/Manrope).
-- Supabase project (EU/Frankfurt) provisioned; **Prisma initialized inside `apps/api`** against
-  Supabase Postgres. `apps/web` calls the API over HTTP and never touches the DB.
-- **NestJS API skeleton**: a Supabase-JWT auth guard + RLS-context middleware, one health endpoint,
-  and a typed HTTP client in `apps/web`. (No workers/webhooks yet — those arrive at M6.)
-- **Temporal core schema** migrated: `Building → Unit → Tenancy` with `validFrom/validTo`,
+- TS `strict` + ESLint/Prettier/Husky + Vitest; Python **Ruff + mypy strict + pytest**; Turbo pipelines; CI.
+- Tailwind wired to the **design tokens** from `docs/05-design-system.md` (colors, Montserrat/Manrope);
+  **shadcn/ui** initialized and themed to the tokens.
+- Supabase project (EU/Frankfurt) provisioned; **SQLAlchemy + Alembic initialized inside `apps/api`**
+  against Supabase Postgres. `apps/web` / `apps/mobile` call the API over HTTP and never touch the DB.
+- **FastAPI skeleton**: a Supabase-JWT auth **dependency** + RLS-context, one health endpoint, and a
+  typed HTTP client (with the shared `api.ts` auth/refresh interceptor) in `apps/web`.
+  (No workers/webhooks yet — those arrive at M6.)
+- **Temporal core schema** migrated (Alembic): `Building → Unit → Tenancy` with `validFrom/validTo`,
   integer-cents money, immutable-statement pattern. (Identity layer stubbed; full RBAC is M5.)
-- PDF service skeleton (headless Chrome / Playwright) that renders a "hello" statement.
+- PDF service skeleton (headless Chrome / **Playwright for Python**) that renders a "hello" statement.
 
-**DoD:** `pnpm dev` runs web + api; the web app reaches the API through the auth guard; `pnpm test`
-runs; one Prisma migration applied; a trivial PDF renders.
+**DoD:** `bun dev` runs web (+ mobile) and `uv run` runs the api; the web app reaches the API through
+the auth dependency; `bun test` + `pytest` run; one Alembic migration applied; a trivial PDF renders.
 
 ---
 
@@ -105,12 +125,12 @@ without touching a database by hand.
 
 ## M6 — Bank + Payment Ledger (async layer enters here)
 
-- Add the **BullMQ worker + webhook layer** to the existing NestJS API (the API itself has been there
-  since M0).
+- Add the **Celery/Arq worker + webhook layer on Redis** to the existing FastAPI API (the API itself
+  has been there since M0). Redis also backs caching + rate-limiting from here on.
 - **finAPI stubbed** (fake transactions) behind an AIS adapter; fuzzy matching (IBAN/amount/purpose) →
   payment status. Store transactions + IBAN→Renter mappings in our own DB (versioned IBAN history).
 - **Payment Ledger** (append-only, payment-date mandatory) — source of truth for tax.
-- Background jobs (Graphile Worker/BullMQ): sync, 180-day reconsent cleanup, deadline watchers.
+- Background jobs (Celery/Arq on Redis): sync, 180-day reconsent cleanup, deadline watchers.
 
 **DoD:** seeded bank transactions auto-match to renters; an NK Nachzahlung becomes a ledger Payment.
 
@@ -151,7 +171,11 @@ without touching a database by hand.
 
 - Mieterportal (activation codes bound to Tenancy, per-person, single-use), Tickets (Mängel),
   StB guest access, **Investment add-on** (Prüfobjekt → Kanban → becomes Building; 7-KPI cockpit).
-- Native **iOS/Android** at public launch (Expo/RN; Capacitor/PWA fallback if native slips).
+- Native **iOS/Android** at public launch (Expo/RN; Capacitor/PWA fallback if native slips) — shared
+  stack with web (Jotai, TanStack Query, RHF+Zod, i18n, theme), `react-native-ease` motion, secure
+  storage + Bearer JWT.
+- **Billing wired:** Stripe (web subscription) + **RevenueCat** (mobile in-app purchases).
+- **Load test with Locust** (~100 concurrent users) before launch to confirm the API holds.
 
 **DoD:** renter onboards via code and sees only their tenancy; investment cockpit computes KPIs from
 the annuity schedule.
@@ -161,6 +185,6 @@ the annuity schedule.
 ## Reality flag (from the arch doc)
 
 A lot has been pulled into V1 (native apps + OCR + contract engine + investment module by ~Sept) for a
-small team. **The pitch (27.07) only needs M0→M3 + a canned M4.** Guard the sequence: engines and
+small team. **The pitch (06.08) only needs M0→M3 + a canned M4.** Guard the sequence: engines and
 correctness first; the launch surface stages in behind them. Don't let native-app or integration work
 cannibalise Tier-1 (engine) capacity.

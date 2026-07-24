@@ -1,0 +1,296 @@
+# Lokara — Code Migration Plan (v4 stack)
+
+> **Scope:** turn the current **TypeScript** scaffold (NestJS + Prisma + pnpm/Turbo) into the **v4
+> target** the docs now describe: **FastAPI (Python) backend + Python engines**, **Supabase Postgres**
+> (kept) via **SQLAlchemy + Alembic**, a **Bun + Turborepo** TS workspace for web + mobile, **shadcn/ui**,
+> plus Redis, RevenueCat, Locust.
+> This is a **plan, not code**. Pair it with `CLAUDE.md`, `PLAN.md`, and `lokara-arch.md`.
+
+---
+
+## 0. Timing & risk (read first)
+
+- **Pitch day is 6 August.**
+- **What's built:** only **M0** (foundations/scaffolding) — on the **interim TS stack** (NestJS +
+  Prisma). M1→M3 (NK engine, heating/CO₂, web slice + PDF) are **not built yet**.
+- **Chosen path:** **migrate M0 to Python now** (Phases A–F), **then build M1→M3 in Python** — Phase C
+  is where M1/M2 get built. The crown-jewel engines are unbuilt, so this builds them once and the pitch
+  runs on the target stack.
+- **Sequencing to the pitch:** Phases A–B (toolchain + DB) → **Phase C = M1 + M2 engines** → Phase E
+  (API) → Phase F + the M3 pages = the pitch demo. Phases G/H (mobile, cutover cleanup) come after.
+- **Honest risk:** with M1→M3 built only in Python, the pitch now **depends on this path reaching M3**.
+  The TS M0 stays on `main` as a safety net, but it's M0-only — not a full demo. Mitigation: do Phase C
+  first and gate on the €1,200 fixture; if the plumbing (A/B/E) snags badly, the escape hatch is to add
+  the engines to the TS M0 for the pitch instead.
+- **The codebase is small** (~1,800 LOC; engines are 30–150 lines each), so the rebuild is limited in scope.
+
+---
+
+## 1. Fresh start vs migrate — the decision you asked about
+
+**Recommendation: a *targeted rebuild*, not a full nuke. Don't delete everything.**
+
+Split the repo into two halves and treat them differently:
+
+| Part | Verdict | Why |
+| --- | --- | --- |
+| **Backend + engines + db** (`apps/api`, `packages/{nk-engine,heating-engine,domain,adapters,rules-store,db,pdf}`) | **Rebuild fresh in Python** | The language is changing (TS→Python), so "converting" line-by-line buys nothing — you're re-implementing anyway. A clean Python scaffold avoids carrying TS-shaped decisions across. Keep the old TS code as **read-only reference** and the **golden fixtures as the spec** until the Python versions pass. |
+| **Web frontend** (`apps/web`, design tokens, PDF templates) | **Keep and evolve** | Next.js stays. Deleting it gains nothing and throws away the working design-token wiring + statement template. Just move it to Bun, add shadcn + Jotai/TanStack/RHF/Zod. |
+| **Mobile** (`apps/mobile`) | **New** | Didn't exist; scaffold fresh (Expo). |
+
+So "delete all the code" is the wrong frame. **"Delete and re-do the backend fresh; keep and upgrade
+the frontend"** is the right one — and it's essentially Phases C–F below.
+
+- **Why not a full clean slate?** You'd re-scaffold a working Next.js app + re-derive the brand tokens
+  and PDF layout for no gain. The value in `apps/web` is real; the value in the TS *backend* is only
+  its fixtures (which you keep as the test spec anyway).
+- **Why not a pure incremental "port"?** Because a TS→Python line-by-line port is slower and messier
+  than re-implementing 30–150-line engines from a fixture spec. For the backend, fresh *is* the fast path.
+
+---
+
+## 2. Guiding principles
+
+1. **The €1,200 golden fixture is the gate.** Port it to **pytest** first; nothing merges until it
+   passes byte-for-byte in Python. Correctness is the product.
+2. **Rebuild in a branch (`feat/py-migration`)**; keep `main` demo-able until parity is proven.
+3. **Engines + DB first, framework last.** The pure math and the schema carry the value.
+4. **Delete old backend only after parity** — FastAPI + SQLAlchemy pass the same tests and render the
+   same PDF before NestJS/Prisma come out.
+5. **One green build per phase.** Never a half-migrated `main`.
+
+---
+
+## 3. Old → new mapping
+
+| Current (TS)                     | Target (v4)                          | Approach                                                     |
+| -------------------------------- | ------------------------------------ | ----------------------------------------------------------- |
+| `apps/api` (NestJS)              | `apps/api` (**FastAPI**, Python)     | Fresh. Routers per domain; auth + RLS as dependencies.      |
+| `packages/db` (Prisma)           | `packages/db` (**SQLAlchemy 2.0 + Alembic**) | Fresh models from docs/02; port RLS policies.       |
+| `packages/nk-engine` (TS)        | `packages/nk-engine` (**Python**)    | Re-implement from fixtures; `decimal.Decimal` + int cents.  |
+| `packages/heating-engine` (TS)   | `packages/heating-engine` (**Python**) | Re-implement; §§7/8, §9, §9a, CO₂ 10-step.                 |
+| `packages/domain` (TS)           | `packages/domain` (**Python**)       | Value objects → dataclasses / Pydantic.                     |
+| `packages/adapters` (TS)         | `packages/adapters` (**Python**)     | Ports as `Protocol`; stub impls.                            |
+| `packages/rules-store` (TS)      | `packages/rules-store` (**Python**)  | Versioned rules + as-of dates.                              |
+| `packages/pdf` (TS/Playwright)   | `packages/pdf` (**Playwright-Python**) | Same templates.                                           |
+| `apps/web` (Next.js, pnpm)       | `apps/web` (Next.js, **Bun**) + shadcn + Jotai/TanStack/RHF/Zod | **Keep & evolve.**             |
+| `packages/ui` (custom)           | `ui/` (**shadcn**, themed to tokens) | Overwrite defaults with brand tokens.                       |
+| — (none)                         | `apps/mobile` (**Expo**)             | New skeleton.                                               |
+| pnpm + Turbo · Vitest            | **Bun + Turbo** (TS) + **uv** (Python) · **pytest** + Vitest | Two workspaces, one repo.            |
+
+---
+
+## 4. Phased plan (each phase ends green)
+
+### Phase A — Branch & toolchain
+- Tag the pitch build (`git tag pre-migration`) and branch `feat/py-migration`.
+- Add a **uv** workspace (root `pyproject.toml`, members `apps/api`, `packages/*`); keep **Bun**/Turbo
+  for `apps/web`, `apps/mobile`, `ui/`. Ruff + mypy + pytest config. Migrate pnpm scripts to Bun.
+- CI runs both lanes: `bun install && bun test` · `uv sync && pytest`.
+- **DoD:** both installs succeed; empty CI green.
+
+### Phase B — DB: Prisma → SQLAlchemy + Alembic
+- `packages/db`: SQLAlchemy 2.0 models from `docs/02` (identity + temporal core + SelfUsePeriod + enums).
+- `alembic init`; first migration = temporal core; **port RLS policies** into Alembic `op.execute` SQL.
+- Local docker-compose Postgres fallback; config via `pydantic-settings`.
+- **DoD:** `alembic upgrade head` clean; a cross-account read **fails** (RLS) in a test.
+
+### Phase C — Engines + rules-store + domain ⭐
+- Port `domain` (dataclasses/Pydantic), `rules-store` (HKVO, CO₂ 10-step, Anlage-V lines + as-of dates).
+- `nk-engine`: day-weighted allocation, all keys incl. DIRECT/MEA, vacancy→landlord, largest-remainder
+  rounding with `decimal.Decimal`.
+- `heating-engine`: §§7/8 split, §9 WW, §9a estimation, degree-days, CO₂ split.
+- **Port fixtures to pytest first**, incl. the **€1,200 example** → must reconcile to €1,200.00.
+- **DoD:** `pytest` green; €1,200 fixture byte-exact; `mypy --strict` clean; no framework/DB/vendor imports.
+
+### Phase D — Adapters + PDF
+- `adapters`: ports as `Protocol` (Bank/Vision/Email/MDL/Destatis/DATEV) + fixture stubs.
+- `pdf`: Playwright-for-Python HTML→PDF; NK/heating template with `Rechtsstand` + disclaimer.
+- **DoD:** a stub txn flows through an adapter; a placeholder PDF renders.
+
+### Phase E — FastAPI backend
+- `apps/api`: FastAPI, per-domain routers; **auth dependency** verifies Supabase JWT, sets RLS context,
+  yields a scoped session; Pydantic at every boundary; async discipline (no blocking calls in async).
+- **DoD:** `uv run` serves the API; a JWT-auth’d NK request returns the fixture's numbers.
+
+### Phase F — Web on Bun + shadcn + data stack
+- Move `apps/web` to Bun; init shadcn in `ui/` themed to brand tokens (overwrite defaults as needed).
+- Add TanStack Query + Jotai + RHF/Zod; shared **`api.ts` interceptor** (cookie JWT; 401 → refresh once
+  → replay, no double-fire); feature-based folders.
+- **DoD:** `bun dev` runs; demo page reads live data from FastAPI via the interceptor.
+
+### Phase G — Mobile skeleton (optional pre-launch)
+- `apps/mobile` (Expo): same Jotai/TanStack/RHF/Zod, `react-native-ease`, secure storage + Bearer JWT,
+  i18n + theme; consume the same FastAPI.
+- **DoD:** Expo app logs in and reads one screen.
+
+### Phase H — Cutover & cleanup
+- Confirm parity (pytest green, PDF identical, web/(mobile) on FastAPI).
+- **Remove** NestJS `apps/api` + Prisma `packages/db`. Pre-commit + CI: Ruff/mypy/pytest +
+  ESLint/Prettier/Husky; React Compiler on; React Scan + Expo profiling.
+- Merge → `main`; remove the migration-status banners from the docs.
+- **DoD:** clean `main` green on both lanes; no NestJS/Prisma left; docs and code agree.
+
+### Later (M6+)
+- Redis (cache + rate-limit) + Celery/Arq workers; Stripe (web) + RevenueCat (mobile) behind an adapter;
+  Locust load test (~100 users) before launch.
+
+---
+
+## 5. Scenario tree
+
+- **Base case (chosen):** migrate M0 to Python now on a branch, build M1→M3 in Python for the pitch.
+  *Confirms:* €1,200 fixture green in Python + M3 demo by 6 August. *Escape hatch:* if plumbing snags,
+  add the engines to the TS M0 for the pitch.
+- **Bull case:** engines port quickly, mobile skeleton lands in the same pass, cutover before the pitch.
+  *Confirms:* Phase C done with no rounding drift.
+- **Bear case:** RLS porting or Bun/Next-Expo friction. *Invalidates "cheap".* → keep TS build for the
+  pitch; land RLS as raw SQL with an explicit isolation test; per-command Node fallback for Bun.
+
+## 6. Top risks & mitigations
+
+- **Rounding drift TS→Python** (`decimal.js` vs `decimal.Decimal`). → fixtures first; cent-exact assert;
+  one fixture per allocation key.
+- **RLS regression** — the easiest silent multi-tenant leak. → migrate policies explicitly; a
+  cross-account read must fail a test before cutover.
+- **Betting the pitch on the rebuild.** → don't; TS build is the fallback until Python is green.
+- **Bun rough edges with Next/Expo.** → per-command Node fallback; don't re-platform over one tool.
+
+## 7. Highest-leverage next action
+
+**Start now:** branch `feat/py-migration`, do Phases A–B (toolchain + DB), then **Phase C — the engines
++ the €1,200 pytest fixture — and gate on it.** The engines are the riskiest and highest-value part, so
+front-load them; once the numbers reconcile in Python, M3 and the rest are plumbing.
+
+---
+
+## Appendix A — Phase C engine checklist (concrete)
+
+Do these in order. Each fixture is a `pytest` test committed **before** the code that satisfies it.
+
+### A.1 Order of fixtures (write tests first)
+1. **€1,200 garbage-cost, key = AREA** (the canonical one, `docs/03`) — mid-year move-out + vacancy.
+2. **DIRECT** — a cost assigned to exactly one unit; no spread; other units get €0.00.
+3. **PERSONS** with a mid-period person-count change (day-weighted).
+4. **CONSUMPTION** from metered readings.
+5. **Interim period (<12 months)** and **>12-month period** (domain-depth differentiators).
+6. **Heating (M2):** §§7/8 base/consumption split; §9 warm-water separation; **CO₂ 10-step** split with
+   `Rechtsstand`; a mid-period renter change apportioned by degree-days.
+
+### A.2 The rounding primitive (get this exactly right — it's the whole game)
+
+Integer cents in, integer cents out; **largest-remainder** so the sum reconciles to the input:
+
+```python
+from decimal import Decimal
+
+def largest_remainder(total_cents: int, weights: list[Decimal]) -> list[int]:
+    """Split total_cents across weights; sum(result) == total_cents, exactly."""
+    wsum = sum(weights)
+    if wsum == 0:
+        return [0] * len(weights)
+    exact  = [Decimal(total_cents) * w / wsum for w in weights]
+    floors = [int(x // 1) for x in exact]                 # floor to whole cents
+    leftover = total_cents - sum(floors)                   # 0..n-1 cents remain
+    # rank by fractional remainder desc; ties broken by original index (stable)
+    order = sorted(range(len(exact)),
+                   key=lambda i: (exact[i] - floors[i], -i), reverse=True)
+    for i in order[:leftover]:
+        floors[i] += 1
+    assert sum(floors) == total_cents                      # never ships if this fails
+    return floors
+```
+
+### A.3 Day-weighting rule
+- A party's weight = `key_value × days_active_in_period` (e.g. `m² × days` for AREA).
+- Any day a unit is **not `RENTED`** and not billable to a renter → its weight goes to the
+  **landlord bucket** (vacancy + self-use). One landlord line collects them.
+- Build weights from the temporal rows (`Tenancy.valid_from/valid_to`, `SelfUsePeriod`), never a scalar.
+
+### A.4 Expected values for the €1,200 fixture (assert these)
+365-day period, key = AREA:
+
+| Party | m²·days | Cents |
+| --- | --- | --- |
+| Unit A — Renter 1 (50 m², 365 d) | 18,250 | 60000 |
+| Unit B — Renter 2 (30 m², 181 d) | 5,430 | 17852 |
+| Unit B — VACANT → landlord (30 m², 184 d) | 5,520 | 18148 |
+| Unit C — Renter 3 (20 m², 365 d) | 7,300 | 24000 |
+| **Total** | 36,500 | **120000** |
+
+### A.5 Phase C Definition of Done
+- `pytest` green; **€1,200 fixture byte-exact** (cents match the table above).
+- `sum(shares) == input_total` asserted in every allocation test.
+- `mypy --strict` clean; money is `int` cents + `decimal.Decimal`, **never `float`**.
+- **No** import of a web framework, DB, or vendor SDK anywhere under `packages/*-engine`.
+
+---
+
+## Appendix B — Phase B RLS migration (concrete)
+
+Postgres RLS is the isolation backstop. The pattern: a per-request session variable holds the caller's
+`account_id`; every policy checks it.
+
+### B.1 Enable RLS + policy per tenant table (Alembic `op.execute`)
+
+```python
+# migrations/versions/xxxx_rls.py
+def upgrade():
+    for table in ("account", "membership", "landlord", "renter", "building", "unit", "tenancy",
+                  "self_use_period", "building_assignment"):
+        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
+
+    # account row itself is scoped by its own id; all others by their account_id column
+    op.execute("""
+        CREATE POLICY account_isolation ON account
+        USING (id = current_setting('app.account_id', true));
+    """)
+    for table in ("membership", "landlord", "renter", "building", "unit", "tenancy",
+                  "self_use_period"):
+        op.execute(f"""
+            CREATE POLICY {table}_isolation ON {table}
+            USING (account_id = current_setting('app.account_id', true));
+        """)
+    # building_assignment has no account_id → scope via its membership
+    op.execute("""
+        CREATE POLICY building_assignment_isolation ON building_assignment
+        USING (EXISTS (SELECT 1 FROM membership m
+                       WHERE m.id = building_assignment.membership_id
+                         AND m.account_id = current_setting('app.account_id', true)));
+    """)
+```
+
+> `current_setting('app.account_id', true)` — the `true` = "don't error if unset" (returns NULL, which
+> matches nothing → deny by default). Use the DB **app role**, not the Postgres superuser/owner, at
+> runtime — owners bypass RLS.
+
+### B.2 Set the context per request (FastAPI dependency)
+
+```python
+async def scoped_session(claims = Depends(verify_supabase_jwt)) -> AsyncSession:
+    account_id = resolve_account_for_caller(claims)      # from the URL /a/{accountId}, re-checked
+    async with SessionLocal() as session:
+        # SET LOCAL lives only for this transaction — no leakage across requests
+        await session.execute(text("SELECT set_config('app.account_id', :aid, true)"),
+                              {"aid": account_id})
+        yield session
+```
+
+The URL carries the context (`/a/{accountId}/…`); the dependency independently verifies the caller holds
+that relationship **before** setting the GUC — the menu is navigation, not authorization.
+
+### B.3 Isolation test (must fail the leak, before cutover)
+
+```python
+async def test_rls_blocks_cross_account(session_factory):
+    # seed Account A with a building; Account B empty
+    await set_context(session, account_id="B")
+    rows = (await session.execute(select(Building))).scalars().all()
+    assert rows == []          # B must NOT see A's building — this is the whole ballgame
+```
+
+### B.4 Phase B Definition of Done
+- `alembic upgrade head` clean; RLS + `FORCE ROW LEVEL SECURITY` on every tenant table.
+- Runtime connects as a **non-owner** app role.
+- The cross-account isolation test passes (i.e. the leak is blocked) — **no cutover without this**.
