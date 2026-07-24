@@ -1,0 +1,81 @@
+# Root of the uv (Python) workspace — apps/api + the backend/engine packages.
+# The TS workspace (apps/web, apps/mobile, packages/ui) is managed by Bun + Turborepo.
+# Explicit member list on purpose: packages/ui stays TypeScript-only.
+[tool.uv.workspace]
+members = [
+  "apps/api",
+  "packages/domain",
+  "packages/nk-engine",
+  "packages/heating-engine",
+  "packages/rules-store",
+  "packages/adapters",
+  "packages/db",
+  "packages/pdf",
+]
+
+# Virtual root: members are pulled in via the dev group so a plain `uv sync`
+# installs the whole workspace (editable) + tooling.
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "mypy>=1.14",
+  "ruff>=0.9",
+  "lokara-api",
+  "lokara-domain",
+  "lokara-nk-engine",
+  "lokara-heating-engine",
+  "lokara-rules-store",
+  "lokara-adapters",
+  "lokara-db",
+  "lokara-pdf",
+]
+
+[tool.uv.sources]
+lokara-api = { workspace = true }
+lokara-domain = { workspace = true }
+lokara-nk-engine = { workspace = true }
+lokara-heating-engine = { workspace = true }
+lokara-rules-store = { workspace = true }
+lokara-adapters = { workspace = true }
+lokara-db = { workspace = true }
+lokara-pdf = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = [
+  "apps/api/src",
+  "apps/api/tests",
+  "packages/domain/src",
+  "packages/domain/tests",
+  "packages/nk-engine/src",
+  "packages/nk-engine/tests",
+  "packages/heating-engine/src",
+  "packages/heating-engine/tests",
+  "packages/rules-store/src",
+  "packages/rules-store/tests",
+  "packages/adapters/src",
+  "packages/adapters/tests",
+  "packages/db/src",
+  "packages/db/tests",
+  "packages/pdf/src",
+  "packages/pdf/tests",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+  "apps/api/tests",
+  "packages/domain/tests",
+  "packages/nk-engine/tests",
+  "packages/heating-engine/tests",
+  "packages/rules-store/tests",
+  "packages/adapters/tests",
+  "packages/db/tests",
+  "packages/pdf/tests",
+]

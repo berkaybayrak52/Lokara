@@ -1,0 +1,14 @@
+[project]
+name = "lokara-adapters"
+version = "0.1.0"
+description = "External-edge ports as Protocols + fixture stubs (skeleton; built in Phase D)"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lokara_adapters"]
+
