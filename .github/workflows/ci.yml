@@ -43,6 +43,26 @@ jobs:
   # Python lane — uv workspace (FastAPI backend + engines, built up in Phases B–E)
   python:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lokara
+          POSTGRES_PASSWORD: lokara
+          POSTGRES_DB: lokara
+        ports:
+          - 54322:5432
+        options: >-
+          --health-cmd "pg_isready -U lokara -d lokara"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://lokara_app:lokara@localhost:54322/lokara
+      DIRECT_URL: postgresql://lokara:lokara@localhost:54322/lokara
+      # The RLS isolation suite (packages/db) may skip when Postgres is absent
+      # locally — in CI it must run: a silent skip would un-gate multi-tenancy.
+      LOKARA_REQUIRE_DB: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
