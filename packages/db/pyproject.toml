@@ -11,6 +11,9 @@ dependencies = [
   "pydantic-settings>=2.7",
 ]
 
+[project.scripts]
+lokara-seed-demo = "lokara_db.seed:main"
+
 [tool.uv.sources]
 lokara-domain = { workspace = true }
 
