@@ -450,6 +450,9 @@ Extended entities: `Landlord`, `Membership`, `BuildingAssignment` (employee↔bu
 **Added this pass:** `ActivationCode` (tenancy-bound, per-person, single-use), `IbanHistory`
 (versioned), `EmailDelivery` (append-only status log), `ClauseBlock` + `ClauseVersion` + `Contract`
 (composition of clause versions), `ProspectObject` (Prüfobjekt → becomes `Building` on purchase).
+**From M0 (see `docs/02`):** `TenancyParty` (Renter↔Tenancy join — multi-party leases) and the
+`Statement` versioning encoding (`version` + `DRAFT/FINALIZED/SUPERSEDED` status + unique
+`(building, period, version)`; a correction is version n+1, never an in-place edit).
 The v1 schema sketch (temporal core + immutable statements + integer-cents money) stands, now expressed
 as SQLAlchemy 2.0 models; add the above around it.
 

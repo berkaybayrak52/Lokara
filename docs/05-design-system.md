@@ -53,19 +53,25 @@ an accent, not a background texture on every screen.
 
 ## Tailwind wiring (M0)
 
-Expose the tokens as CSS variables + Tailwind theme extension:
+**Tailwind v4** (current major) — CSS-first config via the `@theme` directive, not a `tailwind.config.js`
+`theme.extend`. Declare the tokens as theme CSS variables; utilities (`bg-ink`, `text-green`, …) and the
+shadcn variables both read from them:
 
-```js
-// tailwind.config — theme.extend.colors
-colors: {
-  ink:    '#18212A',
-  green:  '#1A6558',
-  forest: '#123F37',
-  mint:   '#E7EFEB',
-  slate:  '#5C6A6B',
-  paper:  '#FBFBFA',
+```css
+/* globals.css */
+@import "tailwindcss";
+
+@theme {
+  --color-ink:    #18212A;
+  --color-green:  #1A6558;
+  --color-forest: #123F37;
+  --color-mint:   #E7EFEB;
+  --color-slate:  #5C6A6B;
+  --color-paper:  #FBFBFA;
+
+  --font-display: "Montserrat", sans-serif;   /* headlines, big numbers */
+  --font-sans:    "Manrope", sans-serif;      /* body, labels, tables */
 }
-// fontFamily: { display: ['Montserrat', ...], sans: ['Manrope', ...] }
 ```
 
 No component uses a raw hex or an off-palette font — everything references a token

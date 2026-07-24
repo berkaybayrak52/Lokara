@@ -80,14 +80,41 @@ the frontend"** is the right one — and it's essentially Phases C–F below.
 
 ---
 
+## 3a. M0 decisions to preserve in the migration
+
+These were settled while building the TS M0 (they weren't in the original docs — now they are, in the
+files noted). **Carry them across; don't re-derive or lose them.**
+
+- [ ] **DB layer in `packages/db`, imported by `apps/api` only** — SQLAlchemy models + Alembic here;
+      no client app touches the DB. *(Phase B · docs/04)*
+- [ ] **Non-owner app role for runtime** — owner/superuser **bypasses RLS**. Request traffic uses a
+      restricted role (`lokara_app`); migrations may run as owner. `DATABASE_URL` (app) vs `DIRECT_URL`
+      (migrations). **Verify a cross-account read fails as the app role.** *(Phase B · docs/02)*
+- [ ] **`TenancyParty` join present from M0** — Renter↔Tenancy is a join entity (multi-party leases),
+      not a direct FK; `account_id`-scoped; unique `(tenancy_id, renter_id)`. *(Phase B · docs/02)*
+- [ ] **Statement versioning encoding** — `version` + `DRAFT/FINALIZED/SUPERSEDED` status + unique
+      `(building, period, version)`; a correction inserts version n+1 and marks the prior SUPERSEDED;
+      **never UPDATE a FINALIZED row.** *(Phase B/C · docs/02)*
+- [ ] **Local auth** — auth dependency verifies **HS256** vs `SUPABASE_JWT_SECRET`; dev-only
+      `POST /auth/dev-token` gated by `AUTH_DEV_TOKEN=true` (never prod); `TODO(supabase)` at every
+      touchpoint. When wiring real Supabase, check HS256 vs asymmetric JWKS. *(Phase E · docs/01 D2)*
+- [ ] **Tailwind v4 `@theme`** — CSS-first tokens (not `tailwind.config` `theme.extend`); shadcn
+      variables read from them. *(Phase F · docs/05)*
+
 ## 4. Phased plan (each phase ends green)
 
-### Phase A — Branch & toolchain
-- Tag the pitch build (`git tag pre-migration`) and branch `feat/py-migration`.
-- Add a **uv** workspace (root `pyproject.toml`, members `apps/api`, `packages/*`); keep **Bun**/Turbo
-  for `apps/web`, `apps/mobile`, `ui/`. Ruff + mypy + pytest config. Migrate pnpm scripts to Bun.
-- CI runs both lanes: `bun install && bun test` · `uv sync && pytest`.
-- **DoD:** both installs succeed; empty CI green.
+### Phase A — Branch & toolchain — ✅ done
+- Branch `feat/py-migration`; the v4 doc edits were committed as its first commit (they were uncommitted).
+- **uv** workspace (root `pyproject.toml`) with an **explicit member list** (`apps/api` + the Python
+  `packages/*`), **not** a `packages/*` glob — so the TS `packages/ui` is excluded. **Python 3.13**
+  pinned via `.python-version`. Ruff + mypy + pytest config.
+- **Bun** ≥ 1.3 for the TS side (`apps/web`, `apps/mobile`, `packages/ui`) + Turbo; pnpm scripts migrated.
+  Note: a stale Homebrew `bun` can shadow `~/.bun/bin/bun` — prepend it on PATH.
+- CI runs both lanes: `bun install && bun run test` (Turbo → Vitest, **not** Bun's native runner) ·
+  `uv sync && pytest`.
+- **Coexistence:** Python skeletons are built **in place** beside the TS packages; TS stays as reference
+  until each phase reaches parity, removed at Phase H.
+- **DoD:** both installs succeed; CI green on both lanes.
 
 ### Phase B — DB: Prisma → SQLAlchemy + Alembic
 - `packages/db`: SQLAlchemy 2.0 models from `docs/02` (identity + temporal core + SelfUsePeriod + enums).

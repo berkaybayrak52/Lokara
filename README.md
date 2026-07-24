@@ -23,6 +23,10 @@ bun run dev                                       # web on :3000, api on :3001
 Then open <http://localhost:3000> — the demo page shows the design tokens and live data
 fetched from the API through the auth guard.
 
+> **Bun on PATH:** needs **≥ 1.3** (text lockfile, reliable `--filter`). A stale Homebrew `bun` can
+> shadow a newer `~/.bun/bin/bun`; if `bun --version` looks old, prepend it:
+> `export PATH="$HOME/.bun/bin:$PATH"` (same shim issue pnpm had).
+
 Other commands: `bun run test` · `bun run lint` · `bun run typecheck` · `bun run build` ·
 `uv run pytest` · `uv run ruff check .` · `uv run mypy` ·
 `bun run --filter @lokara/pdf demo` (renders `packages/pdf/output/placeholder-statement.pdf`).

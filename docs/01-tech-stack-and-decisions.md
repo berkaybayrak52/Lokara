@@ -49,6 +49,12 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
   SQLAlchemy/DB layer lives in `apps/api`**, never in a client app.
 - **Modular monolith:** one deployable FastAPI app, split into per-domain routers/modules with clear
   boundaries (nk, heating, ledger, tax, documents, …). Not microservices.
+- **Local auth without Supabase creds:** the auth dependency verifies **HS256** against
+  `SUPABASE_JWT_SECRET`; a **dev-only** `POST /auth/dev-token` (gated by `AUTH_DEV_TOKEN=true`, never in
+  prod) mints a token so the guard path is exercised. Real Supabase = drop in the project's JWT secret;
+  `TODO(supabase)` marks every touchpoint. ⚠️ When wiring real Supabase, check whether the project uses
+  the legacy **shared-secret (HS256)** or the newer **asymmetric signing keys (JWKS, ES256/RS256)** —
+  verify accordingly.
 - **⚠️ Async discipline:** FastAPI is async — after every backend change, review async paths for a
   forgotten `await` or a blocking (sync) call inside an async handler. These bugs are silent.
 - **Staged within this decision:** stand up the API skeleton + auth + NK endpoints at M0–M3. Add the

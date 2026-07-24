@@ -56,7 +56,8 @@ Everything from **M5 onward is the full-foundation build after the pitch**, stag
 - PDF service skeleton (headless Chrome / **Playwright for Python**) that renders a "hello" statement.
 
 **DoD:** `bun dev` runs web (+ mobile) and `uv run` runs the api; the web app reaches the API through
-the auth dependency; `bun test` + `pytest` run; one Alembic migration applied; a trivial PDF renders.
+the auth dependency; `bun run test` (Turbo → Vitest) + `pytest` run; one Alembic migration applied; a
+trivial PDF renders.
 
 ---
 

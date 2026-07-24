@@ -15,27 +15,33 @@ lokara/
 │                              #   routers per domain (modular monolith), Supabase-JWT auth +
 │                              #   RLS context as FastAPI dependencies; SQLAlchemy/DB layer lives here;
 │                              #   Celery/Arq (Redis) workers/webhooks added at M6
-├─ packages/                   # [PY] pure backend packages (uv workspace)
-│  ├─ nk-engine/               # M1 — pure NK allocation engine + golden fixtures (pytest)
-│  ├─ heating-engine/          # M2 — heating + CO₂ engine + fixtures
-│  ├─ export-engine/           # M7 — Anlage V + DATEV (pure)
-│  ├─ afa-engine/              # M7 — depreciation (pure)
-│  ├─ kpi-engine/              # M10 — investment KPIs (pure)
-│  ├─ rules-store/             # versioned legal rules/config (HKVO, CO₂ table, Anlage-V lines…)
-│  ├─ domain/                  # normalized value objects shared by engines + adapters
-│  ├─ adapters/                # bank, vision, email, mdl, destatis, datev — ports + stubs
-│  ├─ db/                      # SQLAlchemy models, Alembic migrations, RLS policies
-│  └─ pdf/                     # HTML→PDF document service (Playwright for Python)
-├─ ui/                         # [TS] shadcn/ui components themed to the brand tokens (docs/05)
+├─ packages/                   # mostly [PY] backend packages + one [TS] ui package
+│  ├─ nk-engine/               # [PY] M1 — pure NK allocation engine + golden fixtures (pytest)
+│  ├─ heating-engine/          # [PY] M2 — heating + CO₂ engine + fixtures
+│  ├─ export-engine/           # [PY] M7 — Anlage V + DATEV (pure)
+│  ├─ afa-engine/              # [PY] M7 — depreciation (pure)
+│  ├─ kpi-engine/              # [PY] M10 — investment KPIs (pure)
+│  ├─ rules-store/             # [PY] versioned legal rules/config (HKVO, CO₂ table, Anlage-V lines…)
+│  ├─ domain/                  # [PY] normalized value objects shared by engines + adapters
+│  ├─ adapters/                # [PY] bank, vision, email, mdl, destatis, datev — ports + stubs
+│  ├─ db/                      # [PY] SQLAlchemy models, Alembic migrations, RLS policies
+│  ├─ pdf/                     # [PY] HTML→PDF document service (Playwright for Python)
+│  └─ ui/                      # [TS] shadcn/ui components themed to the brand tokens (docs/05)
 ├─ CLAUDE.md
 ├─ PLAN.md
 ├─ lokara-arch.md
 └─ docs/
 ```
 
-> **Two workspaces, one repo.** The TS side (`apps/web`, `apps/mobile`, `ui`) is a **Bun + Turborepo**
-> workspace. The Python side (`apps/api`, `packages/*`) is a **uv** workspace. They meet only over the
-> HTTP API contract — never by importing each other's code.
+> **Two workspaces, one repo.** The TS side (`apps/web`, `apps/mobile`, `packages/ui`) is a **Bun +
+> Turborepo** workspace. The Python side (`apps/api` + the Python `packages/*`) is a **uv** workspace.
+> Because `packages/ui` is TypeScript, the **uv workspace lists its members explicitly** (not a
+> `packages/*` glob) so it excludes `packages/ui`. The two workspaces meet only over the HTTP API
+> contract — never by importing each other's code.
+>
+> **Coexistence during migration:** Python packages are built **in place** alongside the TS scaffold
+> (same directories, per `MIGRATION-PLAN.md`); the TS code stays as reference until each phase reaches
+> parity, and is removed at Phase H.
 
 **Dependency rule:** `engine` packages depend only on `domain`. Nothing in `packages/*-engine`
 imports `db`, `adapters`, `ui`, or any vendor SDK. **`apps/api` (FastAPI)** wires engines + db +

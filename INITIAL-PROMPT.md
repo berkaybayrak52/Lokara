@@ -50,7 +50,7 @@ TASK — do M0 (Foundations & scaffolding) ONLY, then stop and summarize for my 
 - Do NOT build workers/webhooks yet — the Celery/Arq (Redis) async layer arrives at M6.
 
 Definition of Done for M0 (from PLAN.md): `bun dev` runs web and `uv run` runs the api; the web app
-reaches the API through the auth dependency; `bun test` + `pytest` run; one Alembic migration applies;
+reaches the API through the auth dependency; `bun run test` + `pytest` run; one Alembic migration applies;
 a trivial PDF renders. Set up the adapter PORT interfaces (BankGateway, VisionGateway, EmailGateway) as
 Python Protocols with stub implementations, but wire no real providers.
 
@@ -62,7 +62,7 @@ decision you had to make that wasn't in the docs. Do NOT start M1 until I say so
 
 ## After M0
 
-- Review the scaffold, add your Supabase creds, confirm `bun dev` + `uv run` (api) / `bun test` + `pytest`.
+- Review the scaffold, add your Supabase creds, confirm `bun dev` + `uv run` (api) / `bun run test` + `pytest`.
 - Then: **"Continue to M1"** → the `nk-engine`. The M1 DoD is the €1,200 golden fixture in
   `docs/03-nk-heating-engines.md` passing byte-for-byte. Insist the fixture exists and is green
   before any NK UI.

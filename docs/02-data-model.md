@@ -135,11 +135,42 @@ class Renter(Base):
   `/renter/{tenancyId}/…` (renter). Survives tabs/refresh/bookmarks.
 - **Menu is navigation, not authorization.** Every request independently verifies the Person holds the
   relationship in the URL, then scopes the query. Enforced twice: app logic **and** Postgres RLS.
+- **Runtime connects as a non-owner app role.** A Postgres superuser/table-owner **bypasses RLS**, so
+  the app must connect as a restricted role (e.g. `lokara_app`) for RLS to actually apply. Locally this
+  is a second role via the docker init script; on Supabase it's the `DATABASE_URL` (app role, pooled)
+  vs `DIRECT_URL` (migrations) split. Migrations may run as owner; **request traffic never does.**
 
 ## Temporal core: Building → Unit → Tenancy
 
-`Building 1─N Unit 1─N Tenancy`. Tenancy has `validFrom/validTo`; multiple renters per tenancy
-(multi-party leases are an entry-ticket requirement). Statements are **immutable** — new version, never edit.
+`Building 1─N Unit 1─N Tenancy`. Tenancy has `valid_from/valid_to`.
+
+**Multi-party leases via `TenancyParty` (M0).** A Tenancy links to its renters through a join entity,
+not a direct FK — several renters can be on one lease (an entry-ticket requirement), and the link
+itself can carry per-party data later. Present from M0, minimal (no portal link yet — that's
+`Renter.person_id`, added at M5).
+
+```python
+class TenancyParty(Base):
+    __tablename__ = "tenancy_party"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    tenancy_id: Mapped[str] = mapped_column(ForeignKey("tenancy.id"))
+    renter_id: Mapped[str] = mapped_column(ForeignKey("renter.id"))
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))   # scoped like every row
+    __table_args__ = (UniqueConstraint("tenancy_id", "renter_id"), Index("ix_tp_account", "account_id"))
+```
+
+**Statements are immutable — versioned, never edited (M0 encoding).** A correction creates version
+`n+1`; the prior version is retained. Status is an explicit lifecycle, and one `(building, period,
+version)` is unique.
+
+```python
+class StatementStatus(enum.Enum):
+    DRAFT = "DRAFT"; FINALIZED = "FINALIZED"; SUPERSEDED = "SUPERSEDED"
+
+# Statement: building_id, period, version:int, status: StatementStatus, created_at, content_hash
+# __table_args__ = (UniqueConstraint("building_id", "period", "version"),)
+# Correction path: mark vN SUPERSEDED, insert v(N+1) DRAFT → FINALIZED. Never UPDATE a FINALIZED row.
+```
 
 ## Eigennutzung (self-use) is NOT a Renter
 
