@@ -62,6 +62,7 @@ Put this whole folder at your repo root and open Claude Code there.
    - `05-design-system.md` — brand tokens (colors, Montserrat/Manrope) + WCAG/BFSG
    - `06-demo-scenarios.md` — seeded example cases for the investor demo
    - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
+   - `08-statement-document.md` — the Abrechnung's formal content (⏳ awaiting the Notion spec)
 
 ## The one-paragraph version
 

@@ -2,6 +2,8 @@
 
 > These are the product. **Pure Python packages, no web-framework/DB/vendor imports.** Deterministic,
 > cent-exact, golden-tested (pytest). Built at M1 (NK) and M2 (heating/CO₂), before any UI.
+>
+> The **document** these engines feed is specified separately in `docs/08-statement-document.md`.
 
 ## Shared engine contract
 

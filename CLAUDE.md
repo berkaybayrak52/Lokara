@@ -135,3 +135,10 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
   post-pitch foundation.
 - When a decision isn't covered here or in `docs/`, prefer the choice that (a) keeps engines pure,
   (b) keeps data immutable/versioned, (c) keeps `accountId` scoping intact — in that order.
+
+- **Never implement a calculation from a pasted spec or from memory.** Transcribe it into the matching
+  `docs/` file first — inputs, formula, edge cases, legal basis, **`Rechtsstand`** — then turn its
+  worked example into a golden fixture, then write the code. If no `docs/` file fits, add one and link
+  it from `README.md`.
+- **If a new spec contradicts `docs/`, stop and ask.** Don't silently pick one; a `docs/` rule may
+  encode a decision the newer spec hasn't caught up with.
