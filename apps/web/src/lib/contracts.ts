@@ -52,6 +52,68 @@ export const DemoLoadResponseSchema = z.object({
   accountId: z.string(),
 });
 
+export const BuildingSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  street: z.string(),
+  postalCode: z.string(),
+  city: z.string(),
+  unitCount: z.number().int(),
+});
+export type BuildingSummary = z.infer<typeof BuildingSummarySchema>;
+
+export const BuildingListResponseSchema = z.object({
+  buildings: z.array(BuildingSummarySchema),
+});
+
+export const UnitSummarySchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  areaSqm: z.number(),
+  tenancyCount: z.number().int(),
+  occupiedToday: z.boolean(),
+});
+
+export const BuildingDetailResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  street: z.string(),
+  postalCode: z.string(),
+  city: z.string(),
+  units: z.array(UnitSummarySchema),
+});
+export type BuildingDetailResponse = z.infer<typeof BuildingDetailResponseSchema>;
+
+export const TenancyOutSchema = z.object({
+  id: z.string(),
+  renterNames: z.array(z.string()),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+  baseRentCents: z.number().int(),
+  baseRentEur: z.string(),
+  advancePaymentCents: z.number().int(),
+  advancePaymentEur: z.string(),
+  activeToday: z.boolean(),
+});
+export type TenancyOut = z.infer<typeof TenancyOutSchema>;
+
+export const SelfUsePeriodOutSchema = z.object({
+  kind: z.string(),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+});
+
+export const UnitDetailResponseSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  areaSqm: z.number(),
+  buildingId: z.string(),
+  buildingName: z.string(),
+  tenancies: z.array(TenancyOutSchema),
+  selfUsePeriods: z.array(SelfUsePeriodOutSchema),
+});
+export type UnitDetailResponse = z.infer<typeof UnitDetailResponseSchema>;
+
 export const StatementNkLineSchema = z.object({
   partyLabel: z.string(),
   isLandlord: z.boolean(),

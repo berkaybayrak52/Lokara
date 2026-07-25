@@ -21,17 +21,20 @@ const ROLE_LABELS: Record<string, string> = {
 interface NavItem {
   href: (accountId: string) => string;
   label: string;
-  exact: boolean;
+  /** Path prefixes (relative to /a/{id}) that count as "inside" this item. */
+  activePrefixes: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: (id) => `/a/${id}`, label: 'Übersicht', exact: true },
-  { href: (id) => `/a/${id}/abrechnung`, label: 'Abrechnung erstellen', exact: false },
+  { href: (id) => `/a/${id}`, label: 'Übersicht', activePrefixes: [] },
+  // Einheiten pages belong to the Objekte section (list → detail → unit).
+  { href: (id) => `/a/${id}/objekte`, label: 'Objekte', activePrefixes: ['/objekte', '/einheiten'] },
+  { href: (id) => `/a/${id}/abrechnung`, label: 'Abrechnung erstellen', activePrefixes: ['/abrechnung'] },
 ];
 
 // The rest of the M3 pages, visible but explicitly not yet available — an
 // honest roadmap beats dead links (and hiding them would misrepresent scope).
-const UPCOMING = ['Objekte', 'Kosten erfassen', 'Zähler'];
+const UPCOMING = ['Kosten erfassen', 'Zähler'];
 
 export function AppShell({ accountId, children }: { accountId: string; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -54,7 +57,12 @@ export function AppShell({ accountId, children }: { accountId: string; children:
         <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
           {NAV_ITEMS.map((item) => {
             const href = item.href(accountId);
-            const active = item.exact ? pathname === href : pathname.startsWith(href);
+            const active =
+              item.activePrefixes.length === 0
+                ? pathname === href
+                : item.activePrefixes.some((prefix) =>
+                    pathname.startsWith(`/a/${accountId}${prefix}`),
+                  );
             return (
               <Link
                 key={href}
