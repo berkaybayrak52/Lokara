@@ -36,7 +36,9 @@ def load(auth: RequireAuth) -> DemoLoadResponse:
 
 def summary_response(session: Session, account: Account | None) -> DemoSummaryResponse:
     """Shared builder — also serves the URL-scoped /a/{account_id}/summary."""
-    building = session.scalars(select(Building).limit(1)).first()
+    building = session.scalars(
+        select(Building).order_by(Building.created_at, Building.id).limit(1)
+    ).first()
     if account is None or building is None:
         raise HTTPException(
             status_code=404, detail="No demo data — run `uv run lokara-seed-demo` first."

@@ -116,7 +116,10 @@ def _consumptions(
 
 
 def compute_statement(session: Session) -> StatementBundle:
-    building = session.scalars(select(Building).limit(1)).first()
+    # Oldest building = the seeded demo object; user-created ones come later.
+    building = session.scalars(
+        select(Building).order_by(Building.created_at, Building.id).limit(1)
+    ).first()
     if building is None:
         raise NoDemoDataError
     units = sorted(building.units, key=lambda u: u.label)

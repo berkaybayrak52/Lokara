@@ -178,6 +178,89 @@ class StatementCo2(ApiModel):
     rechtsstand: str
 
 
+# ── Objekte / Einheiten / Mietverhältnisse (M3 CRUD) ─────────────────────────
+
+
+class BuildingCreate(ApiModel):
+    name: str = Field(min_length=1, max_length=200)
+    street: str = Field(min_length=1, max_length=200)
+    postal_code: str = Field(pattern=r"^\d{5}$")
+    city: str = Field(min_length=1, max_length=100)
+
+
+class BuildingSummary(ApiModel):
+    id: str
+    name: str
+    street: str
+    postal_code: str
+    city: str
+    unit_count: int
+
+
+class BuildingListResponse(ApiModel):
+    buildings: list[BuildingSummary]
+
+
+class UnitCreate(ApiModel):
+    label: str = Field(min_length=1, max_length=200)
+    # m² × 100 fixed point (docs/02: never floats near allocation math);
+    # bounded to 10,000 m² — beyond that it's a data-entry error, not a unit.
+    area_sqm_x100: int = Field(gt=0, le=1_000_000)
+
+
+class UnitSummary(ApiModel):
+    id: str
+    label: str
+    area_sqm: float  # display only
+    tenancy_count: int
+    occupied_today: bool
+
+
+class BuildingDetailResponse(ApiModel):
+    id: str
+    name: str
+    street: str
+    postal_code: str
+    city: str
+    units: list[UnitSummary]
+
+
+class TenancyCreate(ApiModel):
+    renter_name: str = Field(min_length=1, max_length=200)
+    valid_from: date
+    valid_to: date | None = None  # exclusive; None = open-ended
+    base_rent_cents: int = Field(ge=0)
+    advance_payment_cents: int = Field(ge=0)
+
+
+class TenancyOut(ApiModel):
+    id: str
+    renter_names: list[str]
+    valid_from: date
+    valid_to: date | None
+    base_rent_cents: int
+    base_rent_eur: str
+    advance_payment_cents: int
+    advance_payment_eur: str
+    active_today: bool
+
+
+class SelfUsePeriodOut(ApiModel):
+    kind: str
+    valid_from: date
+    valid_to: date | None
+
+
+class UnitDetailResponse(ApiModel):
+    id: str
+    label: str
+    area_sqm: float
+    building_id: str
+    building_name: str
+    tenancies: list[TenancyOut]  # newest first — the timeline
+    self_use_periods: list[SelfUsePeriodOut]
+
+
 class DemoStatementResponse(ApiModel):
     building_name: str
     building_address: str
