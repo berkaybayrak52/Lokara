@@ -1,9 +1,24 @@
 [project]
 name = "lokara-pdf"
 version = "0.1.0"
-description = "Playwright-for-Python HTML-to-PDF service (skeleton; built in Phase D)"
+description = "Playwright-for-Python HTML-to-PDF document service — statement templates with Rechtsstand + disclaimer"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "playwright>=1.49",
+  "lokara-domain",
+  "lokara-nk-engine",
+  "lokara-heating-engine",
+  "lokara-rules-store",
+]
+
+[project.scripts]
+lokara-pdf-demo = "lokara_pdf.demo:main"
+
+[tool.uv.sources]
+lokara-domain = { workspace = true }
+lokara-nk-engine = { workspace = true }
+lokara-heating-engine = { workspace = true }
+lokara-rules-store = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -11,4 +26,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lokara_pdf"]
-
