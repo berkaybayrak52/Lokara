@@ -142,3 +142,6 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
   it from `README.md`.
 - **If a new spec contradicts `docs/`, stop and ask.** Don't silently pick one; a `docs/` rule may
   encode a decision the newer spec hasn't caught up with.
+- **Write your end-of-task summary to `LAST_OUTPUT.md`** at the repo root, overwriting it each time —
+  same content as the chat summary (what was built, decisions worth knowing, gates, what's next). It's
+  the handoff other tools read. Gitignored on purpose: it's scratch, not project history.

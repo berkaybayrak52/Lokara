@@ -79,4 +79,7 @@ jobs:
       - run: uv run playwright install --with-deps chromium
       - run: uv run ruff check .
       - run: uv run mypy
+      # No role/migration steps needed: the DB suites are self-sufficient — they
+      # apply scripts/init-app-role.sql and `alembic upgrade head` themselves
+      # (packages/db/tests/test_rls_isolation.py), so a bare Postgres service is enough.
       - run: uv run pytest

@@ -67,7 +67,12 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - **§§7/8 HKVO** split between base and consumption cost — configurable **30/70** … **50/50**
   (from rules store).
 - **§9** warm-water separation from heating.
-- **§9a** estimation when readings are missing.
+- **§9a** estimation when readings are missing — **only** in the case §9a actually covers: an individual
+  unit's device failed, estimated by the prescribed methods (comparable period / comparable rooms).
+  ⚠️ **This is not licence to guess a missing building-level total.** If the energy/cost total or a
+  denominator is absent, the API **refuses and explains, in German** — a Heizkostenabrechnung built on a
+  guessed total isn't approximately right, it's wrong. The Betriebskosten still compute, so one missing
+  meter never blocks the whole statement. Don't "fix" the refusal by adding a fallback estimate.
 - **Degree-day (Gradtags) apportionment** on renter change mid-period. Apportionment basis:
   **consumption** cost splits by **degree-days**; **base + warm-water** costs split by **days**.
 - ⚠️ **The degree-day promille table is a VDI convention, not a statute** — it carries a

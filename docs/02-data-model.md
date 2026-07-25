@@ -236,6 +236,26 @@ class AllocationKey(enum.Enum):
   the per-period **`AllocationKeyAssignment` table arrives with M3** plumbing — the enum exists before the
   table that uses it.
 
+### Heating costs are a separate table — never a flag on `CostEntry`
+
+A Betriebskosten row *has* an allocation key; a **heating cost does not** — §§7–9 HeizkostenV determine
+its split (base/consumption, warm-water separation, CO₂). Putting heating on `CostEntry` would surface an
+Umlageschlüssel dropdown for a cost whose split isn't the user's to choose, inviting a **legally wrong
+answer**. Separate tables also keep the proven NK path untouched.
+
+### Meters: `MeterKind` and `MeasurementUnit` are independent axes
+
+A building's Wärmemengenzähler and a flat's Heizkostenverteiler are both `kind = HEAT`, but only the
+**unit** says whether a reading may serve as the **§9 denominator**. Never infer one from the other.
+`MeterReading` carries the normalized shape (`value`, `measurement_unit`, `reason`, `source`), so a
+manually entered row and an MDL/adapter import are indistinguishable downstream — that's the point of
+the port.
+
+**Readings are create-only, enforced structurally.** No `superseded` / `replaced_by` / `updated_at`
+column exists, and there is **no PUT/PATCH route** (asserted by a test over the OpenAPI paths), so a
+correction can only be a new row; supersession is *derived* from `read_at` + `recorded_at`. Superseded
+rows are shown struck through, never hidden — the audit trail is the feature.
+
 ## Two financial time-axes (never merge)
 
 - **NK billing = accrual/period-based.** Costs belong to an _Abrechnungszeitraum_; day-weighted;

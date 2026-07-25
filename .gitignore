@@ -41,3 +41,6 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 bun.lockb
+
+# scratch handoff between tools — overwritten each task, not history
+LAST_OUTPUT.md
