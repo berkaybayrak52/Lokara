@@ -73,8 +73,9 @@ that `packages/pdf` already renders.
 
 **Known open items**
 
-- **No semantic status colors** — the brand board has no red/amber/green, so shadcn's `destructive`
-  variant ships omitted. `TODO(M3)`: add `danger`/`warning`/`success` tokens (docs/05).
+- **Semantic status colors are now specified** (`docs/05` → "Semantic status colors"): `danger`
+  `#A4262C`, `warning` `#92400E`, `success` = Lokara Grün, each with a tint, all AA-verified.
+  **Still to implement:** add them to `@theme` and wire shadcn's `destructive` variant to `--color-danger`.
 - **`TODO(supabase)`** touchpoints: no Supabase project is wired — docker-compose Postgres and the
   dev-token endpoint stand in; the real session exchange lands at M5 (check HS256 vs JWKS then).
 - **The M3 pages are not built** (`docs/04`): Dashboard, Objekte, Einheit, Kosten erfassen, Zähler,

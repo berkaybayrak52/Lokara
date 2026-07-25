@@ -93,19 +93,59 @@ default palette.
 > Mobile (Expo/React Native) doesn't use shadcn (web-only). It shares the **same tokens + theme** through
 > a React Native theme object, so colors, type scale, and radii match across platforms.
 
-### ⚠️ Open gap — no semantic status colors (decide before M3)
+## Semantic status colors (resolved — extends the brand board)
 
-The brand board has **no semantic red/amber/green**, so shadcn's `destructive` variant ships **omitted**
-rather than defaulted (`TODO(M3)`). But the product needs status color regardless:
+The brand board ships no status palette, but the product needs one: destructive actions (delete a
+building, revoke a membership), **form/validation errors** (a 422 must read as an error), the **3-colour
+Zustell-Ampel** (§556 proof-of-receipt), and **Guard/Wächter** severity (§556 deadline, Eichfrist,
+15%-AfA).
 
-- **Destructive actions** (delete a building, revoke a membership) need a clear danger affordance.
-- **Form/validation errors** — a 422 from the API has to read as an error, not as body copy.
-- **The 3-colour Zustell-Ampel** (§556 proof-of-receipt) is *literally* red/amber/green.
-- **Guards/Wächter** (§556 deadline, Eichfrist, 15%-AfA) escalate by severity.
+**Only two new hues are needed** — success reuses Lokara Grün (see the note below).
 
-Add a small semantic set — `danger`, `warning`, `success` — as tokens **beside** the brand palette (not
-replacing it), each verified to **≥4.5:1** on Paper per the contrast rules above. Never signal status by
-color alone (BFSG): pair with an icon or label.
+| Token             | HEX       | Contrast on Paper | White on it | Role                                        |
+| ----------------- | --------- | ----------------- | ----------- | ------------------------------------------- |
+| `--color-danger`  | `#A4262C` | **7.01** ✓        | **7.26** ✓  | Errors, destructive actions, Ampel *rot*    |
+| `--color-warning` | `#92400E` | **6.85** ✓        | **7.09** ✓  | Warnings, pending guards, Ampel *gelb*      |
+| `--color-success` | `#1A6558` | **6.66** ✓        | **6.89** ✓  | = **Lokara Grün** — confirmations, Ampel *grün* |
+
+Tint surfaces (for alert/banner backgrounds), all with Ink text ≥13:1 and their own fg ≥6:1:
+
+| Tint                   | HEX       | fg on tint | Pairs with |
+| ---------------------- | --------- | ---------- | ---------- |
+| `--color-danger-tint`  | `#FBEAE9` | 6.24 ✓     | `danger`   |
+| `--color-warning-tint` | `#FBF1E5` | 6.35 ✓     | `warning`  |
+| `--color-success-tint` | `#E7EFEB` | 6.09 ✓     | = **Mint Tint** (already in the palette) |
+
+All values are computed WCAG ratios against Paper `#FBFBFA`; every one clears **AA (4.5:1)** for normal
+text, so they're also safe as borders, icons, and large text (which need only 3:1). The trio sits at
+7.01 / 6.85 / 6.66 — near-identical weight, so they read as a family rather than three loud accents.
+
+**Why success is not its own green.** A dedicated success green (e.g. `#166534`) lands at a **1.03
+luminance ratio to Lokara Grün** — same lightness, barely distinguishable, and worse for colour-blind
+users. Reusing the brand green is cleaner: green already means "good" here. Distinguish a *success
+message* from a *primary action* by **form, not hue** — primary actions are filled buttons; success
+feedback is a **tint surface + icon + label**.
+
+**Why warning looks like burnt ochre, not bright amber.** Any true amber (`#F59E0B`) fails AA on a light
+background — around 2:1. At AA on Paper, "amber" is necessarily dark. This is a constraint, not a
+compromise.
+
+> **BFSG: never signal by colour alone.** Every status carries an **icon + text label** as well —
+> required for colour-blind users, and the Ampel is legally meaningful (§556 Zugangsnachweis).
+
+Wire them alongside the brand tokens in `@theme`, and map shadcn's `destructive` variant onto
+`--color-danger` (it currently ships omitted):
+
+```css
+@theme {
+  --color-danger:       #A4262C;
+  --color-danger-tint:  #FBEAE9;
+  --color-warning:      #92400E;
+  --color-warning-tint: #FBF1E5;
+  --color-success:      #1A6558;   /* = Lokara Grün */
+  --color-success-tint: #E7EFEB;   /* = Mint Tint   */
+}
+```
 
 ## Look & feel / motion principles (the "Apple-like" bar)
 

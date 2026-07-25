@@ -6,6 +6,13 @@
 > **The seed must include an `OWNER` `Membership`** linking the demo Person to the demo Account — the
 > FastAPI `account_session` dependency authorizes on it, so without the membership every demo request
 > 403s. (The TS seed omitted this; the Python seed `uv run lokara-seed-demo` adds it.)
+>
+> **One occupancy timeline drives every engine.** A renter's tenancy dates must be identical wherever
+> they appear — NK allocation, heating, and the statement. (A seed once had Bernd Muster occupying all
+> year in the heating section but moving out in June in the NK section.) Deriving both engines from the
+> same tenancy rows isn't just consistency: it makes the **degree-day split visible on the statement**
+> — unit B's heating row splits Mieter/Vermieter **585/415 ‰** (786,24 € / 557,76 €), which is exactly
+> the domain depth the competitors don't show. Keep it in the demo.
 
 ## Scenario 1 — Solo landlord, clean NK + vacancy (⭐ the crown jewel)
 

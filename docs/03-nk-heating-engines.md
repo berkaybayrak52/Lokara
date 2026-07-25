@@ -10,6 +10,10 @@
 - Money: integer **cents**; intermediate math with `decimal.Decimal`; **largest-remainder rounding** so
   the sum of allocated shares reconciles to the input **to the cent**.
 - Output: a plain result object (shares per party + a reconciliation total) — the PDF layer formats it.
+- ⚠️ **De-scale at the render boundary.** Engine values are **scaled integers** (money = cents;
+  areas/weights = ×100 fixed-point). The presentation layer must convert back before display, or a
+  Bemessung of `18.250 m²·Tage` renders as `1.825.000`. Tests comparing integers stay green through this
+  bug — **read the rendered PDF** before calling an output done.
 - Every legal ratio/table (HKVO, CO₂ 10-step) comes from the **versioned rules store**, passed in as a
   parameter with an as-of law date. Engines never hardcode a legal number, and never import
   `rules-store` — the caller resolves the values and passes them in; the value *shapes* live in `domain`.
