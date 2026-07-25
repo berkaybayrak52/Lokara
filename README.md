@@ -29,10 +29,11 @@ fetched from the API through the auth guard.
 
 Other commands: `bun run test` · `bun run lint` · `bun run typecheck` · `bun run build` ·
 `uv run pytest` · `uv run ruff check .` · `uv run mypy` ·
-`bun run --filter @lokara/pdf demo` (renders `packages/pdf/output/placeholder-statement.pdf`).
+`uv run lokara-pdf-demo` (renders the NK + heating statement to `packages/pdf/output/`).
 
-**Target flow (arrives with the migration phases):** `uv run alembic upgrade head` (Phase B),
-`uv run python -m lokara_api.seed` + FastAPI on :3001 (Phase E), PDF via Playwright-Python (Phase D).
+**Migrated flow (Phases B/D/E done — see `MIGRATION-PLAN.md` §0a):**
+`uv run alembic -c packages/db/alembic.ini upgrade head` · `uv run lokara-seed-demo` ·
+`uv run lokara-api` (FastAPI on :3001) · PDF via Playwright-Python.
 
 > No Supabase project is wired yet. `.env.example` documents the Frankfurt placeholders;
 > until credentials exist, docker-compose Postgres + the dev-token endpoint

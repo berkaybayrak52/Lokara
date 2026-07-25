@@ -31,9 +31,9 @@
 Branch: **`feat/py-migration`**. `main` is untouched at `c5fadab` (tag `pre-migration`) and stays
 demo-able. Phase details are in the per-phase blockquotes in §4.
 
-**Phases:** ✅ **A** (toolchain) · ✅ **B** (DB + RLS) · ✅ **C** (engines ⭐) · ✅ **E** (FastAPI) ·
-✅ **F** (web) — remaining: **D** (adapters + PDF) · **G** (mobile) · **H** (cutover).
-C ran before B and F before D, per §7 — neither depended on the phase it jumped.
+**Phases:** ✅ **A** (toolchain) · ✅ **B** (DB + RLS) · ✅ **C** (engines ⭐) · ✅ **D**
+(adapters + PDF) · ✅ **E** (FastAPI) · ✅ **F** (web) — remaining: **G** (mobile) · **H** (cutover).
+C ran before B and E/F before D, per §7 — none depended on the phase it jumped.
 
 **Verified gates**
 
@@ -47,8 +47,8 @@ C ran before B and F before D, per §7 — neither depended on the phase it jump
   rejected. **Mutation-checked:** disabling RLS on one table makes the test fail; re-enabling
   restores green. CI's Python lane runs it against a Postgres service with `LOKARA_REQUIRE_DB=1`,
   so it cannot silently skip.
-- Full suite: **97 pytest tests** (10 need the local Postgres), `mypy --strict` clean,
-  `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green.
+- Full suite: **114 pytest tests** (10 need the local Postgres; 1 needs Playwright Chromium),
+  `mypy --strict` clean, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green.
 
 **What works end-to-end today**
 
@@ -62,10 +62,14 @@ C ran before B and F before D, per §7 — neither depended on the phase it jump
   and, on a 401, refreshes once via the `/api/session` route handler (which sets the HttpOnly
   cookie server-side) and replays once — concurrent 401s share a single refresh. Verified headless:
   `401 → POST /api/session → replay 200` renders live API data.
+- **Adapters + PDF** (`packages/adapters`, `packages/pdf`): six external-edge `Protocol` ports with
+  fixture stubs, and `uv run lokara-pdf-demo` renders the real NK + heating/CO₂ statement (engine
+  results, `Rechtsstand` stamps, disclaimer) via Playwright Chromium.
 
-**Next step: Phase D** (§4) — `packages/adapters`: external-edge ports as Python **`Protocol`**s
-(Bank/Vision/Email/MDL/Destatis/DATEV) with fixture stubs · `packages/pdf`: **Playwright-for-Python**
-HTML→PDF rendering the NK + heating statement with the **`Rechtsstand`** stamp and the disclaimer.
+**Next step:** the migration itself has only **G** (Expo mobile skeleton) and **H** (cutover:
+remove the TS backend, merge to `main`) left — but the pitch path (§0) now runs through the
+**M3 pages** (docs/04): the six Vermieter-portal screens on the live API, ending in the PDF
+that `packages/pdf` already renders.
 
 **Known open items**
 
@@ -87,6 +91,7 @@ uv run alembic -c packages/db/alembic.ini upgrade head
 uv run lokara-seed-demo                 # demo account/building/renters + the OWNER membership
 uv run lokara-api                       # FastAPI on 127.0.0.1:3001
 bun run --filter @lokara/web dev        # web on :3000
+uv run lokara-pdf-demo                  # NK+heating statement → packages/pdf/output/
 ```
 
 > ⚠️ Use the **filtered** web command, not bare `bun dev` — `turbo run dev` still starts the **old
@@ -213,7 +218,22 @@ files noted). **Carry them across; don't re-derive or lose them.**
 - **Port fixtures to pytest first**, incl. the **€1,200 example** → must reconcile to €1,200.00.
 - **DoD:** `pytest` green; €1,200 fixture byte-exact; `mypy --strict` clean; no framework/DB/vendor imports.
 
-### Phase D — Adapters + PDF
+### Phase D — Adapters + PDF — ✅ done
+> Built 2026-07-25 on `feat/py-migration`. **Adapters:** six ports as Python `Protocol`s with
+> fixture stubs — Bank (AIS; § 11 EStG booking date), Vision/OCR (canned M4 Beleg flow), Email
+> (immutable receipts for the Zustell-Ampel), Meter/MDL (one normalized `MeterReading` for
+> manual/HeiWaKo/radio; register diffs reproduce the heating fixture), Destatis (VPI), DATEV
+> (transport only — EXTF generation stays in the pure export-engine, M7). Stubs are consumed
+> through their Protocol types in tests, so mypy strict enforces conformance; the flow test runs
+> the vision stub's extraction through the NK engine and reproduces the €1,200 allocation
+> byte-exact. **PDF:** `packages/pdf` renders the first real Betriebs-/Heizkostenabrechnung via
+> Playwright-Python Chromium (`uv run lokara-pdf-demo`): rules resolved from the rules-store
+> as-of the billing date, both engines on the canonical fixtures with one coherent occupancy
+> timeline (B's vacancy → landlord in both sections, consumption degree-day-apportioned 585/415 ‰),
+> Bemessung at human scale (18.250 m²·Tage), CO₂ block, `Rechtsstand` stamps + the
+> "keine Rechts- oder Steuerberatung" disclaimer. Template content is golden-tested without a
+> browser; CI installs Chromium and sets `LOKARA_REQUIRE_PDF=1` so the render test can't silently
+> skip (mutation-checked: skip without the flag, fail with it, pass with the browser).
 - `adapters`: ports as `Protocol` (Bank/Vision/Email/MDL/Destatis/DATEV) + fixture stubs.
 - `pdf`: Playwright-for-Python HTML→PDF; NK/heating template with `Rechtsstand` + disclaimer.
 - **DoD:** a stub txn flows through an adapter; a placeholder PDF renders.
