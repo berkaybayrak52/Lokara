@@ -1,10 +1,12 @@
-"""Composes the demo statement: DB tenancy rows → both engines → one result.
+"""Composes the statement: DB rows → both engines → one result.
 
 One occupancy timeline drives every engine (docs/06) — NK and heating read the
-same seeded tenancy rows, which is what makes the degree-day split visible on
-the statement. Costs and meter totals are still fixture constants: they become
-real data when the Kosten-erfassen and Zähler pages land (M3, next slice);
-consumptions already flow through the meter adapter port.
+same tenancy rows, which is what makes the degree-day split visible on the
+statement. **Betriebskosten are real `CostEntry` rows** with their key from the
+latest `AllocationKeyAssignment`, so re-keying a cost re-runs this computation
+and destroys nothing. Only the heating-system totals are still fixture
+constants (they become meter/invoice data with the Zähler page); consumptions
+already flow through the meter adapter port.
 """
 
 from dataclasses import dataclass
@@ -12,7 +14,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from lokara_adapters import MeterGateway, MeterKind, StubMeterGateway
-from lokara_db import Building, Unit
+from lokara_db import Building, CostEntry, Unit
 from lokara_domain import AllocationKey, Cents, Occupancy, Period, cents
 from lokara_heating_engine import (
     Co2Input,
@@ -43,14 +45,8 @@ BILLING_PERIOD = Period(valid_from=BILLING_START, valid_to=BILLING_END)
 PERIOD_LABEL = "01.01.2025 – 31.12.2025"
 RULES_AS_OF = date(2025, 12, 31)
 
-# TODO(M3-next): these become entered costs / meter data once the
-# Kosten-erfassen and Zähler pages exist.
-GARBAGE_COST = CostItem(
-    cost_id="cost-garbage",
-    label="Müllabfuhr",
-    amount=cents(120000),
-    key=AllocationKey.AREA,
-)
+# TODO(M3-next): the heating-system totals become meter/invoice data with the
+# Zähler page. Betriebskosten are already real CostEntry rows.
 HEATING_TOTAL_COST = cents(1_030_000)  # incl. the €300.00 CO₂ portion
 TOTAL_ENERGY_KWH = Decimal(20000)
 WARM_WATER_VOLUME_M3 = Decimal(40)
@@ -115,6 +111,37 @@ def _consumptions(
     }
 
 
+def _nk_costs(session: Session, building_id: str) -> tuple[CostItem, ...]:
+    """Entered costs overlapping the billing period, each with the key from its
+    LATEST assignment — the cost row itself never carries a key, so re-keying
+    changes only what the engine is told, never what the user typed."""
+    from .routers.costs import current_assignment  # local: avoids a router cycle
+
+    rows = session.scalars(
+        select(CostEntry)
+        .where(
+            CostEntry.building_id == building_id,
+            CostEntry.period_from < BILLING_END,
+            CostEntry.period_to > BILLING_START,
+        )
+        .order_by(CostEntry.created_at, CostEntry.id)
+    ).all()
+    items: list[CostItem] = []
+    for row in rows:
+        assignment = current_assignment(row)
+        items.append(
+            CostItem(
+                cost_id=row.id,
+                label=row.label,
+                amount=cents(row.amount_cents),
+                key=assignment.key,
+                direct_unit_id=assignment.direct_unit_id,
+                direct_tenancy_id=assignment.direct_tenancy_id,
+            )
+        )
+    return tuple(items)
+
+
 def compute_statement(session: Session) -> StatementBundle:
     # Oldest building = the seeded demo object; user-created ones come later.
     building = session.scalars(
@@ -125,6 +152,7 @@ def compute_statement(session: Session) -> StatementBundle:
     units = sorted(building.units, key=lambda u: u.label)
     if not units:
         raise NoDemoDataError
+    nk_costs = _nk_costs(session, building.id)
 
     occupancies = tuple(
         Occupancy(
@@ -143,7 +171,7 @@ def compute_statement(session: Session) -> StatementBundle:
                 UnitBasis(unit_id=u.id, area_sqm_x100=u.area_sqm_x100) for u in units
             ),
             occupancies=occupancies,
-            costs=(GARBAGE_COST,),
+            costs=nk_costs,
         )
     )
 
@@ -194,7 +222,7 @@ def compute_statement(session: Session) -> StatementBundle:
     return StatementBundle(
         building=building,
         nk_result=nk_result,
-        nk_costs=(GARBAGE_COST,),
+        nk_costs=nk_costs,
         heating_result=heating_result,
         party_labels=_party_labels(units),
         rechtsstaende=stamps,

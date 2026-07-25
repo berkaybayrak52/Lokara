@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Literal
 
 from lokara_domain import AllocationKey
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -138,6 +138,60 @@ class MeResponse(ApiModel):
 class DemoLoadResponse(ApiModel):
     ok: Literal[True]
     account_id: str
+
+
+# ── Kosten erfassen (docs/04 M3 page 4) ──────────────────────────────────────
+
+
+class KeyChoice(ApiModel):
+    """A key selection — shared by cost creation and later re-assignment.
+    DIRECT requires a target; every other key must not carry one."""
+
+    key: AllocationKey
+    direct_unit_id: str | None = None
+    direct_tenancy_id: str | None = None
+
+    @model_validator(mode="after")
+    def _direct_target_consistency(self) -> "KeyChoice":
+        has_target = self.direct_unit_id is not None or self.direct_tenancy_id is not None
+        if self.key is AllocationKey.DIRECT and not has_target:
+            raise ValueError("DIRECT requires direct_unit_id or direct_tenancy_id")
+        if self.key is not AllocationKey.DIRECT and has_target:
+            raise ValueError("Only DIRECT may carry a direct target")
+        return self
+
+
+class CostCreate(KeyChoice):
+    label: str = Field(min_length=1, max_length=200)
+    amount_cents: int = Field(gt=0)
+    period_from: date
+    period_to: date  # exclusive
+
+    @model_validator(mode="after")
+    def _period_order(self) -> "CostCreate":
+        if self.period_to <= self.period_from:
+            raise ValueError("period_to must be after period_from")
+        return self
+
+
+class CostEntryOut(ApiModel):
+    id: str
+    label: str
+    amount_cents: int
+    amount_eur: str
+    period_from: date
+    period_to: date
+    key: AllocationKey  # the CURRENT assignment (latest row wins)
+    key_label: str
+    direct_unit_id: str | None
+    direct_tenancy_id: str | None
+    # Length of the append-only assignment history — re-keying grows this and
+    # deletes nothing.
+    assignment_count: int
+
+
+class CostListResponse(ApiModel):
+    costs: list[CostEntryOut]
 
 
 # ── The demo statement (Abrechnung erstellen, M3 slice) ──────────────────────
