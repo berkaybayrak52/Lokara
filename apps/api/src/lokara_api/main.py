@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import auth, demo, health, statements
+from .routers import auth, demo, health, me, portal, statements
 from .settings import ApiSettings
 
 
@@ -20,7 +20,9 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(me.router)
     app.include_router(demo.router)
+    app.include_router(portal.router)
     app.include_router(statements.router)
     return app
 

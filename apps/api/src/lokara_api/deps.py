@@ -10,6 +10,7 @@ in the threadpool, so the blocking psycopg driver never stalls the event loop
 """
 
 from collections.abc import Iterator
+from contextlib import AbstractContextManager
 from functools import lru_cache
 from typing import Annotated
 
@@ -25,6 +26,13 @@ from .auth import AuthContext, require_auth
 def _engine() -> Engine:
     # DATABASE_URL = the non-owner lokara_app role — RLS binds (never DIRECT_URL).
     return create_db_engine(DbSettings().database_url)
+
+
+def raw_account_scoped_session(account_id: str) -> AbstractContextManager[Session]:
+    """An RLS-scoped session WITHOUT the membership gate — only for endpoints
+    whose semantics forbid it (/me lists relationships, /demo/load creates the
+    membership it would be gated on). RLS still confines every row underneath."""
+    return account_scoped_session(_engine(), account_id)
 
 
 def account_session(
@@ -53,3 +61,29 @@ def account_session(
 
 
 AccountSession = Annotated[Session, Depends(account_session)]
+
+
+def account_session_for_path(
+    account_id: str,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+) -> Iterator[Session]:
+    """The URL-carried variant (docs/04 M5 routing, used by /a/{account_id}/…):
+    context comes from the path, never the session — the endpoint independently
+    verifies the caller holds a live Membership in the account named in the URL
+    (CLAUDE.md rule 3: hiding a UI link protects nothing)."""
+    with account_scoped_session(_engine(), account_id) as session:
+        membership = session.scalar(
+            select(Membership).where(
+                Membership.person_id == auth.person_id,
+                Membership.account_id == account_id,
+                Membership.revoked_at.is_(None),
+            )
+        )
+        if membership is None:
+            raise HTTPException(
+                status_code=403, detail="Caller holds no membership in this account"
+            )
+        yield session
+
+
+PathAccountSession = Annotated[Session, Depends(account_session_for_path)]

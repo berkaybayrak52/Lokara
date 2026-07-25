@@ -115,3 +115,81 @@ class NkCalcResponse(ApiModel):
     lines: list[NkShareLineOut]
     total_cents: int
     total_eur: str
+
+
+# ── /me — the Person's relationships (drives the left nav) ───────────────────
+
+
+class MeAccount(ApiModel):
+    id: str
+    name: str
+    role: str
+    shape: str
+
+
+class MeResponse(ApiModel):
+    person_id: str
+    # Empty ⇒ no live membership yet (e.g. before the demo scenario is loaded).
+    # TODO(M5): list every account once a person-scoped RLS policy exists; today
+    # this can only see the token-claimed account's membership.
+    accounts: list[MeAccount]
+
+
+class DemoLoadResponse(ApiModel):
+    ok: Literal[True]
+    account_id: str
+
+
+# ── The demo statement (Abrechnung erstellen, M3 slice) ──────────────────────
+
+
+class StatementNkLine(ApiModel):
+    party_label: str
+    is_landlord: bool  # vacancy/self-use share — lands on the Vermieter
+    weight_display: str  # human-scale Bemessung (e.g. "18.250" m²·Tage)
+    amount_cents: int
+    amount_eur: str
+
+
+class StatementNkCost(ApiModel):
+    label: str
+    key_label: str  # German Umlageschlüssel label
+    amount_cents: int
+    amount_eur: str
+    lines: list[StatementNkLine]
+
+
+class StatementHeatingLine(ApiModel):
+    party_label: str
+    is_landlord: bool
+    heating_base_eur: str
+    heating_consumption_eur: str
+    ww_base_eur: str
+    ww_consumption_eur: str
+    total_cents: int
+    total_eur: str
+
+
+class StatementCo2(ApiModel):
+    intensity_display: str  # kg CO₂/m²/Jahr, German decimal formatting
+    landlord_share_percent: int
+    landlord_amount_eur: str
+    renter_amount_eur: str
+    rechtsstand: str
+
+
+class DemoStatementResponse(ApiModel):
+    building_name: str
+    building_address: str
+    period_label: str
+    nk_costs: list[StatementNkCost]
+    nk_total_cents: int
+    nk_total_eur: str
+    nk_input_total_cents: int  # reconciliation: must equal nk_total_cents
+    heating_lines: list[StatementHeatingLine]
+    heating_total_cents: int
+    heating_total_eur: str
+    heating_input_total_cents: int  # reconciliation: must equal heating_total_cents
+    co2: StatementCo2 | None
+    rechtsstaende: list[str]
+    disclaimer: str
