@@ -84,6 +84,9 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
             )
         )
 
+    # heating is None when the meter/invoice inputs are incomplete: the NK part
+    # still stands on its own, and the response carries the German reason
+    # instead of a table of invented numbers.
     heating_lines = [
         StatementHeatingLine(
             party_label=bundle.party_labels.get(
@@ -97,10 +100,10 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
             total_cents=int(line.total),
             total_eur=format_eur(line.total),
         )
-        for line in heating.lines
+        for line in (heating.lines if heating is not None else ())
     ]
 
-    co2 = heating.co2
+    co2 = heating.co2 if heating is not None else None
     co2_out = (
         StatementCo2(
             intensity_display=format_number_de(co2.intensity_kg_per_sqm),
@@ -112,6 +115,7 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
         if co2 is not None
         else None
     )
+    heating_total = heating.total if heating is not None else cents(0)
 
     building = bundle.building
     return DemoStatementResponse(
@@ -123,9 +127,10 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
         nk_total_eur=format_eur(nk.total),
         nk_input_total_cents=int(input_total(bundle.nk_costs)),
         heating_lines=heating_lines,
-        heating_total_cents=int(heating.total),
-        heating_total_eur=format_eur(heating.total),
-        heating_input_total_cents=int(cents(1_030_000)),
+        heating_total_cents=int(heating_total),
+        heating_total_eur=format_eur(heating_total),
+        heating_input_total_cents=int(bundle.heating_input_total),
+        heating_missing_reason=bundle.heating_missing_reason,
         co2=co2_out,
         rechtsstaende=list(bundle.rechtsstaende),
         disclaimer=DISCLAIMER,

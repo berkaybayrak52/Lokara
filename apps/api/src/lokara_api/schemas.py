@@ -5,11 +5,18 @@ Python stays snake_case. Validate at every boundary: these models are the
 only doorway between HTTP and the engine's frozen dataclasses.
 """
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from lokara_domain import AllocationKey
+from lokara_domain import (
+    CANONICAL_UNITS,
+    AllocationKey,
+    MeasurementUnit,
+    MeterKind,
+    ReadingReason,
+    ReadingSource,
+)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
@@ -315,6 +322,118 @@ class UnitDetailResponse(ApiModel):
     self_use_periods: list[SelfUsePeriodOut]
 
 
+# ── Zähler (docs/04 M3 page 5) ───────────────────────────────────────────────
+
+
+class MeterCreate(ApiModel):
+    """A device. unit_id null = a building-level Hauptzähler."""
+
+    unit_id: str | None = None
+    kind: MeterKind
+    measurement_unit: MeasurementUnit
+    serial: str = Field(min_length=1, max_length=100)
+    label: str | None = Field(default=None, max_length=200)
+    calibration_valid_until: date | None = None  # Eichfrist; null = nicht eichpflichtig
+
+    @model_validator(mode="after")
+    def _unit_matches_kind(self) -> "MeterCreate":
+        """Water is always counted in m³, and only a heat device may count kWh
+        or HKV units — a Kaltwasserzähler in kWh is a data-entry error, and one
+        that reached the DB would silently corrupt the § 9 denominator."""
+        expected = CANONICAL_UNITS.get(self.kind)
+        if expected is not None and self.measurement_unit is not expected:
+            raise ValueError(f"{self.kind.value} is measured in {expected.value}")
+        if self.kind is MeterKind.HEAT and self.measurement_unit is (
+            MeasurementUnit.CUBIC_METRE
+        ):
+            raise ValueError("HEAT is measured in KWH or HKV_UNITS")
+        return self
+
+
+class MeterReadingCreate(ApiModel):
+    """Create-only: a correction is a NEW reading, never an edit of this one."""
+
+    read_at: date
+    # Register value × 1000 (fixed point) — parsed from German input at the
+    # form edge, exactly like money is parsed to cents.
+    value_x1000: int = Field(ge=0)
+    reason: ReadingReason
+    source: ReadingSource = ReadingSource.MANUAL
+    note: str | None = Field(default=None, max_length=500)
+
+
+class MeterReadingOut(ApiModel):
+    id: str
+    read_at: date
+    value_x1000: int
+    value_display: str  # German-formatted, e.g. "1.800" or "241,5"
+    reason: ReadingReason
+    source: ReadingSource
+    note: str | None
+    recorded_at: datetime
+    # True when a later reading for the same date replaced this one. The row
+    # stays visible — an append-only log shows its own history.
+    superseded: bool
+
+
+class MeterOut(ApiModel):
+    id: str
+    unit_id: str | None
+    unit_label: str | None  # null = building-level (Hauptzähler)
+    kind: MeterKind
+    kind_label: str
+    measurement_unit: MeasurementUnit
+    unit_symbol: str  # "kWh", "m³", "Einheiten"
+    serial: str
+    label: str | None
+    calibration_valid_until: date | None
+    # Computed, never stored (CLAUDE.md: guards are derived from data).
+    calibration_status: Literal["EXPIRED", "EXPIRING_SOON", "VALID", "NOT_APPLICABLE"]
+    readings: list[MeterReadingOut]  # newest first
+    # Consumption over the billing period, from the effective opening/closing
+    # readings; null when the pair is missing or unusable (→ § 9a estimate).
+    period_consumption_display: str | None
+
+
+class MeterListResponse(ApiModel):
+    meters: list[MeterOut]
+    period_label: str
+
+
+class HeatingCostCreate(ApiModel):
+    label: str = Field(min_length=1, max_length=200)
+    amount_cents: int = Field(gt=0)  # total, incl. the CO₂ portion
+    period_from: date
+    period_to: date  # exclusive
+    co2_kg_x1000: int | None = Field(default=None, ge=0)
+    co2_cost_cents: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _period_order(self) -> "HeatingCostCreate":
+        if self.period_to <= self.period_from:
+            raise ValueError("period_to must be after period_from")
+        if self.co2_cost_cents is not None and self.co2_cost_cents > self.amount_cents:
+            raise ValueError("co2_cost_cents cannot exceed the total amount")
+        return self
+
+
+class HeatingCostOut(ApiModel):
+    id: str
+    label: str
+    amount_cents: int
+    amount_eur: str
+    period_from: date
+    period_to: date
+    co2_kg_x1000: int | None
+    co2_kg_display: str | None
+    co2_cost_cents: int | None
+    co2_cost_eur: str | None
+
+
+class HeatingCostListResponse(ApiModel):
+    heating_costs: list[HeatingCostOut]
+
+
 class DemoStatementResponse(ApiModel):
     building_name: str
     building_address: str
@@ -327,6 +446,9 @@ class DemoStatementResponse(ApiModel):
     heating_total_cents: int
     heating_total_eur: str
     heating_input_total_cents: int  # reconciliation: must equal heating_total_cents
+    # Set when the heating inputs are incomplete: heating_lines is then empty
+    # and this German sentence says what is missing. Never a silent zero.
+    heating_missing_reason: str | None
     co2: StatementCo2 | None
     rechtsstaende: list[str]
     disclaimer: str
