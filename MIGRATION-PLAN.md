@@ -47,9 +47,9 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
   rejected. **Mutation-checked:** disabling RLS on one table makes the test fail; re-enabling
   restores green. CI's Python lane runs it against a Postgres service with `LOKARA_REQUIRE_DB=1`,
   so it cannot silently skip.
-- Full suite: **133 pytest tests** (29 need the local Postgres; 1 more needs Playwright Chromium),
+- Full suite: **143 pytest tests** (39 need the local Postgres; 1 more needs Playwright Chromium),
   `mypy --strict` clean, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green
-  (17 vitest).
+  (19 vitest).
 
 **What works end-to-end today**
 
@@ -77,12 +77,22 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
 - **Objekte + Einheit/Mietverhältnis** (2026-07-25): CRUD under `/a/{account_id}` — create
   Building → Unit → Tenancy (Renter + TenancyParty in one transaction; **overlapping tenancy
   periods → 422** via `periods_overlap`; temporal rows are **create-only**, corrections become
-  new versions). Web: Objekte list → detail, Einheit page with the **tenancy timeline**
-  (validFrom/validTo bars, table as the accessible representation), and **autosave drafts** —
-  every keystroke mirrored to account-scoped localStorage, restored after abort/reload, cleared
-  only on successful submit (docs/04 non-negotiable, proven live: draft survives a full reload).
-  Money/area cross the form boundary as integer cents / m²×100 (German-format parsing, vitest).
-  Live check 12/12.
+  new versions). Web: Objekte list → detail, Einheit page with the **occupancy timeline** —
+  one track per unit where every day is a tenancy, an Eigennutzung, or a labelled **Leerstand**
+  gap (the gap is what explains the €181,48 landlord share; derivation pinned by vitest, segment
+  list as the accessible representation). **Autosave drafts** — every keystroke mirrored to
+  account-scoped localStorage, restored after abort/reload, cleared only on successful submit
+  (docs/04 non-negotiable, proven live: draft survives a full reload). Money/area cross the form
+  boundary as integer cents / m²×100 (German-format parsing, vitest).
+- **Kosten erfassen** (2026-07-25): `CostEntry` rows per building + Abrechnungszeitraum, money as
+  integer cents. **The Umlageschlüssel is never on the cost row** — it lives in append-only
+  `AllocationKeyAssignment` rows (latest wins), so re-keying re-runs the calculation and deletes
+  nothing: the API test switches AREA → UNITS → AREA and gets the goldens back byte-exact with
+  the history grown by 2, and a structural test forbids a `key` column on `cost_entry`.
+  DIRECT/MEA included (DIRECT validates its target is in the building). The statement now reads
+  these real rows — **the fixture cost constant is retired** — and the seeded demo still produces
+  €1.200,00 → 600,00 / 178,52 / 181,48 / 240,00. Deleting a cost is two-step (no data loss on a
+  misclick). Full demo path re-verified from an empty DB: **20/20**.
 
 **Next step:** the migration itself has only **G** (Expo mobile skeleton) and **H** (cutover:
 remove the TS backend, merge to `main`) left — but the pitch path (§0) now runs through the
@@ -95,10 +105,10 @@ that `packages/pdf` already renders.
   `@theme`, shadcn `destructive` → `--color-danger`, `StatusNote` = tint + icon shape + label (BFSG).
 - **`TODO(supabase)`** touchpoints: no Supabase project is wired — docker-compose Postgres and the
   dev-token endpoint stand in; the real session exchange lands at M5 (check HS256 vs JWKS then).
-- **M3 pages remaining** (`docs/04`): Kosten erfassen + Zähler (shown as "bald" in the nav).
-  Dashboard, Objekte, Einheit/Mietverhältnis and Abrechnung erstellen are built; statement
-  costs/meter totals are fixture constants (`apps/api/…/statement_service.py`) until those two
-  pages exist. The statement also still bills only the oldest (seeded) building.
+- **M3 pages remaining** (`docs/04`): **Zähler** only (shown as "bald" in the nav). Betriebskosten
+  are real entered rows now; the **heating-system totals** (€10.300 / 20.000 kWh / 40 m³ / CO₂)
+  are still clearly-marked fixture constants in `apps/api/…/statement_service.py` until the Zähler
+  page lands. The statement also still bills only the oldest (seeded) building per account.
 - TS backend (NestJS/Prisma) still coexists as reference; it comes out at Phase H.
 
 **How to run it**
