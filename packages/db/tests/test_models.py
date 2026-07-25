@@ -24,6 +24,9 @@ EXPECTED_TABLES = {
     "statement",
     "cost_entry",
     "allocation_key_assignment",
+    "meter",
+    "meter_reading",
+    "heating_cost_entry",
 }
 
 
@@ -98,6 +101,44 @@ class TestSchemaShape:
         exactly that bug."""
         assert "key" not in _table("cost_entry").columns
         assert "key" in _table("allocation_key_assignment").columns
+
+    def test_heating_costs_carry_no_allocation_key(self) -> None:
+        """§§ 7-9 HeizkostenV dictate how heating costs split, so offering an
+        Umlageschlüssel for them would be legally wrong — which is why they are
+        their own table rather than a flag on cost_entry."""
+        heating = _table("heating_cost_entry")
+        assert "key" not in heating.columns
+        assert "allocation_key" not in heating.columns
+        assert not any(
+            fk.column.table.name == "allocation_key_assignment"
+            for col in heating.columns
+            for fk in col.foreign_keys
+        )
+
+    def test_meter_readings_are_append_only_by_shape(self) -> None:
+        """A reading has no mutable-state column (no `superseded`, no
+        `replaced_by`): supersession is DERIVED from read_at + recorded_at, so
+        a correction is a plain INSERT and history cannot be rewritten."""
+        reading = _table("meter_reading")
+        assert {"read_at", "value_x1000", "reason", "source", "recorded_at"} <= set(
+            reading.columns.keys()
+        )
+        for forbidden in ("superseded", "replaced_by", "deleted_at", "updated_at"):
+            assert forbidden not in reading.columns, forbidden
+
+    def test_eichfrist_is_a_date_not_a_flag(self) -> None:
+        """The expiry warning is computed from the date on every read — storing
+        a boolean would go stale the day after it was written."""
+        meter = _table("meter")
+        assert "calibration_valid_until" in meter.columns
+        # Nullable: Heizkostenverteiler are not eichpflichtig at all.
+        assert meter.columns["calibration_valid_until"].nullable
+        assert "calibration_expired" not in meter.columns
+
+    def test_a_meter_may_belong_to_the_building_rather_than_a_unit(self) -> None:
+        """The building's Wärmemengenzähler measures the whole system — its
+        kWh are the § 9 denominator, so unit_id must be nullable."""
+        assert _table("meter").columns["unit_id"].nullable
 
 
 class TestSettings:

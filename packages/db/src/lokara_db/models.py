@@ -15,8 +15,22 @@ Conventions:
 import enum
 from datetime import date, datetime
 
-from lokara_domain import AllocationKey
-from sqlalchemy import Date, DateTime, ForeignKey, Index, UniqueConstraint, func
+from lokara_domain import (
+    AllocationKey,
+    MeasurementUnit,
+    MeterKind,
+    ReadingReason,
+    ReadingSource,
+)
+from sqlalchemy import (
+    BigInteger,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy import Enum as SaEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -69,6 +83,10 @@ class Base(DeclarativeBase):
         StatementStatus: SaEnum(StatementStatus, name="statement_status"),
         SelfUseKind: SaEnum(SelfUseKind, name="self_use_kind"),
         AllocationKey: SaEnum(AllocationKey, name="allocation_key"),
+        MeterKind: SaEnum(MeterKind, name="meter_kind"),
+        MeasurementUnit: SaEnum(MeasurementUnit, name="measurement_unit"),
+        ReadingReason: SaEnum(ReadingReason, name="reading_reason"),
+        ReadingSource: SaEnum(ReadingSource, name="reading_source"),
     }
 
 
@@ -203,6 +221,10 @@ class Building(Base):
     units: Mapped[list["Unit"]] = relationship(back_populates="building")
     statements: Mapped[list["Statement"]] = relationship(back_populates="building")
     cost_entries: Mapped[list["CostEntry"]] = relationship(back_populates="building")
+    meters: Mapped[list["Meter"]] = relationship(back_populates="building")
+    heating_cost_entries: Mapped[list["HeatingCostEntry"]] = relationship(
+        back_populates="building"
+    )
 
     __table_args__ = (Index("ix_building_account", "account_id"),)
 
@@ -221,6 +243,7 @@ class Unit(Base):
     building: Mapped["Building"] = relationship(back_populates="units")
     tenancies: Mapped[list["Tenancy"]] = relationship(back_populates="unit")
     self_use_periods: Mapped[list["SelfUsePeriod"]] = relationship(back_populates="unit")
+    meters: Mapped[list["Meter"]] = relationship(back_populates="unit")
 
     __table_args__ = (
         Index("ix_unit_account", "account_id"),
@@ -379,6 +402,110 @@ class AllocationKeyAssignment(Base):
     )
 
 
+# ── Zähler (docs/04 M3 page 5): meters, readings, heating-system costs. ──
+
+
+class Meter(Base):
+    """A measuring device. ``unit_id`` NULL = a building-level Hauptzähler
+    (the Wärmemengenzähler whose kWh are the § 9 HeizkostenV denominator).
+
+    ``calibration_valid_until`` is the **Eichfrist** (MessEG/MessEV): 5 years
+    for Wärme- and Warmwasserzähler, 6 for Kaltwasserzähler. It is NULL for
+    Heizkostenverteiler, which are not eichpflichtig — a null therefore means
+    "not applicable", never "unknown". Whether it has expired is *computed*
+    from it, never stored (CLAUDE.md: one guard pattern, no denormalized flags).
+    """
+
+    __tablename__ = "meter"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    unit_id: Mapped[str | None] = mapped_column(ForeignKey("unit.id"))
+    kind: Mapped[MeterKind]
+    measurement_unit: Mapped[MeasurementUnit]
+    serial: Mapped[str]  # Zählernummer as printed on the device
+    label: Mapped[str | None]  # e.g. "Küche" when a flat has several
+    calibration_valid_until: Mapped[date | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    building: Mapped["Building"] = relationship(back_populates="meters")
+    unit: Mapped["Unit | None"] = relationship(back_populates="meters")
+    readings: Mapped[list["MeterReading"]] = relationship(back_populates="meter")
+
+    __table_args__ = (
+        UniqueConstraint("building_id", "serial"),
+        Index("ix_meter_account", "account_id"),
+        Index("ix_meter_building", "building_id"),
+        Index("ix_meter_unit", "unit_id"),
+    )
+
+
+class MeterReading(Base):
+    """A point-in-time register value — **create-only**.
+
+    A wrong value is corrected by inserting a new row for the same ``read_at``
+    with ``reason = CORRECTION``; the later ``recorded_at`` wins and the
+    original stays as evidence. Nothing here is ever UPDATEd or deleted, which
+    is what lets a statement be re-derived exactly as it was billed.
+
+    ``value_x1000`` is the register value × 1000 (integer, like every other
+    fixed-point quantity here) — 241,5 m³ is stored as 241500. Floats never
+    touch a consumption that ends up in money.
+    """
+
+    __tablename__ = "meter_reading"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    meter_id: Mapped[str] = mapped_column(ForeignKey("meter.id"))
+    read_at: Mapped[date]
+    value_x1000: Mapped[int] = mapped_column(BigInteger)
+    reason: Mapped[ReadingReason]
+    source: Mapped[ReadingSource]
+    note: Mapped[str | None]
+    recorded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    meter: Mapped["Meter"] = relationship(back_populates="readings")
+
+    __table_args__ = (
+        Index("ix_meter_reading_account", "account_id"),
+        Index("ix_meter_reading_meter", "meter_id"),
+    )
+
+
+class HeatingCostEntry(Base):
+    """The heating-system invoice for a period (Brennstoff, Wartung,
+    Betriebsstrom …).
+
+    Deliberately NOT a `CostEntry`: heating costs carry no Umlageschlüssel —
+    §§ 7–9 HeizkostenV dictate their split, so offering an AllocationKey here
+    would be legally wrong. The CO₂ figures come off the same fuel invoice
+    (mandatory disclosure since 2023) and drive the CO2KostAufG split; both are
+    nullable because a Wärmelieferung invoice may not state them.
+    """
+
+    __tablename__ = "heating_cost_entry"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    label: Mapped[str]
+    amount_cents: Mapped[int]  # total, INCLUDING the CO₂ portion below
+    period_from: Mapped[date]
+    period_to: Mapped[date]  # exclusive
+    co2_kg_x1000: Mapped[int | None] = mapped_column(BigInteger)
+    co2_cost_cents: Mapped[int | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    building: Mapped["Building"] = relationship(back_populates="heating_cost_entries")
+
+    __table_args__ = (
+        Index("ix_heating_cost_account", "account_id"),
+        Index("ix_heating_cost_building", "building_id"),
+    )
+
+
 # Tables scoped by account_id — the Alembic migration enables FORCEd RLS on each
 # of these plus `account` (scoped by its own id) and `building_assignment`
 # (scoped via its membership). `person` is global by design.
@@ -394,4 +521,7 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "statement",
     "cost_entry",
     "allocation_key_assignment",
+    "meter",
+    "meter_reading",
+    "heating_cost_entry",
 )

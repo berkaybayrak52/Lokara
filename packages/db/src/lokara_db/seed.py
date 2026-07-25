@@ -11,9 +11,15 @@ bypasses the FORCEd RLS. TODO(supabase): the Supabase owner is a non-superuser,
 so there the seed must set the app.account_id context first.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 
-from lokara_domain import AllocationKey
+from lokara_domain import (
+    AllocationKey,
+    MeasurementUnit,
+    MeterKind,
+    ReadingReason,
+    ReadingSource,
+)
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -21,7 +27,10 @@ from .models import (
     AllocationKeyAssignment,
     Building,
     CostEntry,
+    HeatingCostEntry,
     Membership,
+    Meter,
+    MeterReading,
     Person,
     Renter,
     Role,
@@ -51,6 +60,136 @@ _TENANCIES = (
     ("ten_demo_b1", "unit_demo_b", "ren_demo_2", date(2021, 9, 1), date(2025, 7, 1), 68000, 15000),
     ("ten_demo_c1", "unit_demo_c", "ren_demo_3", date(2024, 1, 1), None, 52000, 11000),
 )
+
+# ── Zähler (docs/06 Scenario 2: "consumption meters per unit, one warm-water
+# meter"). The register PAIRS are the fixture: their differences are exactly the
+# heating goldens — building 20.000 kWh / 40 m³, flats 600/250/150 HKV units and
+# 20/12/8 m³. Values are × 1000 (fixed point).
+#
+# (meter_id, unit_id, kind, unit, serial, label, Eichfrist, opening, closing)
+_METERS: tuple[
+    tuple[
+        str,
+        str | None,
+        MeterKind,
+        MeasurementUnit,
+        str,
+        str | None,
+        date | None,
+        int,
+        int,
+    ],
+    ...,
+] = (
+    (
+        "met_demo_heat_main",
+        None,
+        MeterKind.HEAT,
+        MeasurementUnit.KWH,
+        "WMZ-2022-004711",
+        "Wärmemengenzähler Heizzentrale",
+        date(2027, 12, 31),
+        148_500_000,
+        168_500_000,
+    ),
+    (
+        "met_demo_ww_main",
+        None,
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "WWZ-2022-118342",
+        "Warmwasserzähler Heizzentrale",
+        date(2027, 12, 31),
+        812_000,
+        852_000,
+    ),
+    # Heizkostenverteiler are NOT eichpflichtig → Eichfrist stays NULL.
+    (
+        "met_demo_heat_a",
+        "unit_demo_a",
+        MeterKind.HEAT,
+        MeasurementUnit.HKV_UNITS,
+        "HKV-A-100231",
+        None,
+        None,
+        1_200_000,
+        1_800_000,
+    ),
+    (
+        "met_demo_heat_b",
+        "unit_demo_b",
+        MeterKind.HEAT,
+        MeasurementUnit.HKV_UNITS,
+        "HKV-B-100232",
+        None,
+        None,
+        3_400_000,
+        3_650_000,
+    ),
+    (
+        "met_demo_heat_c",
+        "unit_demo_c",
+        MeterKind.HEAT,
+        MeasurementUnit.HKV_UNITS,
+        "HKV-C-100233",
+        None,
+        None,
+        880_000,
+        1_030_000,
+    ),
+    (
+        "met_demo_ww_a",
+        "unit_demo_a",
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "WWZ-A-556101",
+        None,
+        date(2028, 12, 31),
+        241_500,
+        261_500,
+    ),
+    (
+        "met_demo_ww_b",
+        "unit_demo_b",
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "WWZ-B-556102",
+        None,
+        date(2028, 12, 31),
+        96_200,
+        108_200,
+    ),
+    (
+        "met_demo_ww_c",
+        "unit_demo_c",
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "WWZ-C-556103",
+        None,
+        date(2028, 12, 31),
+        55_000,
+        63_000,
+    ),
+    # Deliberately expired, and deliberately COLD water: it demonstrates the
+    # Eichfrist warning on the Zähler page without touching a single number the
+    # heating engine consumes.
+    (
+        "met_demo_kw_c",
+        "unit_demo_c",
+        MeterKind.COLD_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "KWZ-C-441097",
+        None,
+        date(2025, 12, 31),
+        302_400,
+        340_900,
+    ),
+)
+
+_READ_FROM = date(2025, 1, 1)
+_READ_TO = date(2025, 12, 31)
+# Fixed so re-seeding never reshuffles which reading is the "latest" one.
+_RECORDED_AT = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
 
 
 def seed_demo(session: Session) -> None:
@@ -129,6 +268,65 @@ def seed_demo(session: Session) -> None:
             key=AllocationKey.AREA,
         )
     )
+
+    # The heating-system invoice: € 10.300,00 total, of which € 300,00 is the
+    # CO₂ price on 2.000 kg — the numbers the CO2KostAufG split runs on. Held
+    # apart from CostEntry on purpose: §§ 7-9 HeizkostenV dictate the split, so
+    # a heating cost never carries an Umlageschlüssel.
+    session.merge(
+        HeatingCostEntry(
+            id="hcost_demo_2025",
+            account_id=DEMO_ACCOUNT_ID,
+            building_id="bld_demo_muster12",
+            label="Heizung & Warmwasser (Brennstoff, Wartung, Betriebsstrom)",
+            amount_cents=1_030_000,
+            period_from=date(2025, 1, 1),
+            period_to=date(2026, 1, 1),
+            co2_kg_x1000=2_000_000,
+            co2_cost_cents=30_000,
+        )
+    )
+
+    for (
+        meter_id,
+        meter_unit_id,
+        kind,
+        measurement_unit,
+        serial,
+        meter_label,
+        eichfrist,
+        opening,
+        closing,
+    ) in _METERS:
+        session.merge(
+            Meter(
+                id=meter_id,
+                account_id=DEMO_ACCOUNT_ID,
+                building_id="bld_demo_muster12",
+                unit_id=meter_unit_id,
+                kind=kind,
+                measurement_unit=measurement_unit,
+                serial=serial,
+                label=meter_label,
+                calibration_valid_until=eichfrist,
+            )
+        )
+        for suffix, read_at, value in (
+            ("open", _READ_FROM, opening),
+            ("close", _READ_TO, closing),
+        ):
+            session.merge(
+                MeterReading(
+                    id=f"mr_{meter_id}_{suffix}",
+                    account_id=DEMO_ACCOUNT_ID,
+                    meter_id=meter_id,
+                    read_at=read_at,
+                    value_x1000=value,
+                    reason=ReadingReason.PERIODIC,
+                    source=ReadingSource.MDL,
+                    recorded_at=_RECORDED_AT,
+                )
+            )
 
 
 def main() -> None:

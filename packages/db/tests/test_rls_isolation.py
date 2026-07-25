@@ -30,7 +30,10 @@ from lokara_db import (
     BuildingAssignment,
     CostEntry,
     DbSettings,
+    HeatingCostEntry,
     Membership,
+    Meter,
+    MeterReading,
     Person,
     Renter,
     Role,
@@ -40,7 +43,13 @@ from lokara_db import (
     create_db_engine,
     new_id,
 )
-from lokara_domain import AllocationKey
+from lokara_domain import (
+    AllocationKey,
+    MeasurementUnit,
+    MeterKind,
+    ReadingReason,
+    ReadingSource,
+)
 from sqlalchemy import CursorResult, Engine, select, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
@@ -87,6 +96,9 @@ class _Seed:
         self.assignment_a = new_id()
         self.cost_a = new_id()
         self.key_assignment_a = new_id()
+        self.meter_a = new_id()
+        self.reading_a = new_id()
+        self.heating_cost_a = new_id()
 
 
 @pytest.fixture(scope="module")
@@ -155,9 +167,48 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 key=AllocationKey.AREA,
             )
         )
+        session.add(
+            HeatingCostEntry(
+                id=ids.heating_cost_a,
+                account_id=ids.account_a,
+                building_id=ids.building_a,
+                label="Heizung & Warmwasser",
+                amount_cents=1_030_000,
+                period_from=date(2025, 1, 1),
+                period_to=date(2026, 1, 1),
+                co2_kg_x1000=2_000_000,
+                co2_cost_cents=30_000,
+            )
+        )
+        session.add(
+            Meter(
+                id=ids.meter_a,
+                account_id=ids.account_a,
+                building_id=ids.building_a,
+                kind=MeterKind.HEAT,
+                measurement_unit=MeasurementUnit.KWH,
+                serial="WMZ-A-1",
+                calibration_valid_until=date(2029, 12, 31),
+            )
+        )
+    with Session(owner) as session, session.begin():
+        session.add(
+            MeterReading(
+                id=ids.reading_a,
+                account_id=ids.account_a,
+                meter_id=ids.meter_a,
+                read_at=date(2025, 1, 1),
+                value_x1000=148_500_000,
+                reason=ReadingReason.PERIODIC,
+                source=ReadingSource.MDL,
+            )
+        )
     yield ids
     with Session(owner) as session, session.begin():
         for model, row_id in (
+            (MeterReading, ids.reading_a),
+            (Meter, ids.meter_a),
+            (HeatingCostEntry, ids.heating_cost_a),
             (AllocationKeyAssignment, ids.key_assignment_a),
             (CostEntry, ids.cost_a),
             (Statement, ids.statement_a),
@@ -205,6 +256,9 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(BuildingAssignment)).all() == []
             assert session.scalars(select(CostEntry)).all() == []
             assert session.scalars(select(AllocationKeyAssignment)).all() == []
+            assert session.scalars(select(Meter)).all() == []
+            assert session.scalars(select(MeterReading)).all() == []
+            assert session.scalars(select(HeatingCostEntry)).all() == []
             assert session.scalars(select(Account.id)).all() == [seed.account_b]
 
     def test_own_context_sees_own_rows(
@@ -221,6 +275,11 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(CostEntry.id)).all() == [seed.cost_a]
             assert session.scalars(select(AllocationKeyAssignment.id)).all() == [
                 seed.key_assignment_a
+            ]
+            assert session.scalars(select(Meter.id)).all() == [seed.meter_a]
+            assert session.scalars(select(MeterReading.id)).all() == [seed.reading_a]
+            assert session.scalars(select(HeatingCostEntry.id)).all() == [
+                seed.heating_cost_a
             ]
             assert session.scalars(select(Account.id)).all() == [seed.account_a]
 
@@ -249,6 +308,29 @@ class TestCrossAccountIsolation:
                     street="Leak-Allee 1",
                     postal_code="00000",
                     city="Nirgendwo",
+                )
+            )
+            session.flush()
+
+    def test_cross_account_reading_insert_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """meter_reading is append-only, so INSERT is its ONLY write path —
+        which makes WITH CHECK the whole of its isolation. B must not be able
+        to append a reading onto A's meter."""
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                MeterReading(
+                    account_id=seed.account_a,
+                    meter_id=seed.meter_a,
+                    read_at=date(2025, 12, 31),
+                    value_x1000=999_000_000,
+                    reason=ReadingReason.CORRECTION,
+                    source=ReadingSource.MANUAL,
                 )
             )
             session.flush()
