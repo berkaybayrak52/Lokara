@@ -102,6 +102,7 @@ export const SelfUsePeriodOutSchema = z.object({
   validFrom: z.string(),
   validTo: z.string().nullable(),
 });
+export type SelfUsePeriodOut = z.infer<typeof SelfUsePeriodOutSchema>;
 
 export const UnitDetailResponseSchema = z.object({
   id: z.string(),
@@ -113,6 +114,37 @@ export const UnitDetailResponseSchema = z.object({
   selfUsePeriods: z.array(SelfUsePeriodOutSchema),
 });
 export type UnitDetailResponse = z.infer<typeof UnitDetailResponseSchema>;
+
+export const ALLOCATION_KEYS = ['AREA', 'PERSONS', 'CONSUMPTION', 'UNITS', 'DIRECT', 'MEA'] as const;
+export const AllocationKeySchema = z.enum(ALLOCATION_KEYS);
+export type AllocationKey = z.infer<typeof AllocationKeySchema>;
+
+/** German Umlageschlüssel labels — mirrors the API's labels (docs/03). */
+export const ALLOCATION_KEY_LABELS: Record<AllocationKey, string> = {
+  AREA: 'Wohnfläche (m²·Tage)',
+  PERSONS: 'Personenzahl (Personen·Tage)',
+  CONSUMPTION: 'Verbrauch',
+  UNITS: 'Einheiten (Einheiten·Tage)',
+  DIRECT: 'Direktzuordnung',
+  MEA: 'Miteigentumsanteile (MEA·Tage)',
+};
+
+export const CostEntryOutSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  amountCents: z.number().int(),
+  amountEur: z.string(),
+  periodFrom: z.string(),
+  periodTo: z.string(),
+  key: AllocationKeySchema,
+  keyLabel: z.string(),
+  directUnitId: z.string().nullable(),
+  directTenancyId: z.string().nullable(),
+  assignmentCount: z.number().int(),
+});
+export type CostEntryOut = z.infer<typeof CostEntryOutSchema>;
+
+export const CostListResponseSchema = z.object({ costs: z.array(CostEntryOutSchema) });
 
 export const StatementNkLineSchema = z.object({
   partyLabel: z.string(),

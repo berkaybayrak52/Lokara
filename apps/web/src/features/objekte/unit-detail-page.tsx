@@ -122,12 +122,15 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
                 <CardHeader>
                   <CardTitle>Zeitstrahl</CardTitle>
                   <CardDescription>
-                    Jedes Mietverhältnis ist ein Zeitraum (validFrom/validTo) — niemals ein
-                    einzelner Wert.
+                    Jeder Tag ist belegt: Mietverhältnis, Eigennutzung oder Leerstand. Zeiträume
+                    sind halboffen (validFrom/validTo) — niemals einzelne Werte.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <TenancyTimeline tenancies={unit.tenancies} />
+                  <TenancyTimeline
+                    tenancies={unit.tenancies}
+                    selfUsePeriods={unit.selfUsePeriods}
+                  />
                 </CardContent>
               </Card>
               <Card>

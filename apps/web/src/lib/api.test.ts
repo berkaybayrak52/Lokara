@@ -44,6 +44,13 @@ describe('api interceptor', () => {
     expect(callsTo('/api/session')).toBe(0);
   });
 
+  it('handles a 204 with no body', async () => {
+    const { api } = await loadApi();
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await expect(api('/thing', z.undefined())).resolves.toBeUndefined();
+  });
+
   it('rejects a 200 whose body violates the contract', async () => {
     const { api } = await loadApi();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { pong: 'yes' }));

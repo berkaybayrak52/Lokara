@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@lokara/ui';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { API_URL, ApiError } from '@/lib/api';
@@ -73,19 +74,44 @@ export function StatementPage({ accountId }: { accountId: string }) {
           </Button>
         </div>
       ) : (
-        <StatementResult data={statement.data} pdfUrl={pdfUrl} />
+        <StatementResult data={statement.data} pdfUrl={pdfUrl} accountId={accountId} />
       )}
     </main>
   );
 }
 
-function StatementResult({ data, pdfUrl }: { data: DemoStatementResponse; pdfUrl: string }) {
+function StatementResult({
+  data,
+  pdfUrl,
+  accountId,
+}: {
+  data: DemoStatementResponse;
+  pdfUrl: string;
+  accountId: string;
+}) {
   return (
     <div className="max-w-4xl space-y-8">
       <section aria-labelledby="nk-heading">
         <h2 id="nk-heading" className="mb-3 font-display text-xl font-bold">
           Betriebskosten
         </h2>
+        {data.nkCosts.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Keine Betriebskosten im Zeitraum</CardTitle>
+              <CardDescription>
+                Für 2025 sind noch keine Kostenarten erfasst. Erfassen Sie sie unter{' '}
+                <Link
+                  href={`/a/${accountId}/kosten`}
+                  className="text-green underline underline-offset-4"
+                >
+                  Kosten erfassen
+                </Link>{' '}
+                — die Abrechnung rechnet danach automatisch neu.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : null}
         {data.nkCosts.map((cost) => (
           <Card key={cost.label}>
             <CardHeader>

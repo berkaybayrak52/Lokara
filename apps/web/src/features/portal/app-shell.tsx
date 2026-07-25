@@ -29,12 +29,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: (id) => `/a/${id}`, label: 'Übersicht', activePrefixes: [] },
   // Einheiten pages belong to the Objekte section (list → detail → unit).
   { href: (id) => `/a/${id}/objekte`, label: 'Objekte', activePrefixes: ['/objekte', '/einheiten'] },
+  { href: (id) => `/a/${id}/kosten`, label: 'Kosten erfassen', activePrefixes: ['/kosten'] },
   { href: (id) => `/a/${id}/abrechnung`, label: 'Abrechnung erstellen', activePrefixes: ['/abrechnung'] },
 ];
 
 // The rest of the M3 pages, visible but explicitly not yet available — an
 // honest roadmap beats dead links (and hiding them would misrepresent scope).
-const UPCOMING = ['Kosten erfassen', 'Zähler'];
+const UPCOMING = ['Zähler'];
 
 export function AppShell({ accountId, children }: { accountId: string; children: React.ReactNode }) {
   const pathname = usePathname();

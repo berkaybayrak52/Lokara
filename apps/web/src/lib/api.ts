@@ -68,5 +68,10 @@ export async function api<Schema extends z.ZodType>(
   if (!response.ok) {
     throw new ApiError(response.status, path);
   }
+  // 204 has no body — parse `undefined` so the caller still declares a schema
+  // (z.undefined()) instead of the call silently skipping validation.
+  if (response.status === 204) {
+    return schema.parse(undefined) as z.infer<Schema>;
+  }
   return schema.parse(await response.json()) as z.infer<Schema>;
 }
