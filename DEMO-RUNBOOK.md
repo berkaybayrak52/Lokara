@@ -44,8 +44,8 @@ bun run --filter @lokara/web dev          # web on :3000
 
 ## 2. The click path
 
-Keep it to four screens. Don't wander into pages marked **"bald"** — they're honest placeholders,
-but they're not the story.
+Keep it to five screens, in this order. M3 is complete, so every nav entry is a real page — but
+resist wandering: the story is the money screen at the end.
 
 ### Screen 1 — Dashboard (`/a/acc_demo_lokara`)
 
@@ -67,7 +67,18 @@ Start on an **empty** database if you can — the cold-start moment is good.
   start and an end. When the flat sits empty, those days belong to the landlord, not to the next
   tenant. Competitors get this wrong or make you delete data to fix it."*
 
-### Screen 4 — Abrechnung erstellen (⭐ the money screen)
+### Screen 4 — Zähler (why the heating numbers are defensible)
+
+- Point at the building's **Wärmemengenzähler** (20.000 kWh) and one flat's **Heizkostenverteiler**
+  (600 Einheiten), then at the **expired Eichfrist** badge on the cold-water meter.
+- **Say:** *"Consumption isn't typed as a total — it's derived from opening and closing register
+  readings, the same shape whether a person types them or a Messdienstleister delivers them. And
+  readings are never edited: a correction is a new row that supersedes the old one, which stays
+  visible. That's what makes a statement re-derivable years later."*
+- Optional 20-second beat if the room is technical: open a meter's readings, enter a wrong closing
+  value, show the statement move, then record a **Korrektur** and watch the numbers come back.
+
+### Screen 5 — Abrechnung erstellen (⭐ the money screen)
 
 This is the pitch. Slow down here.
 
@@ -100,10 +111,11 @@ This is the pitch. Slow down here.
 
 ## 4. Say this if asked (honest answers)
 
-- **"Is this real or hardcoded?"** — *"The allocation is computed by a tested engine; the €1,200
-  example is a golden fixture that runs in CI and must reconcile to the cent. The **cost capture
-  screen** isn't built yet, so the cost totals come from the seeded scenario — that's the next screen
-  we're building."* **Do not claim costs were typed in.**
+- **"Is this real or hardcoded?"** — *"Everything on the statement is computed from rows you can see
+  and edit in the app: the €1.200 cost on Kosten erfassen, the €10.300 heating invoice and the meter
+  readings on Zähler. The same €1.200 case is also a golden fixture that runs in CI and must
+  reconcile to the cent."* You can prove it live — change a value on Kosten or Zähler and re-run the
+  Abrechnung. The seed fills those rows in one click; nothing is a constant in the code.
 - **"Is it multi-tenant safe?"** — *"Every row is scoped by account, enforced twice: in the API and in
   Postgres row-level security. There's a test that proves a landlord from another account sees
   nothing — and we mutation-check it by disabling the policy to confirm the test actually fails."*
@@ -132,5 +144,5 @@ the story survives; a blank browser doesn't.
 
 ## 6. Don't demo these
 
-`Kosten erfassen`, `Zähler`, and anything marked **"bald"** in the nav — not built yet.
-Mobile, bank sync, tax export, contracts: **roadmap**, not screens.
+Mobile, bank sync, doc extraction, tax export, contracts, the Mieter/StB portals: **roadmap**, not
+screens. The five personas in `docs/06` are a **model** to explain, not a UI to click — M5/M10.

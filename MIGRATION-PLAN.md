@@ -47,9 +47,9 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
   rejected. **Mutation-checked:** disabling RLS on one table makes the test fail; re-enabling
   restores green. CI's Python lane runs it against a Postgres service with `LOKARA_REQUIRE_DB=1`,
   so it cannot silently skip.
-- Full suite: **143 pytest tests** (39 need the local Postgres; 1 more needs Playwright Chromium),
-  `mypy --strict` clean, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green
-  (19 vitest).
+- Full suite: **176 pytest tests** (58 need the local Postgres; 1 more needs Playwright Chromium),
+  `mypy --strict` clean on 80 files, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build`
+  green (22 vitest).
 
 **What works end-to-end today**
 
@@ -93,11 +93,30 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
   these real rows — **the fixture cost constant is retired** — and the seeded demo still produces
   €1.200,00 → 600,00 / 178,52 / 181,48 / 240,00. Deleting a cost is two-step (no data loss on a
   misclick). Full demo path re-verified from an empty DB: **20/20**.
+- **Zähler** (2026-07-25) — **M3 is complete**. `Meter` rows per building *or* unit (a NULL
+  `unit_id` is the building's Wärmemengenzähler, whose kWh are the § 9 denominator; only the
+  `measurement_unit` separates it from the flats' dimensionless Heizkostenverteiler). The
+  **Eichfrist** is a date, and expiry is computed on every read — never a stored flag; NULL means
+  "nicht eichpflichtig" (HKV), which is a fact, not a warning. `MeterReading` is **create-only**:
+  a correction is a new row for the same date whose later `recorded_at` supersedes the earlier
+  value, which stays visible (GoBD / § 147 AO); there is no PUT/PATCH route, asserted by a test
+  over the OpenAPI paths. Readings carry the Phase D shape (value, unit, reason, source), so a
+  hand-typed reading and an MDL delivery are one model downstream.
+  **The last four fixtures are retired:** `apps/api/…/statement_service.py` now holds no constants
+  at all — 20.000 kWh and 40 m³ are folded from the building meters, 600/250/150 units and
+  20/12/8 m³ from the flats' meters, and €10.300 with its 2.000 kg / €300 CO₂ figures are a
+  `HeatingCostEntry` (its own table: heating costs carry **no** Umlageschlüssel, because §§ 7-9
+  HeizkostenV decide their split). `DbMeterGateway` is the second implementation of the Phase D
+  `MeterGateway` port, so the statement cannot tell a fixture stub from entered rows. If the inputs
+  are incomplete the API **refuses and explains** in German rather than estimating, and the
+  Betriebskosten still compute. The goldens are unchanged: 585/415 ‰ → €786,24 / €557,76, the CO₂
+  block with `Rechtsstand 01/2023`, and €1.200,00 → 600,00 / 178,52 / 181,48 / 240,00.
+  Full demo path re-verified from an empty DB: **27/27**, including the typo → Korrektur →
+  goldens-restored round-trip in the browser.
 
-**Next step:** the migration itself has only **G** (Expo mobile skeleton) and **H** (cutover:
-remove the TS backend, merge to `main`) left — but the pitch path (§0) now runs through the
-**M3 pages** (docs/04): the six Vermieter-portal screens on the live API, ending in the PDF
-that `packages/pdf` already renders.
+**Next step:** **M3 is done** — all six Vermieter-portal screens (docs/04) run on the live API and
+every number on the statement comes from entered rows. The migration has only **G** (Expo mobile
+skeleton) and **H** (cutover: remove the TS backend, merge to `main`) left.
 
 **Known open items**
 
@@ -105,10 +124,11 @@ that `packages/pdf` already renders.
   `@theme`, shadcn `destructive` → `--color-danger`, `StatusNote` = tint + icon shape + label (BFSG).
 - **`TODO(supabase)`** touchpoints: no Supabase project is wired — docker-compose Postgres and the
   dev-token endpoint stand in; the real session exchange lands at M5 (check HS256 vs JWKS then).
-- **M3 pages remaining** (`docs/04`): **Zähler** only (shown as "bald" in the nav). Betriebskosten
-  are real entered rows now; the **heating-system totals** (€10.300 / 20.000 kWh / 40 m³ / CO₂)
-  are still clearly-marked fixture constants in `apps/api/…/statement_service.py` until the Zähler
-  page lands. The statement also still bills only the oldest (seeded) building per account.
+- **M3 pages: none remaining** (`docs/04`) — the nav has no "bald" entries left. Two scope limits
+  stand: the statement bills only the **oldest** building per account and a **fixed 2025 period**
+  (`BILLING_START`/`BILLING_END`); both become user-chosen at M4. `packages/pdf`'s own
+  `lokara-pdf-demo` keeps local fixture numbers on purpose — that package must not depend on
+  `lokara_db`.
 - TS backend (NestJS/Prisma) still coexists as reference; it comes out at Phase H.
 
 **How to run it**
