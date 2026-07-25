@@ -19,7 +19,7 @@ from lokara_api import create_app
 from lokara_api.auth import create_dev_token
 from lokara_api.settings import ApiSettings
 from lokara_db import Account, DbSettings, Membership, Person, Role, create_db_engine
-from lokara_db.seed import DEMO_ACCOUNT_ID, seed_demo
+from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -61,6 +61,14 @@ def client() -> Iterator[TestClient]:
                 role=Role.OWNER,
             )
         )
+        # "Zero domain data" has to be true on every run, not just the first:
+        # TestDemoReset creates a building here to prove the reset cannot reach
+        # it, and that row would otherwise survive into the next run and break
+        # the isolation test's 404.
+        for table in ("unit", "building"):
+            session.execute(
+                text(f"DELETE FROM {table} WHERE account_id = :a"), {"a": ISO_ACCOUNT_ID}
+            )
     owner.dispose()
     yield TestClient(create_app())
 
@@ -114,3 +122,80 @@ class TestApiIsolation:
             "/demo/summary", headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID)
         )
         assert response.status_code == 404
+
+
+class TestDemoReset:
+    """`POST /demo/reset` — the pitch's undo button. It DELETES, so the two
+    things worth proving are that it removes exactly the stray rows and that
+    it cannot touch another account's data."""
+
+    def test_reset_removes_stray_rows_and_restores_the_scenario(
+        self, client: TestClient
+    ) -> None:
+        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        base = f"/a/{DEMO_ACCOUNT_ID}"
+
+        # A rehearsal leftover: exactly what pollutes the Objekte list.
+        created = client.post(
+            f"{base}/buildings",
+            headers=headers,
+            json={
+                "name": "Testgasse 5",
+                "street": "Testgasse 5",
+                "postalCode": "60313",
+                "city": "Frankfurt am Main",
+            },
+        )
+        assert created.status_code == 201
+        listed = client.get(f"{base}/buildings", headers=headers).json()["buildings"]
+        assert "Testgasse 5" in [b["name"] for b in listed]
+
+        assert client.post("/demo/reset", headers=headers).status_code == 200
+
+        buildings = client.get(f"{base}/buildings", headers=headers).json()["buildings"]
+        assert [b["name"] for b in buildings] == ["Musterstraße 12"]
+        # Re-seeded, not merely emptied: the scenario is back in full.
+        assert buildings[0]["unitCount"] == 3
+        summary = client.get("/demo/summary", headers=headers).json()
+        assert len(summary["tenancies"]) == 3
+
+    def test_reset_leaves_the_callers_own_access_intact(self, client: TestClient) -> None:
+        """It must not wipe the Account/Membership it runs under — doing so
+        would 403 the very session that pressed the button."""
+        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        assert client.post("/demo/reset", headers=headers).status_code == 200
+        me = client.get("/me", headers=headers).json()
+        assert [a["id"] for a in me["accounts"]] == [DEMO_ACCOUNT_ID]
+
+    def test_reset_cannot_delete_another_accounts_rows(self, client: TestClient) -> None:
+        """The guarantee that matters for a DELETE endpoint.
+
+        Like /demo/load, this one is not scoped to the caller — it always acts
+        on the fixed demo account, so any authenticated caller may trigger it
+        (both are dev-only and flag-gated). What must hold is that it can never
+        reach past that account: the DELETEs run under the demo account's RLS
+        context, so a caller from elsewhere cannot use it to wipe their own —
+        or anyone else's — data.
+        """
+        iso = _token(ISO_PERSON_ID, ISO_ACCOUNT_ID)
+        created = client.post(
+            f"/a/{ISO_ACCOUNT_ID}/buildings",
+            headers=iso,
+            json={
+                "name": "Fremdes Haus",
+                "street": "Fremdweg 1",
+                "postalCode": "10115",
+                "city": "Berlin",
+            },
+        )
+        assert created.status_code == 201
+
+        assert client.post("/demo/reset", headers=iso).status_code == 200
+
+        survivors = client.get(f"/a/{ISO_ACCOUNT_ID}/buildings", headers=iso).json()
+        assert [b["name"] for b in survivors["buildings"]] == ["Fremdes Haus"]
+        # …and the demo account is the one that got re-seeded.
+        demo = client.get(
+            f"/a/{DEMO_ACCOUNT_ID}/buildings", headers=_token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        ).json()
+        assert [b["name"] for b in demo["buildings"]] == ["Musterstraße 12"]

@@ -3,7 +3,7 @@ check → RLS-scoped session → typed contract response (consumed by apps/web).
 
 from fastapi import APIRouter, HTTPException
 from lokara_db import Account, Building
-from lokara_db.seed import DEMO_ACCOUNT_ID, seed_demo
+from lokara_db.seed import DEMO_ACCOUNT_ID, reset_demo, seed_demo
 from lokara_domain import cents, format_eur
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,6 +31,24 @@ def load(auth: RequireAuth) -> DemoLoadResponse:
     del auth  # any authenticated caller may (re)load the fixed demo fixture
     with raw_account_scoped_session(DEMO_ACCOUNT_ID) as session:
         seed_demo(session)
+    return DemoLoadResponse(ok=True, account_id=DEMO_ACCOUNT_ID)
+
+
+@router.post("/reset")
+def reset(auth: RequireAuth) -> DemoLoadResponse:
+    """Back to exactly the seeded scenario — the pitch's undo button.
+
+    DEV/PITCH ONLY, behind the same DEMO_SEED_ENABLED flag as /demo/load, and
+    for a stronger reason: this one DELETES. It drops the demo account's domain
+    rows (rehearsal leftovers, stray test buildings) and re-seeds, leaving the
+    Account, Membership and Person intact so the caller keeps its own access.
+    RLS confines every DELETE to the demo account context.
+    """
+    if not ApiSettings().demo_seed_enabled:
+        raise HTTPException(status_code=403, detail="Demo seeding is disabled")
+    del auth  # same audience as /demo/load: any authenticated caller
+    with raw_account_scoped_session(DEMO_ACCOUNT_ID) as session:
+        reset_demo(session)
     return DemoLoadResponse(ok=True, account_id=DEMO_ACCOUNT_ID)
 
 

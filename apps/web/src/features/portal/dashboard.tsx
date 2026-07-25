@@ -10,10 +10,11 @@ import {
   StatusNote,
 } from '@lokara/ui';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import { ApiError } from '@/lib/api';
 
-import { useAccountSummary, useLoadDemo } from './queries';
+import { useAccountSummary, useLoadDemo, useResetDemo } from './queries';
 
 /** Dashboard (docs/04 M3 page 1): overview cards + one-click demo scenario. */
 export function Dashboard({ accountId }: { accountId: string }) {
@@ -98,21 +99,93 @@ export function Dashboard({ accountId }: { accountId: string }) {
         </Card>
       </div>
 
-      <Card className="mt-6 max-w-xl">
-        <CardHeader>
-          <CardTitle>Abrechnung 2025</CardTitle>
-          <CardDescription>
-            Betriebs- und Heizkostenabrechnung für {data.buildingName} — centgenau, mit
-            CO₂-Aufteilung und Rechtsstand.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href={`/a/${accountId}/abrechnung`}>Abrechnung erstellen</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Abrechnung 2025</CardTitle>
+            <CardDescription>
+              Betriebs- und Heizkostenabrechnung für {data.buildingName} — centgenau, mit
+              CO₂-Aufteilung und Rechtsstand.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href={`/a/${accountId}/abrechnung`}>Abrechnung erstellen</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <ResetDemoCard />
+      </div>
     </PageFrame>
+  );
+}
+
+/**
+ * Demo zurücksetzen (docs/06): after a rehearsal the account carries stray
+ * objects and readings, and the demo then opens on a list of test rows. One
+ * click puts it back to exactly the seeded scenario.
+ *
+ * Two-step, because it deletes — the same pattern as every other destructive
+ * action here: a quiet trigger, and the filled destructive button IS the
+ * confirmation.
+ */
+function ResetDemoCard() {
+  const reset = useResetDemo();
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Demo zurücksetzen</CardTitle>
+        <CardDescription>
+          Setzt dieses Konto auf das ursprüngliche Demo-Szenario zurück: Musterstraße 12 mit drei
+          Einheiten, den erfassten Kosten und Zählerständen.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {confirming ? (
+          <>
+            <StatusNote
+              kind="warning"
+              label="Alle eigenen Eingaben in diesem Konto gehen verloren."
+            >
+              Objekte, Einheiten, Mietverhältnisse, Kosten und Ablesungen werden gelöscht und durch
+              das Demo-Szenario ersetzt.
+            </StatusNote>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                disabled={reset.isPending}
+                onClick={() => reset.mutate(undefined, { onSuccess: () => setConfirming(false) })}
+              >
+                {reset.isPending ? 'Wird zurückgesetzt…' : 'Zurücksetzen'}
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirming(false)}>
+                Abbrechen
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div>
+            <Button variant="outline" onClick={() => setConfirming(true)}>
+              Demo zurücksetzen
+            </Button>
+          </div>
+        )}
+        {reset.isError ? (
+          <StatusNote kind="danger" label="Zurücksetzen fehlgeschlagen.">
+            {reset.error instanceof ApiError && reset.error.status === 403
+              ? 'Demo-Funktionen sind deaktiviert — API mit DEMO_SEED_ENABLED=true starten.'
+              : 'Bitte erneut versuchen.'}
+          </StatusNote>
+        ) : null}
+        {reset.isSuccess ? (
+          <StatusNote kind="success" label="Demo-Szenario wiederhergestellt.">
+            Das Konto entspricht wieder genau dem gespeicherten Szenario.
+          </StatusNote>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

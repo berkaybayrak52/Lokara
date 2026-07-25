@@ -20,6 +20,7 @@ from lokara_domain import (
     ReadingReason,
     ReadingSource,
 )
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -327,6 +328,46 @@ def seed_demo(session: Session) -> None:
                     recorded_at=_RECORDED_AT,
                 )
             )
+
+
+# Child-before-parent, so every FK is satisfied as the rows go. `account`,
+# `membership` and `person` are NOT here on purpose: wiping them would delete
+# the caller's own membership and lock the session out of its own account.
+_RESET_ORDER: tuple[str, ...] = (
+    "meter_reading",
+    "meter",
+    "heating_cost_entry",
+    "allocation_key_assignment",
+    "cost_entry",
+    "statement",
+    "self_use_period",
+    "tenancy_party",
+    "tenancy",
+    "unit",
+    "building_assignment",
+    "building",
+    "renter",
+    "landlord",
+)
+
+
+def reset_demo(session: Session) -> None:
+    """Wipe this account's domain data and re-seed the exact demo scenario.
+
+    For the pitch: a rehearsal, a headless test run or a live mis-click leaves
+    stray buildings and readings behind, and "Objekte" then opens on a list
+    full of *Testgasse 5*. This puts the account back to precisely the state
+    `seed_demo` produces — same ids, same numbers.
+
+    Scope is the session's RLS context: these DELETEs cannot reach another
+    account's rows even though they name no account_id (the policy adds it).
+    Destructive by definition, which is why the endpoint that calls it is
+    behind the same flag as the seed itself.
+    """
+    for table in _RESET_ORDER:
+        session.execute(text(f"DELETE FROM {table}"))
+    session.flush()
+    seed_demo(session)
 
 
 def main() -> None:

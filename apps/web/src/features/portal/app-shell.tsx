@@ -60,7 +60,10 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-mint bg-white px-4 py-6">
+      {/* sticky + h-dvh, not the stretched default: without it the aside grows
+          to the full DOCUMENT height on a long page (Zähler is ~2700px), which
+          parks the account block far below the fold and scrolls the nav away. */}
+      <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-mint bg-white px-4 py-6">
         <Link href="/" className="mb-8 flex items-center gap-2 px-2">
           <span
             aria-hidden="true"
@@ -119,14 +122,24 @@ export function AppShell({
         </nav>
 
         {account ? (
-          <div className="mt-8 rounded-lg bg-paper px-3 py-3">
-            <p className="text-sm font-semibold">{account.name}</p>
-            <p className="text-xs text-slate">{ROLE_LABELS[account.role] ?? account.role}</p>
+          // shrink-0 so a long nav never squeezes it, and truncate so a long
+          // Hausverwaltung name clips cleanly instead of pushing the role line
+          // out of the box (title keeps the full name reachable).
+          <div className="mt-8 shrink-0 rounded-lg bg-paper px-3 py-2.5">
+            <p className="truncate text-sm font-semibold" title={account.name}>
+              {account.name}
+            </p>
+            <p className="truncate text-xs text-slate">
+              {ROLE_LABELS[account.role] ?? account.role}
+            </p>
           </div>
         ) : null}
       </aside>
 
-      <div className="min-w-0 flex-1">
+      {/* One centered measure for every page instead of full-bleed: on a wide
+          screen the tables otherwise run to the far edge and the eye loses the
+          row. Set here, once, so no page can drift from it. */}
+      <div className="mx-auto min-w-0 w-full max-w-[1100px] flex-1">
         {account === undefined && me !== undefined ? (
           <main className="mx-auto max-w-2xl px-8 py-16">
             <h1 className="font-display text-2xl font-bold">Kein Zugriff auf dieses Konto</h1>

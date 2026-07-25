@@ -36,6 +36,20 @@ export function useLoadDemo() {
   });
 }
 
+/**
+ * Back to exactly the seeded scenario. Destructive, so the UI gates it behind
+ * a confirmation — but it is the honest fix for a demo account polluted by a
+ * rehearsal: better one deliberate reset than a pitch that opens on
+ * "Testgasse 5". Invalidates everything, since it replaced everything.
+ */
+export function useResetDemo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api('/demo/reset', DemoLoadResponseSchema, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
 /** The statement run is explicit (the demo beat is the click), so the query
  * stays disabled until the user asks for the numbers. */
 export function useDemoStatement(accountId: string, enabled: boolean) {
