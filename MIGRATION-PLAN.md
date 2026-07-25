@@ -47,8 +47,9 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
   rejected. **Mutation-checked:** disabling RLS on one table makes the test fail; re-enabling
   restores green. CI's Python lane runs it against a Postgres service with `LOKARA_REQUIRE_DB=1`,
   so it cannot silently skip.
-- Full suite: **123 pytest tests** (19 need the local Postgres; 1 more needs Playwright Chromium),
-  `mypy --strict` clean, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green.
+- Full suite: **133 pytest tests** (29 need the local Postgres; 1 more needs Playwright Chromium),
+  `mypy --strict` clean, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green
+  (17 vitest).
 
 **What works end-to-end today**
 
@@ -66,12 +67,22 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
   fixture stubs, and `uv run lokara-pdf-demo` renders the real NK + heating/CO₂ statement (engine
   results, `Rechtsstand` stamps, disclaimer) via Playwright Chromium.
 - **The M3 pitch slice** (2026-07-25): the `/a/{accountId}/…` portal — left nav derived from
-  `GET /me`, Dashboard with one-click **"Demo-Szenario laden"** (`POST /demo/load`), and
-  **Abrechnung erstellen** running both engines over the URL-scoped API
-  (`GET /a/{id}/statements/demo` + `/pdf`): golden shares, 585/415 ‰ degree-day split, CO₂ block,
-  cent-exact reconciliation as BFSG status notes, PDF download. Path re-authorization is tested:
-  a valid member of another account gets 403 on the URL's account. Verified headless from an
-  **empty database** (14/14): landing → seed → dashboard → statement → PDF.
+  `GET /me`, Dashboard with one-click **"Demo-Szenario laden"** (`POST /demo/load`, gated by
+  `DEMO_SEED_ENABLED`, off by default), and **Abrechnung erstellen** running both engines over
+  the URL-scoped API (`GET /a/{id}/statements/demo` + `/pdf`): golden shares, 585/415 ‰
+  degree-day split, CO₂ block, cent-exact reconciliation as BFSG status notes, PDF download.
+  Path re-authorization is tested: a valid member of another account gets 403 on the URL's
+  account. Verified headless from an **empty database** (14/14): landing → seed → dashboard →
+  statement → PDF.
+- **Objekte + Einheit/Mietverhältnis** (2026-07-25): CRUD under `/a/{account_id}` — create
+  Building → Unit → Tenancy (Renter + TenancyParty in one transaction; **overlapping tenancy
+  periods → 422** via `periods_overlap`; temporal rows are **create-only**, corrections become
+  new versions). Web: Objekte list → detail, Einheit page with the **tenancy timeline**
+  (validFrom/validTo bars, table as the accessible representation), and **autosave drafts** —
+  every keystroke mirrored to account-scoped localStorage, restored after abort/reload, cleared
+  only on successful submit (docs/04 non-negotiable, proven live: draft survives a full reload).
+  Money/area cross the form boundary as integer cents / m²×100 (German-format parsing, vitest).
+  Live check 12/12.
 
 **Next step:** the migration itself has only **G** (Expo mobile skeleton) and **H** (cutover:
 remove the TS backend, merge to `main`) left — but the pitch path (§0) now runs through the
@@ -84,9 +95,10 @@ that `packages/pdf` already renders.
   `@theme`, shadcn `destructive` → `--color-danger`, `StatusNote` = tint + icon shape + label (BFSG).
 - **`TODO(supabase)`** touchpoints: no Supabase project is wired — docker-compose Postgres and the
   dev-token endpoint stand in; the real session exchange lands at M5 (check HS256 vs JWKS then).
-- **M3 pages remaining** (`docs/04`): Objekte, Einheit/Mietverhältnis, Kosten erfassen, Zähler
-  (shown as "bald" in the nav). Dashboard + Abrechnung erstellen are built; statement costs/meter
-  totals are fixture constants (`apps/api/…/statement_service.py`) until those pages exist.
+- **M3 pages remaining** (`docs/04`): Kosten erfassen + Zähler (shown as "bald" in the nav).
+  Dashboard, Objekte, Einheit/Mietverhältnis and Abrechnung erstellen are built; statement
+  costs/meter totals are fixture constants (`apps/api/…/statement_service.py`) until those two
+  pages exist. The statement also still bills only the oldest (seeded) building.
 - TS backend (NestJS/Prisma) still coexists as reference; it comes out at Phase H.
 
 **How to run it**
