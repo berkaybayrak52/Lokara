@@ -7,8 +7,10 @@ import { cn } from './lib/cn';
 /**
  * shadcn-style Button themed to the brand tokens (docs/05) — never shadcn's
  * default palette. One `default` (filled Lokara-Grün) action per screen;
- * everything else is secondary/outline/ghost/link. No destructive variant yet:
- * the brand board defines no semantic red (TODO(M3): status colors).
+ * everything else is secondary/outline/ghost/link. `destructive` maps to
+ * --color-danger (AA on Paper, white text 7.26:1) — reserve it for actions
+ * that destroy data, and pair it with a confirming label (BFSG: never
+ * colour alone).
  */
 const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-sans ' +
@@ -20,6 +22,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-forest active:bg-forest',
+        destructive:
+          'bg-destructive text-destructive-foreground hover:bg-danger/90 active:bg-danger/90',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-mint/70 active:bg-mint/70',
         outline: 'border border-slate bg-transparent text-ink hover:bg-mint active:bg-mint',
         ghost: 'text-ink hover:bg-mint active:bg-mint',

@@ -15,6 +15,21 @@
   --color-paper: #fbfbfa; /* Paper — app background / light surface */
   --color-white: #ffffff;
 
+  /*
+   * Semantic status set (docs/05 "Semantic status colors") — extends the brand
+   * board; every value is AA-verified on Paper (7.01 / 6.85 / 6.66). Success is
+   * Lokara Grün and its tint is Mint on purpose: green already means "good"
+   * here — a success message differs from a primary action by FORM (tint
+   * surface + icon + label), never by a second green. BFSG: never signal by
+   * colour alone.
+   */
+  --color-danger: #a4262c; /* errors, destructive actions, Ampel rot */
+  --color-danger-tint: #fbeae9;
+  --color-warning: #92400e; /* warnings, pending guards, Ampel gelb (AA forces dark ochre) */
+  --color-warning-tint: #fbf1e5;
+  --color-success: #1a6558; /* = Lokara Grün — confirmations, Ampel grün */
+  --color-success-tint: #e7efeb; /* = Mint Tint */
+
   --font-display: var(--font-montserrat), 'Montserrat', ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-manrope), 'Manrope', ui-sans-serif, system-ui, sans-serif;
 }
@@ -43,6 +58,8 @@
   --border: var(--color-slate);
   --input: var(--color-slate);
   --ring: var(--color-slate);
+  --destructive: var(--color-danger);
+  --destructive-foreground: var(--color-white);
 }
 
 /* Expose the semantic layer as Tailwind utilities (bg-background, text-primary, …). */
@@ -64,6 +81,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
