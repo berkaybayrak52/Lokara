@@ -7,6 +7,15 @@
 > FastAPI `account_session` dependency authorizes on it, so without the membership every demo request
 > 403s. (The TS seed omitted this; the Python seed `uv run lokara-seed-demo` adds it.)
 >
+> **⚠️ `POST /demo/load` is a bootstrap exception — it must be flag-gated like `/auth/dev-token`.**
+> It runs on the raw RLS-scoped session and creates the very `Account` + `OWNER Membership` that the
+> `account_session` gate would otherwise require — i.e. it deliberately steps around the isolation
+> check to solve the chicken-and-egg of an empty database. That is correct for a demo seed and
+> **unacceptable as a reachable production endpoint**: unguarded, it lets any caller mint accounts and
+> memberships. Gate it behind an explicit env flag (`DEMO_SEED_ENABLED`, off by default, **403 when
+> off**), exactly as `AUTH_DEV_TOKEN` gates the dev-token endpoint, and never enable it in prod.
+> Real onboarding (M5) creates the first account through the authenticated signup path instead.
+>
 > **One occupancy timeline drives every engine.** A renter's tenancy dates must be identical wherever
 > they appear — NK allocation, heating, and the statement. (A seed once had Bernd Muster occupying all
 > year in the heating section but moving out in June in the NK section.) Deriving both engines from the

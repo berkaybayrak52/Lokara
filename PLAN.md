@@ -92,7 +92,17 @@ trivial PDF renders.
 
 ---
 
-## M3 — Web-app vertical slice + PDF (⭐ pitch demoable end-to-end)
+## M3 — Web-app vertical slice + PDF (⭐ pitch demoable end-to-end) — 🟡 pitch path done
+
+> **Done:** semantic tokens + `StatusNote`; the URL-scoped portal (`/a/{accountId}`) with
+> `account_session_for_path` (independent Membership check + RLS backstop, cross-account 403 tested);
+> `GET /me`-derived nav; one-click **Demo-Szenario laden**; **Abrechnung erstellen** → both statements
+> with the golden numbers, cent-exact reconciliation, and the PDF download. Verified from an empty DB.
+>
+> **Remaining:** **Objekte**, **Einheit/Mietverhältnis**, **Kosten erfassen**, **Zähler** (nav shows
+> them as "bald"). ⚠️ Until **Kosten erfassen** lands, the statement's costs (€1,200 Müll,
+> €10,300 Heizung/CO₂) are **clearly-marked fixture constants** in `statement_service.py` — correct per
+> Scenario 1/2, but not yet user-entered. Don't present them as captured data.
 
 **Goal:** a landlord can walk the full happy path live.
 
