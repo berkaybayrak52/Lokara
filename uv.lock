@@ -346,6 +346,12 @@ wheels = [
 name = "lokara-adapters"
 version = "0.1.0"
 source = { editable = "packages/adapters" }
+dependencies = [
+    { name = "lokara-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lokara-domain", editable = "packages/domain" }]
 
 [[package]]
 name = "lokara-api"
