@@ -32,3 +32,75 @@ export const DemoSummaryResponseSchema = z.object({
   tenancies: z.array(DemoTenancySummarySchema),
 });
 export type DemoSummaryResponse = z.infer<typeof DemoSummaryResponseSchema>;
+
+export const MeAccountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.string(),
+  shape: z.string(),
+});
+export type MeAccount = z.infer<typeof MeAccountSchema>;
+
+export const MeResponseSchema = z.object({
+  personId: z.string(),
+  accounts: z.array(MeAccountSchema),
+});
+export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+export const DemoLoadResponseSchema = z.object({
+  ok: z.literal(true),
+  accountId: z.string(),
+});
+
+export const StatementNkLineSchema = z.object({
+  partyLabel: z.string(),
+  isLandlord: z.boolean(),
+  weightDisplay: z.string(),
+  amountCents: z.number().int(),
+  amountEur: z.string(),
+});
+
+export const StatementNkCostSchema = z.object({
+  label: z.string(),
+  keyLabel: z.string(),
+  amountCents: z.number().int(),
+  amountEur: z.string(),
+  lines: z.array(StatementNkLineSchema),
+});
+
+export const StatementHeatingLineSchema = z.object({
+  partyLabel: z.string(),
+  isLandlord: z.boolean(),
+  heatingBaseEur: z.string(),
+  heatingConsumptionEur: z.string(),
+  wwBaseEur: z.string(),
+  wwConsumptionEur: z.string(),
+  totalCents: z.number().int(),
+  totalEur: z.string(),
+});
+
+export const StatementCo2Schema = z.object({
+  intensityDisplay: z.string(),
+  landlordSharePercent: z.number().int(),
+  landlordAmountEur: z.string(),
+  renterAmountEur: z.string(),
+  rechtsstand: z.string(),
+});
+
+export const DemoStatementResponseSchema = z.object({
+  buildingName: z.string(),
+  buildingAddress: z.string(),
+  periodLabel: z.string(),
+  nkCosts: z.array(StatementNkCostSchema),
+  nkTotalCents: z.number().int(),
+  nkTotalEur: z.string(),
+  nkInputTotalCents: z.number().int(),
+  heatingLines: z.array(StatementHeatingLineSchema),
+  heatingTotalCents: z.number().int(),
+  heatingTotalEur: z.string(),
+  heatingInputTotalCents: z.number().int(),
+  co2: StatementCo2Schema.nullable(),
+  rechtsstaende: z.array(z.string()),
+  disclaimer: z.string(),
+});
+export type DemoStatementResponse = z.infer<typeof DemoStatementResponseSchema>;
