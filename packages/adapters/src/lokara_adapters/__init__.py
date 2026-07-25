@@ -30,7 +30,17 @@ from .email import (
     SentEmail,
     StubEmailGateway,
 )
-from .meter import MeterGateway, MeterKind, MeterReading, ReadingSource, StubMeterGateway
+from .meter import (
+    MeasurementUnit,
+    MeterConsumption,
+    MeterGateway,
+    MeterKind,
+    MeterReading,
+    ReadingReason,
+    ReadingSource,
+    StubMeterGateway,
+    consumption_by_meter,
+)
 from .vision import (
     ExtractedInvoiceFields,
     SourceDocument,
@@ -52,12 +62,15 @@ __all__ = [
     "EmailDeliveryReceipt",
     "EmailGateway",
     "ExtractedInvoiceFields",
+    "MeasurementUnit",
+    "MeterConsumption",
     "MeterGateway",
     "MeterKind",
     "MeterReading",
     "OutgoingEmail",
     "PriceIndexGateway",
     "PriceIndexValue",
+    "ReadingReason",
     "ReadingSource",
     "SentEmail",
     "SourceDocument",
@@ -69,4 +82,5 @@ __all__ = [
     "StubVisionGateway",
     "TransactionDirection",
     "VisionGateway",
+    "consumption_by_meter",
 ]

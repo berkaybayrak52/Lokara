@@ -9,6 +9,13 @@ from .legal_values import (
     HeatingSplitBounds,
     WarmWaterFormula,
 )
+from .meter import (
+    CANONICAL_UNITS,
+    MeasurementUnit,
+    MeterKind,
+    ReadingReason,
+    ReadingSource,
+)
 from .money import (
     ZERO_CENTS,
     Cents,
@@ -24,6 +31,7 @@ from .period import Period, days_between, overlap_days, period, periods_overlap
 __version__ = "0.1.0"
 
 __all__ = [
+    "CANONICAL_UNITS",
     "ZERO_CENTS",
     "AllocationKey",
     "Cents",
@@ -31,10 +39,14 @@ __all__ = [
     "Co2Table",
     "DegreeDayTable",
     "HeatingSplitBounds",
+    "MeasurementUnit",
+    "MeterKind",
     "NonIntegerCentsError",
     "Occupancy",
     "OccupancyOverlapError",
     "Period",
+    "ReadingReason",
+    "ReadingSource",
     "Segment",
     "WarmWaterFormula",
     "add_cents",

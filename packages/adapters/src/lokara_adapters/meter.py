@@ -6,41 +6,60 @@ self-read (Funk-Selbstabrechner). **The engines never know the source** — the
 heating engine receives period consumption computed from these readings by the
 caller; a reading itself is always a point-in-time register value.
 
-Device management (Eichfrist tracking) is a guard over the same data, later.
+The vocabulary (kind / unit / reason / source) lives in ``lokara_domain`` so
+the persistence layer can store exactly this shape without importing an
+adapter: a hand-typed reading and an MDL delivery are the same row downstream.
+
+Device management (Eichfrist tracking) is a guard over the same data: the
+meter carries its calibration date, the warning is computed, never stored.
 
 TODO(provider): the real MDL implementation speaks HeiWaKo; only this module
 ever parses that format.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from enum import StrEnum
 from typing import Protocol
 
+from lokara_domain import MeasurementUnit, MeterKind, ReadingReason, ReadingSource
 
-class MeterKind(StrEnum):
-    HEAT = "HEAT"  # heat-cost allocator / heat meter units
-    WARM_WATER = "WARM_WATER"  # m³
-    COLD_WATER = "COLD_WATER"  # m³
-
-
-class ReadingSource(StrEnum):
-    MANUAL = "MANUAL"
-    MDL = "MDL"
-    RADIO = "RADIO"
+__all__ = [
+    "MeasurementUnit",
+    "MeterConsumption",
+    "MeterGateway",
+    "MeterKind",
+    "MeterReading",
+    "ReadingReason",
+    "ReadingSource",
+    "StubMeterGateway",
+    "consumption_by_meter",
+]
 
 
 @dataclass(frozen=True)
 class MeterReading:
-    """A point-in-time register value of one meter, normalized from any source."""
+    """A point-in-time register value of one meter, normalized from any source.
+
+    ``unit_id`` is None for a building-level meter (Hauptzähler): the building's
+    Wärmemengenzähler measures the whole system, not one flat.
+
+    ``recorded_at`` is when the value entered the system, not when it was read.
+    Readings are append-only, so two rows can share a ``read_at`` — the one
+    recorded last wins. That is how a ``CORRECTION`` supersedes a typo without
+    anything ever being updated or deleted.
+    """
 
     meter_id: str
-    unit_id: str
+    unit_id: str | None
     kind: MeterKind
+    measurement_unit: MeasurementUnit
     read_at: date
     value: Decimal
+    reason: ReadingReason
     source: ReadingSource
+    recorded_at: datetime
 
 
 class MeterGateway(Protocol):
@@ -55,39 +74,127 @@ class MeterGateway(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class MeterConsumption:
+    """What one meter consumed over the window: closing minus opening."""
+
+    meter_id: str
+    unit_id: str | None
+    kind: MeterKind
+    measurement_unit: MeasurementUnit
+    opening: MeterReading
+    closing: MeterReading
+    value: Decimal
+
+
+def consumption_by_meter(
+    readings: Iterable[MeterReading],
+) -> dict[str, MeterConsumption]:
+    """Fold point-in-time register values into per-meter period consumption.
+
+    The same fold for every source — that is the point of the normalized shape:
+    hand-typed and MDL-delivered readings become one number the same way.
+
+    Two rules carry the append-only contract:
+
+    - **Supersession.** Several readings may share a ``read_at`` (a correction
+      is a new row, never an UPDATE). The one recorded last wins; earlier ones
+      stay for the audit trail and are ignored here.
+    - **Unusable pairs are dropped, not guessed.** A meter with fewer than two
+      dates, or one whose register ran backwards (rollover, device swap),
+      yields no entry — the caller then has a *missing* reading, which the
+      heating engine answers with the § 9a estimate. Inventing a number here
+      would silently mis-bill; § 9a is the lawful answer.
+    """
+    latest_per_date: dict[str, dict[date, MeterReading]] = {}
+    for reading in readings:
+        by_date = latest_per_date.setdefault(reading.meter_id, {})
+        previous = by_date.get(reading.read_at)
+        # >= so the last one in input order wins a recorded_at tie; the DB
+        # gateway orders by (recorded_at, id), making that total.
+        if previous is None or reading.recorded_at >= previous.recorded_at:
+            by_date[reading.read_at] = reading
+
+    consumption: dict[str, MeterConsumption] = {}
+    for meter_id, by_date in latest_per_date.items():
+        if len(by_date) < 2:
+            continue
+        opening = by_date[min(by_date)]
+        closing = by_date[max(by_date)]
+        value = closing.value - opening.value
+        if value < 0:
+            continue
+        consumption[meter_id] = MeterConsumption(
+            meter_id=meter_id,
+            unit_id=closing.unit_id,
+            kind=closing.kind,
+            measurement_unit=closing.measurement_unit,
+            opening=opening,
+            closing=closing,
+            value=value,
+        )
+    return consumption
+
+
+_STUB_RECORDED_AT = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
+
+# (meter_id, unit_id, kind, unit, opening, closing) — differences are exactly
+# the heating golden fixture: the building meters give 20.000 kWh and 40 m³,
+# the flats give heat 600/250/150 HKV units and warm water 20/12/8 m³
+# (docs/03, docs/06 Scenario 2).
+_SPEC: tuple[tuple[str, str | None, MeterKind, MeasurementUnit, str, str], ...] = (
+    ("met_heat_main", None, MeterKind.HEAT, MeasurementUnit.KWH, "148500", "168500"),
+    ("met_ww_main", None, MeterKind.WARM_WATER, MeasurementUnit.CUBIC_METRE, "812", "852"),
+    ("met_heat_a", "unit_demo_a", MeterKind.HEAT, MeasurementUnit.HKV_UNITS, "1200", "1800"),
+    ("met_heat_b", "unit_demo_b", MeterKind.HEAT, MeasurementUnit.HKV_UNITS, "3400", "3650"),
+    ("met_heat_c", "unit_demo_c", MeterKind.HEAT, MeasurementUnit.HKV_UNITS, "880", "1030"),
+    (
+        "met_ww_a",
+        "unit_demo_a",
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "241.5",
+        "261.5",
+    ),
+    (
+        "met_ww_b",
+        "unit_demo_b",
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "96.2",
+        "108.2",
+    ),
+    (
+        "met_ww_c",
+        "unit_demo_c",
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+        "55.0",
+        "63.0",
+    ),
+)
+
+
 def _readings() -> tuple[MeterReading, ...]:
-    # Start/end register pairs whose differences are exactly the heating golden
-    # fixture: heat 600/250/150 units, warm water 20/12/8 m³ (docs/03).
-    spec: tuple[tuple[str, str, MeterKind, Decimal, Decimal], ...] = (
-        ("met_heat_a", "unit_demo_a", MeterKind.HEAT, Decimal(1200), Decimal(1800)),
-        ("met_heat_b", "unit_demo_b", MeterKind.HEAT, Decimal(3400), Decimal(3650)),
-        ("met_heat_c", "unit_demo_c", MeterKind.HEAT, Decimal(880), Decimal(1030)),
-        ("met_ww_a", "unit_demo_a", MeterKind.WARM_WATER, Decimal("241.5"), Decimal("261.5")),
-        ("met_ww_b", "unit_demo_b", MeterKind.WARM_WATER, Decimal("96.2"), Decimal("108.2")),
-        ("met_ww_c", "unit_demo_c", MeterKind.WARM_WATER, Decimal("55.0"), Decimal("63.0")),
-    )
     readings: list[MeterReading] = []
-    for meter_id, unit_id, kind, opening, closing in spec:
-        readings.append(
-            MeterReading(
-                meter_id=meter_id,
-                unit_id=unit_id,
-                kind=kind,
-                read_at=date(2025, 1, 1),
-                value=opening,
-                source=ReadingSource.MDL,
+    for meter_id, unit_id, kind, measurement_unit, opening, closing in _SPEC:
+        for read_at, value in (
+            (date(2025, 1, 1), opening),
+            (date(2025, 12, 31), closing),
+        ):
+            readings.append(
+                MeterReading(
+                    meter_id=meter_id,
+                    unit_id=unit_id,
+                    kind=kind,
+                    measurement_unit=measurement_unit,
+                    read_at=read_at,
+                    value=Decimal(value),
+                    reason=ReadingReason.PERIODIC,
+                    source=ReadingSource.MDL,
+                    recorded_at=_STUB_RECORDED_AT,
+                )
             )
-        )
-        readings.append(
-            MeterReading(
-                meter_id=meter_id,
-                unit_id=unit_id,
-                kind=kind,
-                read_at=date(2025, 12, 31),
-                value=closing,
-                source=ReadingSource.MDL,
-            )
-        )
     return tuple(readings)
 
 
