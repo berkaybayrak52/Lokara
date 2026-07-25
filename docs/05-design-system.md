@@ -93,6 +93,20 @@ default palette.
 > Mobile (Expo/React Native) doesn't use shadcn (web-only). It shares the **same tokens + theme** through
 > a React Native theme object, so colors, type scale, and radii match across platforms.
 
+### ⚠️ Open gap — no semantic status colors (decide before M3)
+
+The brand board has **no semantic red/amber/green**, so shadcn's `destructive` variant ships **omitted**
+rather than defaulted (`TODO(M3)`). But the product needs status color regardless:
+
+- **Destructive actions** (delete a building, revoke a membership) need a clear danger affordance.
+- **Form/validation errors** — a 422 from the API has to read as an error, not as body copy.
+- **The 3-colour Zustell-Ampel** (§556 proof-of-receipt) is *literally* red/amber/green.
+- **Guards/Wächter** (§556 deadline, Eichfrist, 15%-AfA) escalate by severity.
+
+Add a small semantic set — `danger`, `warning`, `success` — as tokens **beside** the brand palette (not
+replacing it), each verified to **≥4.5:1** on Paper per the contrast rules above. Never signal status by
+color alone (BFSG): pair with an icon or label.
+
 ## Look & feel / motion principles (the "Apple-like" bar)
 
 Tokens give structure; this section gives the _feel_. The target is **modern, minimal, calm,

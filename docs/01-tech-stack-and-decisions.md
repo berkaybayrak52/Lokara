@@ -55,8 +55,13 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
   `TODO(supabase)` marks every touchpoint. ⚠️ When wiring real Supabase, check whether the project uses
   the legacy **shared-secret (HS256)** or the newer **asymmetric signing keys (JWKS, ES256/RS256)** —
   verify accordingly.
-- **⚠️ Async discipline:** FastAPI is async — after every backend change, review async paths for a
-  forgotten `await` or a blocking (sync) call inside an async handler. These bugs are silent.
+- **Async strategy (chosen at Phase E):** DB routes are **`sync def`** while the driver is the blocking
+  **psycopg** — FastAPI runs `sync def` handlers in a threadpool, so the blocking call never stalls the
+  event loop. An async engine/driver can land later **without changing the HTTP contract**. The
+  alternative (`async def` everywhere) needs an async driver and forbids any blocking call.
+- **⚠️ Async discipline:** whichever style a route uses, never put a blocking (sync) call inside an
+  `async def` handler — that silently stalls the event loop. After every backend change, review for a
+  forgotten `await` or a blocking call in an async path.
 - **Staged within this decision:** stand up the API skeleton + auth + NK endpoints at M0–M3. Add the
   **Celery/Arq (Redis)** worker/webhook layer at M6 when bank/ledger/email need it — structure from
   day 1, heavy async features when earned.

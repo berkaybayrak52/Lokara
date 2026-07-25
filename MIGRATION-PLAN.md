@@ -26,6 +26,78 @@
 
 ---
 
+## 0a. Current status (as of 2026-07-25)
+
+Branch: **`feat/py-migration`**. `main` is untouched at `c5fadab` (tag `pre-migration`) and stays
+demo-able. Phase details are in the per-phase blockquotes in §4.
+
+**Phases:** ✅ **A** (toolchain) · ✅ **B** (DB + RLS) · ✅ **C** (engines ⭐) · ✅ **E** (FastAPI) ·
+✅ **F** (web) — remaining: **D** (adapters + PDF) · **G** (mobile) · **H** (cutover).
+C ran before B and F before D, per §7 — neither depended on the phase it jumped.
+
+**Verified gates**
+
+- **The €1,200 fixture is byte-exact in pytest** (`packages/nk-engine/tests`):
+  `60000 / 17852 / 18148 / 24000` cents (€600.00 · €178.52 · €181.48 → landlord · €240.00),
+  Σ = `120000` = €1,200.00. Every allocation test also asserts `sum(shares) == input_total`.
+- **The RLS cross-account read is blocked** (`packages/db/tests/test_rls_isolation.py`): the suite
+  connects as the **non-owner `lokara_app`** role (asserted: not `rolsuper`, not `rolbypassrls`),
+  seeds two accounts, and proves account A's context returns **empty** for B's rows, that **no
+  context at all** returns empty (deny by default), and that cross-account **writes/updates** are
+  rejected. **Mutation-checked:** disabling RLS on one table makes the test fail; re-enabling
+  restores green. CI's Python lane runs it against a Postgres service with `LOKARA_REQUIRE_DB=1`,
+  so it cannot silently skip.
+- Full suite: **97 pytest tests** (10 need the local Postgres), `mypy --strict` clean,
+  `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green.
+
+**What works end-to-end today**
+
+- **FastAPI** (`apps/api`): HS256 JWT auth accepted from **either** a `Bearer` header or the
+  HttpOnly `lokara_access_token` cookie · dev-token endpoint gated by `AUTH_DEV_TOKEN` ·
+  **`account_session`** = live-`Membership` check **+** RLS context in one dependency (403 without
+  a membership) · **`POST /calc/nk`** returns the €1,200 fixture's cents over HTTP ·
+  **`GET /demo/summary`** serves the seeded demo building.
+- **Web** (`apps/web` on Bun + Next.js): shadcn-style kit in `packages/ui` themed to the docs/05
+  tokens; TanStack Query + Jotai + RHF/Zod wired; the **`api.ts` interceptor** Zod-parses responses
+  and, on a 401, refreshes once via the `/api/session` route handler (which sets the HttpOnly
+  cookie server-side) and replays once — concurrent 401s share a single refresh. Verified headless:
+  `401 → POST /api/session → replay 200` renders live API data.
+
+**Next step: Phase D** (§4) — `packages/adapters`: external-edge ports as Python **`Protocol`**s
+(Bank/Vision/Email/MDL/Destatis/DATEV) with fixture stubs · `packages/pdf`: **Playwright-for-Python**
+HTML→PDF rendering the NK + heating statement with the **`Rechtsstand`** stamp and the disclaimer.
+
+**Known open items**
+
+- **No semantic status colors** — the brand board has no red/amber/green, so shadcn's `destructive`
+  variant ships omitted. `TODO(M3)`: add `danger`/`warning`/`success` tokens (docs/05).
+- **`TODO(supabase)`** touchpoints: no Supabase project is wired — docker-compose Postgres and the
+  dev-token endpoint stand in; the real session exchange lands at M5 (check HS256 vs JWKS then).
+- **The M3 pages are not built** (`docs/04`): Dashboard, Objekte, Einheit, Kosten erfassen, Zähler,
+  Abrechnung erstellen. Phase F shipped the stack + a demo page, not the product screens.
+- TS backend (NestJS/Prisma) still coexists as reference; it comes out at Phase H.
+
+**How to run it**
+
+```bash
+export PATH="$HOME/.bun/bin:$PATH"      # Homebrew's bun 1.1 shadows ~/.bun/bin (needs ≥ 1.3)
+docker compose up -d                    # Postgres on :54322 (container lokara-db)
+uv sync && bun install
+uv run alembic -c packages/db/alembic.ini upgrade head
+uv run lokara-seed-demo                 # demo account/building/renters + the OWNER membership
+uv run lokara-api                       # FastAPI on 127.0.0.1:3001
+bun run --filter @lokara/web dev        # web on :3000
+```
+
+> ⚠️ Use the **filtered** web command, not bare `bun dev` — `turbo run dev` still starts the **old
+> NestJS `apps/api`** on **:3001**, which collides with `uv run lokara-api`. Resolved at Phase H when
+> the TS backend comes out.
+
+Gates: `uv run pytest` · `uv run mypy` · `uv run ruff check .` · `bun run test` ·
+`bun run typecheck` · `bun run lint` · `bun run build`.
+
+---
+
 ## 1. Fresh start vs migrate — the decision you asked about
 
 **Recommendation: a *targeted rebuild*, not a full nuke. Don't delete everything.**

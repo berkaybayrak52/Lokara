@@ -47,11 +47,11 @@ Put this whole folder at your repo root and open Claude Code there.
 
 ## Read order
 
-1. **`INITIAL-PROMPT.md`** — the exact first message to paste into Claude Code (kicks off M0).
-2. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + locked tech.
+1. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + locked tech.
+2. **`MIGRATION-PLAN.md`** — the active plan turning the TS scaffold into the v4 Python/FastAPI stack.
+   **Start here for current work** (M0 built; migrating phase by phase).
 3. **`PLAN.md`** — milestones M0→M10; the pitch cutline is **M0→M3 + a canned M4**.
 4. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
-   - **`MIGRATION-PLAN.md`** — how the TS scaffold becomes the v4 Python/FastAPI stack (targeted rebuild).
 5. **`docs/`** — modular specs:
    - `00-product-overview.md` — what/why/who, competitive thesis, pitch framing
    - `01-tech-stack-and-decisions.md` — locked defaults for every flagged decision (ADR-style)

@@ -93,12 +93,26 @@ Vermieter portal (`/a/{accountId}`), German labels:
 - The web + mobile apps call the **FastAPI** service (`apps/api`) over HTTP; the API validates the
   Supabase JWT in a **dependency**, sets the RLS context, and calls the engine packages. No DB access
   from any client.
+- **`account_session` dependency = the isolation spine.** It opens the RLS-scoped transaction
+  (`app.account_id` GUC, non-owner role) **and** verifies the caller holds a **live `Membership`** in
+  the claimed account before yielding — **403** otherwise. That's the "enforced twice" rule made
+  concrete: app-logic membership check **and** Postgres RLS on the same request.
+- **JSON casing:** the API speaks **camelCase** JSON (Pydantic aliases) to match the TS/Zod clients,
+  while Python/DB stay **snake_case** — the Pydantic boundary translates. Engine validation errors
+  surface as **422**.
 - **Server state → TanStack Query** (caching, refetch, loading/error, request dedup so nothing
   double-fires). **Client state → Jotai** (atomic). **Forms → React Hook Form + Zod.** Same libraries
   on web and mobile.
 - **Auth in one `api.ts` interceptor:** web sends the JWT via HttpOnly cookie, mobile via Bearer from
   secure storage. On a 401 the interceptor refreshes once, replays the failed requests, and never
-  double-fires. The auth hook layer is separate per platform (cookie vs secure storage).
+  double-fires — **concurrent 401s share a single in-flight refresh**, and a second 401 surfaces to the
+  caller instead of looping. Responses are **Zod-parsed**, so API drift fails loudly. The auth hook
+  layer is separate per platform (cookie vs secure storage).
+- **The web token never touches JS.** A Next **route handler (`/api/session`)** exchanges credentials
+  server-side and sets the **HttpOnly** cookie (`lokara_access_token`) — a small BFF seam, so XSS can't
+  read the token. `TODO(supabase)`: swap the dev-token exchange for the real Supabase session at M5.
+- **The API accepts either transport, verified identically:** `Authorization: Bearer …` (mobile) **or**
+  the HttpOnly cookie (web) — one verification path, two carriers.
 - Forms optimistic + autosave; long-running work (PDF, later OCR/bank) goes through API jobs
   (Celery/Arq on Redis from M6).
 - All queries scoped by `accountId`; RLS is the backstop from M5. The same API endpoints serve the

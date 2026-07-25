@@ -3,6 +3,9 @@
 > Goal: an investor sees the **common cases** work end-to-end, live. Edge cases are deferred.
 > These are **seeded fixtures** loadable with one click ("Demo-Szenario laden"). All money in cents;
 > all German names/addresses realistic. Keep them in `packages/db/seed/` and reuse the engine fixtures.
+> **The seed must include an `OWNER` `Membership`** linking the demo Person to the demo Account — the
+> FastAPI `account_session` dependency authorizes on it, so without the membership every demo request
+> 403s. (The TS seed omitted this; the Python seed `uv run lokara-seed-demo` adds it.)
 
 ## Scenario 1 — Solo landlord, clean NK + vacancy (⭐ the crown jewel)
 
