@@ -115,7 +115,14 @@ export const UnitDetailResponseSchema = z.object({
 });
 export type UnitDetailResponse = z.infer<typeof UnitDetailResponseSchema>;
 
-export const ALLOCATION_KEYS = ['AREA', 'PERSONS', 'CONSUMPTION', 'UNITS', 'DIRECT', 'MEA'] as const;
+export const ALLOCATION_KEYS = [
+  'AREA',
+  'PERSONS',
+  'CONSUMPTION',
+  'UNITS',
+  'DIRECT',
+  'MEA',
+] as const;
 export const AllocationKeySchema = z.enum(ALLOCATION_KEYS);
 export type AllocationKey = z.infer<typeof AllocationKeySchema>;
 
@@ -145,6 +152,127 @@ export const CostEntryOutSchema = z.object({
 export type CostEntryOut = z.infer<typeof CostEntryOutSchema>;
 
 export const CostListResponseSchema = z.object({ costs: z.array(CostEntryOutSchema) });
+
+// ── Zähler (docs/04 M3 page 5) ───────────────────────────────────────────────
+
+export const METER_KINDS = ['HEAT', 'WARM_WATER', 'COLD_WATER'] as const;
+export const MeterKindSchema = z.enum(METER_KINDS);
+export type MeterKind = z.infer<typeof MeterKindSchema>;
+
+export const METER_KIND_LABELS: Record<MeterKind, string> = {
+  HEAT: 'Wärme',
+  WARM_WATER: 'Warmwasser',
+  COLD_WATER: 'Kaltwasser',
+};
+
+export const MEASUREMENT_UNITS = ['KWH', 'CUBIC_METRE', 'HKV_UNITS'] as const;
+export const MeasurementUnitSchema = z.enum(MEASUREMENT_UNITS);
+export type MeasurementUnit = z.infer<typeof MeasurementUnitSchema>;
+
+export const MEASUREMENT_UNIT_LABELS: Record<MeasurementUnit, string> = {
+  KWH: 'Kilowattstunden (kWh)',
+  CUBIC_METRE: 'Kubikmeter (m³)',
+  HKV_UNITS: 'Einheiten (Heizkostenverteiler)',
+};
+
+/**
+ * Which units a medium can be counted in — mirrors the API's validator. Water
+ * is always m³; only a heat device counts kWh or HKV units, and mixing them up
+ * would corrupt the § 9 HeizkostenV denominator.
+ */
+export const UNITS_BY_KIND: Record<MeterKind, readonly MeasurementUnit[]> = {
+  HEAT: ['KWH', 'HKV_UNITS'],
+  WARM_WATER: ['CUBIC_METRE'],
+  COLD_WATER: ['CUBIC_METRE'],
+};
+
+export const READING_REASONS = [
+  'PERIODIC',
+  'INTERIM',
+  'TENANT_CHANGE',
+  'DEVICE_CHANGE',
+  'CORRECTION',
+] as const;
+export const ReadingReasonSchema = z.enum(READING_REASONS);
+export type ReadingReason = z.infer<typeof ReadingReasonSchema>;
+
+export const READING_REASON_LABELS: Record<ReadingReason, string> = {
+  PERIODIC: 'Turnusablesung',
+  INTERIM: 'Zwischenablesung',
+  TENANT_CHANGE: 'Nutzerwechsel',
+  DEVICE_CHANGE: 'Gerätewechsel',
+  CORRECTION: 'Korrektur',
+};
+
+export const ReadingSourceSchema = z.enum(['MANUAL', 'MDL', 'RADIO']);
+export type ReadingSource = z.infer<typeof ReadingSourceSchema>;
+
+export const READING_SOURCE_LABELS: Record<ReadingSource, string> = {
+  MANUAL: 'Manuell erfasst',
+  MDL: 'Messdienstleister',
+  RADIO: 'Funkablesung',
+};
+
+export const MeterReadingOutSchema = z.object({
+  id: z.string(),
+  readAt: z.string(),
+  valueX1000: z.number().int(),
+  valueDisplay: z.string(),
+  reason: ReadingReasonSchema,
+  source: ReadingSourceSchema,
+  note: z.string().nullable(),
+  recordedAt: z.string(),
+  superseded: z.boolean(),
+});
+export type MeterReadingOut = z.infer<typeof MeterReadingOutSchema>;
+
+export const CalibrationStatusSchema = z.enum([
+  'EXPIRED',
+  'EXPIRING_SOON',
+  'VALID',
+  'NOT_APPLICABLE',
+]);
+export type CalibrationStatus = z.infer<typeof CalibrationStatusSchema>;
+
+export const MeterOutSchema = z.object({
+  id: z.string(),
+  unitId: z.string().nullable(),
+  unitLabel: z.string().nullable(),
+  kind: MeterKindSchema,
+  kindLabel: z.string(),
+  measurementUnit: MeasurementUnitSchema,
+  unitSymbol: z.string(),
+  serial: z.string(),
+  label: z.string().nullable(),
+  calibrationValidUntil: z.string().nullable(),
+  calibrationStatus: CalibrationStatusSchema,
+  readings: z.array(MeterReadingOutSchema),
+  periodConsumptionDisplay: z.string().nullable(),
+});
+export type MeterOut = z.infer<typeof MeterOutSchema>;
+
+export const MeterListResponseSchema = z.object({
+  meters: z.array(MeterOutSchema),
+  periodLabel: z.string(),
+});
+
+export const HeatingCostOutSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  amountCents: z.number().int(),
+  amountEur: z.string(),
+  periodFrom: z.string(),
+  periodTo: z.string(),
+  co2KgX1000: z.number().int().nullable(),
+  co2KgDisplay: z.string().nullable(),
+  co2CostCents: z.number().int().nullable(),
+  co2CostEur: z.string().nullable(),
+});
+export type HeatingCostOut = z.infer<typeof HeatingCostOutSchema>;
+
+export const HeatingCostListResponseSchema = z.object({
+  heatingCosts: z.array(HeatingCostOutSchema),
+});
 
 export const StatementNkLineSchema = z.object({
   partyLabel: z.string(),
@@ -193,6 +321,7 @@ export const DemoStatementResponseSchema = z.object({
   heatingTotalCents: z.number().int(),
   heatingTotalEur: z.string(),
   heatingInputTotalCents: z.number().int(),
+  heatingMissingReason: z.string().nullable(),
   co2: StatementCo2Schema.nullable(),
   rechtsstaende: z.array(z.string()),
   disclaimer: z.string(),

@@ -161,58 +161,80 @@ function StatementResult({
         <h2 id="heating-heading" className="mb-3 font-display text-xl font-bold">
           Heiz- und Warmwasserkosten
         </h2>
-        <Card>
-          <CardContent className="pt-6">
-            <Table>
-              <TableCaption>
-                Aufteilung der Heiz- und Warmwasserkosten nach §§ 7–9 HeizkostenV
-              </TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partei</TableHead>
-                  <TableHead className="text-right">Grundk. Heizung</TableHead>
-                  <TableHead className="text-right">Verbrauch Heizung</TableHead>
-                  <TableHead className="text-right">Grundk. Warmwasser</TableHead>
-                  <TableHead className="text-right">Verbrauch Warmwasser</TableHead>
-                  <TableHead className="text-right">Summe</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.heatingLines.map((line) => (
-                  <TableRow key={line.partyLabel}>
-                    <TableCell className={line.isLandlord ? 'text-slate' : undefined}>
-                      {line.partyLabel}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{line.heatingBaseEur}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {line.heatingConsumptionEur}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{line.wwBaseEur}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {line.wwConsumptionEur}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
-                      {line.totalEur}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {data.heatingMissingReason ? (
+          <>
+            <StatusNote kind="warning" label="Keine Heizkostenabrechnung möglich.">
+              {data.heatingMissingReason}
+            </StatusNote>
+            <p className="mt-3 max-w-prose text-sm text-slate">
+              Die Betriebskosten oben sind davon unberührt.{' '}
+              <Link
+                href={`/a/${accountId}/zaehler`}
+                className="text-green underline underline-offset-4"
+              >
+                Zähler und Heizkosten erfassen
+              </Link>{' '}
+              — danach rechnet die Abrechnung automatisch neu.
+            </p>
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="pt-6">
+                <Table>
+                  <TableCaption>
+                    Aufteilung der Heiz- und Warmwasserkosten nach §§ 7–9 HeizkostenV
+                  </TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Partei</TableHead>
+                      <TableHead className="text-right">Grundk. Heizung</TableHead>
+                      <TableHead className="text-right">Verbrauch Heizung</TableHead>
+                      <TableHead className="text-right">Grundk. Warmwasser</TableHead>
+                      <TableHead className="text-right">Verbrauch Warmwasser</TableHead>
+                      <TableHead className="text-right">Summe</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.heatingLines.map((line) => (
+                      <TableRow key={line.partyLabel}>
+                        <TableCell className={line.isLandlord ? 'text-slate' : undefined}>
+                          {line.partyLabel}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {line.heatingBaseEur}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {line.heatingConsumptionEur}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{line.wwBaseEur}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {line.wwConsumptionEur}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {line.totalEur}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
-        {data.co2 ? (
-          <p className="mt-3 max-w-prose rounded-lg bg-mint p-4 text-sm leading-6">
-            <strong>CO₂-Kostenaufteilung</strong> (CO2KostAufG, {data.co2.rechtsstand}):
-            Emissionsintensität {data.co2.intensityDisplay}&nbsp;kg&nbsp;CO₂/m²/Jahr →
-            Vermieteranteil {data.co2.landlordSharePercent}&nbsp;% ({data.co2.landlordAmountEur},
-            vor der Umlage abgezogen); Mieteranteil {data.co2.renterAmountEur}.
-          </p>
-        ) : null}
-        <ReconciliationNote
-          reconciles={data.heatingTotalCents === data.heatingInputTotalCents}
-          totalEur={data.heatingTotalEur}
-        />
+            {data.co2 ? (
+              <p className="mt-3 max-w-prose rounded-lg bg-mint p-4 text-sm leading-6">
+                <strong>CO₂-Kostenaufteilung</strong> (CO2KostAufG, {data.co2.rechtsstand}):
+                Emissionsintensität {data.co2.intensityDisplay}&nbsp;kg&nbsp;CO₂/m²/Jahr →
+                Vermieteranteil {data.co2.landlordSharePercent}&nbsp;% ({data.co2.landlordAmountEur}
+                , vor der Umlage abgezogen); Mieteranteil {data.co2.renterAmountEur}.
+              </p>
+            ) : null}
+            <ReconciliationNote
+              reconciles={data.heatingTotalCents === data.heatingInputTotalCents}
+              totalEur={data.heatingTotalEur}
+            />
+          </>
+        )}
       </section>
 
       <section aria-label="Dokument" className="flex flex-wrap items-center gap-4">

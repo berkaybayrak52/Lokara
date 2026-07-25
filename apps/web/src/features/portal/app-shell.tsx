@@ -28,16 +28,32 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: (id) => `/a/${id}`, label: 'Übersicht', activePrefixes: [] },
   // Einheiten pages belong to the Objekte section (list → detail → unit).
-  { href: (id) => `/a/${id}/objekte`, label: 'Objekte', activePrefixes: ['/objekte', '/einheiten'] },
+  {
+    href: (id) => `/a/${id}/objekte`,
+    label: 'Objekte',
+    activePrefixes: ['/objekte', '/einheiten'],
+  },
   { href: (id) => `/a/${id}/kosten`, label: 'Kosten erfassen', activePrefixes: ['/kosten'] },
-  { href: (id) => `/a/${id}/abrechnung`, label: 'Abrechnung erstellen', activePrefixes: ['/abrechnung'] },
+  { href: (id) => `/a/${id}/zaehler`, label: 'Zähler', activePrefixes: ['/zaehler'] },
+  {
+    href: (id) => `/a/${id}/abrechnung`,
+    label: 'Abrechnung erstellen',
+    activePrefixes: ['/abrechnung'],
+  },
 ];
 
-// The rest of the M3 pages, visible but explicitly not yet available — an
-// honest roadmap beats dead links (and hiding them would misrepresent scope).
-const UPCOMING = ['Zähler'];
+// Pages that exist in the plan but not yet in the app — an honest roadmap
+// beats dead links (and hiding them would misrepresent scope). M3 is complete,
+// so this is empty; the next entries arrive with M4.
+const UPCOMING: string[] = [];
 
-export function AppShell({ accountId, children }: { accountId: string; children: React.ReactNode }) {
+export function AppShell({
+  accountId,
+  children,
+}: {
+  accountId: string;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const { data: me } = useMe();
   const account = me?.accounts.find((a) => a.id === accountId);
@@ -46,7 +62,10 @@ export function AppShell({ accountId, children }: { accountId: string; children:
     <div className="flex min-h-dvh">
       <aside className="flex w-64 shrink-0 flex-col border-r border-mint bg-white px-4 py-6">
         <Link href="/" className="mb-8 flex items-center gap-2 px-2">
-          <span aria-hidden="true" className="grid size-8 shrink-0 grid-cols-2 gap-0.5 rounded-lg bg-ink p-1.5">
+          <span
+            aria-hidden="true"
+            className="grid size-8 shrink-0 grid-cols-2 gap-0.5 rounded-lg bg-ink p-1.5"
+          >
             <span className="rounded-[2px] bg-green" />
             <span className="rounded-[2px] bg-paper/90" />
             <span className="rounded-[2px] bg-paper/90" />
@@ -80,9 +99,11 @@ export function AppShell({ accountId, children }: { accountId: string; children:
             );
           })}
 
-          <p className="mt-6 mb-1 px-3 text-xs font-semibold tracking-wide text-slate uppercase">
-            In Arbeit
-          </p>
+          {UPCOMING.length > 0 ? (
+            <p className="mt-6 mb-1 px-3 text-xs font-semibold tracking-wide text-slate uppercase">
+              In Arbeit
+            </p>
+          ) : null}
           {UPCOMING.map((label) => (
             <span
               key={label}
