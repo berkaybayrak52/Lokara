@@ -15,6 +15,7 @@ Conventions:
 import enum
 from datetime import date, datetime
 
+from lokara_domain import AllocationKey
 from sqlalchemy import Date, DateTime, ForeignKey, Index, UniqueConstraint, func
 from sqlalchemy import Enum as SaEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -67,6 +68,7 @@ class Base(DeclarativeBase):
         Role: SaEnum(Role, name="role"),
         StatementStatus: SaEnum(StatementStatus, name="statement_status"),
         SelfUseKind: SaEnum(SelfUseKind, name="self_use_kind"),
+        AllocationKey: SaEnum(AllocationKey, name="allocation_key"),
     }
 
 
@@ -200,6 +202,7 @@ class Building(Base):
     landlord: Mapped["Landlord | None"] = relationship(back_populates="buildings")
     units: Mapped[list["Unit"]] = relationship(back_populates="building")
     statements: Mapped[list["Statement"]] = relationship(back_populates="building")
+    cost_entries: Mapped[list["CostEntry"]] = relationship(back_populates="building")
 
     __table_args__ = (Index("ix_building_account", "account_id"),)
 
@@ -321,6 +324,61 @@ class Statement(Base):
     )
 
 
+# ── Kosten erfassen (docs/04 M3 page 4). ──
+
+
+class CostEntry(Base):
+    """One operating cost of a building over a period (half-open, like every
+    validity range). The allocation key is deliberately NOT a column here — it
+    lives in versioned AllocationKeyAssignment rows, so re-keying a cost never
+    touches (let alone deletes) the entered data."""
+
+    __tablename__ = "cost_entry"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    label: Mapped[str]
+    amount_cents: Mapped[int]
+    period_from: Mapped[date]
+    period_to: Mapped[date]  # exclusive
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    building: Mapped["Building"] = relationship(back_populates="cost_entries")
+    key_assignments: Mapped[list["AllocationKeyAssignment"]] = relationship(
+        back_populates="cost_entry"
+    )
+
+    __table_args__ = (
+        Index("ix_cost_entry_account", "account_id"),
+        Index("ix_cost_entry_building", "building_id"),
+    )
+
+
+class AllocationKeyAssignment(Base):
+    """The Umlageschlüssel of one cost, as an append-only version history:
+    changing the key INSERTs a new row (latest created_at wins) — the old
+    assignment stays for the audit trail, and no cost data is ever deleted."""
+
+    __tablename__ = "allocation_key_assignment"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    cost_entry_id: Mapped[str] = mapped_column(ForeignKey("cost_entry.id"))
+    key: Mapped[AllocationKey]
+    # Only for key = DIRECT: the single target the cost bypasses allocation to.
+    direct_unit_id: Mapped[str | None] = mapped_column(ForeignKey("unit.id"))
+    direct_tenancy_id: Mapped[str | None] = mapped_column(ForeignKey("tenancy.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    cost_entry: Mapped["CostEntry"] = relationship(back_populates="key_assignments")
+
+    __table_args__ = (
+        Index("ix_aka_account", "account_id"),
+        Index("ix_aka_cost_entry", "cost_entry_id"),
+    )
+
+
 # Tables scoped by account_id — the Alembic migration enables FORCEd RLS on each
 # of these plus `account` (scoped by its own id) and `building_assignment`
 # (scoped via its membership). `person` is global by design.
@@ -334,4 +392,6 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "tenancy_party",
     "self_use_period",
     "statement",
+    "cost_entry",
+    "allocation_key_assignment",
 )

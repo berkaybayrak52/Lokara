@@ -13,11 +13,14 @@ so there the seed must set the app.account_id context first.
 
 from datetime import date
 
+from lokara_domain import AllocationKey
 from sqlalchemy.orm import Session
 
 from .models import (
     Account,
+    AllocationKeyAssignment,
     Building,
+    CostEntry,
     Membership,
     Person,
     Renter,
@@ -103,6 +106,29 @@ def seed_demo(session: Session) -> None:
                 renter_id=renter_id,
             )
         )
+
+    # The canonical €1,200.00 garbage cost as a REAL cost entry + its AREA key
+    # (append-only assignment) — the statement computes from these rows, and
+    # the golden numbers (600,00/178,52/181,48/240,00) must keep reproducing.
+    session.merge(
+        CostEntry(
+            id="cost_demo_garbage",
+            account_id=DEMO_ACCOUNT_ID,
+            building_id="bld_demo_muster12",
+            label="Müllabfuhr",
+            amount_cents=120000,
+            period_from=date(2025, 1, 1),
+            period_to=date(2026, 1, 1),
+        )
+    )
+    session.merge(
+        AllocationKeyAssignment(
+            id="aka_demo_garbage_1",
+            account_id=DEMO_ACCOUNT_ID,
+            cost_entry_id="cost_demo_garbage",
+            key=AllocationKey.AREA,
+        )
+    )
 
 
 def main() -> None:

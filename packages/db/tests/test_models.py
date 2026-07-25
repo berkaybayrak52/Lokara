@@ -22,6 +22,8 @@ EXPECTED_TABLES = {
     "tenancy_party",
     "self_use_period",
     "statement",
+    "cost_entry",
+    "allocation_key_assignment",
 }
 
 
@@ -74,6 +76,7 @@ class TestSchemaShape:
             ("statement", "total_cents"),
             ("unit", "area_sqm_x100"),
             ("self_use_period", "sqm_x100"),
+            ("cost_entry", "amount_cents"),
         ):
             assert _table(table_name).columns[column].type.python_type is int
 
@@ -85,6 +88,16 @@ class TestSchemaShape:
             assert table.columns["valid_from"].type.python_type is date
             assert table.columns["valid_to"].type.python_type is date
             assert table.columns["valid_to"].nullable  # NULL = open-ended (half-open period)
+        cost = _table("cost_entry")
+        assert cost.columns["period_from"].type.python_type is date
+        assert cost.columns["period_to"].type.python_type is date
+
+    def test_allocation_key_never_lives_on_the_cost_row(self) -> None:
+        """docs/03: keys come from a per-period assignment, so re-keying a cost
+        can never destroy entered data. A `key` column on cost_entry would be
+        exactly that bug."""
+        assert "key" not in _table("cost_entry").columns
+        assert "key" in _table("allocation_key_assignment").columns
 
 
 class TestSettings:

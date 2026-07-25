@@ -25,8 +25,10 @@ from alembic import command
 from alembic.config import Config
 from lokara_db import (
     Account,
+    AllocationKeyAssignment,
     Building,
     BuildingAssignment,
+    CostEntry,
     DbSettings,
     Membership,
     Person,
@@ -38,6 +40,7 @@ from lokara_db import (
     create_db_engine,
     new_id,
 )
+from lokara_domain import AllocationKey
 from sqlalchemy import CursorResult, Engine, select, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
@@ -82,6 +85,8 @@ class _Seed:
         self.person_a = new_id()
         self.membership_a = new_id()
         self.assignment_a = new_id()
+        self.cost_a = new_id()
+        self.key_assignment_a = new_id()
 
 
 @pytest.fixture(scope="module")
@@ -130,9 +135,31 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 total_cents=120000,
             )
         )
+    with Session(owner) as session, session.begin():
+        session.add(
+            CostEntry(
+                id=ids.cost_a,
+                account_id=ids.account_a,
+                building_id=ids.building_a,
+                label="Müllabfuhr",
+                amount_cents=120000,
+                period_from=date(2025, 1, 1),
+                period_to=date(2026, 1, 1),
+            )
+        )
+        session.add(
+            AllocationKeyAssignment(
+                id=ids.key_assignment_a,
+                account_id=ids.account_a,
+                cost_entry_id=ids.cost_a,
+                key=AllocationKey.AREA,
+            )
+        )
     yield ids
     with Session(owner) as session, session.begin():
         for model, row_id in (
+            (AllocationKeyAssignment, ids.key_assignment_a),
+            (CostEntry, ids.cost_a),
             (Statement, ids.statement_a),
             (BuildingAssignment, ids.assignment_a),
             (Renter, ids.renter_a),
@@ -176,6 +203,8 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(Statement)).all() == []
             assert session.scalars(select(Membership)).all() == []
             assert session.scalars(select(BuildingAssignment)).all() == []
+            assert session.scalars(select(CostEntry)).all() == []
+            assert session.scalars(select(AllocationKeyAssignment)).all() == []
             assert session.scalars(select(Account.id)).all() == [seed.account_b]
 
     def test_own_context_sees_own_rows(
@@ -189,6 +218,10 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(Renter.id)).all() == [seed.renter_a]
             assert session.scalars(select(Statement.id)).all() == [seed.statement_a]
             assert session.scalars(select(BuildingAssignment.id)).all() == [seed.assignment_a]
+            assert session.scalars(select(CostEntry.id)).all() == [seed.cost_a]
+            assert session.scalars(select(AllocationKeyAssignment.id)).all() == [
+                seed.key_assignment_a
+            ]
             assert session.scalars(select(Account.id)).all() == [seed.account_a]
 
     def test_missing_context_denies_by_default(
