@@ -47,7 +47,7 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
   rejected. **Mutation-checked:** disabling RLS on one table makes the test fail; re-enabling
   restores green. CI's Python lane runs it against a Postgres service with `LOKARA_REQUIRE_DB=1`,
   so it cannot silently skip.
-- Full suite: **114 pytest tests** (10 need the local Postgres; 1 needs Playwright Chromium),
+- Full suite: **123 pytest tests** (19 need the local Postgres; 1 more needs Playwright Chromium),
   `mypy --strict` clean, `ruff check .` clean, Turbo `typecheck`/`lint`/`test`/`build` green.
 
 **What works end-to-end today**
@@ -65,6 +65,13 @@ C ran before B and E/F before D, per §7 — none depended on the phase it jumpe
 - **Adapters + PDF** (`packages/adapters`, `packages/pdf`): six external-edge `Protocol` ports with
   fixture stubs, and `uv run lokara-pdf-demo` renders the real NK + heating/CO₂ statement (engine
   results, `Rechtsstand` stamps, disclaimer) via Playwright Chromium.
+- **The M3 pitch slice** (2026-07-25): the `/a/{accountId}/…` portal — left nav derived from
+  `GET /me`, Dashboard with one-click **"Demo-Szenario laden"** (`POST /demo/load`), and
+  **Abrechnung erstellen** running both engines over the URL-scoped API
+  (`GET /a/{id}/statements/demo` + `/pdf`): golden shares, 585/415 ‰ degree-day split, CO₂ block,
+  cent-exact reconciliation as BFSG status notes, PDF download. Path re-authorization is tested:
+  a valid member of another account gets 403 on the URL's account. Verified headless from an
+  **empty database** (14/14): landing → seed → dashboard → statement → PDF.
 
 **Next step:** the migration itself has only **G** (Expo mobile skeleton) and **H** (cutover:
 remove the TS backend, merge to `main`) left — but the pitch path (§0) now runs through the
@@ -73,13 +80,13 @@ that `packages/pdf` already renders.
 
 **Known open items**
 
-- **Semantic status colors are now specified** (`docs/05` → "Semantic status colors"): `danger`
-  `#A4262C`, `warning` `#92400E`, `success` = Lokara Grün, each with a tint, all AA-verified.
-  **Still to implement:** add them to `@theme` and wire shadcn's `destructive` variant to `--color-danger`.
+- **Semantic status colors are implemented** (`docs/05`): danger/warning/success + tints in
+  `@theme`, shadcn `destructive` → `--color-danger`, `StatusNote` = tint + icon shape + label (BFSG).
 - **`TODO(supabase)`** touchpoints: no Supabase project is wired — docker-compose Postgres and the
   dev-token endpoint stand in; the real session exchange lands at M5 (check HS256 vs JWKS then).
-- **The M3 pages are not built** (`docs/04`): Dashboard, Objekte, Einheit, Kosten erfassen, Zähler,
-  Abrechnung erstellen. Phase F shipped the stack + a demo page, not the product screens.
+- **M3 pages remaining** (`docs/04`): Objekte, Einheit/Mietverhältnis, Kosten erfassen, Zähler
+  (shown as "bald" in the nav). Dashboard + Abrechnung erstellen are built; statement costs/meter
+  totals are fixture constants (`apps/api/…/statement_service.py`) until those pages exist.
 - TS backend (NestJS/Prisma) still coexists as reference; it comes out at Phase H.
 
 **How to run it**
