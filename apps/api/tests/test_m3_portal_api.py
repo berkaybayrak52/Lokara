@@ -90,9 +90,20 @@ class TestMe:
 
 
 class TestDemoLoad:
-    def test_one_click_load_is_idempotent_and_unlocks_the_portal(
-        self, client: TestClient
+    def test_disabled_flag_yields_403(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """DEMO_SEED_ENABLED is off by default — the endpoint must refuse
+        (same pattern as AUTH_DEV_TOKEN; settings are read per request)."""
+        monkeypatch.setenv("DEMO_SEED_ENABLED", "false")
+        response = client.post("/demo/load", headers=DEMO)
+        assert response.status_code == 403
+        assert "disabled" in response.json()["detail"]
+
+    def test_one_click_load_is_idempotent_and_unlocks_the_portal(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DEMO_SEED_ENABLED", "true")
         response = client.post("/demo/load", headers=DEMO)
         assert response.status_code == 200
         assert response.json() == {"ok": True, "accountId": DEMO_ACCOUNT_ID}

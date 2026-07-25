@@ -15,5 +15,8 @@ class ApiSettings(BaseSettings):
     supabase_jwt_secret: str = Field(default="", min_length=16, validate_default=True)
     # Dev-only: enables POST /auth/dev-token. MUST be false (or unset) in prod.
     auth_dev_token: bool = False
+    # Dev/pitch-only: enables POST /demo/load (one-click demo seed). Off by
+    # default — any authenticated caller could otherwise reset the demo account.
+    demo_seed_enabled: bool = False
     api_port: int = 3001
     web_origin: str = "http://localhost:3000"

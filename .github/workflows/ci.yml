@@ -66,6 +66,10 @@ jobs:
       # Same rule for the PDF render test (packages/pdf): CI installs Chromium,
       # so a missing browser is a failure, never a skip.
       LOKARA_REQUIRE_PDF: '1'
+      # The API tests construct ApiSettings (no .env in CI) and exercise the
+      # gated demo-seed endpoint in its enabled state.
+      SUPABASE_JWT_SECRET: ci-only-secret-not-used-in-prod-123456
+      DEMO_SEED_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

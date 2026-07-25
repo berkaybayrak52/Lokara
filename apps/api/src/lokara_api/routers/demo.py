@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..auth import RequireAuth
 from ..deps import AccountSession, raw_account_scoped_session
 from ..schemas import DemoLoadResponse, DemoSummaryResponse, DemoTenancySummary
+from ..settings import ApiSettings
 
 router = APIRouter(prefix="/demo")
 
@@ -19,11 +20,14 @@ router = APIRouter(prefix="/demo")
 def load(auth: RequireAuth) -> DemoLoadResponse:
     """One-click "Demo-Szenario laden" (docs/04 Dashboard, docs/06).
 
-    Idempotent merge of the fixed demo fixture — including the OWNER Membership
-    this endpoint would otherwise be gated on, so it runs on the raw scoped
-    session; RLS confines every write to the demo account context underneath.
-    TODO(M5): restrict to the caller's own sandbox once real accounts exist.
+    DEV/PITCH ONLY — disabled unless DEMO_SEED_ENABLED=true (same pattern as
+    AUTH_DEV_TOKEN). Idempotent merge of the fixed demo fixture — including the
+    OWNER Membership this endpoint would otherwise be gated on, so it runs on
+    the raw scoped session; RLS confines every write to the demo account
+    context underneath.
     """
+    if not ApiSettings().demo_seed_enabled:
+        raise HTTPException(status_code=403, detail="Demo seeding is disabled")
     del auth  # any authenticated caller may (re)load the fixed demo fixture
     with raw_account_scoped_session(DEMO_ACCOUNT_ID) as session:
         seed_demo(session)
