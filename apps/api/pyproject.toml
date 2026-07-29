@@ -9,6 +9,8 @@ dependencies = [
   "pyjwt>=2.10",
   "pydantic>=2.10",
   "pydantic-settings>=2.7",
+  # multipart/form-data parsing — required by FastAPI for the M4 Beleg upload.
+  "python-multipart>=0.0.20",
   "lokara-domain",
   "lokara-db",
   "lokara-nk-engine",

@@ -43,6 +43,7 @@ from .meter import (
 )
 from .vision import (
     ExtractedInvoiceFields,
+    FieldConfidences,
     SourceDocument,
     StubVisionGateway,
     VisionGateway,
@@ -62,6 +63,7 @@ __all__ = [
     "EmailDeliveryReceipt",
     "EmailGateway",
     "ExtractedInvoiceFields",
+    "FieldConfidences",
     "MeasurementUnit",
     "MeterConsumption",
     "MeterGateway",

@@ -327,3 +327,46 @@ export const DemoStatementResponseSchema = z.object({
   disclaimer: z.string(),
 });
 export type DemoStatementResponse = z.infer<typeof DemoStatementResponseSchema>;
+
+// ── Beleg-Upload / Extraktion (docs/04 M4, canned) ───────────────────────────
+
+export const ExtractionFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  value: z.string(),
+  confidencePercent: z.number().int(),
+  /** Decided by the API — one threshold, not one per client. */
+  needsReview: z.boolean(),
+  /** False for values the confirm step cannot persist yet (vendor, date). */
+  stored: z.boolean(),
+  note: z.string().nullable().optional(),
+});
+export type ExtractionField = z.infer<typeof ExtractionFieldSchema>;
+
+/** Exactly the CostCreate shape — the review form starts here and submits it
+ * through the ordinary Kosten erfassen endpoint. */
+export const ExtractionPrefillSchema = z.object({
+  label: z.string(),
+  amountCents: z.number().int(),
+  periodFrom: z.string(),
+  periodTo: z.string(),
+  key: AllocationKeySchema,
+});
+export type ExtractionPrefill = z.infer<typeof ExtractionPrefillSchema>;
+
+export const ExtractionDuplicateSchema = z.object({
+  costId: z.string(),
+  label: z.string(),
+  amountEur: z.string(),
+});
+
+export const ExtractionResponseSchema = z.object({
+  documentName: z.string(),
+  providerLabel: z.string(),
+  documentConfidencePercent: z.number().int(),
+  fields: z.array(ExtractionFieldSchema),
+  prefill: ExtractionPrefillSchema,
+  notExtracted: z.array(z.string()),
+  duplicate: ExtractionDuplicateSchema.nullable(),
+});
+export type ExtractionResponse = z.infer<typeof ExtractionResponseSchema>;

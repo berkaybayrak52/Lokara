@@ -63,6 +63,13 @@ Needed from the Notion page: the **canonical list with default allocation keys p
 
 → lands in `packages/rules-store` with a `Rechtsstand`, never hardcoded in an engine.
 
+**Two screens are already waiting on it**, and both currently take a free-text label rather than a
+type: *Kosten erfassen*, and the M4 *Beleg-Upload* review step. The extraction returns a category
+(`Müllabfuhr`) but deliberately derives **no** Umlageschlüssel from it — it reports the key as *not
+extracted* (`docs/04` → "Beleg-Upload"). Once the catalogue exists, that mapping becomes a suggested
+key with a `Rechtsstand`, and the non-umlagefähig types become a warning on entry. Until then a
+suggestion would be invented law, not a convenience.
+
 ## Open questions the spec must answer
 
 - [ ] Layout of the Mieter-Einzelabrechnung (sections, order, what appears per cost type)

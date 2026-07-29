@@ -19,10 +19,31 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly path: string,
+    /**
+     * FastAPI's `detail`, when the response carried one. Some rejections are
+     * only explainable by the server (which file types it reads, how large an
+     * upload may be) — re-authoring those sentences in the client would let
+     * the two drift apart.
+     */
+    readonly detail?: string,
   ) {
     super(`API request failed: ${status} ${path}`);
     this.name = 'ApiError';
   }
+}
+
+/** Best-effort: an error body is a courtesy, never something to depend on. */
+async function readDetail(response: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === 'object' && 'detail' in body) {
+      const { detail } = body as { detail: unknown };
+      return typeof detail === 'string' ? detail : undefined;
+    }
+  } catch {
+    /* not JSON, or already consumed — fall through to the status alone */
+  }
+  return undefined;
 }
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -66,7 +87,7 @@ export async function api<Schema extends z.ZodType>(
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, path);
+    throw new ApiError(response.status, path, await readDetail(response));
   }
   // 204 has no body — parse `undefined` so the caller still declares a schema
   // (z.undefined()) instead of the call silently skipping validation.

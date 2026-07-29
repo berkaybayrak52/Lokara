@@ -123,3 +123,49 @@ Vermieter portal (`/a/{accountId}`), German labels:
 The PDF service (`packages/pdf`) is **one shared service** behind NK, UVI, AfA dossier, Anlage V, and
 contracts. For M3 it renders the NK + heating/CO₂ statement with the `Rechtsstand MM/JJJJ` stamp and
 the "Tool, keine Rechts-/Steuerberatung" disclaimer.
+
+## Beleg-Upload — upload → prefill → confirm (M4)
+
+`/a/{accountId}/beleg`. One pipeline for NK-receipt OCR **and** later migration import, behind the
+Phase D `VisionGateway` port. For the pitch the implementation is `StubVisionGateway`: every upload
+returns the canned garbage invoice (€ 1.200,00, Stadtreinigung Frankfurt GmbH, 15.12.2025).
+
+**Endpoint:** `POST /a/{accountId}/buildings/{buildingId}/extractions` (multipart, ≤ 10 MB,
+PDF/PNG/JPG). Returns a proposal. **There is no confirm endpoint** — the review form posts to the
+ordinary `POST /buildings/{id}/costs`.
+
+### The three rules this screen encodes
+
+1. **Extraction writes nothing.** The response is a proposal; the entry is created only by the
+   normal Kosten erfassen call, after a human has seen the values. Web and API share one form
+   contract (`features/kosten/cost-form.ts` / `CostCreate`), so a prefilled entry clears exactly the
+   bar a typed one does — an OCR miss cannot become a wrong statement unnoticed.
+2. **No cost type is invented.** The extracted category becomes the same **free-text label** the
+   manual form already takes. Mapping a category to a BetrKV type — and to that type's default
+   Umlageschlüssel — needs the **cost-type catalogue, which is a pending spec** (`docs/08`,
+   "BetrKV cost-type catalogue"). Until it exists with a `Rechtsstand`, the key is reported in
+   `notExtracted` and defaults to the form's own default, visibly.
+3. **The provider is named as a stub.** `providerLabel` says so and the UI prints it, so no screen
+   can imply an integration that is absent. A real provider (EU processing + AVV, listed
+   sub-processor) swaps in behind the same Protocol.
+
+### Confidence is per field
+
+A single document-level score cannot answer the one question the review step exists to answer —
+*which* value should I check? The port therefore returns both: `confidence` (how well the document
+was read) and `field_confidences` (per value). In the stub `cost_category` sits far below the rest
+because it is **inferred, not read**. The `needs_review` threshold lives on the **API**
+(`LOW_CONFIDENCE_PERCENT`), so the rule has one home rather than one per client.
+
+### Not yet stored
+
+`vendor_name` and `invoice_date` are extracted and shown, but `CostEntry` has no column for either,
+so confirming discards them — the UI says so per field rather than hiding it. They belong to a
+**Beleg record** (file + hash + issuer + document date, GoBD / § 147 AO), which needs object storage
+and its own spec; it is not part of the canned M4 slice.
+
+### No data loss
+
+The review step is autosaved like every other form (`useFormDraft`), and the **extraction itself**
+is persisted alongside it — otherwise a reload would restore corrections into a form that no longer
+exists. A new upload replaces both: fresh results must never appear under stale edits.

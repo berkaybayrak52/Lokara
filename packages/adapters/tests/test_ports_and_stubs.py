@@ -16,6 +16,7 @@ from lokara_adapters import (
     DatevGateway,
     DeliveryStatus,
     EmailGateway,
+    FieldConfidences,
     MeterGateway,
     MeterKind,
     OutgoingEmail,
@@ -31,6 +32,13 @@ from lokara_adapters import (
     VisionGateway,
 )
 from lokara_domain import Cents
+
+_ALL_CERTAIN = FieldConfidences(
+    vendor_name=Decimal(1),
+    invoice_date=Decimal(1),
+    total_amount=Decimal(1),
+    cost_category=Decimal(1),
+)
 
 
 class TestBankPort:
@@ -71,6 +79,22 @@ class TestVisionPort:
         assert fields.cost_category == "Müllabfuhr"
         assert Decimal(0) <= fields.confidence <= Decimal(1)
 
+    def test_every_field_carries_its_own_confidence(self) -> None:
+        """The review UI's whole job is to point at the weak field, which a
+        single document-level score cannot do."""
+        fields = StubVisionGateway().extract_invoice(
+            SourceDocument(file_name="beleg.pdf", content=b"%PDF")
+        )
+        per_field = fields.field_confidences
+
+        for name, value in vars(per_field).items():
+            assert Decimal(0) <= value <= Decimal(1), name
+        # cost_category is inferred (and against a catalogue that is still a
+        # pending spec), so it must read as the least certain value.
+        assert per_field.cost_category < min(
+            per_field.vendor_name, per_field.invoice_date, per_field.total_amount
+        )
+
     def test_confidence_outside_unit_interval_is_rejected(self) -> None:
         from lokara_adapters import ExtractedInvoiceFields
 
@@ -81,6 +105,18 @@ class TestVisionPort:
                 total_amount=Cents(100),
                 cost_category="Sonstiges",
                 confidence=Decimal("1.01"),
+                field_confidences=_ALL_CERTAIN,
+            )
+
+    def test_a_per_field_confidence_outside_the_interval_is_rejected(self) -> None:
+        from lokara_adapters import FieldConfidences
+
+        with pytest.raises(ValueError, match="total_amount confidence"):
+            FieldConfidences(
+                vendor_name=Decimal("0.9"),
+                invoice_date=Decimal("0.9"),
+                total_amount=Decimal("-0.1"),
+                cost_category=Decimal("0.9"),
             )
 
 

@@ -158,7 +158,7 @@ without touching a database by hand.
 
 ---
 
-## M4 — Doc-extraction (OCR/Vision) pipeline — canned demo for pitch
+## M4 — Doc-extraction (OCR/Vision) pipeline — canned demo for pitch ✅ done
 
 - One **upload → prefill → confirm** flow, shared by NK-receipt OCR **and** migration import.
 - **Vision adapter is stubbed** for the pitch: canned sample invoices return prefilled fields from
@@ -166,6 +166,15 @@ without touching a database by hand.
 - Review UI where the user confirms/corrects extracted fields before they hit the ledger.
 
 **DoD:** uploading a sample invoice pre-fills a cost entry the user confirms — demonstrable with canned data.
+
+**Built** (`docs/04` → "Beleg-Upload"): `/a/{id}/beleg` and
+`POST /a/{id}/buildings/{id}/extractions`. Extraction **writes nothing** — the confirm step goes
+through the ordinary Kosten erfassen endpoint, sharing one form contract with the manual screen.
+Confidence is **per field**, and the `needs_review` threshold lives on the API. Deliberately **not**
+built: any mapping from cost type to Umlageschlüssel — that needs the BetrKV catalogue, still a
+pending spec (`docs/08`), and the response reports the key as *not extracted* instead of guessing.
+`vendor_name` / `invoice_date` are shown but not stored: they belong to a Beleg record (file + hash,
+GoBD), which needs object storage and its own spec.
 
 ---
 

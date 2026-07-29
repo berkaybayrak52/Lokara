@@ -434,6 +434,60 @@ class HeatingCostListResponse(ApiModel):
     heating_costs: list[HeatingCostOut]
 
 
+# ── Beleg-Upload / Extraktion (docs/04 M4, canned) ───────────────────────────
+
+
+class ExtractionFieldOut(ApiModel):
+    """One extracted value, ready to render: already formatted for German
+    display, with the confidence the provider reported for *that* field.
+
+    ``needs_review`` is decided here, not in the client — the threshold is a
+    product rule and belongs on one side of the wire.
+    """
+
+    id: str
+    label: str
+    value: str
+    # Integer percent, not a float or a Decimal-as-string: the client only ever
+    # displays it, and integers keep the wire unambiguous.
+    confidence_percent: int
+    needs_review: bool
+    # False for values the confirm step cannot yet persist (see the router).
+    stored: bool
+    note: str | None = None
+
+
+class ExtractionPrefill(ApiModel):
+    """Exactly the CostCreate shape — the review form starts from this and
+    submits through the ordinary Kosten erfassen endpoint. Nothing here is
+    written until the user confirms."""
+
+    label: str
+    amount_cents: int
+    period_from: date
+    period_to: date
+    key: AllocationKey
+
+
+class ExtractionDuplicate(ApiModel):
+    cost_id: str
+    label: str
+    amount_eur: str
+
+
+class ExtractionOut(ApiModel):
+    document_name: str
+    provider_label: str
+    document_confidence_percent: int
+    fields: list[ExtractionFieldOut]
+    prefill: ExtractionPrefill
+    # German names of the fields the document does NOT supply — their prefill
+    # values are form defaults, and saying so is the difference between a
+    # suggestion and a silent guess.
+    not_extracted: list[str]
+    duplicate: ExtractionDuplicate | None
+
+
 class DemoStatementResponse(ApiModel):
     building_name: str
     building_address: str

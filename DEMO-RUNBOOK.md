@@ -37,6 +37,7 @@ bun run --filter @lokara/web dev          # web on :3000
 - [ ] `http://localhost:3000` loads, no console errors
 - [ ] Clicking **Demo-Szenario laden** succeeds (not 403)
 - [ ] **Abrechnung erstellen** shows €1.200,00 reconciling and the PDF downloads
+- [ ] **Beleg-Upload** reads a test file and shows the fields — then click **Verwerfen** (see Trap 3)
 - [ ] Browser zoom at 100%, window large enough for the tables (they're wide)
 - [ ] Screen-share tested — dark-on-light UI, small type; consider zoom 110–125% for the room
 
@@ -44,8 +45,8 @@ bun run --filter @lokara/web dev          # web on :3000
 
 ## 2. The click path
 
-Keep it to five screens, in this order. M3 is complete, so every nav entry is a real page — but
-resist wandering: the story is the money screen at the end.
+Keep it to six screens, in this order. M3 and M4 are complete, so every nav entry is a real page —
+but resist wandering: the story is the money screen at the end.
 
 ### Screen 1 — Dashboard (`/a/acc_demo_lokara`)
 
@@ -78,7 +79,29 @@ Start on an **empty** database if you can — the cold-start moment is good.
 - Optional 20-second beat if the room is technical: open a meter's readings, enter a wrong closing
   value, show the statement move, then record a **Korrektur** and watch the numbers come back.
 
-### Screen 5 — Abrechnung erstellen (⭐ the money screen)
+### Screen 5 — Beleg-Upload (the "AI-assisted UX" beat)
+
+- Upload any PDF/PNG/JPG (the extraction is canned — every file returns the garbage invoice).
+- Point at the **per-field confidence**: Betrag 97 %, Kostenart **62 % · prüfen**.
+- **Say:** *"The amount was read; the cost type was inferred — so the screen sends you to the one
+  field that needs a human. Nothing is written until you confirm, and confirming goes through the
+  exact same form the manual entry does. An OCR miss cannot reach a statement unseen."*
+- Then the honest part, which lands better than hiding it: *"Two things are deliberately not
+  guessed. The Umlageschlüssel isn't derived from the cost type — that needs the BetrKV catalogue,
+  and inventing German law is the one thing this product can't do. And the provider here is a stub:
+  a real EU provider with an AVV swaps in behind the same interface."*
+- **Then click "Verwerfen".** The screen also warns *"Möglicherweise bereits erfasst"* — the €1.200
+  Müllabfuhr is already booked, which is itself a good beat: *"and it notices we already have this
+  invoice."*
+
+> **⚠️ Trap 3 — don't confirm the Müllabfuhr during the demo.** The seeded scenario already contains
+> it, so confirming books it **twice** and the money screen then shows €2.400,00 instead of the
+> golden €1.200,00. Either click **Verwerfen**, or — if you want to prove the extraction really
+> drives the numbers — delete the Müllabfuhr on *Kosten erfassen* first, then confirm and watch the
+> statement come back to €600,00 / €178,52 / €181,48 / €240,00. If it goes wrong, **Demo
+> zurücksetzen** on the Dashboard restores the exact scenario.
+
+### Screen 6 — Abrechnung erstellen (⭐ the money screen)
 
 This is the pitch. Slow down here.
 
@@ -144,5 +167,9 @@ the story survives; a blank browser doesn't.
 
 ## 6. Don't demo these
 
-Mobile, bank sync, doc extraction, tax export, contracts, the Mieter/StB portals: **roadmap**, not
-screens. The five personas in `docs/06` are a **model** to explain, not a UI to click — M5/M10.
+Mobile, bank sync, tax export, contracts, the Mieter/StB portals: **roadmap**, not screens. The five
+personas in `docs/06` are a **model** to explain, not a UI to click — M5/M10.
+
+Doc extraction *is* a screen now (M4), but the extraction itself is **canned**. Demo the flow and the
+review gate; say the provider is a stub when you show it — the screen prints that too. Don't imply a
+live OCR integration.

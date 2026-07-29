@@ -10,11 +10,25 @@ import type { FieldValues, UseFormReturn } from 'react-hook-form';
  * successful submit clears it. Server-side drafts arrive with real accounts;
  * the storage key is account-scoped so drafts never bleed across contexts.
  */
+function draftStorageKey(key: string): string {
+  return `lokara.draft.${key}`;
+}
+
+/**
+ * Drop a draft from outside the form that owns it. Needed exactly once: a new
+ * Beleg upload supersedes an in-progress correction of the previous one, and
+ * restoring the old values over fresh extraction results would be worse than
+ * losing them.
+ */
+export function clearFormDraft(key: string): void {
+  window.localStorage.removeItem(draftStorageKey(key));
+}
+
 export function useFormDraft<T extends FieldValues>(
   key: string,
   form: UseFormReturn<T>,
 ): { draftRestored: boolean; clearDraft: () => void } {
-  const storageKey = `lokara.draft.${key}`;
+  const storageKey = draftStorageKey(key);
   const [draftRestored, setDraftRestored] = useState(false);
 
   useEffect(() => {

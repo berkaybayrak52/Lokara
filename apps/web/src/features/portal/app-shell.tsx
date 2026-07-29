@@ -34,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
     activePrefixes: ['/objekte', '/einheiten'],
   },
   { href: (id) => `/a/${id}/kosten`, label: 'Kosten erfassen', activePrefixes: ['/kosten'] },
+  { href: (id) => `/a/${id}/beleg`, label: 'Beleg-Upload', activePrefixes: ['/beleg'] },
   { href: (id) => `/a/${id}/zaehler`, label: 'Zähler', activePrefixes: ['/zaehler'] },
   {
     href: (id) => `/a/${id}/abrechnung`,
@@ -43,8 +44,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 // Pages that exist in the plan but not yet in the app — an honest roadmap
-// beats dead links (and hiding them would misrepresent scope). M3 is complete,
-// so this is empty; the next entries arrive with M4.
+// beats dead links (and hiding them would misrepresent scope). M3 and M4 are
+// complete, so this is empty; the next entries arrive with M5.
 const UPCOMING: string[] = [];
 
 export function AppShell({

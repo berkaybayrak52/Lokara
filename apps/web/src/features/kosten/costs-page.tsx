@@ -22,49 +22,17 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 
 import { useBuildingDetail, useBuildings } from '@/features/objekte/queries';
 import { FormField } from '@/features/objekte/form-field';
 import { ApiError } from '@/lib/api';
 import type { AllocationKey, CostEntryOut } from '@/lib/contracts';
 import { ALLOCATION_KEYS, ALLOCATION_KEY_LABELS } from '@/lib/contracts';
-import { isoToGermanDate, parseEurToCents } from '@/lib/format';
+import { isoToGermanDate } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
 
+import { CostFormSchema, EMPTY_COST_FORM, toCostCreateInput, type CostForm } from './cost-form';
 import { useCosts, useCreateCost, useDeleteCost, useReassignKey } from './queries';
-
-const CostFormSchema = z
-  .object({
-    label: z.string().min(1, 'Pflichtfeld'),
-    amount: z
-      .string()
-      .min(1, 'Pflichtfeld')
-      .refine((v) => parseEurToCents(v) !== null, 'Betrag wie 1.200,00 angeben')
-      .refine((v) => (parseEurToCents(v) ?? 0) > 0, 'Betrag muss größer als 0 sein'),
-    periodFrom: z.string().min(1, 'Pflichtfeld'),
-    periodTo: z.string().min(1, 'Pflichtfeld'),
-    key: z.enum(ALLOCATION_KEYS),
-    directUnitId: z.string(),
-  })
-  .refine((v) => v.periodTo > v.periodFrom, {
-    path: ['periodTo'],
-    message: 'Ende muss nach dem Beginn liegen',
-  })
-  .refine((v) => v.key !== 'DIRECT' || v.directUnitId !== '', {
-    path: ['directUnitId'],
-    message: 'Direktzuordnung braucht eine Einheit',
-  });
-type CostForm = z.infer<typeof CostFormSchema>;
-
-const EMPTY: CostForm = {
-  label: '',
-  amount: '',
-  periodFrom: '2025-01-01',
-  periodTo: '2026-01-01',
-  key: 'AREA',
-  directUnitId: '',
-};
 
 /** Kosten erfassen (docs/04 M3 page 4). */
 export function CostsPage({ accountId }: { accountId: string }) {
@@ -320,29 +288,22 @@ function CreateCostForm({
   units: { id: string; label: string }[];
 }) {
   const create = useCreateCost(accountId, buildingId);
-  const form = useForm<CostForm>({ resolver: zodResolver(CostFormSchema), defaultValues: EMPTY });
+  const form = useForm<CostForm>({
+    resolver: zodResolver(CostFormSchema),
+    defaultValues: EMPTY_COST_FORM,
+  });
   const { draftRestored, clearDraft } = useFormDraft(`${accountId}.${buildingId}.cost-create`, form);
   const selectedKey = form.watch('key');
 
   const onSubmit = form.handleSubmit((values) => {
-    const amountCents = parseEurToCents(values.amount);
-    if (amountCents === null) return; // zod already guards this
-    create.mutate(
-      {
-        label: values.label,
-        amountCents,
-        periodFrom: values.periodFrom,
-        periodTo: values.periodTo,
-        key: values.key,
-        directUnitId: values.key === 'DIRECT' ? values.directUnitId : undefined,
+    const input = toCostCreateInput(values);
+    if (input === null) return; // zod already guards this
+    create.mutate(input, {
+      onSuccess: () => {
+        clearDraft();
+        form.reset(EMPTY_COST_FORM);
       },
-      {
-        onSuccess: () => {
-          clearDraft();
-          form.reset(EMPTY);
-        },
-      },
-    );
+    });
   });
 
   return (
