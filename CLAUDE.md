@@ -129,10 +129,12 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 
 ## How to work
 
-- Follow `PLAN.md` milestones **in order**. Don't start a later milestone before its predecessor's
-  Definition of Done is met. **Engines + fixtures before UI.**
-- The **pitch cutline is M0→M3 solid + M4 as a canned demo** (see `PLAN.md`). Everything past that is
-  post-pitch foundation.
+- Follow `PLAN.md`. Milestone DoDs are binding; **engines + fixtures before UI**. Before the 06.08
+  pitch the build order is the **execution order** in `PLAN.md` (value ÷ risk), not the milestone
+  numbering — and its **hard rules** apply: no calculation without its transcribed spec + golden
+  fixture, the demo path is re-verified every milestone, tag each green state, stubs stay stubs.
+- **Never leave the demo path broken.** If a change breaks clean-DB → seed → statement → PDF, fix or
+  revert before moving on. A working demo beats a broader broken one.
 - When a decision isn't covered here or in `docs/`, prefer the choice that (a) keeps engines pure,
   (b) keeps data immutable/versioned, (c) keeps `accountId` scoping intact — in that order.
 

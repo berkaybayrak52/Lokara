@@ -5,22 +5,60 @@
 > Canonical dates from `lokara-arch.md`: pitch **06.08**, public launch **~08.09** (web + native
 > iOS/Android together). (Earlier freeze/web-only dates of 23.07/25.07 are now historical.)
 >
-> **Status:** **M0 is built** — on the **interim TypeScript stack** (NestJS + Prisma), before the v4
-> architecture change. M1→M3 for the pitch are **not built yet**. **Decision: migrate M0 to Python now
-> (`MIGRATION-PLAN.md` Phases A–F), then build M1→M3 in Python** — so the crown-jewel engines are built
-> once, and the pitch runs on the target stack. The TS M0 stays on `main` as a fallback.
+> **Status: M0–M3 are built and green** on the v4 Python stack (FastAPI + SQLAlchemy/RLS + Bun/shadcn),
+> CI green on both lanes, pushed to `origin/feat/py-migration`. The migration itself has only Phase G
+> (Expo skeleton) and Phase H (cutover) left — see `MIGRATION-PLAN.md`.
 
-## Pitch cutline (target: 06.08)
+## Pitch plan (target: 06.08) — push for maximum breadth
 
-For the **06.08 investor pitch** the app should be _mostly real_ with **stubs where APIs cost money**
-(finAPI, Vision/OCR, email, billing) and **seeded example scenarios** for the common cases
-(edge cases deferred). Concretely:
+**Decision:** attempt **M4 → M10** before the pitch, ordered by investor value ÷ risk, with
+**Berkay's calculation specs written in parallel** so the spec-dependent milestones aren't guesswork.
+Stubs stay stubbed where APIs cost money (finAPI, Vision/OCR, email, billing).
 
-```
-PITCH TARGET = M0 → M3 solid, + M4 shown as a canned demo
-```
+> ⚠️ **Read this before starting anything below.** This is a deliberately ambitious run. Most of
+> M6–M10 is normally months of work. The plan is therefore written to **degrade gracefully**: value
+> lands first, everything spec-dependent is gated, and there is an explicit cut list. **A working demo
+> beats a broader broken one — every time.**
 
-Everything from **M5 onward is the full-foundation build after the pitch**, staged in the order below.
+### Execution order (not milestone order)
+
+Build in this sequence, because it front-loads what an investor reacts to:
+
+| # | Work | Why here | Risk |
+| --- | --- | --- | --- |
+| 1 | **M4** canned doc-extraction | Vision stub already exists (Phase D); mostly review UI. The "AI-assisted UX" pillar. | low |
+| 2 | **M5** identity, roles, RLS, portals | Schema already models it. Unlocks **persona 4** — one login: Vermieter + Mieter + Investor — your strongest differentiator (`docs/06`). | medium |
+| 3 | **M10-slice**: read-only Mieter + StB portals | Completes the persona demo; no tickets/activation yet. | medium |
+| 4 | **M9-slice**: §556 deadline Wächter + reminders | Visible, date-driven, needs no new legal math. | medium |
+| 5 | **M6** bank + Payment Ledger (finAPI stubbed) | Unlocks the two-time-axes story; adds Redis/workers. | high |
+| 6 | **M7** tax export + AfA | 🔒 **gated on specs** — see below. | high |
+| 7 | **M8** document/clause engine | 🔒 **gated on specs**. | high |
+| 8 | **M10 remainder**: tickets, activation codes, investment cockpit | Broad surface, lower per-hour demo value. | high |
+| 9 | **Phase G** native/Expo | Largest surface, least pitch payoff — "at launch" is a fine answer. | highest |
+
+### Hard rules for this run
+
+1. **🔒 No calculation without its spec.** M7/M8 (AfA rates, Anlage-V lines, DATEV encoding, clause
+   versions) must not start until Berkay's page exists, is transcribed into `docs/`, and its worked
+   example is a golden fixture. Guessing German tax law is the one failure this product cannot absorb.
+   If a spec isn't ready, **build the adapter/stub and move on** — never invent the numbers.
+2. **The demo path is sacred.** Every milestone ends with the full path re-verified end to end
+   (clean DB → seed → statement → PDF). If a change breaks it, fix or revert before moving on.
+3. **Tag every green state** (`git tag demo-green-<n>`). At any moment you must be able to check out a
+   tag and demo. This is the whole safety net.
+4. **One milestone per session**, each ending green (tests + CI). No half-merged subsystems.
+5. **Stubs stay stubs.** finAPI, Vision, email, billing behind adapters — no vendor SDK, no real keys.
+
+### Cut list (drop in this order if time runs short)
+
+**9 → 8 → 7 → 6 → 4.** Cut early and deliberately rather than shipping something half-built: an
+honest roadmap slide beats a broken screen. M5 and the persona story are the last things to give up —
+they carry the differentiator.
+
+### Stop-building checkpoint
+
+**Two days before the pitch, stop feature work.** Merge to `main`, rehearse from `DEMO-RUNBOOK.md` on
+a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in after that line.
 
 ---
 
@@ -206,6 +244,13 @@ the annuity schedule.
 ## Reality flag (from the arch doc)
 
 A lot has been pulled into V1 (native apps + OCR + contract engine + investment module by ~Sept) for a
-small team. **The pitch (06.08) only needs M0→M3 + a canned M4.** Guard the sequence: engines and
-correctness first; the launch surface stages in behind them. Don't let native-app or integration work
-cannibalise Tier-1 (engine) capacity.
+small team, and the pre-pitch plan above now attempts **M4→M10** on top of that. That is a deliberate
+stretch, taken with eyes open.
+
+**The floor, if everything else slips:** M0→M3 is built, green and demoable *today* — a correct
+CO₂-compliant NK/heating statement from user-entered data, with tenant isolation proven. That alone is
+a legitimate pitch. Everything above it is upside.
+
+So: guard the sequence — correctness first, breadth second. Use the **cut list**, keep a
+**`demo-green` tag** at all times, and never let integration or native-app work cannibalise
+Tier-1 (engine) capacity or destabilise the working path.
