@@ -35,20 +35,38 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
 REPO = Path(__file__).resolve().parent.parent
 ISOLATION_TEST = REPO / "packages/db/tests/test_rls_isolation.py"
 
-# Tables that legitimately have no account_id and therefore no isolation policy.
+# Tables that legitimately have no account_id column. Note that "no account_id" is NOT
+# the same as "no policy": account and building_assignment are both ENABLEd, FORCEd and
+# policied — they just derive the account from something other than a local column.
 # Keep this list short and always give the reason.
 EXEMPT: dict[str, str] = {
     "alembic_version": "migration bookkeeping, not tenant data",
     "person": "global identity — one human, many accounts (migration 0001)",
+    "account": "IS the isolation boundary — its own id is the account id; policy compares id",
+    "building_assignment": "scoped transitively: policy joins membership.account_id",
 }
 
 
+def _model_name(table: str) -> str:
+    """`allocation_key_assignment` -> `AllocationKeyAssignment`.
+
+    The isolation test selects mapped classes, not table names, so a literal search for
+    the snake_case name reports covered tables as uncovered.
+    """
+    return "".join(part.capitalize() for part in table.split("_"))
+
+
 def _url() -> str:
+    # The rest of the stack loads the root .env itself (alembic's env.py, ApiSettings via
+    # pydantic-settings), so an operator who never exports DIRECT_URL still has a working
+    # repo. This script has to do the same or it fails on a correctly configured machine.
+    load_dotenv(REPO / ".env")
     url = os.environ.get("DIRECT_URL") or os.environ.get("DATABASE_URL")
     if not url:
         print(
@@ -123,7 +141,7 @@ def main() -> int:
             problems.append(
                 f"{name}: RLS enabled but no policy exists — denies everything or nothing"
             )
-        if test_src and name not in test_src:
+        if test_src and name not in test_src and _model_name(name) not in test_src:
             problems.append(
                 f"{name}: not named in packages/db/tests/test_rls_isolation.py — "
                 f"the policy is untested"
