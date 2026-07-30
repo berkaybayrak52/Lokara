@@ -6,41 +6,22 @@ on:
   pull_request:
 
 jobs:
-  # TS lane — Bun + Turbo (web app + the pre-migration TS backend, still live until parity)
+  # TS lane — Bun + Turbo. Frontend only (apps/web + packages/ui): no database, no
+  # browser. Everything server-side is the python lane below.
   ts:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: lokara
-          POSTGRES_PASSWORD: lokara
-          POSTGRES_DB: lokara
-        ports:
-          - 54322:5432
-        options: >-
-          --health-cmd "pg_isready -U lokara -d lokara"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://lokara:lokara@localhost:54322/lokara
-      DIRECT_URL: postgresql://lokara:lokara@localhost:54322/lokara
-      SUPABASE_JWT_SECRET: ci-only-secret-not-used-in-prod-123456
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
-      - run: bun run --filter @lokara/db migrate:deploy
-      - run: bun run --filter @lokara/pdf install-browser
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build
 
-  # Python lane — uv workspace (FastAPI backend + engines, built up in Phases B–E)
+  # Python lane — uv workspace: the FastAPI backend, the engines and the PDF renderer.
   python:
     runs-on: ubuntu-latest
     services:
@@ -79,6 +60,9 @@ jobs:
       - run: uv run playwright install --with-deps chromium
       - run: uv run ruff check .
       - run: uv run mypy
+      # CLAUDE.md rule 1: an engine that imports a framework, a DB or a vendor SDK
+      # is a rewrite waiting to happen. Cheap to check, expensive to discover late.
+      - run: uv run python scripts/check_engine_purity.py
       # No role/migration steps needed: the DB suites are self-sufficient — they
       # apply scripts/init-app-role.sql and `alembic upgrade head` themselves
       # (packages/db/tests/test_rls_isolation.py), so a bare Postgres service is enough.

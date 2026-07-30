@@ -13,7 +13,8 @@ out/
 .env.*
 !.env.example
 
-# prisma generated client
+# Prisma's generated client. The schema that produced it is gone (Phase H); this rule
+# stays until the working copy is deleted, so `git add -A` can never sweep the binaries in.
 packages/db/generated/
 
 # pdf demo output
