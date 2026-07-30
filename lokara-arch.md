@@ -4,8 +4,8 @@
 > revised: backend + engines move to **Python (FastAPI)**, DB stays **Supabase Postgres** (ORM →
 > **SQLAlchemy + Alembic**), the TS side (web + mobile + ui) runs on **Bun + Turborepo**, web uses
 > **shadcn/ui**, mobile is **Expo** with a shared client stack, and **Redis** (cache + rate-limit) +
-> **RevenueCat** (mobile payments) are added. §1 below reflects this. The scaffold code may still be the
-> older TS/NestJS/Prisma build — **docs win; migrate the code toward them.**
+> **RevenueCat** (mobile payments) are added. §1 below reflects this. The code implements this stack;
+> where code and docs still disagree, **docs win.**
 
 ---
 

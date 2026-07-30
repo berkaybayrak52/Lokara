@@ -5,9 +5,9 @@
 > Canonical dates from `lokara-arch.md`: pitch **06.08**, public launch **~08.09** (web + native
 > iOS/Android together). (Earlier freeze/web-only dates of 23.07/25.07 are now historical.)
 >
-> **Status: M0–M3 are built and green** on the v4 Python stack (FastAPI + SQLAlchemy/RLS + Bun/shadcn),
-> CI green on both lanes, pushed to `origin/feat/py-migration`. The migration itself has only Phase G
-> (Expo skeleton) and Phase H (cutover) left — see `MIGRATION-PLAN.md`.
+> **Status: M0–M4 are built and green** on the v4 Python stack (FastAPI + SQLAlchemy/RLS + Bun/shadcn).
+> The migration is complete except **Phase G** (Expo skeleton): Phase H removed the pre-migration
+> TypeScript, so there is now one backend and it is Python — see `MIGRATION-PLAN.md`.
 
 ## Pitch plan (target: 06.08) — push for maximum breadth
 
@@ -62,19 +62,12 @@ a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in af
 
 ---
 
-## M0 — Foundations & scaffolding — ✅ built (interim TS stack)
+## M0 — Foundations & scaffolding — ✅ done (Python stack)
 
-> **What exists today:** M0 was completed on the **interim TypeScript stack** (NestJS + Prisma + pnpm),
-> before the v4 change. The spec below is the **target (Python/FastAPI)** shape M0 takes after the
-> migration (`MIGRATION-PLAN.md` Phases A–F re-establish it). So M0's *intent* is done; its *stack* is
-> pending migration.
->
-> **Decision: migrate M0 to Python now, then build M1→M3 in Python.** Run `MIGRATION-PLAN.md` Phases
-> A–F first (re-establish M0's foundations on FastAPI/SQLAlchemy/Bun/shadcn), then build M1→M3 on that
-> stack — Phase C *is* where the M1 (NK) and M2 (heating/CO₂) engines get built for real. Rationale: the
-> crown-jewel engines aren't written yet, so building them once in Python avoids double work and the
-> pitch runs on the target stack. Keep the TS M0 on `main` as a fallback; the golden fixtures are the
-> spec and don't change.
+> **What exists today:** M0 stands on the v4 Python stack — FastAPI + SQLAlchemy/Alembic + Bun/shadcn
+> — re-established by `MIGRATION-PLAN.md` Phases A–F. The interim TypeScript build (NestJS + Prisma)
+> that originally satisfied M0 was removed in Phase H; `main` still holds it as a historical fallback.
+> `apps/mobile` (Expo) is the one part of the spec below that is still outstanding — Phase G.
 
 **Goal:** an empty but correct skeleton everything else hangs off.
 

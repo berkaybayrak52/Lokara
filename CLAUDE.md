@@ -4,13 +4,10 @@
 > Read this first, then `PLAN.md`, then the relevant file under `docs/`.
 > The single deepest source of truth is `lokara-arch.md` (canonical architecture, v3).
 
-> **⚠️ Stack migration in progress (v4).** These docs describe the **target stack**: a
-> **Python FastAPI** backend + **Python** engine packages, **Supabase Postgres** (kept), a **Bun**
-> TS/JS workspace for web + mobile, and **shadcn/ui**. The current `apps/api` + `packages/*-engine`
-> scaffold is still the older **TypeScript (NestJS + Prisma + Vitest)** code; treat it as pending
-> migration, not as the reference. When code and docs disagree, the docs win — migrate the code toward them.
-> **The step-by-step migration is `MIGRATION-PLAN.md`** (targeted rebuild: fresh Python backend, keep
-> the web frontend). Work it on a branch; keep `main` demo-able for the 06.08 pitch.
+> **The stack is v4.** A **Python FastAPI** backend (`apps/api`) + **Python** engine packages
+> (`packages/*-engine`), **Supabase Postgres**, a **Bun** TS/JS workspace for web + mobile
+> (`apps/web`, `packages/ui`), and **shadcn/ui**. There is one backend and it is Python.
+> `MIGRATION-PLAN.md` records how the tree got here. When code and docs disagree, the docs win.
 
 ---
 
@@ -129,6 +126,9 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 
 ## How to work
 
+- **`AGENTS.md` is how work is executed here** — the deterministic gates (`scripts/gate.sh`,
+  `scripts/verify_demo_path.sh`, the purity/RLS/PDF checks) and the six agents with disjoint write
+  scopes. No agent may both write a test and satisfy it.
 - Follow `PLAN.md`. Milestone DoDs are binding; **engines + fixtures before UI**. Before the 06.08
   pitch the build order is the **execution order** in `PLAN.md` (value ÷ risk), not the milestone
   numbering — and its **hard rules** apply: no calculation without its transcribed spec + golden

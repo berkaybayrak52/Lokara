@@ -322,6 +322,11 @@ files noted). **Carry them across; don't re-derive or lose them.**
 - **DoD:** Expo app logs in and reads one screen.
 
 ### Phase H — Cutover & cleanup
+> **Cleanup done 30.07.2026.** The NestJS/Prisma scaffold and the TS engine mirrors are gone
+> (`b2f5fa4`); the migration banners are retired in the commit that adds this line. `PHASE-H-PLAN.md`
+> holds the executable detail. **Still outstanding from the DoD below:** the merge to `main`, and the
+> pre-commit/Husky + React Compiler/React Scan items (Phase G is untouched).
+
 - Confirm parity (pytest green, PDF identical, web/(mobile) on FastAPI).
 - **Remove** NestJS `apps/api` + Prisma `packages/db`. Pre-commit + CI: Ruff/mypy/pytest +
   ESLint/Prettier/Husky; React Compiler on; React Scan + Expo profiling.
