@@ -44,3 +44,8 @@ bun.lockb
 
 # scratch handoff between tools — overwritten each task, not history
 LAST_OUTPUT.md
+
+# Agent system: the shared config IS project history (it wires the gates in AGENTS.md).
+# A bare `settings.json` rule in a global gitignore would otherwise swallow it.
+!.claude/settings.json
+.claude/settings.local.json
