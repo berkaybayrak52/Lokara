@@ -27,6 +27,7 @@ Build in this sequence, because it front-loads what an investor reacts to:
 | # | Work | Why here | Risk |
 | --- | --- | --- | --- |
 | 1 | **M4** canned doc-extraction | Vision stub already exists (Phase D); mostly review UI. The "AI-assisted UX" pillar. | low |
+| 1.5 | **FK-Isolation slice**: composite FKs on `(id, account_id)` | One migration across most tables. Inside M5 (identity + roles + portals + RLS at once) a failure would be impossible to attribute — and this work needs nothing from M5. | medium |
 | 2 | **M5** identity, roles, RLS, portals | Schema already models it. Unlocks **persona 4** — one login: Vermieter + Mieter + Investor — your strongest differentiator (`docs/06`). | medium |
 | 3 | **M10-slice**: read-only Mieter + StB portals | Completes the persona demo; no tickets/activation yet. | medium |
 | 4 | **M9-slice**: §556 deadline Wächter + reminders | Visible, date-driven, needs no new legal math. | medium |
@@ -35,6 +36,9 @@ Build in this sequence, because it front-loads what an investor reacts to:
 | 7 | **M8** document/clause engine | 🔒 **gated on specs**. | high |
 | 8 | **M10 remainder**: tickets, activation codes, investment cockpit | Broad surface, lower per-hour demo value. | high |
 | 9 | **Phase G** native/Expo | Largest surface, least pitch payoff — "at launch" is a fine answer. | highest |
+
+*The new slice is numbered **1.5** deliberately: the cut list below refers to these indices, so
+renumbering 2–9 would silently repoint it. Milestone identifiers (M4, M5, …) never move.*
 
 ### Hard rules for this run
 
@@ -172,6 +176,48 @@ GoBD), which needs object storage and its own spec.
 
 ---
 
+## FK-Isolation slice — composite FKs on `(id, account_id)` (runs before M5)
+
+> **Split out of M5** (decision, 02.08). M5 is already identity + roles + portals + RLS; a single
+> migration touching most tables *inside* it makes any failure impossible to attribute. The FK work
+> needs nothing from identity, so it ships as its own slice, sequenced first.
+
+**Goal:** make a cross-account foreign key **unrepresentable in Postgres** — not merely something the
+application does not write.
+
+- Postgres enforces referential integrity with **RLS bypassed**. A row that stamps its own
+  `account_id` correctly satisfies `WITH CHECK` and can still point a parent link at another
+  account's row. `WITH CHECK` is **necessary but not sufficient** — the full argument lives in
+  `docs/02-data-model.md` → "Isolation rule".
+- All **15** tenant-to-tenant foreign keys become composite: each parent gains
+  `UNIQUE (id, account_id)`, each child FK spans `(parent_id, account_id)`. `MATCH SIMPLE`, so
+  nullable links (`meter.unit_id`, `building.landlord_id`, the `direct_*` columns) keep their
+  "unset" meaning — never `MATCH FULL`.
+- **DECISION (closed): `building_assignment` gets an `account_id` column**, not an app-level check.
+  (a) Every other tenant table has one; transitive scoping is the odd case out. (b) An app-level
+  check is exactly what gets forgotten when the next endpoint is written. (c) The usual objection to
+  denormalising `account_id` is drift — and the composite FK
+  `(membership_id, account_id) → membership (id, account_id)` makes drift **structurally
+  impossible**: the column cannot disagree with its membership. Its RLS policy then compares the
+  local column instead of joining `membership`, and its `EXEMPT` entry in
+  `scripts/check_rls_coverage.py` becomes dead code, to be removed with the migration.
+- **Completeness is a gate, not a test count.** `scripts/check_fk_isolation.py` (lead-owned, not yet
+  written) fails on any tenant-to-tenant FK that is not composite, so every *new* FK inherits the
+  rule. `packages/db/tests/test_rls_isolation.py::TestCrossAccountForeignKeys` carries the
+  behavioural proof on three representative shapes — a NOT NULL child (`unit.building_id`), a
+  nullable link (`meter.unit_id`), and the transitive-scope case
+  (`building_assignment.building_id`) — deliberately not one test per edge.
+
+**DoD:** the three `TestCrossAccountForeignKeys` tests go green **without their assertions changing**
+— an insert that stamps its own `account_id` correctly but points a FK at another account's parent is
+rejected by the database; `check_fk_isolation.py` passes over all 15 edges plus the 2 on
+`building_assignment`; `check_rls_coverage.py` reports **no new problem** with `building_assignment`
+in the tenant-table loop instead of `EXEMPT` — it still exits 1 on `landlord` + `self_use_period`,
+which are M5's and cannot close here; the demo path (clean DB → seed → statement → PDF) is
+re-verified.
+
+---
+
 ## M5 — Identity, accounts, roles, RLS (start of full foundation)
 
 - Three-layer model: **Person / Account / Membership** + `Landlord`, `Renter`, `SelfUsePeriod`
@@ -179,18 +225,11 @@ GoBD), which needs object storage and its own spec.
 - Roles: OWNER / EMPLOYEE / TAX_ADVISOR on Membership; `AccountShape` SOLO / HAUSVERWALTUNG.
 - Portals + **URL-carried context** (`/a/{accountId}/…`, `/renter/{tenancyId}/…`); switcher only when
   a Person holds >1 context. **Postgres RLS** enforced as the isolation backstop.
-- **Composite FKs on `(id, account_id)`** for all **15** tenant-to-tenant foreign keys
-  (`docs/02-data-model.md` → "Isolation rule"). Postgres checks FKs with **RLS bypassed**, so a
-  correctly stamped row can still point at another account's parent — `WITH CHECK` is necessary but
-  not sufficient. Each parent gains `UNIQUE (id, account_id)`; each child FK spans both columns
-  (`MATCH SIMPLE`, so nullable links stay optional). Lands here because M5 is where tenancy/assignment
-  writes first get an endpoint and this stops being theoretical.
-  **Open decision:** `building_assignment` has no `account_id` (scope derived via `membership`) — its
-  2 edges either get the column or an explicit app-level check. Decide before writing the migration.
+- Composite FKs on `(id, account_id)` are **not** part of M5 — they ship in the FK-Isolation slice
+  above, which runs first; M5 builds on a schema where cross-account edges are already impossible.
 
 **DoD:** an EMPLOYEE with no building assignments sees nothing; renter context exposes zero landlord data
-(verified in app logic **and** RLS); an insert that stamps its own `account_id` correctly but points a
-FK at another account's parent is **rejected by the database** (test, all 15 edges).
+(verified in app logic **and** RLS).
 
 ---
 

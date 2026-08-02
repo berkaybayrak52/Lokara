@@ -54,7 +54,7 @@ from lokara_domain import (
     ReadingSource,
 )
 from sqlalchemy import CursorResult, Engine, select, text
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent
@@ -105,6 +105,16 @@ class _Seed:
         self.meter_a = new_id()
         self.reading_a = new_id()
         self.heating_cost_a = new_id()
+        # Rows the composite-FK tests try to write from B. While the defect is
+        # unfixed those inserts SUCCEED and commit, so the ids are fixed here
+        # and the teardown below deletes them; once the FKs are composite the
+        # inserts are rejected, the transaction rolls back and the deletes are
+        # no-ops. `membership_b` is created per-test, not here — see its fixture.
+        self.membership_b = new_id()
+        self.building_b = new_id()
+        self.leaked_unit_b = new_id()
+        self.leaked_meter_b = new_id()
+        self.leaked_assignment_b = new_id()
 
 
 @pytest.fixture(scope="module")
@@ -240,6 +250,13 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
     yield ids
     with Session(owner) as session, session.begin():
         for model, row_id in (
+            # Rows TestCrossAccountForeignKeys leaks while the composite FKs are
+            # missing; no-ops once the database rejects those inserts.
+            (Meter, ids.leaked_meter_b),
+            (Unit, ids.leaked_unit_b),
+            (BuildingAssignment, ids.leaked_assignment_b),
+            (Membership, ids.membership_b),
+            (Building, ids.building_b),
             (MeterReading, ids.reading_a),
             (Meter, ids.meter_a),
             (HeatingCostEntry, ids.heating_cost_a),
@@ -468,3 +485,134 @@ class TestCrossAccountIsolation:
         with account_scoped_session(app, seed.account_a) as session:
             building = session.get(Building, seed.building_a)
             assert building is not None and building.name == "Haus A"
+
+
+@pytest.fixture
+def membership_b(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[str]:
+    """A membership in account B — created per test, never in the module seed.
+
+    `test_cross_account_read_is_blocked` asserts B's context sees zero
+    memberships, and that assertion is worth keeping, so this row must not
+    exist for the rest of the module. Its leaked child assignment (see below)
+    goes with it.
+    """
+    owner, _ = engines
+    with Session(owner) as session, session.begin():
+        session.add(
+            Membership(
+                id=seed.membership_b,
+                person_id=seed.person_a,  # one Person, two account contexts
+                account_id=seed.account_b,
+                role=Role.EMPLOYEE,
+            )
+        )
+    yield seed.membership_b
+    with Session(owner) as session, session.begin():
+        for model, row_id in (
+            (BuildingAssignment, seed.leaked_assignment_b),
+            (Membership, seed.membership_b),
+        ):
+            obj = session.get(model, row_id)
+            if obj is not None:
+                session.delete(obj)
+
+
+class TestCrossAccountForeignKeys:
+    """Referential integrity is the THIRD enforcement point (docs/02 → "Isolation
+    rule"). Postgres checks foreign keys with **RLS bypassed**, so a row that
+    stamps `account_id = B` — and therefore passes `WITH CHECK` — can still point
+    its parent link at a row owned by account A. `WITH CHECK` is necessary but not
+    sufficient; only a composite FK on `(id, account_id)` makes the cross-account
+    edge unrepresentable.
+
+    These are three representative *shapes*, not a survey: completeness across all
+    15 tenant-to-tenant edges is the job of the `scripts/check_fk_isolation.py`
+    gate, which is what any NEW foreign key has to satisfy. These tests prove the
+    mechanism behaves.
+    """
+
+    def test_cross_account_unit_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """Plain NOT NULL child (`unit.building_id` → `building.id`). B stamps the
+        unit as its own — RLS is satisfied — but hangs it off A's building. Every
+        allocation downstream (area shares, statements, PDFs) would then read a
+        flat that lives in someone else's house."""
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="foreign key constraint"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                Unit(
+                    id=seed.leaked_unit_b,
+                    account_id=seed.account_b,
+                    building_id=seed.building_a,
+                    label="WE Fremdhaus",
+                    area_sqm_x100=5_000,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_nullable_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """Nullable link (`meter.unit_id` → `unit.id`). B's meter sits in B's own
+        building — that edge is clean — and only the OPTIONAL unit link crosses
+        into A. The composite FK must still reject it, while `MATCH SIMPLE` keeps
+        an unset `unit_id` (a building-level Hauptzähler) legal."""
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="foreign key constraint"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                Building(
+                    id=seed.building_b,
+                    account_id=seed.account_b,
+                    name="Haus B",
+                    street="Bahnhofstraße 2",
+                    postal_code="20095",
+                    city="Hamburg",
+                )
+            )
+            session.add(
+                Meter(
+                    id=seed.leaked_meter_b,
+                    account_id=seed.account_b,
+                    building_id=seed.building_b,
+                    unit_id=seed.unit_a,
+                    kind=MeterKind.HEAT,
+                    measurement_unit=MeasurementUnit.KWH,
+                    serial="WMZ-B-1",
+                    calibration_valid_until=date(2029, 12, 31),
+                )
+            )
+            session.flush()
+
+    def test_cross_account_building_assignment_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, membership_b: str
+    ) -> None:
+        """Transitive scope (`building_assignment.building_id` → `building.id`).
+        This table has no `account_id` of its own today: its RLS policy scopes it
+        through `membership`, so a membership in B satisfies `WITH CHECK` and the
+        building link is never checked against an account at all. An assignment is
+        read access — B's employee would be granted A's building.
+
+        Written against today's schema on purpose: the fix adds an `account_id`
+        column here (docs/02 → "Isolation rule"), but the row this test writes is
+        valid with or without it, so the test fails for the defect and not for a
+        missing column."""
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="foreign key constraint"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                BuildingAssignment(
+                    id=seed.leaked_assignment_b,
+                    membership_id=membership_b,
+                    building_id=seed.building_a,
+                )
+            )
+            session.flush()

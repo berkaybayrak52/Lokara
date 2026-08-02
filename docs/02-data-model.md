@@ -214,12 +214,62 @@ child, an optional link (`building.landlord_id`, `meter.unit_id`, the `direct_*`
 `tenancy.unit_id` is the concrete case that surfaced the rule, found while writing the isolation tests
 for `tenancy` / `tenancy_party` (commit `d751897`). It is not special — it is 1 of 15.
 
-**Plus 2 open edges on `building_assignment`** (`membership_id`, `building_id`). That table carries no
-`account_id` of its own; its scope is *derived* through `membership`. The rule cannot be applied as
-written until it either gains an `account_id` or its two edges are explicitly assigned to the
-app-level fallback. **Undecided — settle it in M5**, where an EMPLOYEE assignment first gets a write
-endpoint; a `building_assignment` pointing at another account's building is a read-access leak, not
-just a bad edge.
+**Plus 2 edges on `building_assignment`** (`membership_id`, `building_id`). That table carries no
+`account_id` of its own today; its scope is *derived* through `membership`. A `building_assignment`
+pointing at another account's building is a read-access leak, not just a bad edge — an EMPLOYEE of
+account B would be granted account A's building.
+
+> **DECISION (settled, 02.08): `building_assignment` gains an `account_id` column** — it is not left
+> to the app-level fallback. Three reasons, recorded because the denormalisation looks gratuitous
+> until you see the third:
+>
+> 1. **Every other tenant table has one.** Transitive scoping is the single odd case out; keeping it
+>    special means every future reader has to learn the exception.
+> 2. **An app-level check is exactly what gets forgotten** when the next endpoint is written. That is
+>    the whole reason the rule exists.
+> 3. **The usual objection to denormalising `account_id` is drift** — the copy silently disagreeing
+>    with its parent. The composite FK
+>    `(membership_id, account_id) REFERENCES membership (id, account_id)` makes drift
+>    **structurally impossible**: the column cannot disagree with its membership, because a
+>    disagreeing pair does not exist in the parent. The denormalisation is self-enforcing.
+>
+> Its RLS policy then compares the **local column** (`account_id = current_setting('app.account_id', true)`)
+> instead of the `EXISTS (SELECT 1 FROM membership …)` subquery it uses today, which also makes it
+> identical to every other table's policy.
+>
+> **Consequence for the gates:** with the column in place, `building_assignment` moves out of the
+> `EXEMPT` path in `scripts/check_rls_coverage.py` and into the ordinary tenant-table loop. Verified
+> live against the migrated DB by the lead: the problem count is unchanged, because the table is
+> already ENABLEd + FORCEd + policied and already named in
+> `packages/db/tests/test_rls_isolation.py`, so it passes all four checks the moment it enters the
+> loop. Its `EXEMPT` entry becomes **dead code and should be removed when the migration lands**
+> (that script is lead-owned — note it, don't edit it).
+
+### Completeness is enforced by a gate, not by a test count
+
+The 15 + 2 edges are **not** covered by 17 tests, and never should be — a test-per-edge list rots the
+moment someone adds edge 18, and its absence is invisible.
+
+- **`scripts/check_fk_isolation.py`** (lead-owned, not yet written) is the completeness mechanism: it
+  fails on any foreign key between two account-scoped tables that is not composite on
+  `(id, account_id)`. **This is what any NEW foreign key has to satisfy** — the rule is enforced at
+  the schema level, once, for edges that do not exist yet.
+- **`packages/db/tests/test_rls_isolation.py::TestCrossAccountForeignKeys`** is the *behavioural*
+  proof that the mechanism does what this section claims: as `lokara_app` in account B's context,
+  insert a row that stamps `account_id = B` (so `WITH CHECK` passes) but whose FK points at a parent
+  owned by account A, and assert the **database** refuses it. Three representative shapes, chosen for
+  shape and not for coverage:
+
+  | Test | Edge | Shape it stands for |
+  | --- | --- | --- |
+  | `test_cross_account_unit_parent_is_rejected` | `unit.building_id → building.id` | plain `NOT NULL` child |
+  | `test_cross_account_nullable_parent_is_rejected` | `meter.unit_id → unit.id` | nullable link (`MATCH SIMPLE` must keep "unset" legal) |
+  | `test_cross_account_building_assignment_is_rejected` | `building_assignment.building_id → building.id` | transitive scope (no local `account_id` yet) |
+
+  All three currently fail with `DID NOT RAISE IntegrityError` — the database accepts a row it must
+  refuse. The third is written against **today's** schema (a `building_assignment` whose *membership*
+  belongs to B, whose *building* belongs to A): the new `account_id` column is needed for the **fix**,
+  not for the test, so the test fails for the defect rather than for a missing column.
 
 FKs to `account.id` itself (14 — one per entry in `ACCOUNT_SCOPED_TABLES`) and the 2 to the global
 `person.id` are out of scope: `account` *is* the boundary and `person` is deliberately global.
