@@ -51,8 +51,30 @@ worth having. Concretely:
 
 Enforced by `.claude/hooks/write-scope.sh` (a `PreToolUse` hook that reads `agent_type` and
 the target path). It is a guardrail, not a sandbox — a determined agent could shell out — so
-every write-capable agent also runs `isolation: worktree`, and stray writes land in a
-throwaway copy of the repo that shows up in your diff.
+the two **implementers** also run `isolation: worktree`, and stray writes land in a throwaway
+copy of the repo rather than in your tree.
+
+`spec-scribe` deliberately does **not** get a worktree. It writes only `docs/**` and tests,
+the hook already fences it, and anything stray shows up in `git status` immediately. The
+isolation bought nothing there and cost a copy-back on every run.
+
+### Worktrees do not sync back
+
+A worktree agent reports success while your tree is still clean. Its edits stay in
+`.claude/worktrees/agent-<id>/` on a `worktree-agent-<id>` branch, **uncommitted**, and
+nothing merges them for you. After every worktree run:
+
+```bash
+W=.claude/worktrees/agent-<id>
+git -C "$W" status --short        # what it actually touched — trust this, not the report
+cp "$W/<path>" <path>             # copy each file across
+scripts/gate.sh fast              # re-run the gates HERE
+git worktree remove --force "$W"  # only once the diff is in and verified
+```
+
+Re-run the gates in the main tree rather than trusting the agent's output — a worktree can be
+green on a stale base. Read the agent's factual claims the same way: counts, survey results
+and "I verified X" are worth re-deriving, and both runs so far have had one number wrong.
 
 ---
 
@@ -86,6 +108,14 @@ uv run python scripts/check_rls_coverage.py     # CLAUDE.md rule 3 (needs a migr
   rendered PDF and asserts `18.250` is present and `1.825.000` is not.
 - `stop-gate.sh` — an agent cannot end its turn on red. Set `LOKARA_GATE=off` for
   exploratory sessions, `full` or `demo` when it matters.
+
+**`gate.sh demo` is expected red until M5.** `verify_demo_path.sh` step 2 gates on
+`check_rls_coverage.py`'s **exit code**, which is 1 for any problem count above zero. Two
+problems remain — `landlord` and `self_use_period` — and they stay until M5 populates those
+tables and their policies can be exercised. Everything downstream of step 2 (seed → statement
+→ PDF → `assert_statement_pdf.py`) still passes when run by hand. Do not read this as a
+regression, and do not add a tolerance to the gate to make it green: a canary tuned until it
+goes green is worse than no canary.
 
 ---
 

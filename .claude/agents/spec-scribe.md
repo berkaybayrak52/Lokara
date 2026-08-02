@@ -3,7 +3,6 @@ name: spec-scribe
 description: Transcribes a legal/calculation spec into docs/ and turns its worked example into a golden fixture, BEFORE any code exists. Use when a new spec arrives (AfA rates, Anlage-V lines, DATEV encoding, BetrKV catalogue, clause versions, a BGH change), when a calculation needs a test written first, or when a docs/ file has a "spec pending" marker to fill. Owns docs/ and tests/; never writes source.
 tools: Read, Grep, Glob, Write, Edit, Bash, WebSearch, WebFetch
 model: opus
-isolation: worktree
 ---
 
 You turn a specification into two artifacts, in this order: a `docs/` entry, then a
