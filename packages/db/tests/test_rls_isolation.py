@@ -39,6 +39,9 @@ from lokara_db import (
     Role,
     Statement,
     StatementStatus,
+    Tenancy,
+    TenancyParty,
+    Unit,
     account_scoped_session,
     create_db_engine,
     new_id,
@@ -82,13 +85,16 @@ def engines() -> Iterator[tuple[Engine, Engine]]:
 
 
 class _Seed:
-    """Two accounts: A owns a person/membership/building/assignment/renter/statement;
-    B is empty. Unique ids per run so reruns never collide."""
+    """Two accounts: A owns a person/membership/building/unit/tenancy/assignment/
+    renter/statement; B is empty. Unique ids per run so reruns never collide."""
 
     def __init__(self) -> None:
         self.account_a = new_id()
         self.account_b = new_id()
         self.building_a = new_id()
+        self.unit_a = new_id()
+        self.tenancy_a = new_id()
+        self.tenancy_party_a = new_id()
         self.renter_a = new_id()
         self.statement_a = new_id()
         self.person_a = new_id()
@@ -125,6 +131,15 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 street="Musterstraße 1",
                 postal_code="10115",
                 city="Berlin",
+            )
+        )
+        session.add(
+            Unit(
+                id=ids.unit_a,
+                account_id=ids.account_a,
+                building_id=ids.building_a,
+                label="WE 1",
+                area_sqm_x100=7_500,
             )
         )
         session.add(
@@ -181,6 +196,17 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
             )
         )
         session.add(
+            Tenancy(
+                id=ids.tenancy_a,
+                account_id=ids.account_a,
+                unit_id=ids.unit_a,
+                valid_from=date(2025, 1, 1),
+                valid_to=None,
+                base_rent_cents=85_000,
+                advance_payment_cents=15_000,
+            )
+        )
+        session.add(
             Meter(
                 id=ids.meter_a,
                 account_id=ids.account_a,
@@ -192,6 +218,14 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
             )
         )
     with Session(owner) as session, session.begin():
+        session.add(
+            TenancyParty(
+                id=ids.tenancy_party_a,
+                account_id=ids.account_a,
+                tenancy_id=ids.tenancy_a,
+                renter_id=ids.renter_a,
+            )
+        )
         session.add(
             MeterReading(
                 id=ids.reading_a,
@@ -213,6 +247,10 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
             (CostEntry, ids.cost_a),
             (Statement, ids.statement_a),
             (BuildingAssignment, ids.assignment_a),
+            # FK order: party → tenancy → unit, before renter/building can go.
+            (TenancyParty, ids.tenancy_party_a),
+            (Tenancy, ids.tenancy_a),
+            (Unit, ids.unit_a),
             (Renter, ids.renter_a),
             (Building, ids.building_a),
             (Membership, ids.membership_a),
@@ -250,6 +288,9 @@ class TestCrossAccountIsolation:
         _, app = engines
         with account_scoped_session(app, seed.account_b) as session:
             assert session.scalars(select(Building)).all() == []
+            assert session.scalars(select(Unit)).all() == []
+            assert session.scalars(select(Tenancy)).all() == []
+            assert session.scalars(select(TenancyParty)).all() == []
             assert session.scalars(select(Renter)).all() == []
             assert session.scalars(select(Statement)).all() == []
             assert session.scalars(select(Membership)).all() == []
@@ -269,6 +310,9 @@ class TestCrossAccountIsolation:
         _, app = engines
         with account_scoped_session(app, seed.account_a) as session:
             assert session.scalars(select(Building.id)).all() == [seed.building_a]
+            assert session.scalars(select(Unit.id)).all() == [seed.unit_a]
+            assert session.scalars(select(Tenancy.id)).all() == [seed.tenancy_a]
+            assert session.scalars(select(TenancyParty.id)).all() == [seed.tenancy_party_a]
             assert session.scalars(select(Renter.id)).all() == [seed.renter_a]
             assert session.scalars(select(Statement.id)).all() == [seed.statement_a]
             assert session.scalars(select(BuildingAssignment.id)).all() == [seed.assignment_a]
@@ -334,6 +378,80 @@ class TestCrossAccountIsolation:
                 )
             )
             session.flush()
+
+    def test_cross_account_tenancy_insert_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """WITH CHECK on tenancy: a lease is who-owes-what. B must not be able to
+        stamp a tenancy onto A's unit — that would inject a payer into A's
+        statement (base rent + Vorauszahlung) without ever reading A's data."""
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                Tenancy(
+                    account_id=seed.account_a,
+                    unit_id=seed.unit_a,
+                    valid_from=date(2025, 6, 1),
+                    valid_to=None,
+                    base_rent_cents=1,
+                    advance_payment_cents=1,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_tenancy_party_insert_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """WITH CHECK on tenancy_party: the join row is what makes a Renter liable
+        for a lease. B attaching itself to A's tenancy must fail on INSERT — the
+        SELECT block alone would not stop a blind write."""
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                TenancyParty(
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    renter_id=seed.renter_a,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_tenancy_update_cannot_reach_foreign_rows(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """USING on tenancy: B's UPDATE cannot see A's lease, so raising the rent
+        touches 0 rows and A's figures are untouched afterwards."""
+        _, app = engines
+        with account_scoped_session(app, seed.account_b) as session:
+            result: CursorResult[Any] = session.connection().execute(
+                text("UPDATE tenancy SET base_rent_cents = 1 WHERE id = :tid"),
+                {"tid": seed.tenancy_a},
+            )
+            assert result.rowcount == 0
+        with account_scoped_session(app, seed.account_a) as session:
+            tenancy = session.get(Tenancy, seed.tenancy_a)
+            assert tenancy is not None and tenancy.base_rent_cents == 85_000
+
+    def test_cross_account_tenancy_party_delete_cannot_reach_foreign_rows(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """USING on tenancy_party: detaching A's Renter from A's lease under B's
+        context must touch 0 rows — silent deletion is as damaging as a read."""
+        _, app = engines
+        with account_scoped_session(app, seed.account_b) as session:
+            result: CursorResult[Any] = session.connection().execute(
+                text("DELETE FROM tenancy_party WHERE id = :pid"),
+                {"pid": seed.tenancy_party_a},
+            )
+            assert result.rowcount == 0
+        with account_scoped_session(app, seed.account_a) as session:
+            assert session.get(TenancyParty, seed.tenancy_party_a) is not None
 
     def test_cross_account_update_cannot_reach_foreign_rows(
         self, engines: tuple[Engine, Engine], seed: _Seed
