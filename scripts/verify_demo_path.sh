@@ -64,6 +64,9 @@ uv run alembic -c packages/db/alembic.ini upgrade head || fail "migrations did n
 step "RLS coverage (CLAUDE.md rule 3 — isolation enforced twice)"
 uv run python scripts/check_rls_coverage.py || fail "a tenant table is not protected by RLS"
 
+step "FK isolation (docs/02 — RLS does not cover referential integrity)"
+uv run python scripts/check_fk_isolation.py || fail "a foreign key can cross accounts"
+
 # --- 3. seed -----------------------------------------------------------------------
 step "Seeding the demo scenario (docs/06)"
 uv run lokara-seed-demo || fail "demo seed failed"
