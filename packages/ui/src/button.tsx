@@ -1,27 +1,58 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import type { ButtonHTMLAttributes } from 'react';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** One primary (filled green) action per screen; everything else is secondary. */
-  variant?: 'primary' | 'secondary';
-  children: ReactNode;
+import { cn } from './lib/cn';
+
+/**
+ * shadcn-style Button themed to the brand tokens (docs/05) — never shadcn's
+ * default palette. One `default` (filled Lokara-Grün) action per screen;
+ * everything else is secondary/outline/ghost/link. `destructive` maps to
+ * --color-danger (AA on Paper, white text 7.26:1) — reserve it for actions
+ * that destroy data, and pair it with a confirming label (BFSG: never
+ * colour alone).
+ */
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-sans ' +
+    'font-semibold transition-colors duration-150 ease-out ' +
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ' +
+    'disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none ' +
+    "[&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-forest active:bg-forest',
+        destructive:
+          'bg-destructive text-destructive-foreground hover:bg-danger/90 active:bg-danger/90',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-mint/70 active:bg-mint/70',
+        outline: 'border border-slate bg-transparent text-ink hover:bg-mint active:bg-mint',
+        ghost: 'text-ink hover:bg-mint active:bg-mint',
+        link: 'text-green underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-10 px-4 py-2',
+        sm: 'h-9 px-3',
+        lg: 'h-11 px-6',
+        icon: 'size-10',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+);
+
+export interface ButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  /** Render the child element (e.g. a Link) with button styling instead. */
+  asChild?: boolean;
 }
 
-const BASE =
-  'inline-flex items-center justify-center rounded-lg px-4 py-2 font-sans font-semibold ' +
-  'transition-colors duration-150 ease-out ' +
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green ' +
-  'disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none';
-
-const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
-  primary: 'bg-green text-white hover:bg-forest active:bg-forest',
-  secondary: 'border border-slate text-ink hover:bg-mint active:bg-mint',
-};
-
-export function Button({ variant = 'primary', className, children, ...rest }: ButtonProps) {
-  const classes = [BASE, VARIANTS[variant], className].filter(Boolean).join(' ');
-  return (
-    <button className={classes} {...rest}>
-      {children}
-    </button>
-  );
+export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+  const Comp = asChild ? Slot : 'button';
+  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }
+
+export { buttonVariants };

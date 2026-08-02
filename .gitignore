@@ -13,9 +13,6 @@ out/
 .env.*
 !.env.example
 
-# prisma generated client
-packages/db/generated/
-
 # pdf demo output
 packages/pdf/output/
 
@@ -31,3 +28,24 @@ test-results/
 .idea/
 .vscode/
 *.log
+
+# Python (uv workspace)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+bun.lockb
+
+# scratch handoff between tools — overwritten each task, not history
+LAST_OUTPUT.md
+
+# Agent system: the shared config IS project history (it wires the gates in AGENTS.md).
+# A bare `settings.json` rule in a global gitignore would otherwise swallow it.
+!.claude/settings.json
+.claude/settings.local.json
+# Throwaway checkouts for `isolation: worktree` agents (AGENTS.md). Real git worktrees,
+# so they carry a full tree that would otherwise show up as untracked noise.
+.claude/worktrees/

@@ -1,5 +1,12 @@
 # Lokara — Architecture (v3, aligned with the canonical Notion)
 
+> **⚠️ v4 stack revision.** The domain design below is unchanged; the **implementation stack** was
+> revised: backend + engines move to **Python (FastAPI)**, DB stays **Supabase Postgres** (ORM →
+> **SQLAlchemy + Alembic**), the TS side (web + mobile + ui) runs on **Bun + Turborepo**, web uses
+> **shadcn/ui**, mobile is **Expo** with a shared client stack, and **Redis** (cache + rate-limit) +
+> **RevenueCat** (mobile payments) are added. §1 below reflects this. The code implements this stack;
+> where code and docs still disagree, **docs win.**
+
 ---
 
 ## Terms (new/changed since v1)
@@ -20,22 +27,26 @@
 
 ## 1. Stack — verdict after the Wiki
 
-Unchanged and validated. The breadth (many backend subsystems, integrations, background jobs)
-actually _strengthens_ two earlier calls: a **structured NestJS backend** (modular per domain)
-and a **monorepo of pure engine packages**. Additions in **bold**.
+The breadth (many backend subsystems, integrations, background jobs) _strengthens_ two calls: a
+**structured FastAPI backend** (modular monolith, per-domain routers) and a **monorepo of pure engine
+packages**. Language is now **Python** on the backend/engines (Python is also the natural home for the
+AI/OCR/Vision work) with **TypeScript** on the frontend/mobile. Additions in **bold**.
 
 | Category                           | Pick                                                                                                         | Wiki-driven note                                                                                                                                                                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language                           | **TypeScript** everywhere                                                                                    | Money math lives in isolated, tested packages — decimal-lib + integer cents.                                                                                                                                      |
-| Repo                               | Turborepo monorepo                                                                                           | Now hosts _several_ engine packages (nk, heating, afa, export) + adapters.                                                                                                                                        |
-| Web                                | Next.js + React + Framer Motion                                                                              | Apple-like polish, **but WCAG 2.1 AA / BFSG is mandatory** (see §9).                                                                                                                                              |
-| Mobile                             | **Native iOS/Android at public launch** (Expo/RN; Capacitor/PWA fallback)                                    | ⚠️ **Not "later" anymore** — Wiki says web-app until 25.07, then web **+ native apps together** at the Sept launch.                                                                                               |
-| Backend/API                        | **NestJS**                                                                                                   | Complex domain logic, integrations, webhooks, workers — sits _on top of_ Supabase.                                                                                                                                |
+| Language                           | **Python** (backend + engines) + **TypeScript** (frontend + mobile)                                         | Money math in isolated, tested Python packages — `decimal.Decimal` + integer cents.                                                                                                                               |
+| Repo                               | Polyglot monorepo: **Bun + Turborepo** (TS) + **uv** (Python)                                                | TS: web, mobile, ui. Python: api + engine packages (nk, heating, afa, export) + adapters.                                                                                                                         |
+| Web                                | Next.js + React + Framer Motion + **shadcn/ui**                                                              | Apple-like polish, **but WCAG 2.1 AA / BFSG is mandatory** (see §9). shadcn themed to brand tokens.                                                                                                                |
+| Mobile                             | **Expo / React Native at public launch** (Capacitor/PWA fallback)                                            | ⚠️ **Not "later"** — web until 25.07, then web **+ native together** at the Sept launch. Shared client stack (below); `react-native-ease` motion; secure storage + Bearer JWT.                                     |
+| **Client state / data / forms**    | **Jotai** + **TanStack Query** + **React Hook Form + Zod**                                                   | Jotai = client state, TanStack Query = server state, RHF+Zod = forms — same on web **and** mobile.                                                                                                                 |
+| Backend/API                        | **FastAPI** (Python)                                                                                         | Modular monolith, per-domain routers; async I/O; Pydantic validation; auth + RLS context as dependencies — sits _on top of_ Supabase.                                                                             |
 | **Platform / DB / Auth / Storage** | **Supabase** (Postgres + Auth + Storage + RLS)                                                               | ⚠️ **Wiki decision** (Mieterportal page): Supabase Auth gives password + magic-link + verification + reset out of the box. Supplies Postgres, file storage, and **Row-Level Security** as the isolation backstop. |
-| ORM                                | Prisma (against Supabase Postgres)                                                                           | Migrations/DX; RLS enforces the §2 boundary underneath.                                                                                                                                                           |
-| **Background jobs**                | Graphile Worker / BullMQ                                                                                     | finAPI sync, 180-day reconsent cleanup, monthly UVI, deadline watchers, email retries.                                                                                                                            |
+| ORM                                | **SQLAlchemy 2.0 + Alembic** (against Supabase Postgres)                                                     | Migrations/DX; RLS enforces the §2 boundary underneath.                                                                                                                                                           |
+| **Runtime validation**             | **Pydantic** (backend) + **Zod** (frontend/mobile)                                                           | Validate at every boundary; backend is the authority.                                                                                                                                                            |
+| **Async jobs / cache / rate-limit** | **Celery or Arq on Redis**; **Redis** cache + rate-limit                                                    | finAPI sync, 180-day reconsent cleanup, monthly UVI, deadline watchers, email retries; response caching; per-user/IP throttling.                                                                                  |
 | **Transactional email**            | **Modell A: Lokara is technical sender** — own domain `@lokaraimmo.de`, SPF/DKIM/DMARC, From-name = landlord | Provider: SES Frankfurt / Postmark / Brevo (EU, sub-processor). It's a **compliance-grade delivery subsystem**, not just "send mail" — see §4.                                                                    |
-| **Subscription billing**           | **Stripe (SEPA) — to confirm**                                                                               | Plan brackets + seats + add-ons; PAngV/Brutto display. Decide vs an EU-native like Paddle/Chargebee.                                                                                                              |
+| **Payments**                       | **Stripe (web SEPA) + RevenueCat (mobile IAP)**                                                              | Apple/Google require IAP for mobile digital subs → RevenueCat across stores; Stripe for web. Web billing: decide vs EU-native Paddle/Chargebee. Re-check store policy.                                             |
+| **Load testing**                   | **Locust**                                                                                                   | Simulate ~100 concurrent users against the API before launch (locust.io).                                                                                                                                         |
 | **AI / OCR / Vision**              | **provider with EU processing + AVV**                                                                        | Anschreiben generation **and** the doc-extraction pipeline (Beleg-OCR + migration) — **now V1/Pitch-MVP**, not later.                                                                                             |
 | PDF                                | HTML→PDF (headless Chrome) / Typst                                                                           | One shared document service: NK, UVI, AfA dossier, Anlage V, contracts.                                                                                                                                           |
 | Hosting                            | EU/DE                                                                                                        | DSGVO: EU/DE hosting is the operating licence, not a preference.                                                                                                                                                  |
@@ -49,7 +60,7 @@ resolutions:
 - **Self-hosted Supabase on Hetzner** (it's open source) — full EU control, satisfies the page literally, more ops burden.
 
 Pick one _before_ onboarding real tenant data; it's an AVV/sub-processor-register question, and your
-own page makes it a sales blocker if wrong. Everything else (NestJS + Prisma + pure engines on top,
+own page makes it a sales blocker if wrong. Everything else (FastAPI + SQLAlchemy + pure engines on top,
 RLS as defense-in-depth) works identically either way.
 
 **Still open, both gated by GDPR sub-processor acceptability:** subscription-billing provider and the
@@ -104,98 +115,102 @@ Explicitly supported. Person "Emir" can hold **three roles simultaneously**, eac
 The **Person** has three roles; no single Account holds all three. They hang off three Memberships.
 Add a fourth later (Owner of a second, Hausverwaltung account) and nothing breaks.
 
-### Schema (Prisma)
+### Schema (SQLAlchemy 2.0)
 
-Relation symmetry verified (9 models, 3 enums, 22 relation fields, no orphans).
+Relation symmetry verified (9 models, 3 enums, no orphans). Mapped against Supabase Postgres, migrated
+with Alembic; RLS policies live beside the models in `packages/db`. (Same schema, condensed, in
+`docs/02-data-model.md`.)
 
-```prisma
-// ── Layer 1: Identity — global, not owned by any Account ──
-model Person {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  name        String?
-  createdAt   DateTime     @default(now())
-  memberships Membership[]   // roles inside paying accounts
-  renterLinks Renter[]       // portal access to tenancies elsewhere
-}
+```python
+import enum
+from datetime import datetime
+from sqlalchemy import ForeignKey, UniqueConstraint, Index, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 
-// ── Layer 2: Account — workspace + billing + isolation boundary ──
-model Account {
-  id          String       @id @default(cuid())
-  name        String
-  shape       AccountShape @default(SOLO)
-  plan        Plan         @default(TRIAL)
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
-  landlords   Landlord[]
-  renters     Renter[]
-}
+class Base(DeclarativeBase): ...
 
-enum AccountShape { SOLO HAUSVERWALTUNG }
-enum Plan { TRIAL SOLO_S SOLO_M SOLO_L TEAM PRO ENTERPRISE }
+class AccountShape(enum.Enum): SOLO = "SOLO"; HAUSVERWALTUNG = "HAUSVERWALTUNG"
+class Plan(enum.Enum):
+    TRIAL="TRIAL"; SOLO_S="SOLO_S"; SOLO_M="SOLO_M"; SOLO_L="SOLO_L"; TEAM="TEAM"; PRO="PRO"; ENTERPRISE="ENTERPRISE"
+class Role(enum.Enum): OWNER="OWNER"; EMPLOYEE="EMPLOYEE"; TAX_ADVISOR="TAX_ADVISOR"   # no RENTER — see below
 
-// ── Layer 3: Membership — Person → Account, carrying a Role ──
-model Membership {
-  id         String    @id @default(cuid())
-  personId   String
-  person     Person    @relation(fields: [personId], references: [id])
-  accountId  String
-  account    Account   @relation(fields: [accountId], references: [id])
-  role       Role
-  invitedAt  DateTime  @default(now())
-  acceptedAt DateTime?
-  revokedAt  DateTime?          // revoke, never hard-delete (audit trail)
-  buildings  BuildingAssignment[]   // only meaningful for EMPLOYEE
+# ── Layer 1: Identity — global, not owned by any Account ──
+class Person(Base):
+    __tablename__ = "person"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    email: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    memberships: Mapped[list["Membership"]] = relationship(back_populates="person")   # roles inside paying accounts
+    renter_links: Mapped[list["Renter"]] = relationship(back_populates="person")      # portal access to tenancies elsewhere
 
-  @@unique([personId, accountId])   // DECISION: one role per person per account
-  @@index([accountId])
-}
+# ── Layer 2: Account — workspace + billing + isolation boundary ──
+class Account(Base):
+    __tablename__ = "account"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    name: Mapped[str]
+    shape: Mapped[AccountShape] = mapped_column(default=AccountShape.SOLO)
+    plan: Mapped[Plan] = mapped_column(default=Plan.TRIAL)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    memberships: Mapped[list["Membership"]] = relationship(back_populates="account")
+    landlords: Mapped[list["Landlord"]] = relationship(back_populates="account")
+    renters: Mapped[list["Renter"]] = relationship(back_populates="account")
 
-enum Role { OWNER EMPLOYEE TAX_ADVISOR }   // note: no RENTER — see below
+# ── Layer 3: Membership — Person → Account, carrying a Role ──
+class Membership(Base):
+    __tablename__ = "membership"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    person_id: Mapped[str] = mapped_column(ForeignKey("person.id"))
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    role: Mapped[Role]
+    invited_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    accepted_at: Mapped[datetime | None]
+    revoked_at: Mapped[datetime | None]                 # revoke, never hard-delete (audit trail)
+    person: Mapped["Person"] = relationship(back_populates="memberships")
+    account: Mapped["Account"] = relationship(back_populates="memberships")
+    buildings: Mapped[list["BuildingAssignment"]] = relationship()   # only meaningful for EMPLOYEE
+    __table_args__ = (
+        UniqueConstraint("person_id", "account_id"),    # DECISION: one role per person per account
+        Index("ix_membership_account", "account_id"),
+    )
 
-model BuildingAssignment {
-  id           String     @id @default(cuid())
-  membershipId String
-  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  buildingId   String
-  building     Building   @relation(fields: [buildingId], references: [id])
+class BuildingAssignment(Base):
+    __tablename__ = "building_assignment"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    membership_id: Mapped[str] = mapped_column(ForeignKey("membership.id", ondelete="CASCADE"))
+    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    __table_args__ = (UniqueConstraint("membership_id", "building_id"),)
 
-  @@unique([membershipId, buildingId])
-}
+# ── Vermieter: a DATA entity (legal lessor), not a role ──
+class Landlord(Base):
+    __tablename__ = "landlord"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    legal_name: Mapped[str]                              # the name printed on statements & contracts
+    address: Mapped[str]
+    account: Mapped["Account"] = relationship(back_populates="landlords")
+    buildings: Mapped[list["Building"]] = relationship()
+    __table_args__ = (Index("ix_landlord_account", "account_id"),)
 
-// ── Vermieter: a DATA entity (legal lessor), not a role ──
-model Landlord {
-  id        String     @id @default(cuid())
-  accountId String
-  account   Account    @relation(fields: [accountId], references: [id])
-  legalName String     // the name printed on statements & contracts
-  address   String
-  buildings Building[]
-
-  @@index([accountId])
-}
-
-// ── Mieter: domain entity; portal login is OPTIONAL via personId ──
-model Renter {
-  id        String    @id @default(cuid())
-  accountId String              // lives inside the landlord's account
-  account   Account   @relation(fields: [accountId], references: [id])
-  legalName String
-  email     String?
-  personId  String?             // ← set = this renter can log into the portal
-  person    Person?   @relation(fields: [personId], references: [id])
-  tenancies Tenancy[]
-
-  @@index([accountId])
-  @@index([personId])
-}
+# ── Mieter: domain entity; portal login is OPTIONAL via person_id ──
+class Renter(Base):
+    __tablename__ = "renter"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))   # lives inside the landlord's account
+    legal_name: Mapped[str]
+    email: Mapped[str | None]
+    person_id: Mapped[str | None] = mapped_column(ForeignKey("person.id"))  # set = this renter can log into the portal
+    account: Mapped["Account"] = relationship(back_populates="renters")
+    person: Mapped["Person | None"] = relationship(back_populates="renter_links")
+    tenancies: Mapped[list["Tenancy"]] = relationship()
+    __table_args__ = (Index("ix_renter_account", "account_id"), Index("ix_renter_person", "person_id"))
 ```
 
 ### The decisions this schema makes explicit
 
 Prose hid these; the schema forces an answer. Each is deliberate:
 
-1. **`@@unique([personId, accountId])` — one role per person per account.** Starting strict: you can't be both Owner and Employee in the same account. Relaxing a unique constraint later is trivial; tightening one after real data exists is not.
+1. **`UniqueConstraint("person_id", "account_id")` — one role per person per account.** Starting strict: you can't be both Owner and Employee in the same account. Relaxing a unique constraint later is trivial; tightening one after real data exists is not.
 2. **`RENTER` is not in the `Role` enum.** A renter is _domain data_ (the name on the lease) that exists whether or not they ever log in, and its scope is a **Tenancy**, not an Account. So portal access is just `Renter.personId` pointing at a Person. This avoids a polymorphic Membership with nullable scope columns — the design that quietly breeds bugs.
 3. **An `EMPLOYEE` with zero `BuildingAssignment` rows sees nothing.** Deny by default; access is granted per building, never assumed.
 4. **Memberships are revoked (`revokedAt`), never deleted.** Who had access when is audit-relevant (GoBD + DSGVO).
@@ -240,26 +255,25 @@ source of truth per state, so they can't drift apart.
 **m²** (Flächenschlüssel) — the self-used area is removed from the base. Storing m² rather than a
 boolean also covers partial cases (a rented-out room, an Einliegerwohnung) with no model change.
 
-```prisma
-// Eigennutzung — owner-occupied AREA over time. Never a Renter row.
-model SelfUsePeriod {
-  id        String      @id @default(cuid())
-  unitId    String
-  unit      Unit        @relation(fields: [unitId], references: [id])
-  sqmX100   Int         // self-used m² × 100 — not a flag
-  kind      SelfUseKind @default(OWNER_OCCUPIED)
-  note      String?
-  validFrom DateTime
-  validTo   DateTime?
+```python
+# Eigennutzung — owner-occupied AREA over time. Never a Renter row.
+class SelfUseKind(enum.Enum):
+    OWNER_OCCUPIED = "OWNER_OCCUPIED"   # Eigennutzung — the landlord lives there
+    FREE_OF_CHARGE = "FREE_OF_CHARGE"   # unentgeltliche Überlassung, e.g. to a family member
 
-  @@index([unitId])
-}
-
-enum SelfUseKind {
-  OWNER_OCCUPIED   // Eigennutzung — the landlord lives there
-  FREE_OF_CHARGE   // unentgeltliche Überlassung, e.g. to a family member
-}
-// Unit gains the back-relation:  selfUsePeriods SelfUsePeriod[]
+class SelfUsePeriod(Base):
+    __tablename__ = "self_use_period"
+    id: Mapped[str] = mapped_column(primary_key=True, default=cuid)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))   # every domain row is scoped
+    unit_id: Mapped[str] = mapped_column(ForeignKey("unit.id"))
+    sqm_x100: Mapped[int]                              # self-used m² × 100 — not a flag
+    kind: Mapped[SelfUseKind] = mapped_column(default=SelfUseKind.OWNER_OCCUPIED)
+    note: Mapped[str | None]
+    valid_from: Mapped[date]                           # day-granular DATE (validity, not a timestamp)
+    valid_to: Mapped[date | None]
+    unit: Mapped["Unit"] = relationship(back_populates="self_use_periods")
+    __table_args__ = (Index("ix_self_use_unit", "unit_id"), Index("ix_self_use_account", "account_id"))
+# Unit gains the back-relation:  self_use_periods: Mapped[list["SelfUsePeriod"]] = relationship(...)
 ```
 
 Three notes on this shape:
@@ -361,7 +375,7 @@ distinct subsystems with a clear handoff, not one tangled model.
 
 ## 4. Subsystem map
 
-Each is a NestJS module; each heavy calculation is a **pure engine package** the module calls.
+Each is a FastAPI router/module; each heavy calculation is a **pure Python engine package** the module calls.
 The spine is always **adapters at the edges → normalized internal models → pure engine → immutable, versioned records**.
 
 | Subsystem                             | Core idea                                                                                                                                                                                                                                                                                                                                  | Engine/adapter                              |
@@ -408,8 +422,8 @@ The Wiki's Datenschutz page is explicit: this is the operating licence. Bake in 
 
 ## 7. Revised build order (aligned to the real roadmap)
 
-Roadmap from the Wiki: **MVP freeze 23.07**, **pitch 27.07 (Tolga Önal)**, web-only focus **until 25.07**,
-**launch ~08.09** (web **+ native iOS/Android together**) before NK season. Small team → broad scope,
+Roadmap from the Wiki: **pitch 06.08 (Tolga Önal)**, **launch ~08.09** (web **+ native iOS/Android
+together**) before NK season. (Earlier freeze/web-only dates 23.07/25.07 are historical.) Small team → broad scope,
 hard Tier-1 priority, iterative.
 
 1. **Foundations (now):** Supabase (Postgres+Auth+Storage+RLS), multi-tenant `Account/Landlord/Person/Membership` + RBAC, `Building→Unit→Tenancy` temporal core, `nk-engine` + golden fixtures, PDF service. _This is the pitch core — a correct NK/heating statement._
@@ -423,7 +437,7 @@ hard Tier-1 priority, iterative.
 
 Rule from v1 still governs: **engines + fixtures before UI.** A wrong framework call later costs an app rewrite; it never touches the engines or the data.
 
-> ⚠️ **Reality flag for a two-person team:** the Wiki has pulled a _lot_ into V1 (native apps + OCR + doc-extraction + contract engine + investment module, all by ~Sept). That's ambitious. The pitch (27.07) only needs step 1. Guard the sequence — engines and correctness first; the launch surface can stage in behind them.
+> ⚠️ **Reality flag for a two-person team:** the Wiki has pulled a _lot_ into V1 (native apps + OCR + doc-extraction + contract engine + investment module, all by ~Sept). That's ambitious. The pitch (06.08) only needs step 1. Guard the sequence — engines and correctness first; the launch surface can stage in behind them.
 
 ---
 
@@ -437,20 +451,22 @@ Extended entities: `Landlord`, `Membership`, `BuildingAssignment` (employee↔bu
 **Added this pass:** `ActivationCode` (tenancy-bound, per-person, single-use), `IbanHistory`
 (versioned), `EmailDelivery` (append-only status log), `ClauseBlock` + `ClauseVersion` + `Contract`
 (composition of clause versions), `ProspectObject` (Prüfobjekt → becomes `Building` on purchase).
-The v1 Prisma sketch (temporal core + immutable statements + integer-cents money) stands; add the
-above around it.
+**From M0 (see `docs/02`):** `TenancyParty` (Renter↔Tenancy join — multi-party leases) and the
+`Statement` versioning encoding (`version` + `DRAFT/FINALIZED/SUPERSEDED` status + unique
+`(building, period, version)`; a correction is version n+1, never an in-place edit).
+The v1 schema sketch (temporal core + immutable statements + integer-cents money) stands, now expressed
+as SQLAlchemy 2.0 models; add the above around it.
 
 ### Allocation keys (per _Mindestanforderungen_)
 
-```prisma
-enum AllocationKey {
-  AREA         // Fläche (Wohnfläche)
-  PERSONS      // Personen
-  CONSUMPTION  // Verbrauch (metered)
-  UNITS        // Einheiten
-  DIRECT       // Direktzuordnung — cost assigned to exactly one unit/tenancy
-  MEA          // Miteigentumsanteil (WEG)
-}
+```python
+class AllocationKey(enum.Enum):
+    AREA = "AREA"                # Fläche (Wohnfläche)
+    PERSONS = "PERSONS"          # Personen
+    CONSUMPTION = "CONSUMPTION"  # Verbrauch (metered)
+    UNITS = "UNITS"              # Einheiten
+    DIRECT = "DIRECT"            # Direktzuordnung — cost assigned to exactly one unit/tenancy
+    MEA = "MEA"                  # Miteigentumsanteil (WEG)
 ```
 
 Two requirements ride along with these:

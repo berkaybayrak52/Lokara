@@ -1,16 +1,26 @@
 # 03 — NK & heating/CO₂ engines (the crown jewel)
 
-> These are the product. **Pure packages, no framework/DB/vendor imports.** Deterministic,
-> cent-exact, golden-tested. Built at M1 (NK) and M2 (heating/CO₂), before any UI.
+> These are the product. **Pure Python packages, no web-framework/DB/vendor imports.** Deterministic,
+> cent-exact, golden-tested (pytest). Built at M1 (NK) and M2 (heating/CO₂), before any UI.
+>
+> The **document** these engines feed is specified separately in `docs/08-statement-document.md`.
 
 ## Shared engine contract
 
-- Input: **normalized** value objects (no Prisma models, no vendor types). Adapters map DB → these.
-- Money: integer **cents**; intermediate math with `decimal.js`; **largest-remainder rounding** so the
-  sum of allocated shares reconciles to the input **to the cent**.
+- Input: **normalized** value objects — plain dataclasses / Pydantic models (no SQLAlchemy models, no
+  vendor types). Adapters map DB → these.
+- Money: integer **cents**; intermediate math with `decimal.Decimal`; **largest-remainder rounding** so
+  the sum of allocated shares reconciles to the input **to the cent**.
 - Output: a plain result object (shares per party + a reconciliation total) — the PDF layer formats it.
+- ⚠️ **De-scale at the render boundary.** Engine values are **scaled integers** (money = cents;
+  areas/weights = ×100 fixed-point). The presentation layer must convert back before display, or a
+  Bemessung of `18.250 m²·Tage` renders as `1.825.000`. Tests comparing integers stay green through this
+  bug — **read the rendered PDF** before calling an output done.
 - Every legal ratio/table (HKVO, CO₂ 10-step) comes from the **versioned rules store**, passed in as a
-  parameter with an as-of law date. Engines never hardcode a legal number.
+  parameter with an as-of law date. Engines never hardcode a legal number, and never import
+  `rules-store` — the caller resolves the values and passes them in; the value *shapes* live in `domain`.
+- **Anlage-V line mappings** also live in `rules-store`, but they're **tax-export data (M7)**, not engine
+  input — the NK/heating engines never see them.
 
 ---
 
@@ -57,8 +67,17 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - **§§7/8 HKVO** split between base and consumption cost — configurable **30/70** … **50/50**
   (from rules store).
 - **§9** warm-water separation from heating.
-- **§9a** estimation when readings are missing.
-- **Degree-day (Gradtags) apportionment** on renter change mid-period.
+- **§9a** estimation when readings are missing — **only** in the case §9a actually covers: an individual
+  unit's device failed, estimated by the prescribed methods (comparable period / comparable rooms).
+  ⚠️ **This is not licence to guess a missing building-level total.** If the energy/cost total or a
+  denominator is absent, the API **refuses and explains, in German** — a Heizkostenabrechnung built on a
+  guessed total isn't approximately right, it's wrong. The Betriebskosten still compute, so one missing
+  meter never blocks the whole statement. Don't "fix" the refusal by adding a fallback estimate.
+- **Degree-day (Gradtags) apportionment** on renter change mid-period. Apportionment basis:
+  **consumption** cost splits by **degree-days**; **base + warm-water** costs split by **days**.
+- ⚠️ **The degree-day promille table is a VDI convention, not a statute** — it carries a
+  **"verify before production"** marker in `rules-store` (with its `Rechtsstand`), unlike the HKVO
+  ratios and CO₂ table which are legally fixed.
 - External MDL (Messdienstleister) data feeds in through the meter adapter as normalized readings —
   the engine never knows the source.
 
@@ -80,10 +99,10 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 
 ## Rounding & reconciliation (applies to both engines)
 
-1. Compute exact fractional shares with `decimal.js`.
+1. Compute exact fractional shares with `decimal.Decimal`.
 2. Floor each to cents.
 3. Distribute the leftover cents by **largest fractional remainder** (ties: stable order).
-4. Assert `sum(shares) === inputTotal` — fail loudly if not. No statement ships that doesn't reconcile.
+4. Assert `sum(shares) == input_total` — fail loudly if not. No statement ships that doesn't reconcile.
 
 ## Why this ordering (engines before UI)
 

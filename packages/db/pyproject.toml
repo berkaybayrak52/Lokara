@@ -1,0 +1,25 @@
+[project]
+name = "lokara-db"
+version = "0.1.0"
+description = "SQLAlchemy 2.0 models + Alembic migrations + RLS backstop (imported by apps/api only)"
+requires-python = ">=3.12"
+dependencies = [
+  "lokara-domain",
+  "sqlalchemy>=2.0",
+  "alembic>=1.14",
+  "psycopg[binary]>=3.2",
+  "pydantic-settings>=2.7",
+]
+
+[project.scripts]
+lokara-seed-demo = "lokara_db.seed:main"
+
+[tool.uv.sources]
+lokara-domain = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lokara_db"]

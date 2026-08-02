@@ -4,6 +4,11 @@
 > Read this first, then `PLAN.md`, then the relevant file under `docs/`.
 > The single deepest source of truth is `lokara-arch.md` (canonical architecture, v3).
 
+> **The stack is v4.** A **Python FastAPI** backend (`apps/api`) + **Python** engine packages
+> (`packages/*-engine`), **Supabase Postgres**, a **Bun** TS/JS workspace for web + mobile
+> (`apps/web`, `packages/ui`), and **shadcn/ui**. There is one backend and it is Python.
+> `MIGRATION-PLAN.md` records how the tree got here. When code and docs disagree, the docs win.
+
 ---
 
 ## What Lokara is (one line)
@@ -20,10 +25,11 @@ later milestone). No desktop apps.
 
 ## The three rules that override everything
 
-1. **The money/legal math is the product — keep it in pure, framework-free engine packages with
-   golden tests.** Engines (`packages/*-engine`) import no framework, no vendor SDK, no database.
-   They take normalized inputs and return deterministic outputs. A wrong framework choice later costs
-   an app rewrite; it must never touch an engine or the data.
+1. **The money/legal math is the product — keep it in pure, framework-free Python engine packages
+   with golden tests (pytest).** Engines (`packages/*-engine`, Python) import no web framework, no
+   vendor SDK, no database. They take normalized inputs (plain dataclasses / Pydantic models) and
+   return deterministic outputs. A wrong framework choice later costs an app rewrite; it must never
+   touch an engine or the data.
 
 2. **Correctness and auditability beat features.** Every legally-relevant record (statements, ledger
    entries, exports, IBAN history, email delivery, contracts) is **immutable + versioned** — new
@@ -38,19 +44,23 @@ later milestone). No desktop apps.
 
 ## Locked tech decisions (MVP defaults — see `docs/01-tech-stack-and-decisions.md`)
 
-| Area                                                    | Decision                                                                                                                                                                                                                                                            |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language                                                | TypeScript everywhere, `strict: true`                                                                                                                                                                                                                               |
-| Repo                                                    | Turborepo + pnpm monorepo                                                                                                                                                                                                                                           |
-| Web                                                     | Next.js (App Router) + React + Tailwind + Framer Motion — **frontend only** (no direct DB access)                                                                                                                                                                   |
-| Money math                                              | Pure packages: integer **cents** + `decimal.js`; never floats                                                                                                                                                                                                       |
-| DB / Auth / Storage                                     | **Supabase Cloud, EU region (Frankfurt)** + signed DPA (revisit self-hosted before real tenant data)                                                                                                                                                                |
-| ORM                                                     | Prisma against Supabase Postgres; RLS underneath. **Prisma lives in `apps/api`, never in `apps/web`.**                                                                                                                                                              |
-| Backend / API                                           | **NestJS (`apps/api`) from day 1** — one standalone HTTP/JSON API that both the web app **and** the launch-day native iOS/Android apps consume. Modules per domain; guards for Supabase-JWT auth + RLS context. Workers/webhooks (BullMQ) added when M6 needs them. |
-| PDF                                                     | HTML→PDF via headless Chrome (Playwright)                                                                                                                                                                                                                           |
-| Paid/expensive APIs (finAPI, Vision/OCR, email, Stripe) | **Stubbed behind adapters** for the pitch. Real providers are flagged, EU + AVV required. Never hardcode a vendor SDK into an engine or domain module.                                                                                                              |
-| Hosting (prod)                                          | EU/DE (target Hetzner). Local/dev is fine anywhere.                                                                                                                                                                                                                 |
-| UI copy language                                        | **German**. Code, comments, docs, identifiers: **English**.                                                                                                                                                                                                         |
+| Area                                                    | Decision                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language                                                | **Python** (backend + engines, `mypy` strict) + **TypeScript** (frontend + mobile, `strict: true`)                                                                                                                                                                             |
+| Repo                                                    | Polyglot monorepo: **Bun + Turborepo** for the TS side (web, mobile, ui); **uv** for the Python side (api, engines)                                                                                                                                                            |
+| Web                                                     | Next.js (App Router) + React + Tailwind + Framer Motion + **shadcn/ui** — **frontend only** (no direct DB access)                                                                                                                                                              |
+| Mobile                                                  | **Expo / React Native** — same API + shared patterns as web. `react-native-ease` (animation), **secure storage + Bearer JWT**, i18n, theme, responsive from the start                                                                                                          |
+| Client state / data / forms                             | **Jotai** (client state) + **TanStack Query** (server state) + **React Hook Form + Zod** (forms) — on **both** web and mobile                                                                                                                                                   |
+| Money math                                              | Pure Python packages: integer **cents** + `decimal.Decimal`; never floats                                                                                                                                                                                                     |
+| DB / Auth / Storage                                     | **Supabase Cloud, EU region (Frankfurt)** + signed DPA (revisit self-hosted before real tenant data)                                                                                                                                                                           |
+| ORM                                                     | **SQLAlchemy 2.0 + Alembic** (migrations) against Supabase Postgres; RLS underneath. **The DB layer lives in `apps/api`, never in a client app.**                                                                                                                              |
+| Backend / API                                           | **FastAPI (`apps/api`, Python) from day 1** — one standalone HTTP/JSON API that both the web app **and** the launch-day native iOS/Android apps consume. Routers per domain (modular monolith); **FastAPI dependencies** for Supabase-JWT auth + RLS context. Async workers (Celery/Arq on Redis) added when M6 needs them. |
+| Runtime validation                                      | **Pydantic** (backend) + **Zod** (frontend/mobile) — validate at every boundary                                                                                                                                                                                               |
+| Infra                                                   | **Redis** — rate-limiting + caching. **Locust** — load testing (simulate ~100 concurrent users)                                                                                                                                                                               |
+| PDF                                                     | HTML→PDF via headless Chrome (**Playwright for Python**)                                                                                                                                                                                                                       |
+| Paid/expensive APIs (finAPI, Vision/OCR, email, payments) | **Stubbed behind adapters** for the pitch. Payments: **Stripe (web) + RevenueCat (mobile IAP)**. Real providers are flagged, EU + AVV required. Never hardcode a vendor SDK into an engine or domain module.                                                                  |
+| Hosting (prod)                                          | EU/DE (target Hetzner). Local/dev is fine anywhere.                                                                                                                                                                                                                            |
+| UI copy language                                        | **German**. Code, comments, docs, identifiers: **English**.                                                                                                                                                                                                                   |
 
 Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked in
 `docs/01-tech-stack-and-decisions.md`. Build around the default; don't reopen it without a reason.
@@ -72,6 +82,13 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
   never a scalar (tenancies, allocation keys, meters, self-use, IBANs…). See `docs/02-data-model.md`.
 - **Two financial time-axes never merge.** NK billing = accrual/period-based. Tax = cash basis
   (§11 EStG, payment date). Distinct subsystems, one clean handoff. See `docs/02-data-model.md` §"Two time-axes".
+- **Auth tokens differ per client, one flow.** Web stores the JWT in an **HttpOnly cookie**; mobile
+  stores it in **secure storage** and sends it as a **Bearer** token. Access/refresh handled in one
+  shared **`api.ts` interceptor**: on a 401, refresh once, replay the failed requests, and never
+  double-fire. The auth hook layer is separate per platform (cookie vs secure storage); the API
+  verifies the Supabase JWT the same way for both.
+- **Never trust the client.** Validate every request body with **Pydantic** on the backend; mirror the
+  shape with **Zod** on the client. The backend is the authority.
 
 ---
 
@@ -88,14 +105,16 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 
 ## Definition of done for any engine work
 
-1. Pure package, no framework/DB/vendor imports.
-2. Golden fixtures committed; output is byte-/cent-exact and deterministic.
+1. Pure Python package, no web-framework/DB/vendor imports.
+2. Golden fixtures committed (pytest); output is byte-/cent-exact and deterministic.
 3. The canonical **€1,200 garbage-cost allocation example** (`docs/03-nk-heating-engines.md`) passes.
 4. Rounding uses **largest-remainder**; totals reconcile to the input to the cent.
+5. `mypy --strict` clean; money is `decimal.Decimal` + integer cents, never `float`.
 
 ## Definition of done for any UI work
 
-1. Uses the design tokens in `docs/05-design-system.md` (no ad-hoc colors/fonts).
+1. Uses the design tokens in `docs/05-design-system.md` (no ad-hoc colors/fonts); shadcn components are
+   themed to those tokens, never left on their defaults.
 2. Meets **WCAG 2.1 AA / BFSG**: contrast, visible focus states, scalable type, keyboard nav.
 3. German UI copy; labels are explicit (Apple-style reduction is aesthetic only, never at the cost of
    a clear label or contrast).
@@ -107,9 +126,24 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 
 ## How to work
 
-- Follow `PLAN.md` milestones **in order**. Don't start a later milestone before its predecessor's
-  Definition of Done is met. **Engines + fixtures before UI.**
-- The **pitch cutline is M0→M3 solid + M4 as a canned demo** (see `PLAN.md`). Everything past that is
-  post-pitch foundation.
+- **`AGENTS.md` is how work is executed here** — the deterministic gates (`scripts/gate.sh`,
+  `scripts/verify_demo_path.sh`, the purity/RLS/PDF checks) and the six agents with disjoint write
+  scopes. No agent may both write a test and satisfy it.
+- Follow `PLAN.md`. Milestone DoDs are binding; **engines + fixtures before UI**. Before the 06.08
+  pitch the build order is the **execution order** in `PLAN.md` (value ÷ risk), not the milestone
+  numbering — and its **hard rules** apply: no calculation without its transcribed spec + golden
+  fixture, the demo path is re-verified every milestone, tag each green state, stubs stay stubs.
+- **Never leave the demo path broken.** If a change breaks clean-DB → seed → statement → PDF, fix or
+  revert before moving on. A working demo beats a broader broken one.
 - When a decision isn't covered here or in `docs/`, prefer the choice that (a) keeps engines pure,
   (b) keeps data immutable/versioned, (c) keeps `accountId` scoping intact — in that order.
+
+- **Never implement a calculation from a pasted spec or from memory.** Transcribe it into the matching
+  `docs/` file first — inputs, formula, edge cases, legal basis, **`Rechtsstand`** — then turn its
+  worked example into a golden fixture, then write the code. If no `docs/` file fits, add one and link
+  it from `README.md`.
+- **If a new spec contradicts `docs/`, stop and ask.** Don't silently pick one; a `docs/` rule may
+  encode a decision the newer spec hasn't caught up with.
+- **Write your end-of-task summary to `LAST_OUTPUT.md`** at the repo root, overwriting it each time —
+  same content as the chat summary (what was built, decisions worth knowing, gates, what's next). It's
+  the handoff other tools read. Gitignored on purpose: it's scratch, not project history.

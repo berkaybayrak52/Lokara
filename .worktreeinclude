@@ -1,0 +1,11 @@
+# Gitignored files copied into an `isolation: worktree` agent checkout.
+#
+# A worktree is a fresh checkout, so anything gitignored is absent. Without this the
+# gates fail inside a worktree for the wrong reason: check_rls_coverage.py load_dotenv()s
+# the root .env, and DbSettings/ApiSettings both resolve env_file=".env" relative to the
+# repo root, so alembic and verify_demo_path.sh get the built-in localhost defaults
+# instead of DATABASE_URL/DIRECT_URL.
+#
+# Only what a gate needs to run. packages/db/.env is a pre-migration Prisma leftover --
+# nothing reads it any more (grep: no references outside settings.json's deny list).
+.env

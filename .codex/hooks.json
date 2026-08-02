@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/write-scope.sh'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/post-edit.sh'",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/stop-gate.sh'",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/stop-gate.sh'",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}

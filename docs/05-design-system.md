@@ -53,23 +53,99 @@ an accent, not a background texture on every screen.
 
 ## Tailwind wiring (M0)
 
-Expose the tokens as CSS variables + Tailwind theme extension:
+**Tailwind v4** (current major) — CSS-first config via the `@theme` directive, not a `tailwind.config.js`
+`theme.extend`. Declare the tokens as theme CSS variables; utilities (`bg-ink`, `text-green`, …) and the
+shadcn variables both read from them:
 
-```js
-// tailwind.config — theme.extend.colors
-colors: {
-  ink:    '#18212A',
-  green:  '#1A6558',
-  forest: '#123F37',
-  mint:   '#E7EFEB',
-  slate:  '#5C6A6B',
-  paper:  '#FBFBFA',
+```css
+/* globals.css */
+@import "tailwindcss";
+
+@theme {
+  --color-ink:    #18212A;
+  --color-green:  #1A6558;
+  --color-forest: #123F37;
+  --color-mint:   #E7EFEB;
+  --color-slate:  #5C6A6B;
+  --color-paper:  #FBFBFA;
+
+  --font-display: "Montserrat", sans-serif;   /* headlines, big numbers */
+  --font-sans:    "Manrope", sans-serif;      /* body, labels, tables */
 }
-// fontFamily: { display: ['Montserrat', ...], sans: ['Manrope', ...] }
 ```
 
 No component uses a raw hex or an off-palette font — everything references a token
 (this is checkable and is part of the UI Definition of Done in `CLAUDE.md`).
+
+## Component layer — shadcn/ui (themed to these tokens)
+
+The web app's component kit is **shadcn/ui** (copy-in React components on Radix + Tailwind), living in
+the `ui/` workspace. shadcn is the base; the **brand tokens above are the theme** — never ship shadcn's
+default palette.
+
+- Map shadcn's CSS variables (`--background`, `--foreground`, `--primary`, `--muted`, `--accent`,
+  `--ring`…) onto the brand tokens: `--primary` → Lokara Grün, `--primary-foreground` → Paper,
+  `--background` → Paper, `--foreground` → Petrol Ink, `--muted` → Mint Tint, `--border`/`--ring` → Slate.
+- Set the shadcn radius to the brand's 8–12px and fonts to Montserrat (display) / Manrope (text).
+- It is fine to **overwrite** shadcn defaults to meet the brand board; the tokens win over shadcn's ships-with styling.
+- Every shadcn component still owes the **WCAG 2.1 AA / BFSG** checklist below (contrast, focus, scalable type).
+
+> Mobile (Expo/React Native) doesn't use shadcn (web-only). It shares the **same tokens + theme** through
+> a React Native theme object, so colors, type scale, and radii match across platforms.
+
+## Semantic status colors (resolved — extends the brand board)
+
+The brand board ships no status palette, but the product needs one: destructive actions (delete a
+building, revoke a membership), **form/validation errors** (a 422 must read as an error), the **3-colour
+Zustell-Ampel** (§556 proof-of-receipt), and **Guard/Wächter** severity (§556 deadline, Eichfrist,
+15%-AfA).
+
+**Only two new hues are needed** — success reuses Lokara Grün (see the note below).
+
+| Token             | HEX       | Contrast on Paper | White on it | Role                                        |
+| ----------------- | --------- | ----------------- | ----------- | ------------------------------------------- |
+| `--color-danger`  | `#A4262C` | **7.01** ✓        | **7.26** ✓  | Errors, destructive actions, Ampel *rot*    |
+| `--color-warning` | `#92400E` | **6.85** ✓        | **7.09** ✓  | Warnings, pending guards, Ampel *gelb*      |
+| `--color-success` | `#1A6558` | **6.66** ✓        | **6.89** ✓  | = **Lokara Grün** — confirmations, Ampel *grün* |
+
+Tint surfaces (for alert/banner backgrounds), all with Ink text ≥13:1 and their own fg ≥6:1:
+
+| Tint                   | HEX       | fg on tint | Pairs with |
+| ---------------------- | --------- | ---------- | ---------- |
+| `--color-danger-tint`  | `#FBEAE9` | 6.24 ✓     | `danger`   |
+| `--color-warning-tint` | `#FBF1E5` | 6.35 ✓     | `warning`  |
+| `--color-success-tint` | `#E7EFEB` | 6.09 ✓     | = **Mint Tint** (already in the palette) |
+
+All values are computed WCAG ratios against Paper `#FBFBFA`; every one clears **AA (4.5:1)** for normal
+text, so they're also safe as borders, icons, and large text (which need only 3:1). The trio sits at
+7.01 / 6.85 / 6.66 — near-identical weight, so they read as a family rather than three loud accents.
+
+**Why success is not its own green.** A dedicated success green (e.g. `#166534`) lands at a **1.03
+luminance ratio to Lokara Grün** — same lightness, barely distinguishable, and worse for colour-blind
+users. Reusing the brand green is cleaner: green already means "good" here. Distinguish a *success
+message* from a *primary action* by **form, not hue** — primary actions are filled buttons; success
+feedback is a **tint surface + icon + label**.
+
+**Why warning looks like burnt ochre, not bright amber.** Any true amber (`#F59E0B`) fails AA on a light
+background — around 2:1. At AA on Paper, "amber" is necessarily dark. This is a constraint, not a
+compromise.
+
+> **BFSG: never signal by colour alone.** Every status carries an **icon + text label** as well —
+> required for colour-blind users, and the Ampel is legally meaningful (§556 Zugangsnachweis).
+
+Wire them alongside the brand tokens in `@theme`, and map shadcn's `destructive` variant onto
+`--color-danger` (it currently ships omitted):
+
+```css
+@theme {
+  --color-danger:       #A4262C;
+  --color-danger-tint:  #FBEAE9;
+  --color-warning:      #92400E;
+  --color-warning-tint: #FBF1E5;
+  --color-success:      #1A6558;   /* = Lokara Grün */
+  --color-success-tint: #E7EFEB;   /* = Mint Tint   */
+}
+```
 
 ## Look & feel / motion principles (the "Apple-like" bar)
 

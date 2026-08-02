@@ -53,7 +53,7 @@ leases; reachable human support.
 ## Status & team
 
 Concept/planning phase; an Excel tool already serves as lead-gen. Small team (developer Emir back
-full-time). Broad scope, hard Tier-1 prioritisation required. Pitch **27.07** (Tolga Önal).
+full-time). Broad scope, hard Tier-1 prioritisation required. Pitch **06.08** (Tolga Önal).
 
 ## Pitch framing
 

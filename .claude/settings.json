@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "//": "Lokara agent system. See AGENTS.md for the why. Three layers: deterministic gates (here), judgment agents (.claude/agents), you as lead.",
+
+  "//worktree": "Agents with `isolation: worktree` must branch from the work in progress, not from origin/main. The default (\"fresh\") checked them out at c5fadab -- the pre-migration TypeScript tree -- so an implementer saw packages/nk-engine/ as a Bun package with no pytest fixtures. Merging to main would hide this until the next feature branch.",
+  "worktree": { "baseRef": "head" },
+
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./packages/db/.env)",
+      "Edit(./.env)",
+      "Edit(./packages/db/.env)",
+      "Edit(./packages/db/generated/**)",
+      "Edit(./uv.lock)",
+      "Edit(./bun.lock)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(docker compose down:*)",
+      "Bash(alembic downgrade:*)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/write-scope.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop-gate.sh",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop-gate.sh",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}
