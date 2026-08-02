@@ -92,6 +92,7 @@ scripts/verify_demo_path.sh --fresh   # ...starting from an empty volume (destro
 
 uv run python scripts/check_engine_purity.py    # CLAUDE.md rule 1
 uv run python scripts/check_rls_coverage.py     # CLAUDE.md rule 3 (needs a migrated DB)
+uv run python scripts/check_fk_isolation.py     # docs/02 isolation rule (needs a migrated DB)
 ```
 
 **What each one turns from discipline into a command:**
@@ -102,6 +103,11 @@ uv run python scripts/check_rls_coverage.py     # CLAUDE.md rule 3 (needs a migr
   policies are created inside `for table in (...)` loops and any grep-based checker gives
   false answers in both directions. Checks ENABLE, **FORCE**, a policy, and that the table is
   named in the isolation test.
+- `check_fk_isolation.py` — the other half of rule 3, which RLS structurally cannot cover.
+  Postgres checks foreign keys with **RLS bypassed**, so a correctly stamped row can still
+  point at another account's parent. Fails on any FK whose child and parent are both
+  account-scoped and which is not composite on `(id, account_id)` — and on `MATCH FULL`
+  over a nullable link, which would silently make an optional relationship mandatory.
 - `verify_demo_path.sh` + `assert_statement_pdf.py` — `PLAN.md` hard rule 2, and the one
   documented blind spot in the test suite. `docs/03` says it outright: *"tests comparing
   integers stay green through this bug — read the rendered PDF."* So the script reads the
@@ -109,13 +115,21 @@ uv run python scripts/check_rls_coverage.py     # CLAUDE.md rule 3 (needs a migr
 - `stop-gate.sh` — an agent cannot end its turn on red. Set `LOKARA_GATE=off` for
   exploratory sessions, `full` or `demo` when it matters.
 
-**`gate.sh demo` is expected red until M5.** `verify_demo_path.sh` step 2 gates on
-`check_rls_coverage.py`'s **exit code**, which is 1 for any problem count above zero. Two
-problems remain — `landlord` and `self_use_period` — and they stay until M5 populates those
-tables and their policies can be exercised. Everything downstream of step 2 (seed → statement
-→ PDF → `assert_statement_pdf.py`) still passes when run by hand. Do not read this as a
-regression, and do not add a tolerance to the gate to make it green: a canary tuned until it
-goes green is worse than no canary.
+**`gate.sh demo` is expected red until M5 — and step 2 is now two DB gates, not one.**
+`verify_demo_path.sh` runs `check_rls_coverage.py` and then `check_fk_isolation.py`, and gates
+on each one's **exit code**. Their status differs, so read them separately:
+
+| Gate | Status | Why |
+| --- | --- | --- |
+| `check_fk_isolation.py` | **green** since the FK-Isolation slice (`0004`) | all 17 tenant-to-tenant edges are composite |
+| `check_rls_coverage.py` | **red**, 2 problems | `landlord` + `self_use_period` have policies no test exercises — M5 populates those tables |
+
+Note the ordering trap: RLS runs **first**, so `verify_demo_path.sh` aborts there and never
+reaches the FK step. Run `uv run python scripts/check_fk_isolation.py` directly to see it
+green — do not conclude from a red demo path that the FK work regressed. Everything
+downstream (seed → statement → PDF → `assert_statement_pdf.py`) still passes when run by
+hand. And do not add a tolerance to either gate to make the path green: a canary tuned until
+it goes green is worse than no canary.
 
 ---
 
