@@ -49,11 +49,19 @@ deny() {
 }
 
 # --- Bash: catch the obvious escapes, then get out of the way ----------------------
+#
+# The redirect branch reads: a `>` or `>>` not preceded by an fd digit, `<`, `>` or `&`
+# (so `2>&1` and `>&2` stay legal), pointing at something that is not `&`.
+#
+# It used to be `[^\>\<]\>[^\>]`, which deliberately skipped anything with a `>` on
+# either side -- and therefore skipped `>>` entirely. A read-only agent could append to
+# any file in the repo and the hook said nothing; H3 caught it doing exactly that.
+# Truncate and append are the same escape, so both are matched now.
 if [[ "$tool" == "Bash" ]]; then
   case "$agent" in
     main) exit 0 ;;
     boundary-auditor|statement-reviewer|docs-reconciler)
-      if [[ "$cmd" =~ [^\>\<]\>[^\>]|[[:space:]]tee[[:space:]]|sed[[:space:]]+-i|(^|[[:space:]])rm[[:space:]] ]]; then
+      if [[ "$cmd" =~ (^|[^0-9\<\>\&])\>\>?[[:space:]]*[^\&\>[:space:]]|[[:space:]]tee[[:space:]]|sed[[:space:]]+-i|(^|[[:space:]])rm[[:space:]] ]]; then
         deny "via Bash redirection" "This agent is read-only: it reports, it does not fix."
       fi
       ;;

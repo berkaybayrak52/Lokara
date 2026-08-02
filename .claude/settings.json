@@ -3,6 +3,9 @@
 
   "//": "Lokara agent system. See AGENTS.md for the why. Three layers: deterministic gates (here), judgment agents (.claude/agents), you as lead.",
 
+  "//worktree": "Agents with `isolation: worktree` must branch from the work in progress, not from origin/main. The default (\"fresh\") checked them out at c5fadab -- the pre-migration TypeScript tree -- so an implementer saw packages/nk-engine/ as a Bun package with no pytest fixtures. Merging to main would hide this until the next feature branch.",
+  "worktree": { "baseRef": "head" },
+
   "permissions": {
     "deny": [
       "Read(./.env)",
