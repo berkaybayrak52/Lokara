@@ -32,6 +32,7 @@ Exit 0 = every tenant table is covered, exit 1 = a leak, exit 2 = could not reac
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -60,6 +61,26 @@ def _model_name(table: str) -> str:
     the snake_case name reports covered tables as uncovered.
     """
     return "".join(part.capitalize() for part in table.split("_"))
+
+
+def _is_named(table: str, test_src: str) -> bool:
+    r"""Is this table actually mentioned in the isolation test?
+
+    Word-boundary, not substring. A plain `name in test_src` reports a table as covered
+    whenever its name happens to sit inside a longer identifier, which is the direction
+    of error that hides an untested policy:
+
+        unit    matched  measurement_unit=MeasurementUnit.KWH
+        tenancy matched  tenancy_party / tenancy_id
+        meter   matches  meter_reading
+
+    `\b` does not fire between `_` and a letter, nor between two letters, so none of
+    those longer identifiers counts as a mention of the shorter table any more.
+    """
+    return any(
+        re.search(rf"\b{re.escape(token)}\b", test_src)
+        for token in (table, _model_name(table))
+    )
 
 
 def _url() -> str:
@@ -141,7 +162,7 @@ def main() -> int:
             problems.append(
                 f"{name}: RLS enabled but no policy exists — denies everything or nothing"
             )
-        if test_src and name not in test_src and _model_name(name) not in test_src:
+        if test_src and not _is_named(name, test_src):
             problems.append(
                 f"{name}: not named in packages/db/tests/test_rls_isolation.py — "
                 f"the policy is untested"
