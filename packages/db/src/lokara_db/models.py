@@ -5,6 +5,8 @@ Conventions:
   coexist in the same database until Phase H removes them — no name collisions.
 - Every domain row carries account_id (the isolation boundary; the RLS backstop
   lives in the Alembic migration). Person is global — Supabase Auth maps onto it.
+- Every foreign key between two account-scoped tables is composite on
+  (id, account_id) — see `_scoped_fk` below and docs/02 → "Isolation rule".
 - Day-granular validity (valid_from/valid_to) is DATE, half-open like the engines'
   Period; audit timestamps are timestamptz.
 - Money is integer cents; areas are m² × 100 integers. Never floats.
@@ -27,14 +29,88 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     UniqueConstraint,
     func,
+    select,
 )
 from sqlalchemy import Enum as SaEnum
+from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .ids import new_id
+
+
+def _scoped_fk(
+    child: str, column: str, parent: str, *, ondelete: str | None = None
+) -> ForeignKeyConstraint:
+    """`FOREIGN KEY (column, account_id) REFERENCES parent (id, account_id)`.
+
+    docs/02 → "Isolation rule". Postgres enforces referential integrity with RLS
+    **bypassed**: the check runs as a system operation and never consults a policy.
+    A row that stamps its own `account_id` correctly — and so passes `WITH CHECK` —
+    can still point this link at a parent owned by another account. Spanning both
+    columns is what makes such an edge unrepresentable; the parent carries the
+    matching `UniqueConstraint("id", "account_id")` that this pair references.
+
+    `match="SIMPLE"` is explicit and load-bearing: `account_id` is NOT NULL, so
+    MATCH FULL would demand all-or-nothing across the two columns and silently turn
+    every optional link (`meter.unit_id`, `building.landlord_id`, the `direct_*`
+    columns) into a mandatory one. SIMPLE leaves an unset link unchecked and every
+    set link checked, which is exactly the intended meaning.
+
+    The name matches the single-column constraint this replaced (migration 0004),
+    so the schema reads the same as before — same edge, wider reference.
+    """
+    return ForeignKeyConstraint(
+        [column, "account_id"],
+        [f"{parent}.id", f"{parent}.account_id"],
+        name=f"{child}_{column}_fkey",
+        ondelete=ondelete,
+        match="SIMPLE",
+    )
+
+
+def _scoped_pair(parent: str) -> UniqueConstraint:
+    """`UNIQUE (id, account_id)` — redundant against the primary key, and that is
+    the point: a composite FK can only target a unique constraint, so this is what
+    makes the *pair* referenceable by `_scoped_fk`."""
+    return UniqueConstraint("id", "account_id", name=f"uq_{parent}_id_account")
+
+
+def _account_id_of_membership(context: DefaultExecutionContext) -> str | None:
+    """Derive `building_assignment.account_id` from the membership it links.
+
+    The column is a denormalisation of `membership.account_id` (decision: docs/02 →
+    "Isolation rule"), and it cannot drift, because the composite FK
+    `(membership_id, account_id) → membership (id, account_id)` means a disagreeing
+    pair does not exist in the parent. Deriving it here means a caller never has to
+    restate what the membership already says.
+
+    The lookup runs on the inserting connection, so it is subject to the same RLS
+    context as the write: a membership the caller cannot see yields NULL, and the
+    NOT NULL column refuses the row. The refusal stays in the database — one
+    enforcement point, not a second one in Python that could disagree with it.
+    """
+    # `current_parameters` rather than `get_current_parameters()`: the latter is
+    # unannotated in SQLAlchemy (mypy --strict rejects the call), and the two differ
+    # only for multi-valued INSERT constructs, which this mapping never emits.
+    parameters = context.current_parameters or {}
+    membership_id = parameters.get("membership_id")
+    account_id: str | None = context.connection.scalar(
+        select(Membership.account_id).where(Membership.id == membership_id)
+    )
+    return account_id
+
+
+# A note on the `overlaps=` arguments below: a composite FK makes each relationship
+# carry `account_id` into its child alongside the id link, so a child with two
+# scoped parents (meter → building + unit, tenancy_party → tenancy + renter) has two
+# relationships writing that one column. SQLAlchemy warns about the shape because
+# the two writers could disagree — here they cannot: either both parents are in the
+# same account, or the composite FK rejects the row outright. `overlaps=` records
+# that the sharing is intended; it silences nothing else.
 
 
 class AccountShape(enum.Enum):
@@ -146,20 +222,40 @@ class Membership(Base):
     __table_args__ = (
         # DECISION (docs/02): one role per person per account — start strict.
         UniqueConstraint("person_id", "account_id"),
+        _scoped_pair("membership"),
         Index("ix_membership_account", "account_id"),
     )
 
 
 class BuildingAssignment(Base):
+    """Which of the account's buildings an EMPLOYEE membership may work on.
+
+    `account_id` is a copy of `membership.account_id`. It is denormalised on
+    purpose (docs/02 → "Isolation rule"): transitive scoping made this the one
+    tenant table whose RLS policy joined another table, and — more importantly —
+    left its `building_id` unchecked against any account at all, so an assignment
+    could grant an employee of account B a building owned by account A. The copy
+    cannot drift, because the composite FK to `membership (id, account_id)` means a
+    disagreeing pair does not exist in the parent.
+    """
+
     __tablename__ = "building_assignment"
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
-    membership_id: Mapped[str] = mapped_column(ForeignKey("membership.id", ondelete="CASCADE"))
-    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    account_id: Mapped[str] = mapped_column(
+        ForeignKey("account.id"), default=_account_id_of_membership
+    )
+    membership_id: Mapped[str]
+    building_id: Mapped[str]
 
     membership: Mapped["Membership"] = relationship(back_populates="building_assignments")
 
-    __table_args__ = (UniqueConstraint("membership_id", "building_id"),)
+    __table_args__ = (
+        _scoped_fk("building_assignment", "membership_id", "membership", ondelete="CASCADE"),
+        _scoped_fk("building_assignment", "building_id", "building"),
+        UniqueConstraint("membership_id", "building_id"),
+        Index("ix_building_assignment_account", "account_id"),
+    )
 
 
 # ── Vermieter: a DATA entity (the legal lessor on statements), not a role. ──
@@ -176,7 +272,10 @@ class Landlord(Base):
     account: Mapped["Account"] = relationship(back_populates="landlords")
     buildings: Mapped[list["Building"]] = relationship(back_populates="landlord")
 
-    __table_args__ = (Index("ix_landlord_account", "account_id"),)
+    __table_args__ = (
+        _scoped_pair("landlord"),
+        Index("ix_landlord_account", "account_id"),
+    )
 
 
 # ── Mieter: domain entity; portal login OPTIONAL via person_id (set at M5). ──
@@ -196,6 +295,7 @@ class Renter(Base):
     tenancy_parties: Mapped[list["TenancyParty"]] = relationship(back_populates="renter")
 
     __table_args__ = (
+        _scoped_pair("renter"),
         Index("ix_renter_account", "account_id"),
         Index("ix_renter_person", "person_id"),
     )
@@ -210,7 +310,7 @@ class Building(Base):
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
     # Nullable: the Landlord entity may be filled in after the building exists.
-    landlord_id: Mapped[str | None] = mapped_column(ForeignKey("landlord.id"))
+    landlord_id: Mapped[str | None]
     name: Mapped[str]
     street: Mapped[str]
     postal_code: Mapped[str]
@@ -226,7 +326,11 @@ class Building(Base):
         back_populates="building"
     )
 
-    __table_args__ = (Index("ix_building_account", "account_id"),)
+    __table_args__ = (
+        _scoped_fk("building", "landlord_id", "landlord"),
+        _scoped_pair("building"),
+        Index("ix_building_account", "account_id"),
+    )
 
 
 class Unit(Base):
@@ -234,7 +338,7 @@ class Unit(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    building_id: Mapped[str]
     label: Mapped[str]
     # Wohnfläche in m² × 100 (integer — no floats anywhere near allocation math).
     area_sqm_x100: Mapped[int]
@@ -243,9 +347,11 @@ class Unit(Base):
     building: Mapped["Building"] = relationship(back_populates="units")
     tenancies: Mapped[list["Tenancy"]] = relationship(back_populates="unit")
     self_use_periods: Mapped[list["SelfUsePeriod"]] = relationship(back_populates="unit")
-    meters: Mapped[list["Meter"]] = relationship(back_populates="unit")
+    meters: Mapped[list["Meter"]] = relationship(back_populates="unit", overlaps="meters")
 
     __table_args__ = (
+        _scoped_fk("unit", "building_id", "building"),
+        _scoped_pair("unit"),
         Index("ix_unit_account", "account_id"),
         Index("ix_unit_building", "building_id"),
     )
@@ -259,7 +365,7 @@ class Tenancy(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    unit_id: Mapped[str] = mapped_column(ForeignKey("unit.id"))
+    unit_id: Mapped[str]
     valid_from: Mapped[date]
     valid_to: Mapped[date | None]
     base_rent_cents: Mapped[int]  # Kaltmiete
@@ -267,9 +373,13 @@ class Tenancy(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     unit: Mapped["Unit"] = relationship(back_populates="tenancies")
-    parties: Mapped[list["TenancyParty"]] = relationship(back_populates="tenancy")
+    parties: Mapped[list["TenancyParty"]] = relationship(
+        back_populates="tenancy", overlaps="tenancy_parties"
+    )
 
     __table_args__ = (
+        _scoped_fk("tenancy", "unit_id", "unit"),
+        _scoped_pair("tenancy"),
         Index("ix_tenancy_account", "account_id"),
         Index("ix_tenancy_unit", "unit_id"),
     )
@@ -280,13 +390,19 @@ class TenancyParty(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    tenancy_id: Mapped[str] = mapped_column(ForeignKey("tenancy.id"))
-    renter_id: Mapped[str] = mapped_column(ForeignKey("renter.id"))
+    tenancy_id: Mapped[str]
+    renter_id: Mapped[str]
 
-    tenancy: Mapped["Tenancy"] = relationship(back_populates="parties")
-    renter: Mapped["Renter"] = relationship(back_populates="tenancy_parties")
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="parties", overlaps="tenancy_parties"
+    )
+    renter: Mapped["Renter"] = relationship(
+        back_populates="tenancy_parties", overlaps="parties,tenancy"
+    )
 
     __table_args__ = (
+        _scoped_fk("tenancy_party", "tenancy_id", "tenancy"),
+        _scoped_fk("tenancy_party", "renter_id", "renter"),
         UniqueConstraint("tenancy_id", "renter_id"),
         Index("ix_tenancy_party_account", "account_id"),
     )
@@ -303,7 +419,7 @@ class SelfUsePeriod(Base):
     # docs/02's sketch omits account_id here, but "every domain row carries
     # account_id" (same doc, principle 1) and the RLS plan scopes this table by it.
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    unit_id: Mapped[str] = mapped_column(ForeignKey("unit.id"))
+    unit_id: Mapped[str]
     sqm_x100: Mapped[int]  # self-used m² × 100 — an area, not a flag
     kind: Mapped[SelfUseKind] = mapped_column(default=SelfUseKind.OWNER_OCCUPIED)
     note: Mapped[str | None]
@@ -313,6 +429,7 @@ class SelfUsePeriod(Base):
     unit: Mapped["Unit"] = relationship(back_populates="self_use_periods")
 
     __table_args__ = (
+        _scoped_fk("self_use_period", "unit_id", "unit"),
         Index("ix_self_use_account", "account_id"),
         Index("ix_self_use_unit", "unit_id"),
     )
@@ -330,7 +447,7 @@ class Statement(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    building_id: Mapped[str]
     period_start: Mapped[date]
     period_end: Mapped[date]
     version: Mapped[int] = mapped_column(default=1)
@@ -342,6 +459,7 @@ class Statement(Base):
     building: Mapped["Building"] = relationship(back_populates="statements")
 
     __table_args__ = (
+        _scoped_fk("statement", "building_id", "building"),
         UniqueConstraint("building_id", "period_start", "period_end", "version"),
         Index("ix_statement_account", "account_id"),
     )
@@ -360,7 +478,7 @@ class CostEntry(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    building_id: Mapped[str]
     label: Mapped[str]
     amount_cents: Mapped[int]
     period_from: Mapped[date]
@@ -373,6 +491,8 @@ class CostEntry(Base):
     )
 
     __table_args__ = (
+        _scoped_fk("cost_entry", "building_id", "building"),
+        _scoped_pair("cost_entry"),
         Index("ix_cost_entry_account", "account_id"),
         Index("ix_cost_entry_building", "building_id"),
     )
@@ -387,16 +507,19 @@ class AllocationKeyAssignment(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    cost_entry_id: Mapped[str] = mapped_column(ForeignKey("cost_entry.id"))
+    cost_entry_id: Mapped[str]
     key: Mapped[AllocationKey]
     # Only for key = DIRECT: the single target the cost bypasses allocation to.
-    direct_unit_id: Mapped[str | None] = mapped_column(ForeignKey("unit.id"))
-    direct_tenancy_id: Mapped[str | None] = mapped_column(ForeignKey("tenancy.id"))
+    direct_unit_id: Mapped[str | None]
+    direct_tenancy_id: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     cost_entry: Mapped["CostEntry"] = relationship(back_populates="key_assignments")
 
     __table_args__ = (
+        _scoped_fk("allocation_key_assignment", "cost_entry_id", "cost_entry"),
+        _scoped_fk("allocation_key_assignment", "direct_unit_id", "unit"),
+        _scoped_fk("allocation_key_assignment", "direct_tenancy_id", "tenancy"),
         Index("ix_aka_account", "account_id"),
         Index("ix_aka_cost_entry", "cost_entry_id"),
     )
@@ -420,8 +543,8 @@ class Meter(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
-    unit_id: Mapped[str | None] = mapped_column(ForeignKey("unit.id"))
+    building_id: Mapped[str]
+    unit_id: Mapped[str | None]
     kind: Mapped[MeterKind]
     measurement_unit: Mapped[MeasurementUnit]
     serial: Mapped[str]  # Zählernummer as printed on the device
@@ -429,11 +552,16 @@ class Meter(Base):
     calibration_valid_until: Mapped[date | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    building: Mapped["Building"] = relationship(back_populates="meters")
-    unit: Mapped["Unit | None"] = relationship(back_populates="meters")
+    building: Mapped["Building"] = relationship(back_populates="meters", overlaps="meters")
+    unit: Mapped["Unit | None"] = relationship(
+        back_populates="meters", overlaps="building,meters"
+    )
     readings: Mapped[list["MeterReading"]] = relationship(back_populates="meter")
 
     __table_args__ = (
+        _scoped_fk("meter", "building_id", "building"),
+        _scoped_fk("meter", "unit_id", "unit"),
+        _scoped_pair("meter"),
         UniqueConstraint("building_id", "serial"),
         Index("ix_meter_account", "account_id"),
         Index("ix_meter_building", "building_id"),
@@ -458,7 +586,7 @@ class MeterReading(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    meter_id: Mapped[str] = mapped_column(ForeignKey("meter.id"))
+    meter_id: Mapped[str]
     read_at: Mapped[date]
     value_x1000: Mapped[int] = mapped_column(BigInteger)
     reason: Mapped[ReadingReason]
@@ -469,6 +597,7 @@ class MeterReading(Base):
     meter: Mapped["Meter"] = relationship(back_populates="readings")
 
     __table_args__ = (
+        _scoped_fk("meter_reading", "meter_id", "meter"),
         Index("ix_meter_reading_account", "account_id"),
         Index("ix_meter_reading_meter", "meter_id"),
     )
@@ -489,7 +618,7 @@ class HeatingCostEntry(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
-    building_id: Mapped[str] = mapped_column(ForeignKey("building.id"))
+    building_id: Mapped[str]
     label: Mapped[str]
     amount_cents: Mapped[int]  # total, INCLUDING the CO₂ portion below
     period_from: Mapped[date]
@@ -501,14 +630,17 @@ class HeatingCostEntry(Base):
     building: Mapped["Building"] = relationship(back_populates="heating_cost_entries")
 
     __table_args__ = (
+        _scoped_fk("heating_cost_entry", "building_id", "building"),
         Index("ix_heating_cost_account", "account_id"),
         Index("ix_heating_cost_building", "building_id"),
     )
 
 
-# Tables scoped by account_id — the Alembic migration enables FORCEd RLS on each
-# of these plus `account` (scoped by its own id) and `building_assignment`
-# (scoped via its membership). `person` is global by design.
+# Tables scoped by their own account_id column — the Alembic migration enables
+# FORCEd RLS on each of these plus `account` (scoped by its own id) and
+# `building_assignment`. The latter carries account_id too since migration 0004,
+# but stays out of this tuple: it is not domain data, it is the employee↔building
+# grant, and docs/02 keeps it listed as its own case. `person` is global by design.
 ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "membership",
     "landlord",

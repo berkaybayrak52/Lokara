@@ -43,14 +43,17 @@ REPO = Path(__file__).resolve().parent.parent
 ISOLATION_TEST = REPO / "packages/db/tests/test_rls_isolation.py"
 
 # Tables that legitimately have no account_id column. Note that "no account_id" is NOT
-# the same as "no policy": account and building_assignment are both ENABLEd, FORCEd and
-# policied — they just derive the account from something other than a local column.
+# the same as "no policy": account is ENABLEd, FORCEd and policied — it just derives the
+# account from something other than a local column.
 # Keep this list short and always give the reason.
+#
+# `building_assignment` used to be here, scoped transitively through membership. Migration
+# 0004 gave it a real account_id (docs/02 → "Isolation rule"), so it is now an ordinary
+# tenant table and this script checks it like any other.
 EXEMPT: dict[str, str] = {
     "alembic_version": "migration bookkeeping, not tenant data",
     "person": "global identity — one human, many accounts (migration 0001)",
     "account": "IS the isolation boundary — its own id is the account id; policy compares id",
-    "building_assignment": "scoped transitively: policy joins membership.account_id",
 }
 
 
