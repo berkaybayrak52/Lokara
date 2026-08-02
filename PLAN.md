@@ -66,7 +66,8 @@ a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in af
 
 > **What exists today:** M0 stands on the v4 Python stack — FastAPI + SQLAlchemy/Alembic + Bun/shadcn
 > — re-established by `MIGRATION-PLAN.md` Phases A–F. The interim TypeScript build (NestJS + Prisma)
-> that originally satisfied M0 was removed in Phase H; `main` still holds it as a historical fallback.
+> that originally satisfied M0 was removed in Phase H, which is now merged to `main`. It survives only
+> at the **`pre-migration`** tag (`c5fadab`) — that tag, not a branch, is the historical fallback.
 > `apps/mobile` (Expo) is the one part of the spec below that is still outstanding — Phase G.
 
 **Goal:** an empty but correct skeleton everything else hangs off.

@@ -321,11 +321,19 @@ files noted). **Carry them across; don't re-derive or lose them.**
   i18n + theme; consume the same FastAPI.
 - **DoD:** Expo app logs in and reads one screen.
 
-### Phase H — Cutover & cleanup
-> **Cleanup done 30.07.2026.** The NestJS/Prisma scaffold and the TS engine mirrors are gone
-> (`b2f5fa4`); the migration banners are retired in the commit that adds this line. `PHASE-H-PLAN.md`
-> holds the executable detail. **Still outstanding from the DoD below:** the merge to `main`, and the
-> pre-commit/Husky + React Compiler/React Scan items (Phase G is untouched).
+### Phase H — Cutover & cleanup ✅ DoD met 02.08.2026 (three body items deferred)
+> **The DoD line below is satisfied**, so the migration is done: `main` is green on both lanes,
+> no NestJS/Prisma remains, and the docs describe one backend. Merged at `e9da14e`
+> (`--no-ff`, tagged **`phase-h-done`**), so the whole migration is one range:
+> `git log --oneline pre-migration..phase-h-done`. The cleanup itself was `b2f5fa4` (scaffold +
+> TS engine mirrors removed) and `dd5b32b` (banners retired); `PHASE-H-PLAN.md` holds the
+> executable detail and the H4 prompt.
+>
+> **Deferred, and not part of the DoD** — three developer-tooling items from the bullets below:
+> **Husky / pre-commit**, **React Compiler**, **React Scan**. None is tracked in the repo today.
+> They are DX, not migration: CI already runs Ruff, mypy, pytest, ESLint, typecheck and build on
+> every push, so the checks exist — Husky would only move them earlier. **Expo profiling** belongs
+> to Phase G, which is untouched.
 
 - Confirm parity (pytest green, PDF identical, web/(mobile) on FastAPI).
 - **Remove** NestJS `apps/api` + Prisma `packages/db`. Pre-commit + CI: Ruff/mypy/pytest +
