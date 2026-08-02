@@ -127,7 +127,13 @@ def _dotted(node: ast.AST) -> str:
 
 
 def _layer_for(path: Path) -> Layer | None:
-    rel = path.resolve().relative_to(REPO).as_posix()
+    # The PostToolUse hook feeds this every .py file an agent touches, including scratch
+    # files outside the repo. `relative_to` raises there, and a traceback reads like a
+    # purity violation. Outside the repo is simply "no layer" — nothing to check.
+    try:
+        rel = path.resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return None
     for layer in LAYERS:
         if rel.startswith(layer.root + "/"):
             return layer
