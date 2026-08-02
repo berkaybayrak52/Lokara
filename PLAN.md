@@ -179,9 +179,18 @@ GoBD), which needs object storage and its own spec.
 - Roles: OWNER / EMPLOYEE / TAX_ADVISOR on Membership; `AccountShape` SOLO / HAUSVERWALTUNG.
 - Portals + **URL-carried context** (`/a/{accountId}/…`, `/renter/{tenancyId}/…`); switcher only when
   a Person holds >1 context. **Postgres RLS** enforced as the isolation backstop.
+- **Composite FKs on `(id, account_id)`** for all **15** tenant-to-tenant foreign keys
+  (`docs/02-data-model.md` → "Isolation rule"). Postgres checks FKs with **RLS bypassed**, so a
+  correctly stamped row can still point at another account's parent — `WITH CHECK` is necessary but
+  not sufficient. Each parent gains `UNIQUE (id, account_id)`; each child FK spans both columns
+  (`MATCH SIMPLE`, so nullable links stay optional). Lands here because M5 is where tenancy/assignment
+  writes first get an endpoint and this stops being theoretical.
+  **Open decision:** `building_assignment` has no `account_id` (scope derived via `membership`) — its
+  2 edges either get the column or an explicit app-level check. Decide before writing the migration.
 
 **DoD:** an EMPLOYEE with no building assignments sees nothing; renter context exposes zero landlord data
-(verified in app logic **and** RLS).
+(verified in app logic **and** RLS); an insert that stamps its own `account_id` correctly but points a
+FK at another account's parent is **rejected by the database** (test, all 15 edges).
 
 ---
 

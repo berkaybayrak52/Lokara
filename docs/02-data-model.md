@@ -147,6 +147,90 @@ class Renter(Base):
   the migration role is a **non-superuser owner**, so FORCE binds it as well: **seed/admin flows there
   must set the app context** (`app.account_id`) or use a role explicitly exempted. `TODO(supabase)`.
 
+## Isolation rule: every tenant-to-tenant FK is composite on `(id, account_id)`
+
+> **Rule.** A foreign key from one account-scoped table to another **must carry `account_id` in the
+> reference** — `FOREIGN KEY (parent_id, account_id) REFERENCES parent (id, account_id)`, backed by a
+> matching `UNIQUE (id, account_id)` on the parent. A bare FK on `id` alone is a defect, not a style
+> choice. This is a rule about the **whole data model**, not about any one table.
+
+CLAUDE.md rule 3 says isolation is enforced **twice**: in app logic and in Postgres RLS. Referential
+integrity is a **third** enforcement point that neither of those two covers.
+
+### Why RLS cannot close this
+
+**Postgres enforces foreign keys with RLS bypassed.** The FK check runs as a system operation, not as
+the querying role, so it does **not** see the row-level policies. Concretely:
+
+1. A session scoped to account **B** inserts a `tenancy` and correctly stamps `account_id = B`.
+2. The `WITH CHECK` policy is satisfied — the row is stamped B, so RLS lets the write through.
+3. `unit_id` is set to the id of a `unit` owned by account **A**. The FK check finds that unit,
+   because the check does not apply A's/B's row policies. The insert **succeeds**.
+
+The child row is correctly isolated (B reads it, A does not). The **edge it draws is not**: a lease in
+B's workspace now hangs off A's flat. Cross-account state exists, and every join downstream —
+statements, allocation, PDFs — inherits it.
+
+So `account_id` in `WITH CHECK` is **necessary but not sufficient**. There is no policy formulation
+that fixes this; RLS is structurally the wrong tool for this class of leak, because the leak is not in
+a row's visibility but in a constraint that never consults visibility. The only two mechanisms that do
+work are:
+
+- **Composite FK on `(id, account_id)`** — preferred. The parent gains `UNIQUE (id, account_id)`
+  (redundant against its PK, and that is the point: it is what makes the pair referenceable), the
+  child's FK spans both columns, and Postgres itself makes a cross-account edge unrepresentable. No
+  new column is needed on the child — its `account_id` already exists and now does double duty.
+- **An application-level check on every write path** — the fallback. Load the parent through an
+  account-scoped query before the insert and reject a miss. Correct only if *every* write path does it,
+  which is exactly the property a schema constraint gives for free and code review does not.
+
+**Nullable parent links stay optional.** Postgres multi-column FKs default to `MATCH SIMPLE`: if any
+referencing column is NULL the constraint is not checked. Since `account_id` is `NOT NULL` on every
+child, an optional link (`building.landlord_id`, `meter.unit_id`, the `direct_*` columns) keeps its
+"unset" meaning. Do **not** write `MATCH FULL` — it would forbid the unset case.
+
+### Blast radius (surveyed against `packages/db/src/lokara_db/models.py`)
+
+**15 foreign keys join two account-scoped tables, and all 15 are currently bare FKs on `id`:**
+
+| Child → parent | Column(s) |
+| --- | --- |
+| `building` → `landlord` | `landlord_id` (nullable) |
+| `unit` → `building` | `building_id` |
+| `tenancy` → `unit` | `unit_id` |
+| `tenancy_party` → `tenancy` | `tenancy_id` |
+| `tenancy_party` → `renter` | `renter_id` |
+| `self_use_period` → `unit` | `unit_id` |
+| `statement` → `building` | `building_id` |
+| `cost_entry` → `building` | `building_id` |
+| `allocation_key_assignment` → `cost_entry` | `cost_entry_id` |
+| `allocation_key_assignment` → `unit` | `direct_unit_id` (nullable) |
+| `allocation_key_assignment` → `tenancy` | `direct_tenancy_id` (nullable) |
+| `meter` → `building` | `building_id` |
+| `meter` → `unit` | `unit_id` (nullable) |
+| `meter_reading` → `meter` | `meter_id` |
+| `heating_cost_entry` → `building` | `building_id` |
+
+`tenancy.unit_id` is the concrete case that surfaced the rule, found while writing the isolation tests
+for `tenancy` / `tenancy_party` (commit `d751897`). It is not special — it is 1 of 15.
+
+**Plus 2 open edges on `building_assignment`** (`membership_id`, `building_id`). That table carries no
+`account_id` of its own; its scope is *derived* through `membership`. The rule cannot be applied as
+written until it either gains an `account_id` or its two edges are explicitly assigned to the
+app-level fallback. **Undecided — settle it in M5**, where an EMPLOYEE assignment first gets a write
+endpoint; a `building_assignment` pointing at another account's building is a read-access leak, not
+just a bad edge.
+
+FKs to `account.id` itself (14 — one per entry in `ACCOUNT_SCOPED_TABLES`) and the 2 to the global
+`person.id` are out of scope: `account` *is* the boundary and `person` is deliberately global.
+That accounts for all 33 FKs in the file: 15 tenant-to-tenant + 2 on `building_assignment` + 14 + 2.
+
+### Reading the sketches in this file
+
+The inline SQLAlchemy sketches elsewhere in this document predate this rule and show the bare
+`ForeignKey("unit.id")` form. They are illustrative of *shape*, not of the constraint; where a sketch
+crosses two account-scoped tables, the composite form above is the binding one.
+
 ## Temporal core: Building → Unit → Tenancy
 
 `Building 1─N Unit 1─N Tenancy`. Tenancy has `valid_from/valid_to`.
