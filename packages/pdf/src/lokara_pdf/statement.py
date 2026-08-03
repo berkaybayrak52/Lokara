@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from html import escape
 
-from lokara_domain import AllocationKey, format_eur
+from lokara_domain import AllocationKey, cents, format_eur
 from lokara_heating_engine import HeatingResult
 from lokara_nk_engine import CostItem, NkResult, ShareLine
 
@@ -214,6 +214,27 @@ def _heating_section(data: StatementData) -> str:
             "Verbrauchsanteil wurde nach Wohnfläche umgelegt (§ 9a Abs. 2 HeizkostenV).</p>"
         )
 
+    # The footer figure is the Gesamtkosten — *not* the sum of the column above
+    # it: the CO₂-Vermieteranteil is deducted before the renter-facing split
+    # (§ 7 Abs. 1 CO2KostAufG) and is not a row in this table, so the party
+    # shares add up to less. docs/08 → "Heating table footer". One code path for
+    # both branches: without a CO₂ split the two figures are equal by
+    # construction, and printing them still beats asserting the equality in
+    # words — the reader adds the printed numbers, the document claims nothing.
+    # Fixed copy, deliberately not derived from ``heating_cost_label`` (that
+    # field spells "Heiz- und Warmwasserkosten" → "Gesamtkosten Heiz- und
+    # Warmwasserkosten").
+    footer_label = "Gesamtkosten Heizung und Warmwasser"
+    share_sum = cents(sum(int(line.total) for line in heating.lines))
+    reconciliation = f"Summe der oben ausgewiesenen Anteile: {escape(format_eur(share_sum))}."
+    if heating.co2 is not None:
+        footer_label += " (inkl. CO₂-Vermieteranteil)"
+        reconciliation += (
+            f" Die Differenz von {escape(format_eur(heating.co2.landlord_amount))} "
+            "ist der CO₂-Vermieteranteil; er wird vor der Umlage abgezogen "
+            "(§ 7 Abs. 1 CO2KostAufG)."
+        )
+
     total = format_eur(heating.total)
     return f"""
   <h2>{escape(data.heating_cost_label)}</h2>
@@ -227,8 +248,7 @@ def _heating_section(data: StatementData) -> str:
       {"".join(rows)}
     </tbody>
     <tfoot>
-      <tr><td colspan="5">Summe Heiz- und Warmwasserkosten (inkl. CO₂-Vermieteranteil,
-      stimmt centgenau mit den Gesamtkosten überein)</td>
+      <tr><td colspan="5">{footer_label}<span class="foot-note">{reconciliation}</span></td>
       <td class="num">{escape(total)}</td></tr>
     </tfoot>
   </table>
@@ -281,6 +301,14 @@ def statement_html(data: StatementData) -> str:
   .ref-total {{ white-space: nowrap; }}
   tfoot td {{
     font-weight: 700; border-top: 1pt solid var(--color-ink); border-bottom: none;
+    /* Keeps the amount on the label's line when the cell has a second line. */
+    vertical-align: top;
+  }}
+  /* Second line of a footer cell: the reconciliation sentence. Quieter than the
+     label but full-width and readable — slate on paper is 5.5:1 (WCAG AA). */
+  tfoot .foot-note {{
+    display: block; font-weight: 400; color: var(--color-slate);
+    font-size: 8.5pt; line-height: 1.4; margin-top: 1.2mm;
   }}
   .co2 {{
     background: var(--color-mint); border-radius: 8px; padding: 4mm;
