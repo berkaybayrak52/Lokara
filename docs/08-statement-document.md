@@ -19,12 +19,38 @@ hard part and it's correct — what's missing is document completeness, not new 
 
 Settled BGH case law: a Betriebskostenabrechnung must contain all four.
 
-| # | Requirement | First render |
+| # | Requirement | Current render |
 | --- | --- | --- |
 | 1 | **Zusammenstellung der Gesamtkosten** (per cost type) | ✅ |
 | 2 | **Angabe + Erläuterung des Verteilerschlüssels** | ✅ — e.g. "Wohnfläche (m²·Tage)" |
-| 3 | **Berechnung des Anteils des Mieters** | ✅ — day-weighted, cent-exact |
+| 3 | **Berechnung des Anteils des Mieters** | ◐ **half** — every figure is on the page, the calculation joining them is not (spelled out below) |
 | 4 | **Abzug der geleisteten Vorauszahlungen** → **Saldo** | ❌ **missing** |
+
+Markers: **✅** rendered · **◐** partly rendered — what is and is not on the page is named exactly,
+never left to the reader · **❌** absent.
+
+### #3 is half closed, and this is which half
+
+The share the engine computes is `Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung`. Checked
+against the rendered PDF (`packages/pdf/output/nk-heating-statement-demo.pdf`), **all four figures of
+that equation are now printed**:
+
+- **Gesamtkosten** of the cost — on the cost header row (that is minimum #1);
+- **Bemessung** of the party — e.g. `5.430` on Wohnung B's line;
+- **Gesamtbemessung** of that cost's key, with its unit — `36.500 m²·Tage`, added by the
+  reference-totals slice below;
+- **Anteil** in euro; plus the **Umlageschlüssel** label (minimum #2).
+
+Two things are missing, and #3 is a *Berechnung* — something the tenant re-performs — until both are
+there:
+
+1. **The operator is nowhere on the page.** Nothing states that those four figures stand in the
+   relation `Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung`. A reader who does not already know
+   the formula reads four unrelated numbers.
+2. **The numerator is not derived.** `5.430` is printed as a bare Bemessung. That it is
+   `30 m² × 181 Tage` appears nowhere — neither the `30 m²` nor the `181 Tage` is next to it. The
+   tenant can re-use the figure but cannot check it, so a wrong area or a wrong move-out date is
+   invisible in the document.
 
 **#4 is the point of the document for the tenant:** advances paid − share owed = **Nachzahlung oder
 Guthaben**. The data model already anticipates it (`docs/02`: the statement's Nachzahlung/Guthaben
@@ -45,8 +71,10 @@ Both derive from the same engine result — this is a rendering split, not a sec
 ## Also missing from the tenant document
 
 - **Addressee block + date** — the statement is addressed to one tenant (name, address).
-- ~~**Reference totals so the share is verifiable**~~ — **specified below** ("Reference totals
-  (Gesamtbemessung)"); one per allocation key, each with its own unit. Not yet rendered.
+- ~~**Reference totals so the share is verifiable**~~ — specified below ("Reference totals
+  (Gesamtbemessung)"), one per allocation key with its own unit, and **rendered** since `b404173`.
+  It makes the share *checkable against a denominator*; it does not by itself close BGH #3 (see the
+  ◐ note above).
 - **Heating consumption values** — meter start/end readings (HeizkostenV gives the tenant a right to
   check); wire from `Zähler` data, not fixtures.
 - **§556 deadline context** — the 12-month Abrechnungsfrist, and the tenant's Einwendungsfrist.
@@ -66,6 +94,12 @@ tenant sees `€600.00` and their own `18.250 m²·Tage`; without the **denomina
 prove nothing. `600 = 1200 × 18.250 / 36.500` is only checkable once `36.500` is on the page. The
 share alone is unverifiable, which is precisely the formal defect that makes statements
 challengeable.
+
+**This section does not close #3** — it supplies the denominator and nothing else. The page still
+states no operator, and it still prints the numerator (`18.250`) without the `50 m² × 365 Tage` it
+comes from; see *"#3 is half closed, and this is which half"* above. What would close #3 is a rendered
+per-party calculation that names the operation **and** derives the Bemessung from its factors. A
+future slice owns that; it is deliberately not designed here.
 
 **What the row is.** For each cost on the statement, the **sum of the allocation weights of all
 parties of that cost**, de-scaled to the human figure, printed with its unit next to that cost's
@@ -151,6 +185,89 @@ the display unit into `StatementData` per cost, and the German spellings of `Mea
 written down — in this file — first. Until then no `CONSUMPTION` reference total is specified and
 none is fixture-tested; a guessed unit on a Verbrauchsabrechnung is a defect that reaches a tenant.
 
+## Heating table footer — the figure is the Gesamtkosten, not the column's sum
+
+> **Rechtsstand 08/2026** (transcribed 03.08.2026). A **document-copy rule**: it introduces nothing
+> into `packages/rules-store` and reads no dated rule. The one legal value involved — the CO₂ split —
+> is resolved by the heating engine from the store and already carries its own `Rechtsstand` on the
+> page. The statutory reference in the copy below was checked against the consolidated text of the
+> CO2KostAufG as of 08/2026; standard caveat of this file applies (`docs/07`).
+
+**The defect.** The heating `tfoot` currently reads *"Summe Heiz- und Warmwasserkosten (inkl.
+CO₂-Vermieteranteil, stimmt centgenau mit den Gesamtkosten überein)" — 10.300,00 €*. The sentence is
+literally true: 10.300,00 € **is** the Gesamtkosten. But it sits under a column of four party amounts
+that sum to **10.240,00 €** (5.657,60 + 1.509,84 + 1.293,36 + 1.779,20). The 60,00 € difference is the
+CO₂-Vermieteranteil, which is deducted **before** the renter-facing split (§ 7 Abs. 1 CO2KostAufG) and
+is **not a row in the table**. So the column visibly does not add up while the footer appears to assert
+that it does.
+
+Two things make it worse than a loose phrase:
+
+- The word **`Summe`** is itself part of the claim. A `tfoot` labelled *Summe* under a column of
+  amounts means "these amounts, added up". Here it is not that.
+- The Betriebskosten footer uses the **identical parenthetical** for a row where the claim is true.
+  Same wording, two meanings, one page — a reader who verifies the first will trust the second.
+
+### Required rendered text (heating footer)
+
+German UI copy (CLAUDE.md), in the heating table's `tfoot` label cell. Two lines in **one** cell; the
+footer's amount column carries **exactly one figure**, the Gesamtkosten.
+
+With a CO₂ split (`heating.co2` present):
+
+```
+Gesamtkosten Heizung und Warmwasser (inkl. CO₂-Vermieteranteil)          10.300,00 €
+Summe der oben ausgewiesenen Anteile: 10.240,00 €. Die Differenz von 60,00 € ist der
+CO₂-Vermieteranteil; er wird vor der Umlage abgezogen (§ 7 Abs. 1 CO2KostAufG).
+```
+
+Without a CO₂ split (`heating.co2 is None` — the two figures are then equal by construction):
+
+```
+Gesamtkosten Heizung und Warmwasser                                      10.300,00 €
+Summe der oben ausgewiesenen Anteile: 10.300,00 €.
+```
+
+Rules the copy encodes:
+
+- **State what the figure is, never that a column sums to it.** `Gesamtkosten`, not `Summe`.
+- **The reconciliation is printed as figures, in both branches** — sum of the shares, and (when there
+  is one) the difference, named and cited. No branch asserts an equality in words; the reader adds two
+  printed numbers. One code path, so the no-CO₂ case cannot drift back into a claim.
+- The label is **fixed copy**, not derived from `StatementData.heating_cost_label` — that field
+  spells the heading *"Heiz- und Warmwasserkosten"*, which would render as
+  *"Gesamtkosten Heiz- und Warmwasserkosten"*.
+- Both euro figures come from the engine result (Σ `HeatingLine.total`, `Co2Result.landlord_amount`),
+  formatted with `format_eur`. Nothing here is a new calculation.
+
+Gate: `packages/pdf/tests/test_statement_heating_footer.py` — asserts the claim per section (present
+on the Betriebskosten footer, absent from the heating one), the copy above with both figures derived
+from the engine, and the arithmetic that motivates it: the **rendered** party amounts sum to strictly
+less than the footer figure, by exactly the CO₂-Vermieteranteil. A future change that drops the CO₂
+deduction — making the column add up and the old wording true again — surfaces there rather than
+silently.
+
+### The Betriebskosten footer keeps its current wording ⚠️
+
+*"Summe Betriebskosten (stimmt centgenau mit den Gesamtkosten überein)"* stays **exactly as it is**.
+There the claim holds: the indented party rows sum to the printed figure to the cent, and that
+reconciliation is the engine's core invariant (`docs/03` → Rounding). Do **not** "harmonise" the two
+footers back into identical wording — the wordings differ because the facts differ. (The cost-header
+rows in that table sit in the same column but are group totals, not addends; the addends are the
+indented lines.)
+
+If a pre-split deduction is ever introduced on the Betriebskosten side, the same rule applies there
+and the claim comes out.
+
+### The eventual fix is a row, not a wording — and it is not this slice
+
+The better long-term answer is that the CO₂-Vermieteranteil becomes a **visible row in the heating
+table** (a landlord-side party line), so the column literally adds up to the Gesamtkosten and no
+explanatory sentence is needed. That belongs with the heating table's full treatment — the open
+question *"Heating: how consumption values and the CO₂ split are presented to the tenant"* below. It is
+recorded here so the reword is understood as an interim honest state, and it is **not** specified or
+designed in this section.
+
 ## BetrKV cost-type catalogue (to specify)
 
 `BetrKV §2` enumerates the umlagefähige Betriebskosten (Grundsteuer, Wasser, Abwasser, Aufzug,
@@ -174,7 +291,11 @@ suggestion would be invented law, not a convenience.
 - [ ] Exact **Vorauszahlung → Saldo** block wording and arithmetic
 - [x] Which reference totals accompany each allocation key → **"Reference totals (Gesamtbemessung)"**
       above. One open sub-question remains: the **unit** of a `CONSUMPTION` total (see the gap there).
-- [ ] Heating: how consumption values and the CO₂ split are presented to the tenant
+- [ ] Heating: how consumption values and the CO₂ split are presented to the tenant — **including
+      the CO₂-Vermieteranteil as a visible row** in the heating table, which is the eventual fix the
+      footer reword above is standing in for
+- [ ] What closes BGH minimum #3: a rendered per-party calculation (the operator, and the Bemessung
+      derived from its factors) — see the ◐ note under the four-minimums table
 - [ ] Required legal notices (§556 frist, Einwendungsfrist, disclaimer placement)
 - [ ] BetrKV cost-type catalogue + default keys + non-umlagefähig flags
 - [ ] A **worked example** with real numbers → becomes the golden fixture for the document layer
