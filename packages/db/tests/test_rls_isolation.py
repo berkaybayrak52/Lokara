@@ -527,9 +527,15 @@ class TestCrossAccountForeignKeys:
     edge unrepresentable.
 
     These are three representative *shapes*, not a survey: completeness across all
-    15 tenant-to-tenant edges is the job of the `scripts/check_fk_isolation.py`
+    17 tenant-to-tenant edges is the job of the `scripts/check_fk_isolation.py`
     gate, which is what any NEW foreign key has to satisfy. These tests prove the
     mechanism behaves.
+
+    Each `match=` names the **specific** constraint the test exists to prove. A
+    generic "foreign key constraint" would be satisfied by a rejection from
+    `*_account_id_fkey` — a different failure with a different meaning (a bad
+    account link, not a cross-account edge) — and the test would pass while
+    proving nothing.
     """
 
     def test_cross_account_unit_parent_is_rejected(
@@ -541,7 +547,7 @@ class TestCrossAccountForeignKeys:
         flat that lives in someone else's house."""
         _, app = engines
         with (
-            pytest.raises(IntegrityError, match="foreign key constraint"),
+            pytest.raises(IntegrityError, match="unit_building_id_fkey"),
             account_scoped_session(app, seed.account_b) as session,
         ):
             session.add(
@@ -561,10 +567,17 @@ class TestCrossAccountForeignKeys:
         """Nullable link (`meter.unit_id` → `unit.id`). B's meter sits in B's own
         building — that edge is clean — and only the OPTIONAL unit link crosses
         into A. The composite FK must still reject it, while `MATCH SIMPLE` keeps
-        an unset `unit_id` (a building-level Hauptzähler) legal."""
+        an unset `unit_id` (a building-level Hauptzähler) legal.
+
+        The Building below is flushed in the same transaction as the Meter, so a
+        failure on *its* insert would otherwise satisfy the test. Naming
+        `meter_unit_id_fkey` closes that: a rejection of the Building (it has no
+        tenant-to-tenant parent — only `building_account_id_fkey` or the PK could
+        refuse it) no longer matches, and the test fails instead of passing for
+        the wrong reason."""
         _, app = engines
         with (
-            pytest.raises(IntegrityError, match="foreign key constraint"),
+            pytest.raises(IntegrityError, match="meter_unit_id_fkey"),
             account_scoped_session(app, seed.account_b) as session,
         ):
             session.add(
@@ -609,7 +622,7 @@ class TestCrossAccountForeignKeys:
         constraint that refuses it."""
         _, app = engines
         with (
-            pytest.raises(IntegrityError, match="foreign key constraint"),
+            pytest.raises(IntegrityError, match="building_assignment_building_id_fkey"),
             account_scoped_session(app, seed.account_b) as session,
         ):
             session.add(

@@ -226,10 +226,34 @@ re-verified.
 - Portals + **URL-carried context** (`/a/{accountId}/…`, `/renter/{tenancyId}/…`); switcher only when
   a Person holds >1 context. **Postgres RLS** enforced as the isolation backstop.
 - Composite FKs on `(id, account_id)` are **not** part of M5 — they ship in the FK-Isolation slice
-  above, which runs first; M5 builds on a schema where cross-account edges are already impossible.
+  above, which runs first; M5 builds on a schema where **tenant-to-tenant** cross-account edges are
+  already impossible.
+- **`person` is the edge the FK slice could not reach — M5 owns it.** `person` is global and carries
+  **no RLS today** (verified live against `0004`: `relrowsecurity = f`, zero policies). Two FKs point
+  at it — `membership.person_id` and `renter.person_id` — and an insert of
+  `renter(account_id = mine, person_id = <a person with no relationship to my account>)` is currently
+  **accepted**: the row is correctly isolated, the *edge* is not. Full argument:
+  `docs/02-data-model.md` → "Limit of the rule: an edge to a global table is outside it".
+  - **A composite FK cannot express this.** `person` has no `account_id` to compose with, and it must
+    not get one — one human legitimately belongs to many accounts, which is the whole reason
+    Person / Account / Membership are three tables. The predicate "this person shares an account with
+    me" spans `membership`, and no foreign key can state it.
+  - **So whoever designs M5 must choose a mechanism and name it** — RLS on `person` for the read side,
+    plus one of: a trigger, an app-level invariant with its own test, or routing the write so the case
+    cannot arise. **Do not assume the FK work covers it**; `scripts/check_fk_isolation.py` is silent
+    here by construction (it inspects tenant-to-tenant edges only), so a green gate says nothing about
+    `person_id`. Being unable to express this as a constraint is the finding, not an oversight.
 
 **DoD:** an EMPLOYEE with no building assignments sees nothing; renter context exposes zero landlord data
-(verified in app logic **and** RLS).
+(verified in app logic **and** RLS). Plus:
+
+- **`person` is under RLS:** a caller sees a `person` row only if they share an account with it —
+  `pg_class.relrowsecurity` and `relforcerowsecurity` are true for `person`, and a session scoped to
+  account B reads zero `person` rows that hold no membership in B (with a non-vacuous control: the
+  same query in A's context finds A's people).
+- **An insert of `renter(person_id = <a person with no relationship to this account>)` is rejected** —
+  by the chosen mechanism, proven by a test that performs the write as `lokara_app` under the
+  account's own context and asserts the database (or the single write path) refuses it.
 
 ---
 

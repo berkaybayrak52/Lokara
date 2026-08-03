@@ -271,9 +271,75 @@ moment someone adds edge 18, and its absence is invisible.
   belongs to B, whose *building* belongs to A): the new `account_id` column is needed for the **fix**,
   not for the test, so the test fails for the defect rather than for a missing column.
 
+  > **Since `0004` landed** all three are green, with their assertions unchanged in substance. What
+  > did change (03.08): each `pytest.raises` now matches the **specific constraint name**
+  > (`unit_building_id_fkey`, `meter_unit_id_fkey`, `building_assignment_building_id_fkey`) instead of
+  > the generic `"foreign key constraint"`. The generic match would equally accept a rejection from
+  > `*_account_id_fkey` — a different failure with a different meaning — so the test could have gone
+  > on passing while the cross-account edge it names was no longer the thing being refused.
+
 FKs to `account.id` itself (14 — one per entry in `ACCOUNT_SCOPED_TABLES`) and the 2 to the global
 `person.id` are out of scope: `account` *is* the boundary and `person` is deliberately global.
 That accounts for all 33 FKs in the file: 15 tenant-to-tenant + 2 on `building_assignment` + 14 + 2.
+
+> **After migration `0004` landed** the counts read (confirmed against `pg_constraint` on the live
+> schema, 03.08): **34** foreign keys — **17** composite tenant-to-tenant (the 15 above plus the 2 on
+> `building_assignment`, which now has its own `account_id`), **15** to `account.id` (one per entry in
+> `ACCOUNT_SCOPED_TABLES`, `building_assignment` included), **2** to `person.id`. The survey above is
+> kept as written because it is the *pre-migration* blast radius; 17 / 15 / 2 / 34 is the current
+> state. The 2 to `person.id` are the subject of the next subsection.
+
+### Limit of the rule: an edge to a **global** table is outside it
+
+> **The rule above is about tenant-to-tenant edges only.** An FK from an account-scoped table to a
+> **global** table (`person`, and `account` itself) can never be composite, so it is not covered — by
+> the rule, by `scripts/check_fk_isolation.py`, or by `TestCrossAccountForeignKeys`. Such an edge
+> needs a **different mechanism**, chosen deliberately. This is a stated limit, not a gap to be
+> discovered again by the next global table.
+
+**The two edges that have this shape today** — both to `person`:
+
+| Child → parent | Column | Meaning |
+| --- | --- | --- |
+| `membership` → `person` | `person_id` (`NOT NULL`) | which human holds this seat in the account |
+| `renter` → `person` | `person_id` (nullable) | optional portal login for a Mieter (set at M5) |
+
+**Verified live against `0004` (03.08, lead + audit).** `person` carries no RLS at all
+(`pg_class.relrowsecurity = f`, `relforcerowsecurity = f`, zero rows in `pg_policies`), and the write
+below is **accepted**:
+
+```sql
+set app.account_id = 'acc_iso_check';
+INSERT INTO renter (id, account_id, legal_name, person_id)
+VALUES (…, 'acc_iso_check', 'Fremde Person', 'per_demo_owner');   -- ACCEPTED
+```
+
+`per_demo_owner` belongs to a different account. The row is correctly isolated (`account_id` is the
+caller's own, so `WITH CHECK` passes and only the caller reads it), but the **edge points at a human
+who has no relationship to this account** — the same class of defect the composite FK was introduced
+to make unrepresentable, one step out of its reach.
+
+**A composite FK cannot fix this, and `account_id` on `person` is not the answer.** There is nothing
+to compose with: `person` has no `account_id`, and it must not get one. One human legitimately belongs
+to **many** accounts — that is the entire reason Person / Account / Membership are three tables and
+not two (see "Person / Account / Membership" above). Giving `person` an owner would either duplicate
+the human per account (breaking one identity ↔ one Supabase Auth user) or pick one account as the
+owner (breaking every other account's link). Both are worse than the leak.
+
+**What follows from this:**
+
+- The completeness gate is silent here **by construction** — `check_fk_isolation.py` inspects edges
+  between two account-scoped tables, and this is not one. A green gate says nothing about
+  `person_id`. Do not read it as coverage.
+- The mechanism is **open**, and picking it belongs to **M5** (`PLAN.md` → M5), which owns identity.
+  The candidates are RLS on `person` (a caller sees a `person` only if they share an account with it)
+  plus one of: a trigger, an app-level invariant with a test, or routing the write so the case cannot
+  arise. **None of them is a foreign key** — the constraint language cannot express "this person
+  shares an account with me", because that predicate spans `membership`. That inexpressibility is the
+  finding.
+- **Before adding the next edge to a global table**, state in this file which of those mechanisms
+  guards it. An edge to a global table with no named mechanism is the defect, whether or not anyone
+  has exploited it yet.
 
 ### Reading the sketches in this file
 
