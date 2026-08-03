@@ -17,9 +17,12 @@ Checks, for every table that carries an `account_id` column:
 4. The table is named in `packages/db/tests/test_rls_isolation.py`, so the policy is
    not merely present but actually exercised.
 
-Tables without `account_id` are out of scope by design (`person` is global — Supabase
-Auth maps onto it — and is deliberately not under RLS, see migration 0001). Add any
-other intentional exception to EXEMPT below, with a reason.
+Tables without `account_id` are out of scope **of this script**, not of isolation. `person`
+is the case that makes the distinction matter: it is global by design — one human, many
+accounts, Supabase Auth maps onto it — so it has no `account_id` and stays in EXEMPT, but
+it does carry RLS (a policy over `membership`, M5a). EXEMPT means "not scoped by a local
+account_id column", never "unprotected". Add any other intentional exception below, with a
+reason — and if it holds identities or money, say where its protection lives instead.
 
 Usage:
     docker compose up -d

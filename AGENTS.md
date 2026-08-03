@@ -150,6 +150,35 @@ it goes green is worse than no canary.
 
 ## How to run a piece of work
 
+### Every slice gets its own branch
+
+**Decision, 03.08, after CI went red on `main` for exactly this reason.** The spec-before-
+implementation split is not optional here — `spec-scribe` writes the failing test, and only
+then may an implementer satisfy it. That guarantees a **red window on every slice**, and
+`main` is the wrong place to spend it: `.github/workflows/ci.yml` runs `uv run pytest` with
+`LOKARA_REQUIRE_DB=1`, so a committed red fixture is a red push, indistinguishable from a
+real regression by anyone reading the badge.
+
+So:
+
+```bash
+git switch -c slice/<name>       # BEFORE dispatching spec-scribe
+# ... red tests commit, then the implementation commit(s), on the branch
+scripts/gate.sh full             # green in the main tree, on the branch
+git switch main && git merge --no-ff slice/<name>
+git push                         # main is only ever pushed green
+```
+
+The red tests and the implementation land on the **same** branch. Merge to `main` only once
+the gates are green. This does not relax the lane rules — `spec-scribe` still cannot satisfy
+its own test, it just does so on a branch instead of on the trunk.
+
+The worktree note above still applies and is a different thing: worktrees isolate an *agent's
+writes*, slice branches isolate a *red window*. An implementer in a worktree branches from
+`HEAD`, so create the slice branch first and let the worktree fork from it.
+
+### The loop
+
 The normal loop, for anything with a calculation in it:
 
 1. **Spec** — `> Use spec-scribe to transcribe <spec> into docs/ and write the failing fixture.`
@@ -160,8 +189,8 @@ The normal loop, for anything with a calculation in it:
 3. **Audit** — `> Use boundary-auditor to review the diff` for anything touching tables,
    endpoints or roles. `> Use statement-reviewer` for anything touching output.
 4. **You** read the findings and decide. Fixes go back through an implementer.
-5. **Close** — `scripts/gate.sh demo`, then `git tag demo-green-<n>`, then write
-   `LAST_OUTPUT.md`.
+5. **Close** — `scripts/gate.sh demo`, **merge the slice branch to `main`**, then
+   `git tag demo-green-<n>`, then write `LAST_OUTPUT.md`.
 
 For work with no calculation in it (a screen, a refactor), skip step 1 and go straight to
 `app-implementer` — but the reviewer step is not optional for anything a landlord will read.

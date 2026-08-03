@@ -403,7 +403,9 @@ applies. `person` therefore gets RLS:
 > account. `person` is `ENABLE` + `FORCE ROW LEVEL SECURITY` with a policy whose `USING` is an
 > `EXISTS` over `membership` scoped by `current_setting('app.account_id', true)`.
 
-Three things the implementer must decide or respect, recorded here so the failing test cannot be
+Five things the implementer must decide or respect — items 2–4 were decided when the policy was
+written (`0005`, 03.08); 1 and 5 remain constraints on later work. Recorded here so the failing test
+cannot be
 "fixed" the wrong way:
 
 1. **Deny by default is not negotiable.** With no `app.account_id` set, `current_setting(..., true)`
@@ -413,15 +415,34 @@ Three things the implementer must decide or respect, recorded here so the failin
    for this Supabase Auth user, *before* any account context exists) is a genuinely different read and
    needs a genuinely different path: a `SECURITY DEFINER` function, a dedicated role, or Supabase
    Auth's own tables. `TODO(M5-remainder)`: name which.
-2. **OPEN: does a renter link count as "shares an account"?** If the policy's `EXISTS` covers only
-   `membership`, then an account that has linked a renter's portal login cannot read that `person` row
-   back through `Renter.person`. Adding the disjunct
-   `EXISTS (SELECT 1 FROM renter r WHERE r.person_id = person.id AND r.account_id = current_setting('app.account_id', true))`
-   fixes that and widens visibility by exactly the rows the account already controls. **Not decided
-   here** — the M5a test is written so it passes under either choice (its visible person holds a
-   membership; its invisible person holds neither). Decide it when the policy is written, and record
-   the choice in this file.
-3. **The renter portal is not an `app.account_id` context.** Portal URLs are `/renter/{tenancyId}/…`
+2. **DECIDED (M5a, migration `0005`): yes — a renter link counts.** The `USING` is
+   `EXISTS(membership) OR EXISTS(renter)`, both scoped by `current_setting('app.account_id', true)`.
+   With `membership` alone, an account that has linked a renter's portal login cannot read that
+   `person` row back through `Renter.person`: it resolves silently to `None`, and the API would need a
+   `SECURITY DEFINER` escape hatch for an ordinary, legitimate read — adding a bypass so a normal read
+   works is precisely the failure mode this policy exists to prevent. The disjunct widens visibility by
+   no more than the account already controls: `renter` is itself account-scoped and FORCEd, so it can
+   only match that account's own renters, humans it invited and whose `legal_name` it already stores.
+   It gives a renter *session* nothing — see item 5.
+3. **DECIDED (M5a, migration `0005`): the policy is `FOR SELECT`, so INSERT/UPDATE/DELETE have no
+   policy and are denied.** `FOR ALL` derives `WITH CHECK` from `USING`, which grants no write signup
+   needs — a brand-new Person has no Membership, so it fails its own policy either way — while granting
+   one nobody should have: any account sharing a membership could rewrite or delete that human's
+   **global** identity row, including the `email` their login hangs on, refused today only by an
+   incidental FK from `membership`. Measured both ways against the live database before choosing.
+   **The consequence M5-remainder inherits:** under `lokara_app`, `person` is read-only — an INSERT
+   raises `InsufficientPrivilege`, an UPDATE/DELETE raises nothing and matches **0 rows**
+   (SQLAlchemy turns that into `StaleDataError`). Signup, profile edits and invitations all wait on the
+   bootstrap path in constraint 1.
+4. **The composition with `membership_isolation` is real, and verified.** A table named inside a policy
+   expression is itself subject to RLS for the querying role, so the `EXISTS` runs under
+   `membership_isolation` / `renter_isolation` — with `membership_isolation` temporarily set to
+   `USING (false)`, every `person` row disappeared. It is harmless only because those policies carry the
+   same account predicate this one does, making the composition an intersection of identical filters.
+   It is **not** free of coupling: narrowing either policy later (e.g. "you see only your own membership
+   row") would silently narrow `person` visibility with it. That is why the `person` policy repeats the
+   account comparison rather than leaning on the referenced table to supply it.
+5. **The renter portal is not an `app.account_id` context.** Portal URLs are `/renter/{tenancyId}/…`
    (see "Portals & active context"). Whatever RLS context a renter session runs under is **M10's**
    problem; `person` RLS at M5a must not be read as having solved it. In particular, giving a renter
    session `app.account_id = <the landlord's account>` would expose every renter in that account —
