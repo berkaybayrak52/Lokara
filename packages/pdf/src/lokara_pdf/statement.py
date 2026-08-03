@@ -13,7 +13,7 @@ from html import escape
 
 from lokara_domain import AllocationKey, format_eur
 from lokara_heating_engine import HeatingResult
-from lokara_nk_engine import CostItem, NkResult
+from lokara_nk_engine import CostItem, NkResult, ShareLine
 
 # (unit_id, tenancy_id) as they appear on result lines; tenancy_id=None is the
 # landlord side (vacancy/self-use) of that unit.
@@ -33,6 +33,18 @@ _ALLOCATION_KEY_LABELS: dict[AllocationKey, str] = {
 _WEIGHT_DISPLAY_DIVISORS: dict[AllocationKey, Decimal] = {
     AllocationKey.AREA: Decimal(100),
     AllocationKey.MEA: Decimal(10000),
+}
+
+# Unit of the reference total (Gesamtbemessung) per key — docs/08 table. Keys
+# absent here print no reference total: CONSUMPTION because its unit of measure
+# is not derivable from the engine result (docs/08 gap — a guessed kWh/m³ on a
+# Verbrauchsabrechnung is a defect that reaches a tenant), DIRECT because it
+# depends on the target and is resolved in _reference_total_unit().
+_REFERENCE_TOTAL_UNITS: dict[AllocationKey, str] = {
+    AllocationKey.AREA: "m²·Tage",
+    AllocationKey.PERSONS: "Personen·Tage",
+    AllocationKey.UNITS: "Einheiten·Tage",
+    AllocationKey.MEA: "MEA·Tage",
 }
 
 DISCLAIMER = (
@@ -67,6 +79,49 @@ def format_number_de(value: Decimal) -> str:
     return grouped.replace(",", "\0").replace(".", ",").replace("\0", ".")
 
 
+def _display_weight(key: AllocationKey, weight: Decimal) -> Decimal:
+    """De-scale an engine weight to the human figure (docs/03).
+
+    The single de-scaling site for both the per-party Bemessung and the
+    Gesamtbemessung — two sites drift apart, and integer-comparing tests stay
+    green while they do.
+    """
+    return weight / _WEIGHT_DISPLAY_DIVISORS.get(key, Decimal(1))
+
+
+def _reference_total_unit(cost: CostItem) -> str | None:
+    """Unit of this cost's Gesamtbemessung, or None if none is printed.
+
+    docs/08: DIRECT → a tenancy has a denominator of 1 (noise, no row); DIRECT →
+    a unit is day-split inside that unit and does have one, in Tage.
+    """
+    if cost.key is AllocationKey.DIRECT:
+        return None if cost.direct_tenancy_id is not None else "Tage"
+    return _REFERENCE_TOTAL_UNITS.get(cost.key)
+
+
+def _reference_total(cost: CostItem, lines: list[ShareLine]) -> str:
+    """`· Gesamtbemessung: 36.500 m²·Tage` — the denominator the engine divided
+    by, so the tenant can check their share (docs/08, BGH minimum #2/#3).
+
+    The **sum** is de-scaled once; de-scaling per line and summing would
+    reintroduce the rounding error the engine avoids (docs/08 → Rounding).
+
+    Figure and unit are joined by a non-breaking space, as ``format_eur`` joins
+    the amount and the euro sign.
+    """
+    unit = _reference_total_unit(cost)
+    if unit is None or not lines:
+        return ""
+    total = _display_weight(cost.key, sum((line.weight for line in lines), Decimal(0)))
+    # <span class="ref-total"> only prevents the figure from being split off its
+    # label when the cost header wraps; it inherits .key-label's tokens.
+    return (
+        ' · <span class="ref-total">Gesamtbemessung: '
+        f"{escape(format_number_de(total))} {escape(unit)}</span>"
+    )
+
+
 def _party(labels: Mapping[PartyKey, str], unit_id: str | None, tenancy_id: str | None) -> str:
     label = labels.get((unit_id, tenancy_id))
     if label is not None:
@@ -83,16 +138,17 @@ def _nk_section(data: StatementData) -> str:
         rows.append(
             f'<tr class="cost-row"><td colspan="3">{escape(cost.label)}'
             f'<span class="key-label">Umlageschlüssel: '
-            f"{escape(_ALLOCATION_KEY_LABELS[cost.key])}</span></td>"
+            f"{escape(_ALLOCATION_KEY_LABELS[cost.key])}"
+            f"{_reference_total(cost, lines)}</span></td>"
             f'<td class="num">{escape(format_eur(cost.amount))}</td></tr>'
         )
-        divisor = _WEIGHT_DISPLAY_DIVISORS.get(cost.key, Decimal(1))
         for line in lines:
             party = _party(data.party_labels, line.unit_id, line.tenancy_id)
             rows.append(
                 "<tr>"
                 f'<td class="indent">{escape(party)}</td>'
-                f'<td class="num">{escape(format_number_de(line.weight / divisor))}</td>'
+                f'<td class="num">'
+                f"{escape(format_number_de(_display_weight(cost.key, line.weight)))}</td>"
                 f"<td></td>"
                 f'<td class="num">{escape(format_eur(line.amount))}</td>'
                 "</tr>"
@@ -221,6 +277,8 @@ def statement_html(data: StatementData) -> str:
   td.indent {{ padding-left: 7mm; }}
   tr.cost-row td {{ background: var(--color-mint); font-weight: 600; }}
   .key-label {{ font-weight: 400; color: var(--color-slate); margin-left: 3mm; font-size: 8.5pt; }}
+  /* The reference total stays one unbroken phrase when the cost header wraps. */
+  .ref-total {{ white-space: nowrap; }}
   tfoot td {{
     font-weight: 700; border-top: 1pt solid var(--color-ink); border-bottom: none;
   }}
