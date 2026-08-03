@@ -162,12 +162,31 @@ real regression by anyone reading the badge.
 So:
 
 ```bash
+git switch main && git pull      # ALWAYS from main — see below
 git switch -c slice/<name>       # BEFORE dispatching spec-scribe
 # ... red tests commit, then the implementation commit(s), on the branch
 scripts/gate.sh full             # green in the main tree, on the branch
 git switch main && git merge --no-ff slice/<name>
 git push                         # main is only ever pushed green
+git push -u origin slice/<name>  # push the slice too: ci.yml's slice/** trigger
+                                 # fires on push, and on nothing else
 ```
+
+**A slice is cut from `main`, never from another slice branch.** Branching
+`slice/b` off `slice/a` because `b` "needs the spec from `a`" couples them
+permanently: merging `b` drags every commit of `a` along with it, whether or not
+`a` was ready, and the two red windows become one. If `b` genuinely needs `a`,
+merge `a` to `main` first and cut `b` from the new tip — that is a two-command
+fix before the fact and a rebase after it. (Cost 03.08: `slice/heating-typography`
+was cut from `slice/heating-disclosure` and had to be re-cut with
+`git rebase --onto main <old-base> slice/heating-typography`.)
+
+⚠️ **`git reset --hard origin/<branch>` when local is ahead silently discards
+those commits.** No prompt, no summary, and the branch afterwards looks
+plausible — it just quietly lost work. It nearly took the handoff gate with it
+on 03.08. Reach for `git status` and `git log origin/<branch>..HEAD` first; if
+that list is non-empty, `reset --hard` is not the command you want. `git pull
+--ff-only` fails loudly instead, which is the point.
 
 The red tests and the implementation land on the **same** branch. Merge to `main` only once
 the gates are green. This does not relax the lane rules — `spec-scribe` still cannot satisfy
