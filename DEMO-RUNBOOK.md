@@ -28,14 +28,23 @@ bun run --filter @lokara/web dev          # web on :3000
 > without `.env`, or the API is started with a different environment, the button returns **403** and
 > the demo dead-ends on an empty dashboard. **Click it once during pre-flight.**
 >
+> **⚠️ Trap 1b — seed once from the CLI *before* you click it.** Run `uv run lokara-seed-demo` in
+> pre-flight. Since migration `0005` the global `person` table is under a deny-by-default policy and
+> is read-only for `lokara_app`, so on a **truly empty** database `POST /demo/load` **500s** — it
+> merges a `Person` as its first statement (`new row violates row-level security policy for table
+> "person"`). The CLI seed runs as the schema owner and is unaffected; afterwards the button merges
+> an existing row, writes nothing, and works. This is the M5-remainder bootstrap hole, not a seed
+> bug — see §2 Screen 1 before changing it back.
+>
 > **⚠️ Trap 2 — never run `bun run build` while the dev server is up.** It clobbers `apps/web/.next`,
 > and pages then render but never hydrate: everything looks fine and nothing responds to clicks. If it
 > happens: stop dev, `rm -rf apps/web/.next`, restart. Don't run production builds on demo day.
 
 **Green-light checklist**
 
+- [ ] `uv run lokara-seed-demo` has run at least once against this database (Trap 1b)
 - [ ] `http://localhost:3000` loads, no console errors
-- [ ] Clicking **Demo-Szenario laden** succeeds (not 403)
+- [ ] Clicking **Demo-Szenario laden** succeeds (not 403, not 500)
 - [ ] **Abrechnung erstellen** shows €1.200,00 reconciling and the PDF downloads
 - [ ] **Beleg-Upload** reads a test file and shows the fields — then click **Verwerfen** (see Trap 3)
 - [ ] Browser zoom at 100%, window large enough for the tables (they're wide)
@@ -50,7 +59,21 @@ but resist wandering: the story is the money screen at the end.
 
 ### Screen 1 — Dashboard (`/a/acc_demo_lokara`)
 
-Start on an **empty** database if you can — the cold-start moment is good.
+Start on a database that has been **seeded once already** — `uv run lokara-seed-demo` during
+pre-flight (see §1). **Do not start from a truly empty database.** Since migration `0005`, `person`
+carries a deny-by-default RLS policy and is read-only for `lokara_app`, so `POST /demo/load` — which
+merges a `Person` as its first statement — **500s** on an empty `person` table. `lokara-seed-demo`
+runs as the schema owner and is unaffected; once the row exists, the button's merge finds it, emits
+no write, and works normally.
+
+> **Do not "fix" this back to an empty database.** The failure is not a bug in the seed — it is the
+> bootstrap hole `docs/02` hands to **M5-remainder** (finding the Person behind a Supabase Auth user
+> before any account context exists needs a `SECURITY DEFINER` path or a dedicated role). Restoring
+> the empty-DB start before that ships just re-breaks the demo. **The cold-start beat is weakened
+> until then**: the button still runs live in front of the room, but the database is not visibly
+> empty beforehand, so lead with the *data*, not with the emptiness. The scripted line below already
+> does that ("One click seeds a realistic building…") — keep it, and don't ad-lib "as you can see,
+> nothing here yet".
 
 - Click **"Demo-Szenario laden"**.
 - **Say:** *"One click seeds a realistic building — Musterstraße 12, three units, real tenancies.
