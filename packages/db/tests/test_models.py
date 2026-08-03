@@ -53,10 +53,16 @@ class TestSchemaShape:
             assert not table.columns["account_id"].nullable, f"{name}.account_id must be NOT NULL"
 
     def test_scoped_list_covers_all_domain_tables(self) -> None:
-        # person = global identity; account = scoped by its own id;
-        # building_assignment = scoped via its membership. Everything else MUST
-        # be in ACCOUNT_SCOPED_TABLES — a new domain table cannot dodge RLS.
-        exempt = {"person", "account", "building_assignment"}
+        # Only two tables are exempt: person = global identity (one human, many
+        # accounts); account = IS the boundary, scoped by its own id. Everything
+        # else MUST be in ACCOUNT_SCOPED_TABLES — a domain table cannot dodge RLS.
+        #
+        # building_assignment was the third entry here while its scope was derived
+        # through membership. Migration 0004 gave it a real, NOT NULL account_id
+        # (docs/02 → "Isolation rule"), which is exactly what this tuple means, so
+        # it is an ordinary account-scoped table now — same as it already is in
+        # scripts/check_rls_coverage.py, whose EXEMPT set no longer lists it.
+        exempt = {"person", "account"}
         assert set(ACCOUNT_SCOPED_TABLES) == EXPECTED_TABLES - exempt
 
     def test_membership_is_unique_per_person_and_account(self) -> None:

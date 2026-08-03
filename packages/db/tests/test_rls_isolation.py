@@ -155,6 +155,7 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
         session.add(
             BuildingAssignment(
                 id=ids.assignment_a,
+                account_id=ids.account_a,
                 membership_id=ids.membership_a,
                 building_id=ids.building_a,
             )
@@ -593,16 +594,19 @@ class TestCrossAccountForeignKeys:
     def test_cross_account_building_assignment_is_rejected(
         self, engines: tuple[Engine, Engine], seed: _Seed, membership_b: str
     ) -> None:
-        """Transitive scope (`building_assignment.building_id` → `building.id`).
-        This table has no `account_id` of its own today: its RLS policy scopes it
-        through `membership`, so a membership in B satisfies `WITH CHECK` and the
-        building link is never checked against an account at all. An assignment is
-        read access — B's employee would be granted A's building.
+        """Formerly transitive scope (`building_assignment.building_id` →
+        `building.id`). Before migration 0004 this table had no `account_id` of its
+        own: its RLS policy scoped it through `membership`, so a membership in B
+        satisfied `WITH CHECK` and the building link was never checked against an
+        account at all. An assignment is read access — B's employee would be
+        granted A's building.
 
-        Written against today's schema on purpose: the fix adds an `account_id`
-        column here (docs/02 → "Isolation rule"), but the row this test writes is
-        valid with or without it, so the test fails for the defect and not for a
-        missing column."""
+        The row below is the leak in its purest form and stays valid on its own
+        terms: `account_id` and `membership_id` both say B, so `WITH CHECK` passes
+        and the composite FK to `membership (id, account_id)` is satisfied. Only
+        `building_id` crosses into A, so the FK on
+        `(building_id, account_id) → building (id, account_id)` is the single
+        constraint that refuses it."""
         _, app = engines
         with (
             pytest.raises(IntegrityError, match="foreign key constraint"),
@@ -611,6 +615,7 @@ class TestCrossAccountForeignKeys:
             session.add(
                 BuildingAssignment(
                     id=seed.leaked_assignment_b,
+                    account_id=seed.account_b,
                     membership_id=membership_b,
                     building_id=seed.building_a,
                 )
