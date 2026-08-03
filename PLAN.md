@@ -28,7 +28,8 @@ Build in this sequence, because it front-loads what an investor reacts to:
 | --- | --- | --- | --- |
 | 1 | **M4** canned doc-extraction | Vision stub already exists (Phase D); mostly review UI. The "AI-assisted UX" pillar. | low |
 | 1.5 | **FK-Isolation slice**: composite FKs on `(id, account_id)` | One migration across most tables. Inside M5 (identity + roles + portals + RLS at once) a failure would be impossible to attribute — and this work needs nothing from M5. | medium |
-| 2 | **M5** identity, roles, RLS, portals | Schema already models it. Unlocks **persona 4** — one login: Vermieter + Mieter + Investor — your strongest differentiator (`docs/06`). | medium |
+| 2 | **M5a** identity schema + isolation (`person` RLS, `landlord`/`self_use_period` coverage, roles/shape) | Pure schema + policy. Split out for the same reason as 1.5: mixing a migration with routers and screens makes a failure impossible to attribute. Closes the last 2 `check_rls_coverage.py` problems. | low |
+| 2.5 | **M5 remainder** roles in the API, portals, URL-carried context, switcher | Unlocks **persona 4** — one login: Vermieter + Mieter + Investor — your strongest differentiator (`docs/06`). | medium |
 | 3 | **M10-slice**: read-only Mieter + StB portals | Completes the persona demo; no tickets/activation yet. | medium |
 | 4 | **M9-slice**: §556 deadline Wächter + reminders | Visible, date-driven, needs no new legal math. | medium |
 | 5 | **M6** bank + Payment Ledger (finAPI stubbed) | Unlocks the two-time-axes story; adds Redis/workers. | high |
@@ -37,8 +38,9 @@ Build in this sequence, because it front-loads what an investor reacts to:
 | 8 | **M10 remainder**: tickets, activation codes, investment cockpit | Broad surface, lower per-hour demo value. | high |
 | 9 | **Phase G** native/Expo | Largest surface, least pitch payoff — "at launch" is a fine answer. | highest |
 
-*The new slice is numbered **1.5** deliberately: the cut list below refers to these indices, so
-renumbering 2–9 would silently repoint it. Milestone identifiers (M4, M5, …) never move.*
+*The FK slice is numbered **1.5**, and M5's split reuses row 2 + a new **2.5**, deliberately: the cut
+list below refers to these indices, so renumbering 3–9 would silently repoint it. Milestone
+identifiers (M4, M5, …) never move — M5a is a slice of M5, not a new milestone.*
 
 ### Hard rules for this run
 
@@ -213,47 +215,79 @@ application does not write.
 rejected by the database; `check_fk_isolation.py` passes over all 15 edges plus the 2 on
 `building_assignment`; `check_rls_coverage.py` reports **no new problem** with `building_assignment`
 in the tenant-table loop instead of `EXEMPT` — it still exits 1 on `landlord` + `self_use_period`,
-which are M5's and cannot close here; the demo path (clean DB → seed → statement → PDF) is
+which are M5a's and cannot close here; the demo path (clean DB → seed → statement → PDF) is
 re-verified.
 
 ---
 
-## M5 — Identity, accounts, roles, RLS (start of full foundation)
+## M5a — Identity schema + isolation (schema and policies only) — execution row 2
+
+> **Split out of M5** (decision, 03.08), for the same reason the FK slice became row 1.5: M5 was
+> identity **and** roles **and** RLS **and** routers **and** portal screens. A migration that changes
+> row visibility, landing in the same milestone as the API and UI that consume it, makes any failure
+> impossible to attribute. M5a is schema + policy, no HTTP surface, no React.
 
 - Three-layer model: **Person / Account / Membership** + `Landlord`, `Renter`, `SelfUsePeriod`
   (`docs/02-data-model.md`). Supabase Auth maps onto `Person`.
-- Roles: OWNER / EMPLOYEE / TAX_ADVISOR on Membership; `AccountShape` SOLO / HAUSVERWALTUNG.
+- Roles OWNER / EMPLOYEE / TAX_ADVISOR on Membership and `AccountShape` SOLO / HAUSVERWALTUNG are
+  **already shipped** — Python enums in `models.py`, PG enum types `role` / `account_shape` created in
+  migration `0001`, `membership.role` and `account.shape` both `NOT NULL` (verified against
+  `pg_enum`, 03.08). Nothing to build; nothing to test that would not pass on arrival.
+- Composite FKs on `(id, account_id)` are **not** part of M5a — they shipped in the FK-Isolation slice
+  (row 1.5); M5a builds on a schema where **tenant-to-tenant** cross-account edges are already
+  impossible.
+- **`landlord` + `self_use_period`** are the last two problems `scripts/check_rls_coverage.py` reports.
+  Both already carry a FORCEd policy from `0001` — the reported failure is check **4**, *not named in
+  the isolation test*, i.e. the policy was never exercised. `self_use_period` is the substantive one:
+  a `SELF_USED` row on a foreign unit silently removes that area from the other account's allocation
+  base.
+- **`person` is the edge the FK slice could not reach — the READ half is M5a's.** `person` is global
+  and carries **no RLS today** (verified live against `0004`: `relrowsecurity = f`, zero policies), so
+  `lokara_app` in any one account reads every human in the database. A composite FK cannot fix it —
+  `person` has no `account_id` to compose with and must not get one, since one human legitimately
+  belongs to many accounts, which is the whole reason Person / Account / Membership are three tables.
+  `scripts/check_fk_isolation.py` is silent here **by construction** (it inspects tenant-to-tenant
+  edges only), so a green gate says nothing about `person`.
+  - The mechanism is **RLS with an `EXISTS` over `membership`**, deny-by-default. Full spec,
+    including the two open sub-decisions and the one way it must **not** be fixed:
+    `docs/02-data-model.md` → "The `person` edge splits: READ is a policy (M5a), WRITE is an ordering
+    rule (M10)".
+  - ⚠️ **Do not relax the policy to make an unscoped login lookup work.** Adding
+    `OR current_setting('app.account_id', true) IS NULL` switches the policy off for every unscoped
+    connection in the system. The bootstrap read gets its own path (row 2.5 names it).
+- **Note for the lead (script is lead-owned, not edited here):** once `person` is under RLS, its entry
+  in `scripts/check_rls_coverage.py` stays in `EXEMPT` — that set is about *tables with no
+  `account_id` column*, which `person` still is — but the module docstring's *"`person` … is
+  deliberately not under RLS"* becomes false and should be reworded.
+
+**DoD:** `packages/db/tests/test_rls_isolation.py` is fully green, specifically:
+`TestLandlordAndSelfUseIsolation` (4 tests: read blocked, non-vacuous own-context control, and
+`WITH CHECK` on both inserts) and `TestGlobalPersonIsolation` (3 tests: `person` ENABLEd **and**
+FORCEd; a caller sees a `person` row only where an account is shared, asserted in **both** directions
+against a control person who holds a Membership in the reading account; and zero rows with no context
+set). `scripts/check_rls_coverage.py` exits **0** — `verify_demo_path.sh` clears its RLS step. The
+demo path (clean DB → seed → statement → PDF) is re-verified.
+
+---
+
+## M5 remainder — roles in the API, portals, context switching — execution row 2.5
+
 - Portals + **URL-carried context** (`/a/{accountId}/…`, `/renter/{tenancyId}/…`); switcher only when
-  a Person holds >1 context. **Postgres RLS** enforced as the isolation backstop.
-- Composite FKs on `(id, account_id)` are **not** part of M5 — they ship in the FK-Isolation slice
-  above, which runs first; M5 builds on a schema where **tenant-to-tenant** cross-account edges are
-  already impossible.
-- **`person` is the edge the FK slice could not reach — M5 owns it.** `person` is global and carries
-  **no RLS today** (verified live against `0004`: `relrowsecurity = f`, zero policies). Two FKs point
-  at it — `membership.person_id` and `renter.person_id` — and an insert of
-  `renter(account_id = mine, person_id = <a person with no relationship to my account>)` is currently
-  **accepted**: the row is correctly isolated, the *edge* is not. Full argument:
-  `docs/02-data-model.md` → "Limit of the rule: an edge to a global table is outside it".
-  - **A composite FK cannot express this.** `person` has no `account_id` to compose with, and it must
-    not get one — one human legitimately belongs to many accounts, which is the whole reason
-    Person / Account / Membership are three tables. The predicate "this person shares an account with
-    me" spans `membership`, and no foreign key can state it.
-  - **So whoever designs M5 must choose a mechanism and name it** — RLS on `person` for the read side,
-    plus one of: a trigger, an app-level invariant with its own test, or routing the write so the case
-    cannot arise. **Do not assume the FK work covers it**; `scripts/check_fk_isolation.py` is silent
-    here by construction (it inspects tenant-to-tenant edges only), so a green gate says nothing about
-    `person_id`. Being unable to express this as a constraint is the finding, not an oversight.
+  a Person holds >1 context. Menu is navigation, not authorization — every request independently
+  verifies the relationship in the URL, then scopes the query.
+- Enforce roles in app logic on top of M5a's RLS backstop: an EMPLOYEE is limited to their
+  `BuildingAssignment`s (zero assignments ⇒ sees nothing); TAX_ADVISOR is read-only.
+- **Name the bootstrap path for `person`.** M5a's policy denies by default, so the login lookup
+  (find the Person behind a Supabase Auth user, before any account context exists) must run through a
+  `SECURITY DEFINER` function or a dedicated role. Pick one and record it in `docs/02`.
+- **Guard the `renter.person_id` ordering rule with an artifact, not a comment.** The column is
+  written by **exactly one** path — M10's activation-code redemption — so at this milestone the
+  provable statement is a **negative**: no API route sets `person_id`, asserted over the OpenAPI paths
+  the same way create-only `meter_reading` asserts the absence of PUT/PATCH.
 
-**DoD:** an EMPLOYEE with no building assignments sees nothing; renter context exposes zero landlord data
-(verified in app logic **and** RLS). Plus:
-
-- **`person` is under RLS:** a caller sees a `person` row only if they share an account with it —
-  `pg_class.relrowsecurity` and `relforcerowsecurity` are true for `person`, and a session scoped to
-  account B reads zero `person` rows that hold no membership in B (with a non-vacuous control: the
-  same query in A's context finds A's people).
-- **An insert of `renter(person_id = <a person with no relationship to this account>)` is rejected** —
-  by the chosen mechanism, proven by a test that performs the write as `lokara_app` under the
-  account's own context and asserts the database (or the single write path) refuses it.
+**DoD:** an EMPLOYEE with no building assignments sees nothing; a renter context exposes zero landlord
+data (verified in app logic **and** RLS); a Person holding two contexts can switch between them by URL
+and each request re-verifies; the OpenAPI surface contains no write path that sets `renter.person_id`.
 
 ---
 
@@ -305,6 +339,18 @@ re-verified.
 
 - Mieterportal (activation codes bound to Tenancy, per-person, single-use), Tickets (Mängel),
   StB guest access, **Investment add-on** (Prüfobjekt → Kanban → becomes Building; 7-KPI cockpit).
+- **M10 owns the write half of the `person` edge** (moved here from M5, 03.08). `renter.person_id`
+  is NULL at creation and is written by **exactly one** path: redeeming an ActivationCode bound to one
+  of that renter's tenancies. This is an **ordering rule plus a null default — no trigger, no CHECK,
+  no foreign key.** The old M5 DoD line *"an insert of `renter(person_id = a person with no
+  relationship to this account)` is rejected"* is **withdrawn**: the person being linked has, by
+  definition, no prior relationship to the account (that is what activation *is*), and enforcing it
+  would break persona 4 — one login as Vermieter in account A **and** Mieter in account B, execution
+  row 2.5's whole differentiator. Reasoning in full: `docs/02-data-model.md` → "The `person` edge
+  splits: READ is a policy (M5a), WRITE is an ordering rule (M10)".
+- Also decide here whether `renter.person_id` may ever be **repointed** once set — silently moving a
+  link from one human to another hands over portal access to a tenancy's statements. Unlike the
+  creation case, immutability-once-set **is** expressible; it is not specified yet, so do not assume it.
 - Native **iOS/Android** at public launch (Expo/RN; Capacitor/PWA fallback if native slips) — shared
   stack with web (Jotai, TanStack Query, RHF+Zod, i18n, theme), `react-native-ease` motion, secure
   storage + Bearer JWT.
@@ -312,7 +358,9 @@ re-verified.
 - **Load test with Locust** (~100 concurrent users) before launch to confirm the API holds.
 
 **DoD:** renter onboards via code and sees only their tenancy; investment cockpit computes KPIs from
-the annuity schedule.
+the annuity schedule. Plus the redemption invariant, proven as a test: a valid single-use code sets
+`renter.person_id`; a spent code, a code bound to another tenancy, and a direct write outside
+redemption all leave it untouched.
 
 ---
 

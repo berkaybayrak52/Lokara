@@ -302,7 +302,7 @@ That accounts for all 33 FKs in the file: 15 tenant-to-tenant + 2 on `building_a
 | Child → parent | Column | Meaning |
 | --- | --- | --- |
 | `membership` → `person` | `person_id` (`NOT NULL`) | which human holds this seat in the account |
-| `renter` → `person` | `person_id` (nullable) | optional portal login for a Mieter (set at M5) |
+| `renter` → `person` | `person_id` (nullable) | optional portal login for a Mieter (column exists; **written only at M10**, by activation-code redemption — see below) |
 
 **Verified live against `0004` (03.08, lead + audit).** `person` carries no RLS at all
 (`pg_class.relrowsecurity = f`, `relforcerowsecurity = f`, zero rows in `pg_policies`), and the write
@@ -331,15 +331,117 @@ owner (breaking every other account's link). Both are worse than the leak.
 - The completeness gate is silent here **by construction** — `check_fk_isolation.py` inspects edges
   between two account-scoped tables, and this is not one. A green gate says nothing about
   `person_id`. Do not read it as coverage.
-- The mechanism is **open**, and picking it belongs to **M5** (`PLAN.md` → M5), which owns identity.
-  The candidates are RLS on `person` (a caller sees a `person` only if they share an account with it)
-  plus one of: a trigger, an app-level invariant with a test, or routing the write so the case cannot
-  arise. **None of them is a foreign key** — the constraint language cannot express "this person
-  shares an account with me", because that predicate spans `membership`. That inexpressibility is the
-  finding.
-- **Before adding the next edge to a global table**, state in this file which of those mechanisms
-  guards it. An edge to a global table with no named mechanism is the defect, whether or not anyone
-  has exploited it yet.
+- **The finding is one sentence but two different problems**, and they do not have the same answer or
+  the same milestone. Read side = "which `person` rows may this caller see". Write side = "who may
+  create a `person ↔ renter` link". See the next subsection — that split is settled (03.08).
+- **Before adding the next edge to a global table**, state in this file which mechanism guards it. An
+  edge to a global table with no named mechanism is the defect, whether or not anyone has exploited
+  it yet.
+
+### The `person` edge splits: READ is a policy (M5a), WRITE is an ordering rule (M10)
+
+> **DECISION (settled, 03.08).** The audit finding above was carried into `PLAN.md` as a single M5 DoD
+> line — *"an insert of `renter(person_id = a person with no relationship to this account)` is
+> rejected"*. That line is **withdrawn**: it is not merely hard to express, it forbids the one write
+> that must be legal. What replaces it is below.
+
+#### Why the write invariant cannot be stated, and must not be
+
+**There is no non-circular witness.** "This person has a relationship to this account" can only be
+witnessed by one of the two edges that point at `person`:
+
+- `membership` — but a renter never holds a Membership. `Role` is staff-only by design (`OWNER` /
+  `EMPLOYEE` / `TAX_ADVISOR`; see "Roles" above: *"`RENTER` is **not** in the Role enum"*). A trigger
+  reading `EXISTS (SELECT 1 FROM membership WHERE person_id = NEW.person_id AND account_id =
+  NEW.account_id)` would reject **every legitimate renter activation** and admit only the one case
+  that deserves a second look — wiring a staff login into a renter row. The predicate is backwards.
+- `renter` itself — which is the row being inserted. `EXISTS (SELECT 1 FROM renter r WHERE
+  r.person_id = NEW.person_id AND r.account_id = NEW.account_id)` can never become true for a first
+  link. It is a bootstrap that never starts.
+
+**And the invariant is wrong on the merits, not just unimplementable.** At the moment of activation the
+person *by definition* has no prior relationship to the account — that is what onboarding is. Worse, the
+product's headline differentiator (`PLAN.md` execution order row 2, `docs/06` persona 4: *one login —
+Vermieter **and** Mieter **and** Investor*) requires exactly the shape the rule would forbid: a human who
+is an `OWNER` in account A being linked as a renter in account B. Enforcing the line as written would
+break persona 4 in the database.
+
+#### What the real invariant is: **consent, not scope**
+
+`renter.person_id` is not a scoping column. This file already says what it is
+(see "Identity" and the `Renter` sketch): *"portal access is just `Renter.personId` pointing at a
+Person"* / *"set = renter can log into the portal"*. Writing it **grants a human login access to a
+tenancy's statements**. The question it raises is *did that human consent, and did the landlord intend
+this human* — an authorization question, which no referential constraint has ever been able to answer.
+
+The model already carries the consent artifact: `ActivationCode` (**tenancy-bound, per-person,
+single-use**; listed under "Other temporal/immutable entities", built at M10 — `PLAN.md` → M10,
+*"Mieterportal (activation codes bound to Tenancy, per-person, single-use)"*). Redeeming a code **is**
+the proof. So:
+
+> **Rule (ordering + default), owned by M10.** `renter.person_id` is **NULL at creation** and is written
+> by **exactly one** code path: redemption of an ActivationCode bound to one of that renter's tenancies.
+> No trigger, no CHECK, no foreign key expresses this, and none should be added.
+
+Its two halves are proven in two different places, because neither is a database property:
+
+| Half | Artifact | Milestone |
+| --- | --- | --- |
+| NULL at creation | `renter.person_id` is nullable with no default — **already true** in `models.py` and in the migrated schema (verified 03.08). Nothing to build. | done |
+| exactly one writer | **No API write path sets `person_id`** — proven the way create-only `meter_reading` is proven, by a test over the OpenAPI paths asserting absence (see "Meters" above). | M5 remainder (owns the API) |
+| the writer is redemption | The redemption test: a valid single-use code sets `person_id`; a spent, foreign, or wrong-tenancy code does not. | M10 |
+
+An ordering rule with no artifact decays into a comment. These three lines are the artifact.
+
+#### The read side **is** expressible, and it is M5a's
+
+Reading a `person` row through `renter` or `membership` is a join to an **already-scoped** table, and
+the row being tested is not the row that creates the relationship — so none of the circularity above
+applies. `person` therefore gets RLS:
+
+> **Policy (M5a).** A caller sees a `person` row only if the row is reachable from the caller's own
+> account. `person` is `ENABLE` + `FORCE ROW LEVEL SECURITY` with a policy whose `USING` is an
+> `EXISTS` over `membership` scoped by `current_setting('app.account_id', true)`.
+
+Three things the implementer must decide or respect, recorded here so the failing test cannot be
+"fixed" the wrong way:
+
+1. **Deny by default is not negotiable.** With no `app.account_id` set, `current_setting(..., true)`
+   is NULL, the `EXISTS` is false, and the caller sees zero `person` rows. Do **not** add
+   `OR current_setting('app.account_id', true) IS NULL` to make a login flow work — that disables the
+   policy for every unscoped connection in the system. **The login/bootstrap lookup** (find the Person
+   for this Supabase Auth user, *before* any account context exists) is a genuinely different read and
+   needs a genuinely different path: a `SECURITY DEFINER` function, a dedicated role, or Supabase
+   Auth's own tables. `TODO(M5-remainder)`: name which.
+2. **OPEN: does a renter link count as "shares an account"?** If the policy's `EXISTS` covers only
+   `membership`, then an account that has linked a renter's portal login cannot read that `person` row
+   back through `Renter.person`. Adding the disjunct
+   `EXISTS (SELECT 1 FROM renter r WHERE r.person_id = person.id AND r.account_id = current_setting('app.account_id', true))`
+   fixes that and widens visibility by exactly the rows the account already controls. **Not decided
+   here** — the M5a test is written so it passes under either choice (its visible person holds a
+   membership; its invisible person holds neither). Decide it when the policy is written, and record
+   the choice in this file.
+3. **The renter portal is not an `app.account_id` context.** Portal URLs are `/renter/{tenancyId}/…`
+   (see "Portals & active context"). Whatever RLS context a renter session runs under is **M10's**
+   problem; `person` RLS at M5a must not be read as having solved it. In particular, giving a renter
+   session `app.account_id = <the landlord's account>` would expose every renter in that account —
+   do not do that.
+
+> **Known, accepted limit:** `person.email` is globally `UNIQUE`, and a unique-violation fires
+> regardless of row visibility. Any account can therefore probe whether an email address is already
+> registered. This is an enumeration oracle inherent to a global identity table (Supabase Auth has the
+> same property) and is **not** closed by the policy above. Recorded, not fixed.
+
+#### `landlord` and `self_use_period`: policies exist, coverage did not
+
+Both tables have been `ENABLE`d, `FORCE`d and policied since migration `0001` (verified against
+`pg_policies`, 03.08 — `landlord_isolation` / `self_use_period_isolation`, both
+`account_id = current_setting('app.account_id', true)` in `USING` **and** `WITH CHECK`). The two
+problems `scripts/check_rls_coverage.py` reports are check **4** only — *not named in
+`packages/db/tests/test_rls_isolation.py`*, i.e. the policy was never exercised. M5a closes that by
+naming them. `self_use_period` is the substantive one: a `SELF_USED` row written onto a foreign unit
+would silently remove that unit's area from the other account's allocation base (see "Eigennutzung"),
+so its `WITH CHECK` is worth a test of its own rather than a mention.
 
 ### Reading the sketches in this file
 
@@ -354,7 +456,7 @@ crosses two account-scoped tables, the composite form above is the binding one.
 **Multi-party leases via `TenancyParty` (M0).** A Tenancy links to its renters through a join entity,
 not a direct FK — several renters can be on one lease (an entry-ticket requirement), and the link
 itself can carry per-party data later. Present from M0, minimal (no portal link yet — that's
-`Renter.person_id`, added at M5).
+`Renter.person_id`; the column exists, but nothing writes it before M10's activation flow).
 
 ```python
 class TenancyParty(Base):
