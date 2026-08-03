@@ -35,9 +35,9 @@ mode this policy exists to prevent.
 It widens visibility by no more than the account already controls: `renter` is account-scoped
 and FORCEd, so the disjunct can only match a `renter` row belonging to the querying account —
 a human that account invited and whose `legal_name` it already stores. It gives a renter
-*session* nothing: the renter portal is not an `app.account_id` context (docs/02, constraint
-3 — that is M10's problem and must not be solved by handing a renter the landlord's account
-id).
+*session* nothing: the renter portal is not an `app.account_id` context (docs/02, item 5 of
+that subsection — that is M10's problem and must not be solved by handing a renter the
+landlord's account id).
 
 Decision 2 — `FOR SELECT`, so INSERT/UPDATE/DELETE have no policy at all
 ------------------------------------------------------------------------
