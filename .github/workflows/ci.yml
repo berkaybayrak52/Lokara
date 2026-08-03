@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, feat/py-migration]
+    # `slice/**` is not optional. AGENTS.md moves the red window of every slice off
+    # `main` onto a slice branch — but a branch CI never sees is merged on local gates
+    # alone, which trades one blind spot for another. Both branches run the full lane.
+    branches: [main, 'slice/**']
   pull_request:
 
 jobs:
