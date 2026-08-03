@@ -24,7 +24,7 @@ Settled BGH case law: a Betriebskostenabrechnung must contain all four.
 | 1 | **Zusammenstellung der Gesamtkosten** (per cost type) | ✅ |
 | 2 | **Angabe + Erläuterung des Verteilerschlüssels** | ✅ — e.g. "Wohnfläche (m²·Tage)" |
 | 3 | **Berechnung des Anteils des Mieters** | ◐ **half** — every figure is on the page, the calculation joining them is not (spelled out below) |
-| 4 | **Abzug der geleisteten Vorauszahlungen** → **Saldo** | ❌ **missing** |
+| 4 | **Abzug der geleisteten Vorauszahlungen** → **Saldo** | ❌ **absent by decision** — blocked on the M6 Payment Ledger, not on rendering ([why](#4-is-blocked-on-the-m6-ledger-by-decision)) |
 
 Markers: **✅** rendered · **◐** partly rendered — what is and is not on the page is named exactly,
 never left to the reader · **❌** absent.
@@ -55,6 +55,49 @@ there:
 **#4 is the point of the document for the tenant:** advances paid − share owed = **Nachzahlung oder
 Guthaben**. The data model already anticipates it (`docs/02`: the statement's Nachzahlung/Guthaben
 becomes a `Payment` in the Ledger); it is simply not on the page.
+
+### #4 is blocked on the M6 ledger, by decision
+
+> **Rechtsstand 08/2026** (recorded 03.08.2026). No legal value enters `packages/rules-store` from
+> this section — it records what may **not** be computed, and why. Standard caveat of this file
+> applies (`docs/07`).
+
+> **DECISION (settled, 03.08).** Minimum #4 stays **❌ by decision, not by oversight**. It is blocked
+> on the **M6 Payment Ledger**, not on rendering, and the contractual-figure shortcut
+> (`advance_payment_cents × months`) is **explicitly rejected**. Nothing renders a Saldo before M6.
+
+**The shortcut computes the wrong quantity.** `advance_payment_cents × months` is the **agreed**
+(Soll) figure. § 556 Abs. 3 BGB and the BGH minimum above require the deduction of the **geleisteten**
+(Ist) Vorauszahlungen — what the renter actually paid. The two diverge exactly where the document
+matters most: a renter in arrears receives a statement **understating their Nachzahlung**. That is a
+wrong document, not a rounding difference, and it is wrong in the landlord's favour on its face while
+being against his interest in substance — settled case law treats Sollvorschüsse silently entered in
+place of the Istvorauszahlungen as costing the landlord the unpaid advances once the § 556 Abs. 3
+Abrechnungsfrist has run.
+
+**The Ist figure is not derivable from anything in the tree today.**
+
+- **There is no `Payment` table.** `docs/02` puts the whole Payment Ledger at **M6**.
+- The `BankGateway` is a **stub** (`packages/adapters/src/lokara_adapters/bank.py`) carrying **one
+  January transaction per renter**, with rent and NK **fused into a single amount** (`117000` =
+  950,00 € Miete + 220,00 € NK) and the split recorded nowhere. Even a real AIS feed gives a
+  transaction, not an allocation; the ledger is what turns one into the other.
+
+**The demo hides both problems — this is the thing that will tempt someone.** All three seeded
+tenancies begin and end on **month boundaries** and none has an advance change, so `monthly × months`
+happens to be exact for 2025 (2.640,00 / 900,00 / 1.320,00 €) and the shortcut would look right on
+the pitch PDF. It is right by coincidence of the fixture. A **mid-month move-out** has no defined
+answer under that formula at all — and the legal question was never "how many months" but "what was
+received".
+
+**Second dependency, same milestone.** Even the Soll side is not currently expressible over time:
+`Tenancy.advance_payment_cents` is a scalar, though § 560 Abs. 4 BGB lets either party adjust the
+advance after every statement — recorded as a named defect in `docs/02` → *"DEFECT:
+`Tenancy.advance_payment_cents` is a scalar on a temporal row"*, with the temporal
+`AdvancePaymentPeriod` that replaces it also owned by M6.
+
+The ledger design is **not** re-derived here; `docs/02` → "Payment Ledger" already sketches it. What
+this section fixes is only that the gap is deliberate and what would close it.
 
 ## Two documents from one calculation ⚠️
 
@@ -288,7 +331,9 @@ suggestion would be invented law, not a convenience.
 ## Open questions the spec must answer
 
 - [ ] Layout of the Mieter-Einzelabrechnung (sections, order, what appears per cost type)
-- [ ] Exact **Vorauszahlung → Saldo** block wording and arithmetic
+- [ ] Exact **Vorauszahlung → Saldo** block wording and arithmetic — **blocked on M6** (the ledger
+      supplies the *geleistete* figure; `advance × months` is rejected, see "#4 is blocked on the M6
+      ledger, by decision")
 - [x] Which reference totals accompany each allocation key → **"Reference totals (Gesamtbemessung)"**
       above. One open sub-question remains: the **unit** of a `CONSUMPTION` total (see the gap there).
 - [ ] Heating: how consumption values and the CO₂ split are presented to the tenant — **including

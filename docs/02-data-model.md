@@ -489,6 +489,62 @@ class TenancyParty(Base):
     __table_args__ = (UniqueConstraint("tenancy_id", "renter_id"), Index("ix_tp_account", "account_id"))
 ```
 
+### DEFECT: `Tenancy.advance_payment_cents` is a scalar on a temporal row (fix owned by M6)
+
+> **Rechtsstand 08/2026** (recorded 03.08.2026). This entry introduces **no legal value** — no rate,
+> ratio or table enters `packages/rules-store` from it. What is dated is the statutory *reason* the
+> field changes mid-lease, quoted below. Standard caveat of `docs/07` applies.
+
+**The rule broken.** This file's opening principle, and CLAUDE.md's "Temporal by default":
+*anything that can change during a period is a row with `valid_from/valid_to`, never a scalar.*
+`Tenancy` obeys it for the lease itself and breaks it for the advance:
+
+```python
+advance_payment_cents: Mapped[int]   # monthly NK Vorauszahlung — models.py, NOT NULL since 0001
+```
+
+The list in the principle (*tenancies, allocation keys, meters, self-use, IBANs…*) does not name the
+Vorauszahlung. It belongs on it.
+
+**Why it changes mid-lease — by statute, not by edge case.** § 560 Abs. 4 BGB: *"Sind
+Betriebskostenvorauszahlungen vereinbart worden, so kann jede Vertragspartei nach einer Abrechnung
+durch Erklärung in Textform eine Anpassung auf eine angemessene Höhe vornehmen."* Either party, after
+every statement, in Textform. A multi-year tenancy whose advance never moves is the exception; the
+scalar models the exception and cannot express the norm. Note the shape this implies for the eventual
+row: an adjustment is a **dated declaration**, so it has a `valid_from` that is a legal fact, not a
+bookkeeping convenience.
+
+**Today there is no way to record a change at all.** The value is written once, at tenancy creation
+(`POST /units/{unit_id}/tenancies`), and read back on tenancy read — **there is no update endpoint on
+`tenancy`, and no PUT/PATCH anywhere on the resource**. So the only expressible workaround is to end
+the tenancy and open a new one with the new amount.
+
+**That workaround produces a visibly wrong document.** The statement keys parties on
+`(unit_id, tenancy_id)` (`packages/pdf` `PartyKey`; `lokara_domain.Segment`/`Occupancy` carry
+`tenancy_id`). One renter, one continuous lease, one advance adjustment would therefore render as
+**two parties with two shares** on a single Abrechnung — two lines where the tenant is one party.
+
+**No gate catches it.** `build_unit_segments` rejects *overlaps*; two consecutive tenancies do not
+overlap, so it returns two clean segments, the money still reconciles to the cent, and every existing
+test stays green. The defect is silent by construction.
+
+**Nothing consumes the field yet** — it is no engine input, no `StatementData` field, and no line in
+the rendered PDF (it is read only for display). That is why this is recorded now: today the fix is a
+schema change; once a caller depends on the scalar, it is a schema change *plus* a caller migration.
+
+**The fix, owned by M6.** Replace the scalar with a temporal child row — working name
+**`AdvancePaymentPeriod`** (`tenancy_id`, `amount_cents`, `valid_from`, `valid_to`), account-scoped
+and composite-FK'd like every other tenant-to-tenant edge. **The actual design is M6's**, not this
+entry's: how an adjustment records its § 560 Abs. 4 declaration, whether adjustments are immutable
+versions, and how the API expresses create/read are open and deliberately not decided here. What is
+decided is that the scalar goes.
+
+**The migration cost, stated honestly.** `advance_payment_cents` is `NOT NULL` (migration `0001`) and
+seeded for all three demo tenancies (220,00 / 150,00 / 110,00 € for units A/B/C), so this is a real
+migration with a backfill: every existing tenancy becomes **one open-ended period**
+(`valid_from = tenancy.valid_from`, `valid_to = NULL`), plus the API create and read shapes and their
+Pydantic schemas. Small today; it does not get smaller.
+
 **Statements are immutable — versioned, never edited (M0 encoding).** A correction creates version
 `n+1`; the prior version is retained. Status is an explicit lifecycle, and one `(building, period,
 version)` is unique.
@@ -595,6 +651,10 @@ rows are shown struck through, never hidden — the audit trail is the feature.
 - `TaxCategoryMapping`: category → Anlage-V line (**year-versioned**) + SKR03 + SKR04; StB-overridable.
 - Export = **pure deterministic function** `f(ledger, mapping, params) → file`. DATEV EXTF is
   Windows-1252, `;`, CRLF (the #1 footgun). Every export archived immutably with hash + timestamp.
+- **The statement's Saldo block (BGH formal minimum #4) waits here.** It needs the *geleistete*
+  Vorauszahlungen — what the renter actually paid — which only this ledger knows, **and** the temporal
+  `AdvancePaymentPeriod` above to say what was owed when. Both are M6; the block is therefore M6, not
+  a rendering task. See `docs/08` → "#4 is blocked on the M6 ledger, by decision".
 
 ## Other temporal/immutable entities (added as their milestones arrive)
 

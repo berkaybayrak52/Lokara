@@ -298,9 +298,21 @@ and each request re-verifies; the OpenAPI surface contains no write path that se
 - **finAPI stubbed** (fake transactions) behind an AIS adapter; fuzzy matching (IBAN/amount/purpose) →
   payment status. Store transactions + IBAN→Renter mappings in our own DB (versioned IBAN history).
 - **Payment Ledger** (append-only, payment-date mandatory) — source of truth for tax.
+- **`AdvancePaymentPeriod`** — the temporal NK-Vorauszahlung (`tenancy_id`, `amount_cents`,
+  `valid_from`, `valid_to`) replacing the `Tenancy.advance_payment_cents` scalar. § 560 Abs. 4 BGB
+  lets either party adjust the advance after every statement, so it changes *during* a tenancy by
+  design. Migration + backfill (every existing tenancy → one open-ended period) + the API
+  create/read shapes. See `docs/02` → "DEFECT: `Tenancy.advance_payment_cents` is a scalar on a
+  temporal row".
+- **BGH formal minimum #4 — the Saldo block on the statement — is M6 work, not earlier.** It needs
+  *both* the ledger (the **geleistete** Vorauszahlungen; `advance × months` is the agreed figure and
+  is rejected — `docs/08` → "#4 is blocked on the M6 ledger, by decision") **and** the temporal
+  advance above. It is not a rendering task and must not be shipped as one.
 - Background jobs (Celery/Arq on Redis): sync, 180-day reconsent cleanup, deadline watchers.
 
-**DoD:** seeded bank transactions auto-match to renters; an NK Nachzahlung becomes a ledger Payment.
+**DoD:** seeded bank transactions auto-match to renters; an NK Nachzahlung becomes a ledger Payment;
+a tenancy's advance can change mid-lease without ending the tenancy, and a statement's Saldo deducts
+the **paid** advances, not the agreed ones.
 
 ---
 
