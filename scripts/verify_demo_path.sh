@@ -61,11 +61,21 @@ docker compose exec -T db pg_isready -U lokara -d lokara >/dev/null 2>&1 \
 step "alembic upgrade head"
 uv run alembic -c packages/db/alembic.ini upgrade head || fail "migrations did not apply"
 
+# Both isolation gates run, and BOTH report, before either aborts the path. Short-circuiting
+# on the first one hid the second: while check_rls_coverage.py is red on landlord +
+# self_use_period, an FK regression could not surface here at all. A gate you cannot reach
+# is not a gate.
+ISOLATION_FAILED=()
+
 step "RLS coverage (CLAUDE.md rule 3 — isolation enforced twice)"
-uv run python scripts/check_rls_coverage.py || fail "a tenant table is not protected by RLS"
+uv run python scripts/check_rls_coverage.py || ISOLATION_FAILED+=("RLS coverage")
 
 step "FK isolation (docs/02 — RLS does not cover referential integrity)"
-uv run python scripts/check_fk_isolation.py || fail "a foreign key can cross accounts"
+uv run python scripts/check_fk_isolation.py || ISOLATION_FAILED+=("FK isolation")
+
+if (( ${#ISOLATION_FAILED[@]} )); then
+  fail "isolation gate(s) red: $(IFS=', '; echo "${ISOLATION_FAILED[*]}") — see above"
+fi
 
 # --- 3. seed -----------------------------------------------------------------------
 step "Seeding the demo scenario (docs/06)"

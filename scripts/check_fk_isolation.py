@@ -38,7 +38,7 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import Connection, create_engine, text
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -111,7 +111,45 @@ FOREIGN_KEYS = text(
 )
 
 
+def _survey_rows(conn: Connection, edges: list[tuple[str, str, str]]) -> list[str]:
+    """`--rows`: find data that already crosses accounts, before the migration runs.
+
+    Migration 0004 adds the composite constraints. On a database that has been writable
+    under 0001-0003 — which every one of them has, since bare FKs are the whole defect —
+    `ALTER TABLE ... ADD CONSTRAINT` fails on the first offending row and says nothing
+    about the other sixteen edges. The operator then re-runs, fixes one, re-runs, and
+    learns the extent of the damage seventeen deploys later.
+
+    This enumerates every violating row across every in-scope edge in one pass, so the
+    deploy decision is made with the whole picture. Run it as the table **owner** on the
+    target database *before* upgrading — under RLS you would only see your own rows,
+    which is precisely the blind spot being probed.
+    """
+    findings: list[str] = []
+    for child, parent, link in edges:
+        sql = text(
+            # Table/column names are interpolated because they come from pg_constraint,
+            # not from user input — there is no parameter form for an identifier.
+            f'SELECT c.id, c.account_id AS child_account, p.account_id AS parent_account '
+            f'FROM "{child}" c JOIN "{parent}" p ON c."{link}" = p.id '
+            f"WHERE c.account_id IS DISTINCT FROM p.account_id "
+            f"LIMIT 20"
+        )
+        try:
+            rows = conn.execute(sql).all()
+        except Exception as exc:  # a shape we cannot probe is still news
+            findings.append(f"{child}.{link} -> {parent}: could not probe ({exc})")
+            continue
+        for row_id, child_acct, parent_acct in rows:
+            findings.append(
+                f"{child}.{link} -> {parent}: row {row_id!r} is in account "
+                f"{child_acct!r} but its parent belongs to {parent_acct!r}"
+            )
+    return findings
+
+
 def main() -> int:
+    rows_mode = "--rows" in sys.argv
     engine = create_engine(_url())
     try:
         with engine.connect() as conn:
@@ -120,6 +158,20 @@ def main() -> int:
                 (r[0], r[1]): (r[2] == "YES") for r in conn.execute(NULLABILITY).all()
             }
             fks = conn.execute(FOREIGN_KEYS).all()
+
+            if rows_mode:
+                edges = [
+                    (
+                        child,
+                        parent,
+                        next(c for c in (child_cols or []) if c != "account_id"),
+                    )
+                    for _n, child, parent, _m, child_cols, _p in fks
+                    if child in scoped
+                    and parent in scoped
+                    and any(c != "account_id" for c in (child_cols or []))
+                ]
+                violations = _survey_rows(conn, edges)
     except Exception as exc:  # any connection failure is the same answer: cannot verify
         print(f"check_fk_isolation: cannot reach the database: {exc}", file=sys.stderr)
         return 2
@@ -131,9 +183,36 @@ def main() -> int:
         )
         return 2
 
+    if rows_mode:
+        if violations:
+            print(
+                f"FK isolation (--rows): {len(violations)} row(s) already cross accounts. "
+                f"Migration 0004 WILL FAIL on this database.\n",
+                file=sys.stderr,
+            )
+            for v in violations:
+                print(f"  {v}", file=sys.stderr)
+            print(
+                "\nQuarantine or repair these rows before upgrading. Each one is a "
+                "reference that should never have been representable.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"FK isolation (--rows): clean — no cross-account rows across {len(edges)} edge(s)")
+        return 0
+
     problems: list[str] = []
     in_scope = 0
     composite = 0
+
+    # A composite FK on a nullable account_id is decorative: MATCH SIMPLE skips the check
+    # entirely when any referencing column is NULL, so the pair stops constraining anything.
+    for table in sorted(scoped):
+        if nullable.get((table, "account_id"), False):
+            problems.append(
+                f"{table}: account_id is NULLABLE — every composite FK on this table is a "
+                f"no-op for rows where it is NULL (MATCH SIMPLE skips them). Make it NOT NULL."
+            )
 
     for name, child, parent, match_type, child_cols, parent_cols in fks:
         # Out of scope unless both ends are account-scoped tables.
