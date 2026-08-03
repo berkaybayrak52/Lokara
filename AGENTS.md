@@ -76,6 +76,21 @@ Re-run the gates in the main tree rather than trusting the agent's output — a 
 green on a stale base. Read the agent's factual claims the same way: counts, survey results
 and "I verified X" are worth re-deriving, and both runs so far have had one number wrong.
 
+**A worktree agent must not run `scripts/verify_demo_path.sh`, and cannot.** The script does
+`docker compose up`, which derives its project name from the working directory — so from a
+worktree it tries to start a *second* stack and dies on
+`Conflict. The container name "/lokara-db" is already in use`, after creating a stray volume
+and network you then have to remove by hand.
+
+Generalise from that: **DB-backed gates run in the main tree only.** The Postgres container is
+a single shared resource, and a worktree agent driving it is driving *your* database —
+`alembic upgrade`/`downgrade`, seeds and probes from a worktree all land in the same instance
+the main tree is using. That is acceptable for `check_rls_coverage.py`, `check_fk_isolation.py`
+and `pytest` (read-mostly, and a migration left at head is the state you want anyway); it is not
+acceptable for anything that recreates the stack. One run cost the demo seed three tables when
+an agent misread a swallowed `downgrade` and ran it twice. So: let agents run the query-level
+gates, and run `verify_demo_path.sh` yourself after the copy-back.
+
 ---
 
 ## The gates
