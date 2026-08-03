@@ -77,13 +77,25 @@ def _scoped_pair(parent: str) -> UniqueConstraint:
     return UniqueConstraint("id", "account_id", name=f"uq_{parent}_id_account")
 
 
-# A note on the `overlaps=` arguments below: a composite FK makes each relationship
-# carry `account_id` into its child alongside the id link, so a child with two
-# scoped parents (meter → building + unit, tenancy_party → tenancy + renter) has two
-# relationships writing that one column. SQLAlchemy warns about the shape because
-# the two writers could disagree — here they cannot: either both parents are in the
-# same account, or the composite FK rejects the row outright. `overlaps=` records
-# that the sharing is intended; it silences nothing else.
+# A note on the explicit `primaryjoin=` / `foreign_keys=` on every relationship that
+# sits on a `_scoped_fk` below. Left to itself, SQLAlchemy reflects the composite
+# constraint and joins on **both** columns, which puts `account_id` into the local
+# column set of every many-to-one relationship: it then belongs to `Meter.building`
+# *and* to `Meter.unit`, and a relationship set to — or left at — `None` synchronises
+# a NULL over it (`UPDATE meter SET account_id=NULL, unit_id=NULL …`). That destroys
+# the tenant key of a building-level Hauptzähler (`meter.unit_id IS NULL`, the § 9
+# HeizkostenV denominator) even when the caller stated `account_id` explicitly.
+#
+# So each relationship names only the id column it owns. `account_id` is written by
+# the caller, never by a relationship — the same explicit-`account_id` rule every
+# other table follows — and the composite FK in `__table_args__` is what makes a
+# wrong value impossible. The constraint is unchanged and still spans both columns;
+# only what the ORM *synchronises* is narrowed.
+#
+# Consequence: `overlaps=` is gone. It was needed because two relationships wrote the
+# one shared `account_id` column; no relationship writes it any more, so nothing
+# overlaps. The collections stay writable (appending sets the id column, as it always
+# did) — they simply no longer supply `account_id`, which is the point.
 
 
 class AccountShape(enum.Enum):
@@ -189,7 +201,9 @@ class Membership(Base):
     person: Mapped["Person"] = relationship(back_populates="memberships")
     account: Mapped["Account"] = relationship(back_populates="memberships")
     building_assignments: Mapped[list["BuildingAssignment"]] = relationship(
-        back_populates="membership"
+        back_populates="membership",
+        primaryjoin="Membership.id == BuildingAssignment.membership_id",
+        foreign_keys="BuildingAssignment.membership_id",
     )  # only meaningful for EMPLOYEE; zero assignments ⇒ sees nothing
 
     __table_args__ = (
@@ -219,7 +233,11 @@ class BuildingAssignment(Base):
     membership_id: Mapped[str]
     building_id: Mapped[str]
 
-    membership: Mapped["Membership"] = relationship(back_populates="building_assignments")
+    membership: Mapped["Membership"] = relationship(
+        back_populates="building_assignments",
+        primaryjoin="Membership.id == BuildingAssignment.membership_id",
+        foreign_keys="BuildingAssignment.membership_id",
+    )
 
     __table_args__ = (
         _scoped_fk("building_assignment", "membership_id", "membership", ondelete="CASCADE"),
@@ -241,7 +259,11 @@ class Landlord(Base):
     address: Mapped[str]
 
     account: Mapped["Account"] = relationship(back_populates="landlords")
-    buildings: Mapped[list["Building"]] = relationship(back_populates="landlord")
+    buildings: Mapped[list["Building"]] = relationship(
+        back_populates="landlord",
+        primaryjoin="Landlord.id == Building.landlord_id",
+        foreign_keys="Building.landlord_id",
+    )
 
     __table_args__ = (
         _scoped_pair("landlord"),
@@ -263,7 +285,11 @@ class Renter(Base):
 
     account: Mapped["Account"] = relationship(back_populates="renters")
     person: Mapped["Person | None"] = relationship(back_populates="renter_links")
-    tenancy_parties: Mapped[list["TenancyParty"]] = relationship(back_populates="renter")
+    tenancy_parties: Mapped[list["TenancyParty"]] = relationship(
+        back_populates="renter",
+        primaryjoin="Renter.id == TenancyParty.renter_id",
+        foreign_keys="TenancyParty.renter_id",
+    )
 
     __table_args__ = (
         _scoped_pair("renter"),
@@ -288,13 +314,35 @@ class Building(Base):
     city: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    landlord: Mapped["Landlord | None"] = relationship(back_populates="buildings")
-    units: Mapped[list["Unit"]] = relationship(back_populates="building")
-    statements: Mapped[list["Statement"]] = relationship(back_populates="building")
-    cost_entries: Mapped[list["CostEntry"]] = relationship(back_populates="building")
-    meters: Mapped[list["Meter"]] = relationship(back_populates="building")
+    landlord: Mapped["Landlord | None"] = relationship(
+        back_populates="buildings",
+        primaryjoin="Landlord.id == Building.landlord_id",
+        foreign_keys="Building.landlord_id",
+    )
+    units: Mapped[list["Unit"]] = relationship(
+        back_populates="building",
+        primaryjoin="Building.id == Unit.building_id",
+        foreign_keys="Unit.building_id",
+    )
+    statements: Mapped[list["Statement"]] = relationship(
+        back_populates="building",
+        primaryjoin="Building.id == Statement.building_id",
+        foreign_keys="Statement.building_id",
+    )
+    cost_entries: Mapped[list["CostEntry"]] = relationship(
+        back_populates="building",
+        primaryjoin="Building.id == CostEntry.building_id",
+        foreign_keys="CostEntry.building_id",
+    )
+    meters: Mapped[list["Meter"]] = relationship(
+        back_populates="building",
+        primaryjoin="Building.id == Meter.building_id",
+        foreign_keys="Meter.building_id",
+    )
     heating_cost_entries: Mapped[list["HeatingCostEntry"]] = relationship(
-        back_populates="building"
+        back_populates="building",
+        primaryjoin="Building.id == HeatingCostEntry.building_id",
+        foreign_keys="HeatingCostEntry.building_id",
     )
 
     __table_args__ = (
@@ -315,10 +363,26 @@ class Unit(Base):
     area_sqm_x100: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    building: Mapped["Building"] = relationship(back_populates="units")
-    tenancies: Mapped[list["Tenancy"]] = relationship(back_populates="unit")
-    self_use_periods: Mapped[list["SelfUsePeriod"]] = relationship(back_populates="unit")
-    meters: Mapped[list["Meter"]] = relationship(back_populates="unit", overlaps="meters")
+    building: Mapped["Building"] = relationship(
+        back_populates="units",
+        primaryjoin="Building.id == Unit.building_id",
+        foreign_keys="Unit.building_id",
+    )
+    tenancies: Mapped[list["Tenancy"]] = relationship(
+        back_populates="unit",
+        primaryjoin="Unit.id == Tenancy.unit_id",
+        foreign_keys="Tenancy.unit_id",
+    )
+    self_use_periods: Mapped[list["SelfUsePeriod"]] = relationship(
+        back_populates="unit",
+        primaryjoin="Unit.id == SelfUsePeriod.unit_id",
+        foreign_keys="SelfUsePeriod.unit_id",
+    )
+    meters: Mapped[list["Meter"]] = relationship(
+        back_populates="unit",
+        primaryjoin="Unit.id == Meter.unit_id",
+        foreign_keys="Meter.unit_id",
+    )
 
     __table_args__ = (
         _scoped_fk("unit", "building_id", "building"),
@@ -343,9 +407,15 @@ class Tenancy(Base):
     advance_payment_cents: Mapped[int]  # monthly NK Vorauszahlung
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    unit: Mapped["Unit"] = relationship(back_populates="tenancies")
+    unit: Mapped["Unit"] = relationship(
+        back_populates="tenancies",
+        primaryjoin="Unit.id == Tenancy.unit_id",
+        foreign_keys="Tenancy.unit_id",
+    )
     parties: Mapped[list["TenancyParty"]] = relationship(
-        back_populates="tenancy", overlaps="tenancy_parties"
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == TenancyParty.tenancy_id",
+        foreign_keys="TenancyParty.tenancy_id",
     )
 
     __table_args__ = (
@@ -365,10 +435,14 @@ class TenancyParty(Base):
     renter_id: Mapped[str]
 
     tenancy: Mapped["Tenancy"] = relationship(
-        back_populates="parties", overlaps="tenancy_parties"
+        back_populates="parties",
+        primaryjoin="Tenancy.id == TenancyParty.tenancy_id",
+        foreign_keys="TenancyParty.tenancy_id",
     )
     renter: Mapped["Renter"] = relationship(
-        back_populates="tenancy_parties", overlaps="parties,tenancy"
+        back_populates="tenancy_parties",
+        primaryjoin="Renter.id == TenancyParty.renter_id",
+        foreign_keys="TenancyParty.renter_id",
     )
 
     __table_args__ = (
@@ -397,7 +471,11 @@ class SelfUsePeriod(Base):
     valid_from: Mapped[date]
     valid_to: Mapped[date | None]
 
-    unit: Mapped["Unit"] = relationship(back_populates="self_use_periods")
+    unit: Mapped["Unit"] = relationship(
+        back_populates="self_use_periods",
+        primaryjoin="Unit.id == SelfUsePeriod.unit_id",
+        foreign_keys="SelfUsePeriod.unit_id",
+    )
 
     __table_args__ = (
         _scoped_fk("self_use_period", "unit_id", "unit"),
@@ -427,7 +505,11 @@ class Statement(Base):
     content_hash: Mapped[str | None]  # SHA-256 of the rendered document, set on finalize (GoBD)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    building: Mapped["Building"] = relationship(back_populates="statements")
+    building: Mapped["Building"] = relationship(
+        back_populates="statements",
+        primaryjoin="Building.id == Statement.building_id",
+        foreign_keys="Statement.building_id",
+    )
 
     __table_args__ = (
         _scoped_fk("statement", "building_id", "building"),
@@ -456,9 +538,15 @@ class CostEntry(Base):
     period_to: Mapped[date]  # exclusive
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    building: Mapped["Building"] = relationship(back_populates="cost_entries")
+    building: Mapped["Building"] = relationship(
+        back_populates="cost_entries",
+        primaryjoin="Building.id == CostEntry.building_id",
+        foreign_keys="CostEntry.building_id",
+    )
     key_assignments: Mapped[list["AllocationKeyAssignment"]] = relationship(
-        back_populates="cost_entry"
+        back_populates="cost_entry",
+        primaryjoin="CostEntry.id == AllocationKeyAssignment.cost_entry_id",
+        foreign_keys="AllocationKeyAssignment.cost_entry_id",
     )
 
     __table_args__ = (
@@ -485,7 +573,11 @@ class AllocationKeyAssignment(Base):
     direct_tenancy_id: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    cost_entry: Mapped["CostEntry"] = relationship(back_populates="key_assignments")
+    cost_entry: Mapped["CostEntry"] = relationship(
+        back_populates="key_assignments",
+        primaryjoin="CostEntry.id == AllocationKeyAssignment.cost_entry_id",
+        foreign_keys="AllocationKeyAssignment.cost_entry_id",
+    )
 
     __table_args__ = (
         _scoped_fk("allocation_key_assignment", "cost_entry_id", "cost_entry"),
@@ -523,11 +615,21 @@ class Meter(Base):
     calibration_valid_until: Mapped[date | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    building: Mapped["Building"] = relationship(back_populates="meters", overlaps="meters")
-    unit: Mapped["Unit | None"] = relationship(
-        back_populates="meters", overlaps="building,meters"
+    building: Mapped["Building"] = relationship(
+        back_populates="meters",
+        primaryjoin="Building.id == Meter.building_id",
+        foreign_keys="Meter.building_id",
     )
-    readings: Mapped[list["MeterReading"]] = relationship(back_populates="meter")
+    unit: Mapped["Unit | None"] = relationship(
+        back_populates="meters",
+        primaryjoin="Unit.id == Meter.unit_id",
+        foreign_keys="Meter.unit_id",
+    )
+    readings: Mapped[list["MeterReading"]] = relationship(
+        back_populates="meter",
+        primaryjoin="Meter.id == MeterReading.meter_id",
+        foreign_keys="MeterReading.meter_id",
+    )
 
     __table_args__ = (
         _scoped_fk("meter", "building_id", "building"),
@@ -565,7 +667,11 @@ class MeterReading(Base):
     note: Mapped[str | None]
     recorded_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    meter: Mapped["Meter"] = relationship(back_populates="readings")
+    meter: Mapped["Meter"] = relationship(
+        back_populates="readings",
+        primaryjoin="Meter.id == MeterReading.meter_id",
+        foreign_keys="MeterReading.meter_id",
+    )
 
     __table_args__ = (
         _scoped_fk("meter_reading", "meter_id", "meter"),
@@ -598,7 +704,11 @@ class HeatingCostEntry(Base):
     co2_cost_cents: Mapped[int | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    building: Mapped["Building"] = relationship(back_populates="heating_cost_entries")
+    building: Mapped["Building"] = relationship(
+        back_populates="heating_cost_entries",
+        primaryjoin="Building.id == HeatingCostEntry.building_id",
+        foreign_keys="HeatingCostEntry.building_id",
+    )
 
     __table_args__ = (
         _scoped_fk("heating_cost_entry", "building_id", "building"),

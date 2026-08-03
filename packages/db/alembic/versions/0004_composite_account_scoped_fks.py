@@ -109,6 +109,22 @@ def upgrade() -> None:
     # would turn the policies off for *everyone* for the length of the transaction,
     # which is a far larger blast radius for the same backfill. FORCE is restored
     # below; a NO FORCE that is never restored is a silent isolation hole.
+    #
+    # What actually guarantees the restoration on the FAILURE path is **transactional
+    # DDL**, not the explicit FORCE statements below: `packages/db/alembic/env.py`
+    # wraps the whole run in `context.begin_transaction()`, and Postgres rolls back
+    # `ALTER TABLE … NO FORCE` with everything else. If any statement after this point
+    # raises, `membership` and `building_assignment` come back FORCEd because the
+    # transaction never committed — the two `FORCE` calls below are what covers the
+    # *success* path only.
+    #
+    # Therefore: do not introduce `op.get_context().autocommit_block()` anywhere in
+    # this migration. It commits the surrounding transaction and runs outside it, so a
+    # later failure would leave the NO FORCE committed — `membership` un-FORCEd, its
+    # owner exempt from RLS, with nothing in the schema recording that it happened.
+    # The same applies to changing `env.py` to autocommit. If a future statement here
+    # genuinely needs autocommit (e.g. CREATE INDEX CONCURRENTLY), it belongs in its
+    # own migration, not inside this NO FORCE window.
     op.execute("ALTER TABLE membership NO FORCE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE building_assignment NO FORCE ROW LEVEL SECURITY")
     op.execute(
