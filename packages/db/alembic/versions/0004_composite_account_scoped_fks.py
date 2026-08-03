@@ -100,10 +100,17 @@ def upgrade() -> None:
     # The backfill reads `membership` and writes `building_assignment`, both of which
     # are FORCEd under RLS — and FORCE binds the table owner too, so on a
     # non-superuser owner (Supabase) the UPDATE would silently match zero rows and
-    # the SET NOT NULL below would fail. Lifting RLS for the length of this
+    # the SET NOT NULL below would fail. Lifting FORCE for the length of this
     # transaction makes the migration behave the same on every deployment.
-    op.execute("ALTER TABLE membership DISABLE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE building_assignment DISABLE ROW LEVEL SECURITY")
+    #
+    # NO FORCE, not DISABLE: this migration runs as the table owner, and NO FORCE is
+    # exactly the switch that exempts the owner while leaving RLS enabled — every
+    # non-owner role (`lokara_app`) stays bound by its policies throughout. DISABLE
+    # would turn the policies off for *everyone* for the length of the transaction,
+    # which is a far larger blast radius for the same backfill. FORCE is restored
+    # below; a NO FORCE that is never restored is a silent isolation hole.
+    op.execute("ALTER TABLE membership NO FORCE ROW LEVEL SECURITY")
+    op.execute("ALTER TABLE building_assignment NO FORCE ROW LEVEL SECURITY")
     op.execute(
         """
         UPDATE building_assignment ba
@@ -112,9 +119,9 @@ def upgrade() -> None:
         WHERE m.id = ba.membership_id
         """
     )
-    op.execute("ALTER TABLE membership ENABLE ROW LEVEL SECURITY")
+    # Restore FORCE. RLS itself was never switched off, so there is nothing to
+    # re-ENABLE — only the owner exemption is taken back.
     op.execute("ALTER TABLE membership FORCE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE building_assignment ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE building_assignment FORCE ROW LEVEL SECURITY")
 
     op.alter_column("building_assignment", "account_id", nullable=False)

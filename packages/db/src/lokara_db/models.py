@@ -33,10 +33,8 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
     func,
-    select,
 )
 from sqlalchemy import Enum as SaEnum
-from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .ids import new_id
@@ -77,31 +75,6 @@ def _scoped_pair(parent: str) -> UniqueConstraint:
     the point: a composite FK can only target a unique constraint, so this is what
     makes the *pair* referenceable by `_scoped_fk`."""
     return UniqueConstraint("id", "account_id", name=f"uq_{parent}_id_account")
-
-
-def _account_id_of_membership(context: DefaultExecutionContext) -> str | None:
-    """Derive `building_assignment.account_id` from the membership it links.
-
-    The column is a denormalisation of `membership.account_id` (decision: docs/02 →
-    "Isolation rule"), and it cannot drift, because the composite FK
-    `(membership_id, account_id) → membership (id, account_id)` means a disagreeing
-    pair does not exist in the parent. Deriving it here means a caller never has to
-    restate what the membership already says.
-
-    The lookup runs on the inserting connection, so it is subject to the same RLS
-    context as the write: a membership the caller cannot see yields NULL, and the
-    NOT NULL column refuses the row. The refusal stays in the database — one
-    enforcement point, not a second one in Python that could disagree with it.
-    """
-    # `current_parameters` rather than `get_current_parameters()`: the latter is
-    # unannotated in SQLAlchemy (mypy --strict rejects the call), and the two differ
-    # only for multi-valued INSERT constructs, which this mapping never emits.
-    parameters = context.current_parameters or {}
-    membership_id = parameters.get("membership_id")
-    account_id: str | None = context.connection.scalar(
-        select(Membership.account_id).where(Membership.id == membership_id)
-    )
-    return account_id
 
 
 # A note on the `overlaps=` arguments below: a composite FK makes each relationship
@@ -242,9 +215,7 @@ class BuildingAssignment(Base):
     __tablename__ = "building_assignment"
 
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
-    account_id: Mapped[str] = mapped_column(
-        ForeignKey("account.id"), default=_account_id_of_membership
-    )
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
     membership_id: Mapped[str]
     building_id: Mapped[str]
 
@@ -637,12 +608,14 @@ class HeatingCostEntry(Base):
 
 
 # Tables scoped by their own account_id column — the Alembic migration enables
-# FORCEd RLS on each of these plus `account` (scoped by its own id) and
-# `building_assignment`. The latter carries account_id too since migration 0004,
-# but stays out of this tuple: it is not domain data, it is the employee↔building
-# grant, and docs/02 keeps it listed as its own case. `person` is global by design.
+# FORCEd RLS on each of these plus `account`, which is scoped by its own id.
+# `building_assignment` joined this tuple with migration 0004: its scope used to be
+# derived through `membership`, and the migration gave it a real NOT NULL account_id
+# (docs/02 → "Isolation rule" → "Consequence for the gates"), which is precisely
+# what membership of this tuple means. `person` is global by design.
 ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "membership",
+    "building_assignment",
     "landlord",
     "renter",
     "building",
