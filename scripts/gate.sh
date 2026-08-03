@@ -44,6 +44,10 @@ case "$LEVEL" in
     run "eslint"            bun run lint
     run "tsc"               bun run typecheck
     run "vitest"            bun run test
+    # Not in `fast`: mid-task stops legitimately predate the handoff. At full/demo you are
+    # closing something, and that is when a stale LAST_OUTPUT.md starts lying to the next
+    # session.
+    run "handoff"           scripts/check_handoff.sh
     ;;
   *)
     echo "usage: scripts/gate.sh [fast|full|demo]" >&2; exit 2 ;;
