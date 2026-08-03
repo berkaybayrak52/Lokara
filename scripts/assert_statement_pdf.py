@@ -46,6 +46,13 @@ MUST_APPEAR: dict[str, str] = {
     # --- the de-scaling canaries: these are the *human* figures, not the scaled ints
     "18.250": "docs/03: Bemessung for Unit A in m2*Tage (NOT 1.825.000)",
     "36.500": "docs/03: total Bemessung in m2*Tage (NOT 3.650.000)",
+    # The bare figures above would survive a regression that dropped or changed the unit,
+    # and the unit is where a de-scaling error actually reads as wrong to a human. Written
+    # with a PLAIN space: the document joins figure and unit with U+00A0, so the direct
+    # `in text` check fails and only the whitespace-stripped `flat` path matches. Do not
+    # extend this leftward to include "Wohnflaeche" — PDF extraction renders the ligature
+    # as U+FB02 and the golden then fails both paths.
+    "Gesamtbemessung: 36.500 m²·Tage": "docs/08: the denominator BGH minimum #3 needs",
 }
 
 MUST_NOT_APPEAR: dict[str, str] = {
