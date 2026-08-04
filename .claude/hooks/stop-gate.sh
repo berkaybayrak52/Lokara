@@ -12,7 +12,12 @@
 # Set LOKARA_GATE=off for exploratory sessions where you want no gate at all.
 
 set -uo pipefail
-cd "$CLAUDE_PROJECT_DIR" 2>/dev/null || cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Grade the tree the agent is actually working in, not the one the session started in.
+# $CLAUDE_PROJECT_DIR points at the main checkout, so inside a worktree this graded the
+# wrong files -- an agent that had done everything right ended on a red gate for work that
+# was not in the directory under test. Cost two sessions. The cwd toplevel is the tree
+# whose changes are being graded; CLAUDE_PROJECT_DIR is only the fallback.
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || cd "${CLAUDE_PROJECT_DIR:-$PWD}"
 
 level="${LOKARA_GATE:-fast}"
 [[ "$level" == "off" ]] && exit 0
