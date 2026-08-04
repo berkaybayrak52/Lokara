@@ -615,6 +615,30 @@ Berechnungsgrundlagen: CO₂-Emissionen des Gebäudes 2.000 kg · beheizte Fläc
 - `total_co2_kg`, `co2_cost` and `heated_area_sqm` are engine inputs today and reach `Co2Result`
   nowhere; they must be carried on the result, for the same drift reason as everything else here.
 
+**`kg CO₂/m²/Jahr` is a false label on any period shorter than a year.** `docs/03` §*"The Stufenmodell
+is a per-year table"* follows § 5 Abs. 1 S. 4 CO2KostAufG literally: the **Anlage table is shortened**
+by the period factor and the emission figure is **not** extrapolated. So
+`Co2Result.intensity_kg_per_sqm` is the emission **of the Abrechnungszeitraum** per m², and for an
+interim period both the unit above (`statement.py`, the `co2` block) and the Einstufung band in the
+Berechnungsgrundlagen line above print a per-year claim for a per-period number — the tenant reads
+*19,5 kg CO₂/m²/Jahr · Einstufung: 17 bis unter 22* where the applied Einstufung was *37 bis unter 42*.
+Required form once a short period can reach the PDF:
+
+```
+Emissionsintensität 19,5 kg CO₂/m² im Abrechnungszeitraum (181 von 365 Tagen)
+Einstufung: 18,3 bis unter 20,8 kg CO₂/m² — Werte der Anlage anteilig gekürzt (§ 5 Abs. 1 Satz 4 CO2KostAufG)
+```
+
+- **Nothing on the demo path changes.** Its period is the full calendar year 2025, factor exactly 1;
+  the label, the band and every figure `scripts/assert_statement_pdf.py` pins stay as they are. The
+  full-year wording above this bullet is the one that renders, and it is correct — this is the
+  short-period branch only.
+- The renderer must **not** recompute the factor from the period: the engine carries it
+  (`Co2Result.period_factor`, per `docs/03`), the same way the ratio and the Rechtsstand are carried.
+  A second implementation of a legal rule in the template layer is how the two drift apart.
+- Scope: a rendering slice of its own, after the engine carries the factor. Listed here so the defect
+  is on the record and not rediscovered from a tenant's complaint.
+
 ### 6 — M2: every `Rechtsstand` names its statute
 
 **Presentation only. Nothing in `packages/rules-store` changes and no resolution changes.**

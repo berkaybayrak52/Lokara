@@ -89,11 +89,133 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - Missing/incorrect CO₂ split = tenant's **3% reduction right** (§7 Abs. 4 CO2KostAufG) — so this is
   correctness-critical, not cosmetic.
 
+#### The Stufenmodell is a **per-year** table — a short Abrechnungszeitraum shortens the table
+
+> **Rechtsstand 01/2023** (CO2KostAufG of 05.12.2022, in force 01.01.2023; text checked against
+> gesetze-im-internet.de on 04.08.2026). Rule owner: `co2kostaufg.stufenmodell` in
+> `packages/rules-store`. The engine hardcodes no bound and no divisor — both arrive as parameters.
+
+**Inputs**
+
+| Input | Where from | Note |
+| --- | --- | --- |
+| `total_co2_kg` | `Co2Input` | Emissions **of the Abrechnungszeitraum**, already converted to it per § 5 Abs. 1 S. 5 (see below) |
+| `heated_area_sqm` | Σ unit `area_sqm_x100` / 100 | Wohnfläche of the supplied units |
+| `co2_cost` | `Co2Input` | The CO₂-price portion of the heating cost, in cents |
+| `table` | rules store, `Co2Table` | Anlage CO2KostAufG, bounds in **kg CO₂/m²/a** |
+| **`billing_period`** | `HeatingInput.billing_period` | **the input this section adds** — the split is not period-free |
+
+**Formula**
+
+```
+intensity      = total_co2_kg / heated_area_sqm      # over the Abrechnungszeitraum, NOT per year
+period_factor  = days(billing_period) / days(reference year)     # ≤ 1, see convention below
+bound_i(scaled) = bound_i × period_factor            # every finite bound of the Anlage table
+step           = first step with intensity < bound_i(scaled)   (open-ended step: no bound, no scaling)
+landlord_share = step.landlord_share_percent
+landlord, renter = largest_remainder(co2_cost, [share, 100 − share])
+```
+
+For a full-year period `period_factor == 1` and every number is exactly what it was before — the
+factor is a no-op on the demo path.
+
+**Legal basis — the statute is _not_ silent here.** § 5 Abs. 1 S. 4 CO2KostAufG, verbatim:
+
+> *"Ist ein Abrechnungszeitraum von unter einem Jahr vereinbart, so sind die Werte der
+> Einstufungstabelle in der Anlage anteilig zu kürzen."*
+
+and the Anlage's own column header — *"Kohlendioxidausstoß des vermieteten Gebäudes oder der Wohnung
+pro Quadratmeter Wohnfläche **und Jahr**"*, unit **`kg CO2/m2/a`** — is what makes the factor
+necessary at all. Comparing a six-month emission figure against a per-year bound puts every short
+period one or more Stufen too low, i.e. the **landlord's** share too small and the **renter's** too
+large, on a document the renter is entitled to rely on. Exposure: § 7 Abs. 4 CO2KostAufG, the 3 %
+Kürzungsrecht (§ 7 Abs. 3 requires the *Einstufung* and the *Berechnungsgrundlagen* to be shown, and a
+wrong Einstufung is not a shown one).
+
+**The statute shortens the table; it does not extrapolate the consumption.** The two are
+arithmetically identical for step *selection* (`i < b·f` ⇔ `i/f < b`) but not for what is **disclosed**,
+and the disclosed value is what § 7 Abs. 3 is about. We follow the statute's own mechanic:
+
+- `Co2Result.intensity_kg_per_sqm` stays the **period** figure (kg CO₂/m² *over the
+  Abrechnungszeitraum*). It is **not** annualised. No extrapolated emission figure is ever computed —
+  extrapolating consumption is precisely what the legislator did not write.
+- Therefore, for a period shorter than a year, the PDF label `kg CO₂/m²/Jahr` and the printed
+  Einstufung band become **wrong**, because they claim a per-year quantity for a period figure. That is
+  a rendering defect, tracked in `docs/08` § *"§ 7 Abs. 3 CO2KostAufG"*; it does not touch the demo,
+  whose period is a full calendar year. The engine must therefore also expose the applied
+  `period_factor` on `Co2Result`, or the PDF cannot print the gekürzt band without recomputing law.
+
+**Convention (statute silent) — the divisor.** § 5 Abs. 1 S. 4 says *anteilig* and defines neither the
+numerator nor the denominator; no BMWSB/BMWK Arbeitshilfe or Aufteilungsrechner documentation found
+(04.08.2026) states one either. Commentary only ever gives the clean case ("bei einem halben Jahr
+beginnt die oberste Stufe schon bei 26 statt 52 kg/m²"). Chosen convention, **labelled as a convention,
+not as statute** — the same status as the VDI Gradtagszahlen table in `packages/rules-store`:
+
+```
+period_factor = min(1, days(billing_period) / days(reference year))
+reference year = [valid_from, same calendar date one year later)   # 366 if it spans a 29 Feb
+                                                                   # 29 Feb start → 1 Mar
+```
+
+- **Days, not months.** The engine is day-based everywhere else (§§ 7/8 base costs are m²·days), and a
+  day count needs no calendar-alignment assumption. The alternative reading, *Monate/12*, differs
+  slightly — a Jan–Jul period is `181/365 = 0,4959` here vs `0,5000` there — and can in principle move
+  a band at the margin. **Risk accepted and recorded here**; it is the kind of point a Mietrechtler
+  should confirm before production.
+- **Anchoring the reference year on `valid_from`** makes any full 12-month period, leap or not, come out
+  at exactly `1` — a 2024-01-01…2025-01-01 period is 366/366, not 366/365. Without the anchor a leap
+  full year would be *lengthened* past the table, which § 5 Abs. 1 S. 4 does not authorise.
+- **Rump periods vs *vereinbarte* periods.** S. 4 literally addresses a period *"von unter einem Jahr
+  **vereinbart**"*. Our short periods usually arise as a one-off Rumpfperiode (first/last year of a
+  tenancy, a changed Abrechnungszeitraum) rather than an agreed short cycle. Applying S. 4 to those as
+  well is an interpretation; it is the tenant-protective one and the only one that does not
+  systematically under-classify buildings, so we take it. Named here so it is a decision, not an
+  accident.
+
+**Edge cases**
+
+| Case | Behaviour | Why |
+| --- | --- | --- |
+| Period = exactly one year (365 or 366 days) | `period_factor = 1`, table unscaled | S. 4 applies only *unter einem Jahr*; demo path unchanged |
+| Period < one year | table bounds × factor | § 5 Abs. 1 S. 4 |
+| Period **> 12 months** with a CO₂ split | **refuse** — `HeatingInputError`, explained in German | see below |
+| Open-ended top step (`max_intensity_exclusive is None`) | never scaled | it has no bound to shorten; a building already at 95 % stays at 95 % |
+| `heated_area_sqm <= 0` | `HeatingInputError` (existing) | no denominator |
+| Emissions invoiced over a different period than the agreed one | **input-side**, not the engine's: § 5 Abs. 1 S. 5 requires the invoiced Brennstoffemissionen to be *umgerechnet* to the agreed period **before** they arrive as `total_co2_kg`. The engine trusts its input and must not re-derive it | § 5 Abs. 1 S. 5 |
+
+**Why a period > 12 months is refused rather than scaled.** S. 4 shortens the table for periods *under*
+a year and says nothing about longer ones, and for Wohnraum a longer Abrechnungszeitraum is not lawful
+in the first place (§ 556 Abs. 3 S. 1 BGB — *jährlich* abzurechnen). Extending the factor upward would
+enlarge the bounds, push the building into a **lower** Stufe and shift cost onto the renter — inventing
+a legal number in the one direction the 3 % Kürzungsrecht punishes. Leaving the factor at 1 instead
+over-classifies and overcharges the landlord. Neither is defensible, so the engine refuses the CO₂
+split for such a period and says so in German; the Heizkosten themselves still compute, exactly as with
+a missing meter (`docs/03` § 9a rule above). A conscious decision, open to being overruled by the lead.
+
+**Known gap, deliberately not implemented here.** § 5 Abs. 1 S. 3 requires the specific emission value
+to be **rounded to one decimal place** (*"auf die erste Nachkommastelle zu runden"*) — the engine
+currently classifies the unrounded `Decimal`. At a bound (e.g. 11,96 → 12,0) rounding *before*
+classification changes the Stufe, so it needs its own spec and its own fixture and is **not** folded
+into this one. Recorded, not guessed.
+
+**Uncertain / would resolve it:** whether *anteilig* is meant day-exact or month-exact, and whether S. 4
+applies to a Rumpfperiode that was never *vereinbart*. A published BMWSB Arbeitshilfe, the source of the
+official Aufteilungsrechner, or a Mietrechtler's sign-off would resolve both. Until then the two
+conventions above stand as conventions.
+
 ### Heating/CO₂ golden fixtures
 
 - A central-heating building with consumption meters → base/consumption split + WW separation.
 - The same building → CO₂ 10-step selection + landlord/renter split, with `Rechtsstand MM/JJJJ`.
 - A mid-period renter change apportioned by degree-days.
+- **Interim period (< 1 year) → the Anlage table is shortened** (`test_co2_period_factor.py`): 1.950 kg
+  over 100 m² in a 181-day period is **19,5 kg/m²**, which reads as Stufe *17 – < 22* (Vermieter 20 %)
+  against the unscaled table and as Stufe *37 – < 42* (Vermieter 60 %) against the table shortened by
+  `181/365` — 18,35 … 20,83. Both readings sit clear of their bounds, so the fixture pins a band change
+  and not a rounding accident: **60,00 €/240,00 € wrong vs 180,00 €/120,00 € right** on 300,00 € CO₂
+  cost. Companion cases in the same file: a full year and a full leap year (factor exactly 1, nothing
+  moves), a building already in the open-ended top step (95 % either way — no over-correction), and a
+  > 12-month period, which is refused.
 
 ---
 
