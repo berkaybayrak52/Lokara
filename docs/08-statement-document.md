@@ -684,6 +684,12 @@ Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 01/1981 ·
 - Mechanically: `StatementData.rechtsstaende` becomes label+stamp pairs instead of bare stamps, and the
   caller (`demo.py`, later the API) builds them from the `ResolvedRule`s it already holds. No engine
   change, no rules change — which is why this ships on its own.
+- **This supersedes the bare `Rechtsstand MM/JJJJ` form on the page.** Once item 6 ships, the raw string
+  renders in exactly one place: the CO₂ block of item 5, where the citation already stands beside it.
+  Any check that looks for a bare stamp in the footer — or page-wide, which the footer used to satisfy —
+  is asserting the defect and is removed, not restated. The stamps are covered footer-side by
+  `packages/pdf/tests/test_statement_rechtsstand_labels.py`, block-side by
+  `packages/pdf/tests/test_statement_template.py`, both resolved from `packages/rules-store`.
 
 ### The carried-intermediates contract (slice 3)
 
@@ -814,37 +820,56 @@ band_min_inclusive = previous_step.max_intensity_exclusive × period_factor   # 
   belongs to this picture rather than beside it, because the short-period copy in item 5 needs the
   factor **and** the two day counts together.
 
-### Typographic floor for legally required disclosure
+### Which text on the statement is legally required
 
-Measured on the current page (WCAG ratios against the `docs/05` tokens): the Umlageschlüssel +
-Gesamtbemessung line (`.key-label`) is **8,5 pt Slate on Mint = 4,81:1** — AA with 0,31 to spare, and
-the **smallest, lowest-contrast text on the page**. Legally required content must not be the hardest
-thing to read; a disclosure the tenant squints at is a disclosure in form only. Contrast of the
-available token pairs:
+**This section names the text and assigns each carrier a tier. It sets no thresholds.** The
+typographic rules — the tier-1 pair (`legal-t1-size`, `legal-t1-contrast`) and the tier-2 pair
+(`legal-t2-contrast`, `legal-t2-scale`, **no size floor**) — live in `docs/05-design-system.md`
+§*Legally required disclosure — two tiers, split by what the content is for*, together with the
+measured ratios of the brand pairs and the reason there is no absolute pt floor. A design-system rule
+with two homes is a rule waiting to disagree with itself, so no number is repeated here.
 
-| Pair | Ratio | Use |
-| --- | --- | --- |
-| Petrol Ink on Mint | **13,91** | legally required text on a tinted surface — default |
-| Forest Deep on Mint | **10,01** | legally required text, secondary emphasis |
-| Petrol Ink on Paper | **15,72** | legally required text on the page ground |
-| Slate on Paper | **5,44** | non-legal secondary framing text only |
-| Slate on Mint | **4,81** | ⚠️ **not permitted** for legally required text |
-| Lokara Grün on Mint | 5,89 | decorative per `docs/05` — never body text |
+On this document, the following is legally required and falls under those rules. **Every carrier is
+in exactly one tier**; adding a carrier without a tier is a defect, and the test in this section
+fails on it.
 
-The floor, for everything this file marks as legally required (the four BGH minimums, every disclosure
-in this section, the `Rechtsstand` footer):
+| Content | Carrier | Tier | Basis |
+| --- | --- | --- | --- |
+| The four BGH formal minimums — Gesamtkosten, Umlageschlüssel, Anteil des Mieters, Vorauszahlungen | the cost rows, `.key-label`, the `tfoot` totals | **1** | BGH-Mindestangaben, § 259 BGB |
+| Umlageschlüssel + Gesamtbemessung | `.key-label` | **1** | minimum #2, and the denominator #3 rests on |
+| The heating footer's reconciliation sentence | `tfoot .foot-note` | **1** | HeizkostenV disclosure; it reconciles the Gesamtkosten a reader adds up |
+| § 9a estimation / fallback disclosure | `.note` | **1** | § 9a HeizkostenV — see *Why `.note` is tier 1* below |
+| The CO₂ split and its Berechnungsgrundlagen | `.co2` | **1** | § 7 Abs. 3 CO2KostAufG — the reconciliation `240,00 + 60,00 = 300,00` |
+| `Rechtsstand` stamps + the "keine Rechts- oder Steuerberatung" disclaimer | `footer` | **2** | `CLAUDE.md` cross-cutting rules — **not** a BGH minimum, our own rule |
 
-1. **Size ≥ 9 pt**, and never smaller than the smallest non-legal text on the page. The existing 8,5 pt
-   `.key-label` and `tfoot .foot-note` come up to 9 pt with it — same class, same rule.
-2. **Contrast ≥ 7:1** on its own background → Petrol Ink or Forest Deep. Slate is retired from
-   legally required text; it keeps its role for non-legal secondary text on Paper.
-3. **Line-height ≥ 1,4**, weight ≥ 400, no all-caps and no negative letter-spacing at these sizes.
-4. Numeric columns keep `font-variant-numeric: tabular-nums` so figures align for comparison.
-5. Tokens only (`docs/05`) — no ad-hoc hex, and no new colour is needed for any of the above.
+Everything else on the page — the Vermieter/period meta line, column headings, decorative framing — is
+body or secondary copy and keeps the ordinary **AA** bar from `docs/05`.
 
-Checkable in `packages/pdf/tests/` against `statement_html()`: the classes carrying legal disclosure
-are enumerated in the test, and each must declare a size ≥ 9 pt and an ink/forest colour token. This is
-a stylesheet-level assertion, deliberately not a pixel one.
+**Why `.note` is tier 1.** It is emitted in exactly two places (`packages/pdf/src/lokara_pdf/statement.py`,
+the `notes` list) and both are § 9a HeizkostenV notices: *"Fehlende Ablesungen wurden gemäß § 9a
+HeizkostenV geschätzt …"* and *"Mehr als 25 % der Fläche ohne Ablesung — der Verbrauchsanteil wurde
+nach Wohnfläche umgelegt (§ 9a Abs. 2 HeizkostenV)."* Both change **how the renter must read their own
+Bemessung**. The first says the figure in the Verbrauch column is an **estimate, not a reading**. The
+second says the **consumption key was replaced by the area key** — i.e. the Umlageschlüssel printed in
+`.key-label` is *not* the one that was applied. A renter cannot verify their share without either
+fact, which puts both squarely inside BGH minimums #2 and #3. It is not incidental copy, and its
+9,0 pt setting is a defect, not a deliberate de-emphasis.
+
+**The state of the page today** (this is the defect, not the rule): `.key-label` is **8,5 pt Slate on
+Mint = 4,81:1** — below body copy (10 pt) and AA-by-0,31 where tier 1 owes AAA; `tfoot .foot-note` is
+8,5 pt Slate on Paper and `.note` 9,0 pt Slate on Paper, both below body copy and both 5,44:1 against
+a 7:1 bar. Slate leaves tier 1 entirely; Petrol Ink and Forest Deep are the qualifying inks. `.co2`
+declares neither `font-size` nor `color`, so it inherits 10 pt Petrol Ink on Mint (13,91:1) and is
+already compliant. **`footer` is now compliant**: at 8,0 pt Slate on Paper it is 5,44:1 ≥ the tier-2
+4,5:1 bar, and tier 2 has no size floor — the 8,0 pt that read as a violation under the old flat tier
+is the correct setting for provenance text.
+
+Checkable in `packages/pdf/tests/test_statement_legal_typography.py` against `statement_html()`: the
+carriers above are enumerated per tier, tier 1 is compared against the stylesheet's own body
+font-size **and** the AAA floor, tier 2 against the AA floor **only** — the tier-2 code path has no
+size branch at all, by construction. A further test asserts the two tiers partition the carrier list,
+so a newly added carrier cannot fall through untested. A stylesheet-level assertion, deliberately not
+a pixel one — rendering and measuring glyphs would test Chromium.
 
 ### Gaps — not invented here
 
@@ -910,7 +935,7 @@ needed for the six items above, the fifth unblocks the one column they cannot sh
 | # | Lands | Lane | Independent? |
 | --- | --- | --- | --- |
 | 1 | `Rechtsstand` labels (item 6) | `app-implementer` (`packages/pdf/src`) | yes |
-| 2 | Typographic floor for legal disclosure | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
+| 2 | Tier-1 disclosure meets `legal-t1-size` + `legal-t1-contrast`; tier 2 stays as it is (`docs/05`) | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
 | 3 | `HeatingResult` carries its intermediates (+ `Co2Result` Berechnungsgrundlagen, + § 9b in the degree-day `source`) | `engine-implementer` (`packages/{heating-engine,rules-store}/src`) | yes |
 | 4 | Blocks A / B / C render (items 1–5) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
 | 5 | `MeasurementUnit` carried meter → statement; `Verbrauch Heizung` Bemessung column; NK `CONSUMPTION` reference total | `engine-implementer` then `app-implementer` | yes — strictly before the heating-consumption column |

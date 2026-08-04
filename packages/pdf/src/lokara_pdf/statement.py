@@ -57,8 +57,12 @@ DISCLAIMER = (
 class StatementData:
     """Everything the template needs, already computed and labeled.
 
-    ``rechtsstaende`` are the stamps of every rule version used (deduped,
-    display order) — the caller resolves rules, so only the caller knows them.
+    ``rechtsstaende`` is one entry per rule version used (deduped, display
+    order), each naming the rule *and* carrying its date —
+    ``§ 7 Abs. 1 HeizkostenV 03/1989``. The caller resolves the rules, so only
+    the caller knows them; ``rechtsstand_entry`` composes an entry from a
+    ``ResolvedRule``. A bare date discloses nothing (docs/08 item 6), so the
+    footer prints the word ``Rechtsstand`` once and every date after it is named.
     """
 
     landlord_name: str
@@ -296,7 +300,14 @@ def statement_html(data: StatementData) -> str:
   td.num, th.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
   td.indent {{ padding-left: 7mm; }}
   tr.cost-row td {{ background: var(--color-mint); font-weight: 600; }}
-  .key-label {{ font-weight: 400; color: var(--color-slate); margin-left: 3mm; font-size: 8.5pt; }}
+  /* Tier 1 (docs/05, docs/08): carries BGH minimum #2 and the denominator #3
+     rests on. No font-size — it inherits body copy, so `legal-t1-size` holds
+     even if body copy moves. Forest Deep on the cost row's Mint is 10,01:1
+     (>= 7:1, SC 1.4.6); weight 400 against the row's 600 keeps the label
+     secondary without buying that quietness with contrast.
+     Comments here render into the document's <style>; keep domain vocabulary
+     out of them so text-occurrence gates count the page, not the stylesheet. */
+  .key-label {{ font-weight: 400; color: var(--color-forest); margin-left: 3mm; }}
   /* The reference total stays one unbroken phrase when the cost header wraps. */
   .ref-total {{ white-space: nowrap; }}
   tfoot td {{
@@ -304,17 +315,23 @@ def statement_html(data: StatementData) -> str:
     /* Keeps the amount on the label's line when the cell has a second line. */
     vertical-align: top;
   }}
-  /* Second line of a footer cell: the reconciliation sentence. Quieter than the
-     label but full-width and readable — slate on paper is 5.5:1 (WCAG AA). */
+  /* Second line of a footer cell: the reconciliation sentence. Tier 1 — it
+     reconciles the total a reader adds up. Inherits body copy (no font-size);
+     Forest Deep on Paper is 11,32:1 (>= 7:1, SC 1.4.6). Quieter than the footer
+     label through weight, not through size or ink. */
   tfoot .foot-note {{
-    display: block; font-weight: 400; color: var(--color-slate);
-    font-size: 8.5pt; line-height: 1.4; margin-top: 1.2mm;
+    display: block; font-weight: 400; color: var(--color-forest);
+    line-height: 1.4; margin-top: 1.2mm;
   }}
   .co2 {{
     background: var(--color-mint); border-radius: 8px; padding: 4mm;
     margin-top: 4mm; line-height: 1.5;
   }}
-  .note {{ color: var(--color-slate); font-size: 9pt; }}
+  /* Estimation / fallback disclosure. Tier 1: it changes how the printed
+     allocation key must be read, so it inherits body copy and takes Forest Deep
+     on Paper (11,32:1). line-height 1.5 is the hygiene both tiers owe (>= 1,4);
+     it is running prose and is now set at body size. */
+  .note {{ color: var(--color-forest); line-height: 1.5; }}
   footer {{
     color: var(--color-slate); font-size: 8pt; border-top: 0.5pt solid var(--color-slate);
     padding-top: 3mm; margin-top: 10mm; line-height: 1.6;
@@ -331,7 +348,7 @@ def statement_html(data: StatementData) -> str:
   {_nk_section(data)}
   {_heating_section(data)}
   <footer>
-    {rechtsstaende} · Erstellt mit Lokara.<br />
+    Rechtsstand: {rechtsstaende} · Erstellt mit Lokara.<br />
     {escape(DISCLAIMER)}
   </footer>
 </body>

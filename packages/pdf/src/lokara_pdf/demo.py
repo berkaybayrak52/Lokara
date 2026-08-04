@@ -31,6 +31,7 @@ from lokara_rules_store import (
     get_rule,
 )
 
+from .rechtsstand import rechtsstand_entry
 from .render import render_html_to_pdf
 from .statement import PartyKey, StatementData, statement_html
 
@@ -78,7 +79,8 @@ def compute_nk() -> NkResult:
 
 def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
     """Runs the heating fixture with rules resolved from the store; returns the
-    result plus the deduped Rechtsstand stamps of every rule version used."""
+    result plus one deduped Rechtsstand entry per rule version used — each
+    naming its rule, as ``docs/08`` item 6 requires."""
     split_bounds = get_rule(HEATING_SPLIT_BOUNDS, AS_OF)
     warm_water = get_rule(WARM_WATER_FORMULA, AS_OF)
     degree_days = get_rule(DEGREE_DAY_TABLE, AS_OF)
@@ -116,13 +118,16 @@ def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
             co2=Co2Input(total_co2_kg=Decimal(2000), co2_cost=cents(30000)),
         )
     )
+    # Label + date per rule, in resolution order. The citations come from the
+    # store's `source`; the degree-day table is the documented exception, see
+    # `rechtsstand.py`.
     stamps = tuple(
         dict.fromkeys(
             (
-                split_bounds.rechtsstand,
-                warm_water.rechtsstand,
-                degree_days.rechtsstand,
-                co2_table.rechtsstand,
+                rechtsstand_entry(split_bounds),
+                rechtsstand_entry(warm_water),
+                rechtsstand_entry(degree_days),
+                rechtsstand_entry(co2_table),
             )
         )
     )
