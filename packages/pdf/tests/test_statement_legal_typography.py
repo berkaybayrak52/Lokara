@@ -90,6 +90,9 @@ LEGAL_SURFACES = {
     "tfoot .foot-note": "--color-paper",  # the heating footer's reconciliation
     ".note": "--color-paper",  # § 9a estimation / fallback disclosure
     ".co2": "--color-mint",  # CO2KostAufG § 7 Abs. 3
+    ".cost-split": "--color-paper",  # Block A — §§ 7/8/9 split of the Gesamtkosten
+    ".basis-table": "--color-paper",  # Block B — Umlageschlüssel/Bemessung per column
+    ".party-change": "--color-paper",  # Block C — § 9b Nutzerwechsel apportionment
     "footer": "--color-paper",  # Rechtsstand + disclaimer
 }
 
@@ -101,12 +104,22 @@ LEGAL_SURFACES = {
 # consumption key was *replaced by the area key* — i.e. the Umlageschlüssel
 # printed in `.key-label` is not the one that was applied. Neither is incidental
 # copy; both sit inside BGH minimums #2 and #3. (docs/08, "Why `.note` is tier 1")
+#
+# The three heating-disclosure blocks are here for the same reason and by the
+# same test — "can the reader verify a number with it?" (docs/05, "Assigning a
+# carrier to a tier"). Block A is the vertical half of the tenant's calculation,
+# Block B is the horizontal half (Umlageschlüssel, Bemessung, Gesamtbemessung),
+# Block C derives the Bemessung the money table prints. Their surfaces are
+# Paper — docs/08 → 4a, "Carriers, and their tier".
 TIER_1_VERIFICATION = frozenset(
     {
         ".key-label",
         "tfoot .foot-note",
         ".note",
         ".co2",
+        ".cost-split",
+        ".basis-table",
+        ".party-change",
     }
 )
 
@@ -141,6 +154,20 @@ def _stylesheet() -> dict[str, dict[str, str]]:
 
 def _tokens(rules: dict[str, dict[str, str]]) -> dict[str, str]:
     return {k: v.lower() for k, v in rules[":root"].items() if k.startswith("--color")}
+
+
+def _declarations(rules: dict[str, dict[str, str]], selector: str) -> dict[str, str]:
+    """The stylesheet's own rule for a legal carrier.
+
+    A carrier the stylesheet never mentions is untested typography — this reports
+    it by name instead of raising a `KeyError` three frames deep.
+    """
+    declared = rules.get(selector)
+    assert declared is not None, (
+        f"{selector} carries legally required text (docs/08) but the stylesheet "
+        "declares no rule for it, so its tier cannot be checked"
+    )
+    return declared
 
 
 def _pt(value: str, *, selector: str, prop: str) -> float:
@@ -179,7 +206,7 @@ def _contrast_violations(
     tokens = _tokens(rules)
     violations = []
     for selector in sorted(selectors):
-        declared = rules[selector].get("color")
+        declared = _declarations(rules, selector).get("color")
         if declared is None:
             continue  # inherits body → Petrol Ink, the highest pair available
         match = _VAR.search(declared)
@@ -234,6 +261,26 @@ def test_every_legal_carrier_is_in_exactly_one_tier() -> None:
     assert not both, "selectors claimed by both tiers: " + ", ".join(both)
 
 
+def test_every_legal_carrier_is_declared_in_the_stylesheet() -> None:
+    """A tier is only enforceable against a rule that exists.
+
+    The checks below skip a carrier that declares no `color` (it inherits body
+    copy, the highest pair available) and no `font-size` (same). That skip is
+    correct for a *declared* carrier and wrong for a missing one: a class the
+    stylesheet never mentions would collect no assertions at all and still show
+    green — the same hole `test_every_legal_carrier_is_in_exactly_one_tier`
+    closes one step earlier.
+    """
+    rules = _stylesheet()
+
+    missing = sorted(selector for selector in LEGAL_SURFACES if selector not in rules)
+    assert not missing, (
+        "legally required carriers with no stylesheet rule: "
+        + ", ".join(missing)
+        + " — declare each one (docs/08 names them, docs/05 sets the bars)"
+    )
+
+
 def test_tier1_verification_content_is_never_smaller_than_body_copy() -> None:
     """`legal-t1-size` (docs/05). The reference is the stylesheet's own body
     font-size — 10 pt today — not a constant, and not "the smallest text on the
@@ -247,7 +294,7 @@ def test_tier1_verification_content_is_never_smaller_than_body_copy() -> None:
 
     too_small = []
     for selector in sorted(TIER_1_VERIFICATION):
-        declared = rules[selector].get("font-size")
+        declared = _declarations(rules, selector).get("font-size")
         if declared is None:
             continue  # inherits body — at the reference by construction
         size = _pt(declared, selector=selector, prop="font-size")
@@ -299,7 +346,7 @@ def test_legal_disclosure_meets_the_line_height_floor() -> None:
 
     cramped = []
     for selector in sorted(LEGAL_SURFACES):
-        declared = rules[selector].get("line-height")
+        declared = _declarations(rules, selector).get("line-height")
         if declared is None:
             continue
         if float(declared) < MIN_LEGAL_LINE_HEIGHT:

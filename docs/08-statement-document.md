@@ -603,6 +603,132 @@ Vorgabe (Rechtsstand 01/1981).
 - The internal marker `— verify before production` is a developer note and **never renders**. Asserted
   absent from the PDF.
 
+### 4a — The rendered form (slice 4): carriers, order, and where the copy outran the data
+
+> **Rechtsstand 08/2026** (transcribed 04.08.2026). Introduces **no legal value** into
+> `packages/rules-store`, resolves no rule and computes nothing. It fixes *where* items 1–4 render and
+> closes the places where the drafted copy above names a fact the **engine result does not carry** —
+> the copy, the figures and the legal basis stay exactly as items 1–4 state them. Written before the
+> template change; golden fixtures `packages/pdf/tests/test_statement_heating_disclosure.py`, red on
+> purpose, plus the three carrier rows this section adds to
+> `packages/pdf/tests/test_statement_legal_typography.py`.
+
+**Carriers, and their tier.** Each block is one element with one class, so the disclosure is
+addressable by a gate and by the stylesheet:
+
+| Block | Carrier | Surface | Tier |
+| --- | --- | --- | --- |
+| A — *Aufteilung der Gesamtkosten* | `.cost-split` | Paper | **1** |
+| B — *Bemessungsgrundlagen* | `.basis-table` | Paper | **1** |
+| C — *Nutzerwechsel* | `.party-change` | Paper | **1** |
+
+All three are **tier 1**: a reader recomputes their own share from them, which is the whole test in
+`docs/05` → *"Assigning a carrier to a tier"*. The thresholds are not repeated here — `docs/05` owns
+them — and the three rows are added to *"Which text on the statement is legally required"* below, so
+the partition guard covers them rather than a new class sliding past it. **Paper, not the `.co2`
+block's Mint:** three tinted slabs stacked under the money table is ornament, not clarity
+(`docs/05` → *Restraint over reduction*), and Paper carries the higher-contrast pairs of the two.
+
+**Order is the numbered list above** (A, B, C, then the existing `.co2` block, then the existing
+`.note`s) and is asserted as document order, not merely as presence.
+
+**Glyphs are part of the copy.** `−` is U+2212 MINUS SIGN (an operator, not a hyphen), the separator
+is `·` U+00B7, the result arrow `→` U+2192. Transcribed here because a hyphen in
+`− CO₂-Vermieteranteil` turns a deduction into a dash.
+
+#### Four places where the drafted copy names something the result cannot supply
+
+Each names what renders **instead** and what would restore the drafted form. None of them is a change
+of substance: no figure moves and no citation changes.
+
+1. **Block C identifies each segment by party label, not by date range.** Item 4 prints
+   `01.01.–30.06.2025 585 ‰ von 1.000 ‰`; the date range needs a per-party `Period` and `HeatingLine`
+   carries `days` / `unit_total_days` and no dates at all. Taking the dates from the engine *input*
+   alongside the result is exactly the drift this section forbids at its head. What renders is the
+   **party label the money table already prints**, beside that party's own `585 ‰ von 1.000 ‰` — and
+   the day derivation keeps item 4's operands exactly (`12 m³ × 181 von 365 Tagen = 5,95 m³`), one
+   line per party instead of one `·`-joined sentence. **Restores the dates:** `HeatingLine` carrying
+   its segment `Period` (an engine slice). Not invented here.
+   For the same reason the heading carries **no unit name**: there is no unit label anywhere —
+   `StatementData.party_labels` is keyed per *party*, and `unit-b` is an internal id that never
+   reaches a renter. The heading is `Nutzerwechsel — Aufteilung des erfassten Verbrauchs`, one block
+   per affected unit, and the parties named inside it are what identify the unit. **Closes it:** a
+   `unit_labels` mapping on `StatementData`, supplied by the caller that already supplies the party
+   labels.
+2. **Block C's convention caveat renders without a `Rechtsstand` stamp.** Item 4's draft ends
+   `(Rechtsstand 01/1981)`. Item 6 leaves the raw `Rechtsstand MM/JJJJ` form in exactly **one** place
+   (the CO₂ block), the footer already carries the labelled degree-day stamp, and no degree-day stamp
+   reaches `HeatingResult` at all — the template would have to hardcode the date or re-resolve the
+   rule, and both are the drift rule again. The **mandatory** sentence therefore renders as
+   *"Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gesetzliche
+   Vorgabe."* The caveat is kept — it is the point of item 4 — and only the duplicated stamp is
+   dropped.
+3. **No ‰ figure renders when § 9a Abs. 2 replaced the consumption key.** With
+   `heat_fallback_to_area` the degree-day apportionment determined **no euro on the page**, so
+   printing it would disclose a method that was not applied — item 4's own rule ("states no fact the
+   data does not carry") and the contract's `None`-means-not-applied rule. The day apportionment of
+   Grund- und Warmwasserkosten still renders: `base_weight_sqm_days_x100` is day-weighted in every
+   branch.
+4. **Block A without central warm water prints no § 9 paragraph and no Warmwasser line.**
+   `warm_water_separation is None` means nothing was separated, and `ww_base_pot` / `ww_cons_pot` are
+   `0` by construction — a printed `Warmwasser: Grundkosten 0,00 €` would state a warm-water split
+   that does not exist. The two Heizung lines render unchanged.
+
+#### Block C — the rendered form
+
+Item 4 owns the copy, the figures and the legal basis; this is the same block with corrections 1–3
+applied, spelled out so the seam leaves no design decision open. One block per unit with more than
+one party. Demo:
+
+```
+Nutzerwechsel — Aufteilung des erfassten Verbrauchs
+
+Diese Einheit wurde im Abrechnungszeitraum von mehreren Parteien genutzt. Der für die Einheit
+erfasste Wärmeverbrauch wurde nach monatlichen Gradtagszahlen auf die Nutzungszeiträume aufgeteilt:
+Wohnung B — Bernd Muster (Auszug 30.06.2025): 585 ‰ von 1.000 ‰
+Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 415 ‰ von 1.000 ‰
+Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:
+Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × 181 von 365 Tagen = 5,95 m³
+Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 12 m³ × 184 von 365 Tagen = 6,05 m³
+
+Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gesetzliche Vorgabe.
+```
+
+Three parts, each rendered only when it was applied:
+
+| Part | Renders when | Otherwise |
+| --- | --- | --- |
+| the Gradtagszahlen sentence + one `‰ von ‰` line per party | `heat_consumption_weight` is not `None` | absent — correction 3 |
+| the Tage sentence + one derivation line per party | always (the base Bemessung is day-weighted in every branch) | — |
+| the convention caveat | wherever a `‰` figure renders | absent with the ‰ lines |
+
+Without central warm water (or with `ww_fallback_to_area`) the Tage sentence reads
+*"Grundkosten werden nach Tagen aufgeteilt:"* and each derivation line is the day fraction alone —
+`Wohnung B — Bernd Muster (Auszug 30.06.2025): 181 von 365 Tagen`. The m³ operands are the withheld
+Bemessung of a column that was not applied, and printing them would be the false disclosure the
+contract's `None` rule exists to prevent.
+
+#### Two branch forms the items above leave open
+
+- **Block A without a CO₂ split.** The `−` line is dropped; the `Gesamtkosten` line **and** the
+  `= umlagefähige Kosten` line both stay, with equal figures. Item 1 says the block then "opens
+  directly at `umlagefähige Kosten = Gesamtkosten`" — this is that identity, *printed*, for the same
+  reason the heating footer prints both of its figures in both branches: one code path, the reader
+  adds the printed numbers, and no branch asserts an equality in words. A reader sees that no
+  deduction was made instead of having to notice a missing line.
+- **Block B when a column fell back to the area key (§ 9a Abs. 2).** `ww_fallback_to_area` ⇒
+  `ww_consumption_weight_m3` is `None` on every line, so the `Verbrauch Warmwasser` row states
+  **`Wohnfläche (m²·Tage)` / `36.500 m²·Tage`** — the key that *was* applied — and no m³ Bemessung is
+  printed anywhere in the block. `Verbrauch Heizung` has no Bemessung either, for the unrelated reason
+  that its measurement unit is not carried (slice 5); the two absences must not be read as one.
+
+#### Not in this slice, deliberately
+
+Item 5's **short-period** wording (`… im Abrechnungszeitraum (181 von 365 Tagen)` and the
+`anteilig gekürzt` band) — item 5 assigns it a rendering slice of its own, the demo period is a full
+calendar year and nothing on the demo path exercises it. What *is* in this slice from item 5 is the
+full-year `Berechnungsgrundlagen:` line appended to the existing `.co2` block.
+
 ### 5 — § 7 Abs. 3 CO2KostAufG: what already works, and the remainder only
 
 § 7 Abs. 3 CO2KostAufG requires the landlord to show, **in the Heizkostenabrechnung**, the tenant's CO₂
@@ -837,6 +963,9 @@ fails on it.
 | --- | --- | --- | --- |
 | The four BGH formal minimums — Gesamtkosten, Umlageschlüssel, Anteil des Mieters, Vorauszahlungen | the cost rows, `.key-label`, the `tfoot` totals | **1** | BGH-Mindestangaben, § 259 BGB |
 | Umlageschlüssel + Gesamtbemessung | `.key-label` | **1** | minimum #2, and the denominator #3 rests on |
+| Block A — the §§ 7/8/9 split of the Gesamtkosten into the four pots | `.cost-split` | **1** | §§ 7, 8, 9 HeizkostenV; it is the vertical half of minimum #3 |
+| Block B — Umlageschlüssel + Gesamtbemessung + Bemessung per money column | `.basis-table` | **1** | minimums #2/#3 for the heating table, which the `.key-label` line does not reach |
+| Block C — the Nutzerwechsel apportionment (Gradtagszahlen, Zeitanteile) | `.party-change` | **1** | § 9b Abs. 2/Abs. 3 HeizkostenV; it derives the Bemessung a renter checks |
 | The heating footer's reconciliation sentence | `tfoot .foot-note` | **1** | HeizkostenV disclosure; it reconciles the Gesamtkosten a reader adds up |
 | § 9a estimation / fallback disclosure | `.note` | **1** | § 9a HeizkostenV — see *Why `.note` is tier 1* below |
 | The CO₂ split and its Berechnungsgrundlagen | `.co2` | **1** | § 7 Abs. 3 CO2KostAufG — the reconciliation `240,00 + 60,00 = 300,00` |
@@ -926,6 +1055,15 @@ a pixel one — rendering and measuring glyphs would test Chromium.
   the same kind of source as the *anteilig* question above.
 - **§§ 7/8 with different shares for heating and warm water** — see item 2; the input cannot express it
   today.
+- **A party's own date range is not on the result.** `HeatingLine` carries `days` and
+  `unit_total_days`; the `01.01.–30.06.2025` of item 4's drafted Block C would have to come from the
+  engine *input*, which is the drift this section forbids. Block C therefore names each segment by its
+  party label (4a, correction 1). Closing it means `HeatingLine` carrying its segment `Period` — an
+  engine change with no legal content, deliberately not folded into a rendering slice.
+- **Nothing carries a *unit* label into the statement.** `StatementData.party_labels` is keyed per
+  party and `unit-b` is an internal id, so no block may print a unit name (4a, correction 1). A
+  `unit_labels` mapping on `StatementData`, filled by the same caller that fills `party_labels`, is
+  what closes it; until then Block C's heading names no unit and the parties inside identify it.
 
 ### Proposed implementation split
 
@@ -937,7 +1075,7 @@ needed for the six items above, the fifth unblocks the one column they cannot sh
 | 1 | `Rechtsstand` labels (item 6) | `app-implementer` (`packages/pdf/src`) | yes |
 | 2 | Tier-1 disclosure meets `legal-t1-size` + `legal-t1-contrast`; tier 2 stays as it is (`docs/05`) | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
 | 3 | `HeatingResult` carries its intermediates (+ `Co2Result` Berechnungsgrundlagen, + § 9b in the degree-day `source`) | `engine-implementer` (`packages/{heating-engine,rules-store}/src`) | yes |
-| 4 | Blocks A / B / C render (items 1–5) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
+| 4 | Blocks A / B / C render (items 1–5; rendered form, carriers and branch cases in **4a**) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
 | 5 | `MeasurementUnit` carried meter → statement; `Verbrauch Heizung` Bemessung column; NK `CONSUMPTION` reference total | `engine-implementer` then `app-implementer` | yes — strictly before the heating-consumption column |
 
 Slice 3 is **deliberately not demo-visible**; that is the cost of the seam, and it is the right cost.
