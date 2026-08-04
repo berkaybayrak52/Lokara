@@ -183,8 +183,12 @@ was cut from `slice/heating-disclosure` and had to be re-cut with
 
 ⚠️ **`git reset --hard origin/<branch>` when local is ahead silently discards
 those commits.** No prompt, no summary, and the branch afterwards looks
-plausible — it just quietly lost work. It nearly took the handoff gate with it
-on 03.08. Reach for `git status` and `git log origin/<branch>..HEAD` first; if
+plausible — it just quietly lost work. Whether that work is still recoverable
+depends on something git never mentions at the prompt: another ref pointing at
+the same objects, or the reflog. On 03.08 the discarded commits stayed reachable
+the whole time, because `slice/heating-typography` had already been cut from them
+— a property of the branch layout that happened to hold, not a safety net you can
+count on. Reach for `git status` and `git log origin/<branch>..HEAD` first; if
 that list is non-empty, `reset --hard` is not the command you want. `git pull
 --ff-only` fails loudly instead, which is the point.
 
@@ -213,6 +217,15 @@ The normal loop, for anything with a calculation in it:
 
 For work with no calculation in it (a screen, a refactor), skip step 1 and go straight to
 `app-implementer` — but the reviewer step is not optional for anything a landlord will read.
+
+**A handoff that accuses — "unauthorized change", "the agent did this unprompted", "fabricated" —
+is verified against git before anyone acts on it.** `git log`, `git show`, `md5` the file against
+what you actually wrote. A session that compacts mid-task reconstructs its own history from a
+summary and writes the reconstruction fluently and confidently; fluency is not evidence. On 04.08
+such a claim came within one command of a history rewrite over a commit that was correct in every
+particular — the attribution it called fabricated was byte-accurate, and the "unprompted" actions
+were all in the prompt. The cost of checking is one `git show`. The cost of not checking is
+reverting good work and distrusting a lane that was behaving.
 
 ### Parallelism — where it pays and where it doesn't
 
