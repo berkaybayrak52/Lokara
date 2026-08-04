@@ -15,6 +15,9 @@ from lokara_domain import AllocationKey, cents, format_eur
 from lokara_heating_engine import HeatingResult
 from lokara_nk_engine import CostItem, NkResult, ShareLine
 
+from .formatting import format_number_de
+from .heating_disclosure import co2_grounds, heating_disclosure_html
+
 # (unit_id, tenancy_id) as they appear on result lines; tenancy_id=None is the
 # landlord side (vacancy/self-use) of that unit.
 PartyKey = tuple[str | None, str | None]
@@ -73,13 +76,6 @@ class StatementData:
     rechtsstaende: tuple[str, ...]
     heating_result: HeatingResult | None = None
     heating_cost_label: str = field(default="Heiz- und Warmwasserkosten")
-
-
-def format_number_de(value: Decimal) -> str:
-    """German number formatting for non-money figures (weights, intensities)."""
-    is_integral = value == value.to_integral_value()
-    grouped = f"{int(value):,}" if is_integral else f"{value.normalize():,f}"
-    return grouped.replace(",", "\0").replace(".", ",").replace("\0", ".")
 
 
 def _display_weight(key: AllocationKey, weight: Decimal) -> Decimal:
@@ -179,8 +175,13 @@ def _heating_section(data: StatementData) -> str:
     if heating is None:
         return ""
     rows = []
-    for line in heating.lines:
-        party = _party(data.party_labels, line.unit_id, line.tenancy_id)
+    # Resolved once and handed to the disclosure blocks: the same label names a
+    # party in the money table, in Block B and in Block C, so a reader can follow
+    # one row across all three.
+    party_labels = tuple(
+        _party(data.party_labels, line.unit_id, line.tenancy_id) for line in heating.lines
+    )
+    for line, party in zip(heating.lines, party_labels, strict=True):
         rows.append(
             "<tr>"
             f"<td>{escape(party)}</td>"
@@ -195,6 +196,9 @@ def _heating_section(data: StatementData) -> str:
     co2_block = ""
     if heating.co2 is not None:
         co2 = heating.co2
+        # § 7 Abs. 3 CO2KostAufG wants the Einstufung *and* its grounds. The
+        # grounds line is appended to this block rather than given a surface of
+        # its own — same disclosure, one place to read it (docs/08 item 5).
         co2_block = f"""
   <div class="co2">
     <strong>CO₂-Kostenaufteilung (CO2KostAufG, {escape(co2.rechtsstand)}):</strong>
@@ -202,6 +206,7 @@ def _heating_section(data: StatementData) -> str:
     → Vermieteranteil {co2.landlord_share_percent} %
     ({escape(format_eur(co2.landlord_amount))}, vor der Umlage abgezogen);
     Mieteranteil {escape(format_eur(co2.renter_amount))}.
+    {co2_grounds(co2)}
   </div>"""
 
     notes = []
@@ -255,6 +260,7 @@ def _heating_section(data: StatementData) -> str:
       <td class="num">{escape(total)}</td></tr>
     </tfoot>
   </table>
+  {heating_disclosure_html(heating, party_labels)}
   {co2_block}
   {"".join(notes)}"""
 
@@ -282,7 +288,7 @@ def statement_html(data: StatementData) -> str:
     margin: 0;
     font-size: 10pt;
   }}
-  h1, h2 {{
+  h1, h2, h3 {{
     font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
     font-weight: 700;
   }}
@@ -331,6 +337,53 @@ def statement_html(data: StatementData) -> str:
      on Paper (11,32:1). line-height 1.5 is the hygiene both tiers owe (>= 1,4);
      it is running prose and is now set at body size. */
   .note {{ color: var(--color-forest); line-height: 1.5; }}
+  /* The three heating-disclosure carriers. All tier 1: no font-size, so each
+     inherits body copy, and Forest Deep on Paper is 11,32:1 (>= 7:1, SC 1.4.6).
+     They sit on Paper rather than on a tinted panel — three stacked slabs under
+     the money table would be ornament, not clarity — and they recede below it
+     through weight and a hairline rule, never through a lighter ink. Declared
+     one selector each, because a grouped rule is not addressable per carrier.
+     Keep every comment in this stylesheet English: it ships inside the document
+     and the text-occurrence gates count the whole file. */
+  .cost-split {{
+    color: var(--color-forest); line-height: 1.5; margin-top: 6mm;
+    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint); break-inside: avoid;
+  }}
+  .basis-table {{
+    color: var(--color-forest); line-height: 1.5; margin-top: 6mm;
+    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint);
+  }}
+  .party-change {{
+    color: var(--color-forest); line-height: 1.5; margin-top: 6mm;
+    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint); break-inside: avoid;
+  }}
+  .disclosure-title {{ font-size: 10.5pt; font-weight: 600; margin: 0 0 2.5mm; }}
+  .cost-split p, .party-change p {{ margin: 0 0 1.5mm; }}
+  /* Which rule was applied, then what the rule permits: the second is quieter
+     by weight alone, so both stay at the tier-1 pair. */
+  .cost-split .rule-line {{ font-weight: 600; margin-top: 3.5mm; }}
+  .cost-split .rule-bound {{ font-weight: 400; }}
+  .cost-split .formula, .cost-split .pot-figures, .apportionment li {{
+    font-variant-numeric: tabular-nums;
+  }}
+  .cost-split td {{ border-bottom: none; padding: 0.9mm 0; }}
+  .cost-split .split-sum td {{
+    border-top: 0.5pt solid var(--color-forest); font-weight: 600;
+  }}
+  .cost-split .pots {{ margin-top: 1.5mm; }}
+  .basis-table table {{ margin-bottom: 4mm; }}
+  .basis-table th {{
+    background: none; color: var(--color-forest); font-size: inherit; font-weight: 600;
+    padding: 1.5mm 2.5mm; border-bottom: 0.5pt solid var(--color-forest);
+  }}
+  .basis-table td {{ padding: 1.5mm 2.5mm; }}
+  .basis-table tfoot td {{
+    font-weight: 600; border-top: 0.5pt solid var(--color-forest);
+  }}
+  .apportionment {{ margin: 0 0 2mm; padding-left: 5mm; list-style: none; }}
+  .apportionment li {{ margin-bottom: 0.8mm; }}
+  .party-change .caveat {{ margin-top: 2.5mm; }}
+  .co2-grounds {{ display: block; margin-top: 2mm; }}
   footer {{
     color: var(--color-slate); font-size: 8pt; border-top: 0.5pt solid var(--color-slate);
     padding-top: 3mm; margin-top: 10mm; line-height: 1.6;
