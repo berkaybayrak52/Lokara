@@ -215,6 +215,14 @@ The normal loop, for anything with a calculation in it:
 5. **Close** — `scripts/gate.sh demo`, **merge the slice branch to `main`**, then
    `git tag demo-green-<n>`, then write `LAST_OUTPUT.md`.
 
+**When a slice claims to change the document — or claims not to — record
+`scripts/pdf_fingerprint.sh` before and after in `LAST_OUTPUT.md`.** Both directions are claims, and
+both are cheap to check and easy to assert instead. An engine refactor that swears it is invisible
+and a typography slice that swears it is visible are the same bet, and the fingerprint settles it in
+one line. It is deliberately **not** in `gate.sh`: most slices are supposed to move the page, so a
+standing assertion would be red by default and ignored within a week. Nothing else prompts you —
+that is why it is written here, in the step where you are already writing the handoff.
+
 For work with no calculation in it (a screen, a refactor), skip step 1 and go straight to
 `app-implementer` — but the reviewer step is not optional for anything a landlord will read.
 
@@ -226,6 +234,15 @@ such a claim came within one command of a history rewrite over a commit that was
 particular — the attribution it called fabricated was byte-accurate, and the "unprompted" actions
 were all in the prompt. The cost of checking is one `git show`. The cost of not checking is
 reverting good work and distrusting a lane that was behaving.
+
+**A tool the lead hands you is unverified until it has run on *your* machine.** The same standard
+this file applies to agent claims applies to the lead's. `scripts/pdf_fingerprint.sh` arrived
+described as verified — and it was, on Linux. It piped to `md5sum`, which darwin does not ship, and
+`set -uo pipefail` without `-e` let the failure through: it printed an **empty hash and exited 0**.
+Before and after would have compared equal, which is precisely the failure the script exists to
+catch — a verification tool that passes by producing nothing. "It works on the machine it was
+written on" is a claim about that machine. Run it, look at the output, and check it against a value
+you already know before you trust it with a question that matters.
 
 ### Parallelism — where it pays and where it doesn't
 

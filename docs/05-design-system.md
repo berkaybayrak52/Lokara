@@ -13,7 +13,7 @@
 | `--color-green`  | Lokara Grün | `#1A6558` | 26·101·88 | **Accent** — signals, highlights, primary actions |
 | `--color-forest` | Forest Deep | `#123F37` | —         | Deep green — hover/pressed, dark accents          |
 | `--color-mint`   | Mint Tint   | `#E7EFEB` | —         | Soft tint — subtle backgrounds, selected states   |
-| `--color-slate`  | Slate       | `#5C6A6B` | —         | Muted text, borders, secondary labels             |
+| `--color-slate`  | Slate       | `#5C6A6B` | —         | Muted text, borders, secondary labels — **never tier 1** |
 | `--color-paper`  | Paper       | `#FBFBFA` | —         | App background / light surface                    |
 
 ### Contrast guidance (WCAG AA)
@@ -21,6 +21,15 @@
 - Body text: Petrol Ink on Paper (very high contrast — safe).
 - **Slate is for secondary text only** — verify ≥4.5:1 on its background; never use it for primary
   body copy on Paper at small sizes.
+- **Slate is excluded from tier 1 outright — it is not a judgement call.** Slate reaches **5,44 on
+  Paper** and **4,81 on Mint**; those are its only two grounds in this system, and **neither reaches
+  7:1**. So there is no background on which Slate can carry verification content, and no size at
+  which that changes — the AAA large-text relaxation is declined for tier 1 (see *Legally required
+  disclosure* below). Picking Slate for legally required text is therefore always wrong, not usually
+  wrong. Slate keeps its role on tier 2 and on non-legal secondary framing text, where 4,5:1 is the
+  bar and it clears it on Paper. If a surface must be quiet **and** tier 1, buy the quietness with
+  **weight** (400 against a 600/700 neighbour), never with a lighter ink: **Forest Deep** is the
+  quiet tier-1 ink at 11,32 on Paper and 10,01 on Mint.
 - Lokara Grün as a button background needs white/Paper text; verify ≥4.5:1 (it passes for normal text).
 - Green-on-mint is decorative/low-contrast — never use it for text that must be read.
 
@@ -37,8 +46,8 @@ don't re-derive it per surface.
 | Forest Deep on Mint | **10,01** | legally required text, secondary emphasis                    |
 | Lokara Grün on Paper| 6,66      | AA text, links, icons — **not** legally required text        |
 | Lokara Grün on Mint | 5,89      | decorative only — never body text                            |
-| Slate on Paper      | 5,44      | non-legal secondary framing text only                        |
-| Slate on Mint       | 4,81      | AA by 0,31 — **not permitted** for legally required text     |
+| Slate on Paper      | 5,44      | tier 2 and non-legal secondary framing text — **never tier 1** |
+| Slate on Mint       | 4,81      | AA by 0,31 — **never tier 1**; avoid on re-tintable surfaces  |
 
 ### Legally required disclosure — two tiers, split by what the content is *for*
 
