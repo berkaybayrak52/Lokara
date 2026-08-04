@@ -684,6 +684,12 @@ Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 01/1981 ·
 - Mechanically: `StatementData.rechtsstaende` becomes label+stamp pairs instead of bare stamps, and the
   caller (`demo.py`, later the API) builds them from the `ResolvedRule`s it already holds. No engine
   change, no rules change — which is why this ships on its own.
+- **This supersedes the bare `Rechtsstand MM/JJJJ` form on the page.** Once item 6 ships, the raw string
+  renders in exactly one place: the CO₂ block of item 5, where the citation already stands beside it.
+  Any check that looks for a bare stamp in the footer — or page-wide, which the footer used to satisfy —
+  is asserting the defect and is removed, not restated. The stamps are covered footer-side by
+  `packages/pdf/tests/test_statement_rechtsstand_labels.py`, block-side by
+  `packages/pdf/tests/test_statement_template.py`, both resolved from `packages/rules-store`.
 
 ### The carried-intermediates contract (slice 3)
 
