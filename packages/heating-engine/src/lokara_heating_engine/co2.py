@@ -12,14 +12,25 @@ the finite bounds are scaled. Spec + the day-based `period_factor` convention:
 Rechtsstand 01/2023.
 """
 
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from lokara_domain import Cents, Co2Table, Period, days_between, distribute_cents
+from lokara_domain import Cents, Co2Step, Co2Table, Period, days_between, distribute_cents
 
 from .inputs import Co2Result, HeatingInputError
 
 _ONE = Decimal(1)
+
+
+@dataclass(frozen=True)
+class _PeriodBasis:
+    """The three figures § 5 Abs. 1 S. 4 needs, derived once. `Co2Result` carries
+    all three because the factor alone cannot be un-divided back into the days."""
+
+    period_days: int
+    reference_year_days: int
+    factor: Decimal
 
 
 def _reference_year_days(start: date) -> int:
@@ -37,7 +48,12 @@ def _reference_year_days(start: date) -> int:
 
 
 def period_factor_for(billing_period: Period) -> Decimal:
-    """`min(1, days(billing_period) / days(reference year))` — exact, never float.
+    """`min(1, days(billing_period) / days(reference year))` — exact, never float."""
+    return _period_basis_for(billing_period).factor
+
+
+def _period_basis_for(billing_period: Period) -> _PeriodBasis:
+    """The factor and the two day counts it came from, computed together.
 
     Raises for a period longer than its reference year: § 5 Abs. 1 S. 4 shortens
     the table only for periods *under* a year, and stretching the bounds upward
@@ -62,7 +78,27 @@ def period_factor_for(billing_period: Period) -> Decimal:
             "(§ 556 Abs. 3 Satz 1 BGB)."
         )
     factor = Decimal(period_days) / Decimal(reference_days)
-    return min(_ONE, factor)
+    return _PeriodBasis(
+        period_days=period_days,
+        reference_year_days=reference_days,
+        factor=min(_ONE, factor),
+    )
+
+
+def _select_step(
+    intensity_kg_per_sqm: Decimal, table: Co2Table, period_factor: Decimal
+) -> tuple[int, Co2Step]:
+    """The one place the Einstufung is decided — the percent and the band both
+    read off this single walk, so they can never disagree."""
+    for index, step in enumerate(table):
+        if (
+            step.max_intensity_exclusive is None
+            or intensity_kg_per_sqm < step.max_intensity_exclusive * period_factor
+        ):
+            return index, step
+    raise HeatingInputError(
+        f"CO₂ table has no step for intensity {intensity_kg_per_sqm} (missing open-ended step)"
+    )
 
 
 def landlord_share_percent_for_intensity(
@@ -74,15 +110,7 @@ def landlord_share_percent_for_intensity(
     open-ended top step has no bound and is therefore never scaled — a building
     already in it stays in it.
     """
-    for step in table:
-        if (
-            step.max_intensity_exclusive is None
-            or intensity_kg_per_sqm < step.max_intensity_exclusive * period_factor
-        ):
-            return step.landlord_share_percent
-    raise HeatingInputError(
-        f"CO₂ table has no step for intensity {intensity_kg_per_sqm} (missing open-ended step)"
-    )
+    return _select_step(intensity_kg_per_sqm, table, period_factor)[1].landlord_share_percent
 
 
 def split_co2_cost(
@@ -95,11 +123,17 @@ def split_co2_cost(
 ) -> Co2Result:
     if heated_area_sqm <= 0:
         raise HeatingInputError("CO₂ split requires a positive heated area")
-    factor = period_factor_for(billing_period)
+    basis = _period_basis_for(billing_period)
+    factor = basis.factor
     # The period figure, deliberately not annualised: the statute shortens the
     # table, and this is the value § 7 Abs. 3 requires to be disclosed.
     intensity = total_co2_kg / heated_area_sqm
-    landlord_percent = landlord_share_percent_for_intensity(intensity, table, factor)
+    index, step = _select_step(intensity, table, factor)
+    landlord_percent = step.landlord_share_percent
+    # The bounds the intensity was *actually* compared against, i.e. already
+    # shortened. A renderer that scaled them itself would be a second
+    # implementation of § 5 Abs. 1 S. 4, and the two would drift.
+    previous_bound = table[index - 1].max_intensity_exclusive if index > 0 else None
     landlord_amount, renter_amount = distribute_cents(
         co2_cost, [landlord_percent, 100 - landlord_percent]
     )
@@ -110,4 +144,13 @@ def split_co2_cost(
         landlord_amount=landlord_amount,
         renter_amount=renter_amount,
         rechtsstand=rechtsstand,
+        total_co2_kg=total_co2_kg,
+        heated_area_sqm=heated_area_sqm,
+        co2_cost=co2_cost,
+        band_min_inclusive=None if previous_bound is None else previous_bound * factor,
+        band_max_exclusive=(
+            None if step.max_intensity_exclusive is None else step.max_intensity_exclusive * factor
+        ),
+        period_days=basis.period_days,
+        reference_year_days=basis.reference_year_days,
     )

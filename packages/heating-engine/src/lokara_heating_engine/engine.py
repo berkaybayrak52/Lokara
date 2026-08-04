@@ -32,9 +32,17 @@ from .inputs import (
     HeatingLine,
     HeatingResult,
     HeatingUnit,
+    WarmWaterSeparation,
 )
 
 _ZERO = cents(0)
+
+
+def _heated_area_sqm(units: tuple[HeatingUnit, ...]) -> Decimal:
+    """The building's heated area. One source: § 7 Abs. 3 CO2KostAufG and § 9
+    Abs. 2's Ersatzwert must never disclose two different areas for one
+    building."""
+    return Decimal(sum(u.area_sqm_x100 for u in units)) / 100
 
 
 @dataclass(frozen=True)
@@ -60,7 +68,9 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
 
     co2_result, billable = _apply_co2(heating_input)
 
-    ww_pot, heating_pot = _separate_warm_water(heating_input, billable, window_from, window_to)
+    ww_pot, heating_pot, separation = _separate_warm_water(
+        heating_input, billable, window_from, window_to
+    )
 
     share = heating_input.rules.consumption_share
     heat_base_pot, heat_cons_pot = distribute_cents(heating_pot, [1 - share, share])
@@ -69,15 +79,18 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     heat_values, heat_estimated, heat_fallback = _resolve_readings(
         heating_input.units, [u.heat_consumption for u in heating_input.units]
     )
+    # `None` = no consumption Bemessung was applied to this column, so none may
+    # be disclosed; otherwise these are the exact weights that were allocated by.
+    heat_weights: list[Decimal] | None = None
     if heat_fallback:
         heat_cons = distribute_cents(heat_cons_pot, base_weights)
     else:
-        heat_cons = distribute_cents(
-            heat_cons_pot, _consumption_weights(parties, heat_values, by_degree_days=True)
-        )
+        heat_weights = _consumption_weights(parties, heat_values, by_degree_days=True)
+        heat_cons = distribute_cents(heat_cons_pot, heat_weights)
 
     ww_estimated: tuple[str, ...] = ()
     ww_fallback = False
+    ww_weights: list[Decimal] | None = None
     if heating_input.warm_water is not None:
         ww_base_pot, ww_cons_pot = distribute_cents(ww_pot, [1 - share, share])
         ww_base = distribute_cents(ww_base_pot, base_weights)
@@ -87,13 +100,16 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
         if ww_fallback:
             ww_cons = distribute_cents(ww_cons_pot, base_weights)
         else:
-            ww_cons = distribute_cents(
-                ww_cons_pot, _consumption_weights(parties, ww_values, by_degree_days=False)
-            )
+            ww_weights = _consumption_weights(parties, ww_values, by_degree_days=False)
+            ww_cons = distribute_cents(ww_cons_pot, ww_weights)
     else:
+        # No warm-water column exists at all — that is not a § 9a Abs. 2
+        # fallback, and the statement must not claim one happened.
+        ww_base_pot, ww_cons_pot = _ZERO, _ZERO
         ww_base = [_ZERO] * party_count
         ww_cons = [_ZERO] * party_count
 
+    unit_days, unit_promille = _unit_totals(parties)
     lines = tuple(
         HeatingLine(
             unit_id=party.unit_id,
@@ -103,9 +119,16 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
             ww_base=wb,
             ww_consumption=wc,
             total=cents(int(hb) + int(hc) + int(wb) + int(wc)),
+            days=party.days,
+            unit_total_days=unit_days[party.unit_id],
+            base_weight_sqm_days_x100=party.base_weight,
+            heat_consumption_weight=None if heat_weights is None else heat_weights[index],
+            ww_consumption_weight_m3=None if ww_weights is None else ww_weights[index],
+            degree_day_promille=party.degree_day_promille,
+            unit_degree_day_promille_total=unit_promille[party.unit_id],
         )
-        for party, hb, hc, wb, wc in zip(
-            parties, heat_base, heat_cons, ww_base, ww_cons, strict=True
+        for index, (party, hb, hc, wb, wc) in enumerate(
+            zip(parties, heat_base, heat_cons, ww_base, ww_cons, strict=True)
         )
     )
 
@@ -123,8 +146,35 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
         co2=co2_result,
         estimated_unit_ids=estimated,
         consumption_fallback_to_area=heat_fallback or ww_fallback,
+        heat_fallback_to_area=heat_fallback,
+        ww_fallback_to_area=ww_fallback,
         total=total,
+        billable_cost=billable,
+        heating_pot=heating_pot,
+        ww_pot=ww_pot,
+        heat_base_pot=heat_base_pot,
+        heat_cons_pot=heat_cons_pot,
+        ww_base_pot=ww_base_pot,
+        ww_cons_pot=ww_cons_pot,
+        applied_consumption_share=share,
+        split_bounds=heating_input.rules.split_bounds,
+        warm_water_separation=separation,
     )
+
+
+def _unit_totals(parties: list[_Party]) -> tuple[dict[str, int], dict[str, Decimal]]:
+    """Per unit: the days and the Gradtagszahlen-promille its parties sum to —
+    the denominators `_consumption_weights` apportions against. Disclosed
+    alongside each party's own figure, because over a partial billing period a
+    unit's parties sum to less than the full period and less than 1.000 ‰."""
+    days: dict[str, int] = {}
+    promille: dict[str, Decimal] = {}
+    for party in parties:
+        days[party.unit_id] = days.get(party.unit_id, 0) + party.days
+        promille[party.unit_id] = (
+            promille.get(party.unit_id, Decimal(0)) + party.degree_day_promille
+        )
+    return days, promille
 
 
 def _validate(heating_input: HeatingInput) -> None:
@@ -210,7 +260,7 @@ def _apply_co2(heating_input: HeatingInput) -> tuple[Co2Result | None, Cents]:
     table = heating_input.rules.co2_table
     rechtsstand = heating_input.rules.co2_rechtsstand
     assert table is not None and rechtsstand is not None  # _validate guarantees
-    heated_area_sqm = Decimal(sum(u.area_sqm_x100 for u in heating_input.units)) / 100
+    heated_area_sqm = _heated_area_sqm(heating_input.units)
     co2_result = split_co2_cost(
         total_co2_kg=heating_input.co2.total_co2_kg,
         co2_cost=heating_input.co2.co2_cost,
@@ -225,18 +275,52 @@ def _apply_co2(heating_input: HeatingInput) -> tuple[Co2Result | None, Cents]:
 
 def _separate_warm_water(
     heating_input: HeatingInput, billable: Cents, window_from: date, window_to: date
-) -> tuple[Cents, Cents]:
-    """§ 9: returns (ww_pot, heating_pot)."""
+) -> tuple[Cents, Cents, WarmWaterSeparation | None]:
+    """§ 9: returns (ww_pot, heating_pot, the separation that produced them).
+
+    The separation records the branch and its operands so the statement can
+    reprint the formula that ran; the other branch's operands stay `None`.
+    """
     if heating_input.warm_water is None:
-        return _ZERO, billable
+        return _ZERO, billable, None
     formula = heating_input.rules.warm_water_formula
+    total_energy = heating_input.total_energy_kwh
     if heating_input.warm_water.volume_m3 is not None:
-        q_ww = formula.energy_kwh_for_volume(heating_input.warm_water.volume_m3)
+        volume_m3 = heating_input.warm_water.volume_m3
+        q_ww = formula.energy_kwh_for_volume(volume_m3)
+        separation = WarmWaterSeparation(
+            method="MEASURED",
+            q_ww_kwh=q_ww,
+            total_energy_kwh=total_energy,
+            volume_m3=volume_m3,
+            factor_kwh_per_m3_kelvin=formula.factor_kwh_per_m3_kelvin,
+            hot_temp_c=formula.hot_temp_c,
+            cold_temp_c=formula.cold_temp_c,
+            area_fallback_kwh_per_sqm_year=None,
+            heated_area_sqm=None,
+            period_days=None,
+            reference_year_days=None,
+        )
     else:
-        # § 9 Abs. 2 fallback: kWh per m² living area per year, pro-rated.
-        area_sqm = Decimal(sum(u.area_sqm_x100 for u in heating_input.units)) / 100
-        days = Decimal((window_to - window_from).days)
+        # § 9 Abs. 2 fallback: kWh per m² living area per year, pro-rated over a
+        # flat 365 — the divisor is echoed, not harmonised with co2.py (docs/08).
+        area_sqm = _heated_area_sqm(heating_input.units)
+        period_days = (window_to - window_from).days
+        days = Decimal(period_days)
         q_ww = formula.area_fallback_kwh_per_sqm_year * area_sqm * days / Decimal(365)
+        separation = WarmWaterSeparation(
+            method="AREA_FALLBACK",
+            q_ww_kwh=q_ww,
+            total_energy_kwh=total_energy,
+            volume_m3=None,
+            factor_kwh_per_m3_kelvin=None,
+            hot_temp_c=None,
+            cold_temp_c=None,
+            area_fallback_kwh_per_sqm_year=formula.area_fallback_kwh_per_sqm_year,
+            heated_area_sqm=area_sqm,
+            period_days=period_days,
+            reference_year_days=365,
+        )
     if q_ww <= 0 or q_ww >= heating_input.total_energy_kwh:
         raise HeatingInputError(
             f"Warm-water energy {q_ww} kWh must lie inside (0, total energy "
@@ -245,7 +329,7 @@ def _separate_warm_water(
     ww_pot, heating_pot = distribute_cents(
         billable, [q_ww, heating_input.total_energy_kwh - q_ww]
     )
-    return ww_pot, heating_pot
+    return ww_pot, heating_pot, separation
 
 
 def _resolve_readings(
