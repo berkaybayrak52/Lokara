@@ -36,7 +36,7 @@ from lokara_heating_engine import (
     calculate_heating_statement,
 )
 from lokara_nk_engine import CostItem, NkInput, NkResult, UnitBasis, calculate_nk_statement
-from lokara_pdf import PartyKey, StatementData
+from lokara_pdf import PartyKey, StatementData, rechtsstand_entry
 from lokara_rules_store import (
     CO2_SPLIT_TABLE,
     DEFAULT_CONSUMPTION_SHARE,
@@ -88,7 +88,13 @@ class StatementBundle:
     heating_input_total: Cents
     heating_missing_reason: str | None
     party_labels: dict[PartyKey, str]
+    # Two spellings of the same four rules, on purpose. `rechtsstaende` is the
+    # bare stamp and is the JSON contract the portal page reads (mirrored by
+    # Zod); `rechtsstand_entries` names each rule beside its date, which is what
+    # a printed legal document owes (docs/08 item 6). The JSON side gains the
+    # labels in its own slice, together with the web copy that renders them.
     rechtsstaende: tuple[str, ...]
+    rechtsstand_entries: tuple[str, ...]
 
 
 def _party_labels(units: list[Unit]) -> dict[PartyKey, str]:
@@ -314,6 +320,16 @@ def compute_statement(session: Session) -> StatementBundle:
             )
         )
     )
+    entries = tuple(
+        dict.fromkeys(
+            (
+                rechtsstand_entry(split_bounds),
+                rechtsstand_entry(warm_water_rule),
+                rechtsstand_entry(degree_days),
+                rechtsstand_entry(co2_table),
+            )
+        )
+    )
     return StatementBundle(
         building=building,
         nk_result=nk_result,
@@ -323,6 +339,7 @@ def compute_statement(session: Session) -> StatementBundle:
         heating_missing_reason=missing,
         party_labels=_party_labels(units),
         rechtsstaende=stamps,
+        rechtsstand_entries=entries,
     )
 
 
@@ -357,7 +374,7 @@ def to_pdf_data(bundle: StatementBundle, landlord_name: str) -> StatementData:
         nk_result=bundle.nk_result,
         nk_costs=bundle.nk_costs,
         party_labels=bundle.party_labels,
-        rechtsstaende=bundle.rechtsstaende,
+        rechtsstaende=bundle.rechtsstand_entries,
         heating_result=bundle.heating_result,
     )
 

@@ -57,8 +57,12 @@ DISCLAIMER = (
 class StatementData:
     """Everything the template needs, already computed and labeled.
 
-    ``rechtsstaende`` are the stamps of every rule version used (deduped,
-    display order) — the caller resolves rules, so only the caller knows them.
+    ``rechtsstaende`` is one entry per rule version used (deduped, display
+    order), each naming the rule *and* carrying its date —
+    ``§ 7 Abs. 1 HeizkostenV 03/1989``. The caller resolves the rules, so only
+    the caller knows them; ``rechtsstand_entry`` composes an entry from a
+    ``ResolvedRule``. A bare date discloses nothing (docs/08 item 6), so the
+    footer prints the word ``Rechtsstand`` once and every date after it is named.
     """
 
     landlord_name: str
@@ -344,7 +348,7 @@ def statement_html(data: StatementData) -> str:
   {_nk_section(data)}
   {_heating_section(data)}
   <footer>
-    {rechtsstaende} · Erstellt mit Lokara.<br />
+    Rechtsstand: {rechtsstaende} · Erstellt mit Lokara.<br />
     {escape(DISCLAIMER)}
   </footer>
 </body>
