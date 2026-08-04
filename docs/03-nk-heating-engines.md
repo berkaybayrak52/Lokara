@@ -57,6 +57,14 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - `PERSONS` key with a mid-period person-count change.
 - `CONSUMPTION` key from metered readings.
 - Interim statement (<12 months) and >12-month period (domain-depth differentiators).
+  ⚠️ **Neither fixture exists yet, and the >12-month half is now partly contradicted below.** The CO₂
+  split *refuses* a period longer than a year (§ 5 Abs. 1 S. 4 shortens the table only *downward*; see
+  "Why a period > 12 months is refused rather than scaled"). NK is unaffected and heating still
+  computes when `co2 is None`, so the refusal bites in exactly one place: a **Gewerbe** building with a
+  CO₂ split. § 556 Abs. 3 S. 1 BGB's 12-month cap is Wohnraum-only and CO2KostAufG **§ 8** governs
+  Nichtwohngebäude, so that combination is lawful and we currently reject it. Recorded as drift, not
+  resolved: closing it means either dropping >12 months as a differentiator, or specifying what the
+  Einstufung means over such a period — which needs a source we do not have.
 
 ---
 

@@ -32,6 +32,7 @@ Build in this sequence, because it front-loads what an investor reacts to:
 | 2.5 | **M5 remainder** roles in the API, portals, URL-carried context, switcher | Unlocks **persona 4** — one login: Vermieter + Mieter + Investor — your strongest differentiator (`docs/06`). | medium |
 | 3 | **M10-slice**: read-only Mieter + StB portals | Completes the persona demo; no tickets/activation yet. | medium |
 | 4 | **M9-slice**: §556 deadline Wächter + reminders | Visible, date-driven, needs no new legal math. | medium |
+| 4.5 | **CO₂ rounding slice**: § 5 Abs. 1 S. 3 CO2KostAufG — round the specific emission value to one decimal **before** classifying | Same class as the period-factor bug already fixed: a wrong Stufe on a legal document, § 7 Abs. 4 exposure. The engine classifies the raw `Decimal`, so 11,96 lands in a different Stufe than the 12,0 the statute says to classify. Cheap, isolated, and it should not drift — `docs/03` → "Known gap, deliberately not implemented here". | low |
 | 5 | **M6** bank + Payment Ledger (finAPI stubbed) | Unlocks the two-time-axes story; adds Redis/workers. | high |
 | 6 | **M7** tax export + AfA | 🔒 **gated on specs** — see below. | high |
 | 7 | **M8** document/clause engine | 🔒 **gated on specs**. | high |
