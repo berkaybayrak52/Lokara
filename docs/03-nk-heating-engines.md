@@ -81,11 +81,16 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
   denominator is absent, the API **refuses and explains, in German** — a Heizkostenabrechnung built on a
   guessed total isn't approximately right, it's wrong. The Betriebskosten still compute, so one missing
   meter never blocks the whole statement. Don't "fix" the refusal by adding a fallback estimate.
-- **Degree-day (Gradtags) apportionment** on renter change mid-period. Apportionment basis:
-  **consumption** cost splits by **degree-days**; **base + warm-water** costs split by **days**.
-- ⚠️ **The degree-day promille table is a VDI convention, not a statute** — it carries a
-  **"verify before production"** marker in `rules-store` (with its `Rechtsstand`), unlike the HKVO
-  ratios and CO₂ table which are legally fixed.
+- **Degree-day (Gradtags) apportionment** on renter change mid-period — **§ 9b HeizkostenV**: Abs. 2
+  permits apportioning an unread period by Gradtagszahlen, Abs. 3 puts Grund- und Warmwasserkosten on
+  Zeitanteile. Apportionment basis therefore: **consumption** cost splits by **degree-days**;
+  **base + warm-water** costs split by **days**.
+- ⚠️ **The method is statutory (§ 9b), the promille table is not.** The table is a VDI convention and
+  carries a **"verify before production"** marker in `rules-store` (with its `Rechtsstand 01/1981`),
+  unlike the HKVO ratios and the CO₂ table which are legally fixed. The rule's `source` names both
+  halves, separated — see `docs/08` → *"§ 9b HeizkostenV is a prerequisite"*. The `01/1981` stamp dates
+  the **table**; § 9b's own in-force date is not asserted anywhere and would need the BGBl. history of
+  the HeizkostenV to establish.
 - External MDL (Messdienstleister) data feeds in through the meter adapter as normalized readings —
   the engine never knows the source.
 
@@ -216,6 +221,12 @@ conventions above stand as conventions.
 - A central-heating building with consumption meters → base/consumption split + WW separation.
 - The same building → CO₂ 10-step selection + landlord/renter split, with `Rechtsstand MM/JJJJ`.
 - A mid-period renter change apportioned by degree-days.
+- **The disclosure intermediates the result must carry** (`test_heating_disclosure.py`): the pots of
+  the §§ 7/8/9 vertical split, the per-party Bemessungen of the horizontal one, the § 9 branch that
+  ran with its operands, and the CO₂ Berechnungsgrundlagen incl. the Einstufung band. Contract:
+  `docs/08` → *"The carried-intermediates contract (slice 3)"*. Nothing it pins renders yet and no
+  euro figure moves — the fixtures exist so that the numbers the tenant will be shown are the numbers
+  the engine actually used.
 - **Interim period (< 1 year) → the Anlage table is shortened** (`test_co2_period_factor.py`): 1.950 kg
   over 100 m² in a 181-day period is **19,5 kg/m²**, which reads as Stufe *17 – < 22* (Vermieter 20 %)
   against the unscaled table and as Stufe *37 – < 42* (Vermieter 60 %) against the table shortened by
