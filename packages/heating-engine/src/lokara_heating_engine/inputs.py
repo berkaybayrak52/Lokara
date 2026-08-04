@@ -82,7 +82,11 @@ class HeatingLine:
 
 @dataclass(frozen=True)
 class Co2Result:
+    # kg CO₂/m² **over the Abrechnungszeitraum** — not annualised (§ 7 Abs. 3).
     intensity_kg_per_sqm: Decimal
+    # § 5 Abs. 1 S. 4 CO2KostAufG: the factor the Anlage's finite bounds were
+    # shortened by. Exactly 1 for a full year. Rendering the gekürzt band needs it.
+    period_factor: Decimal
     landlord_share_percent: int
     landlord_amount: Cents
     renter_amount: Cents
