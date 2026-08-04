@@ -365,6 +365,9 @@ intermediate this spec needs is computed in `engine.py` as a local and then drop
 | `_Party.days` | `_build_parties` | day-apportionment of WW/base at a Nutzerwechsel |
 | `total_co2_kg`, `co2_cost`, `heated_area_sqm`, the selected step's band | `_apply_co2` / `co2.py` | § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen |
 
+Field-by-field, that table is resolved in **"The carried-intermediates contract (slice 3)"** below —
+names, types, demo values, and which statute makes each one required rather than merely useful.
+
 **Consequence:** the renderer *cannot* show any of this today, and no amount of template work changes
 that. The engine result must carry it first — a pure-package change under CLAUDE.md rule 1
 (framework-free, golden fixtures, `mypy --strict`, `Decimal`/cents), then a template change. The
@@ -577,11 +580,26 @@ Vorgabe (Rechtsstand 01/1981).
   reading at all, so the engine does not know whether one was taken.
 - **The method's statutory basis (§ 9b HeizkostenV) is a prerequisite, not an assumption.** § 9b Abs. 2
   is what permits apportioning an unread period by Gradtagszahlen, and Abs. 3 is what puts Grund- and
-  Warmwasserkosten on Zeitanteile — exactly what `engine.py` does. **`packages/rules-store` does not
-  record that citation**: the degree-day rule's `source` names only the VDI table. Either the store's
-  `source` is extended to name § 9b (a one-line rules-store change, `engine-implementer` lane, listed
-  in the split below) **and the copy cites it**, or the citation stays out of the copy. The page must
-  not cite a paragraph the store does not carry.
+  Warmwasserkosten on Zeitanteile — exactly what `engine.py` does. **Decided 04.08.2026 (lead):** the
+  store's `source` is extended to name § 9b, and the copy may therefore cite it. Exact new value of
+  `DEGREE_DAY_TABLE`'s single `RuleVersion.source` (`packages/rules-store`, slice 3):
+
+  ```
+  § 9b Abs. 2 und Abs. 3 HeizkostenV; Gradtagszahlen nach anerkannter Promilletabelle
+  (VDI-Konvention, keine Rechtsnorm) — verify before production
+  ```
+
+  (one line, no newline; pinned by `packages/rules-store/tests/test_rule_data.py`). Three things this
+  string is careful about, and none of them is optional:
+  - **The statute and the table are separated by the semicolon.** § 9b is law; the promille numbers are
+    not. A source reading *"§ 9b HeizkostenV"* alone would present the VDI table as statutory.
+  - **`valid_from` and the `Rechtsstand` stamp do not move.** `Rechtsstand 01/1981` dates the *promille
+    table*. We have **not** verified when § 9b entered the HeizkostenV, so the pair
+    *"§ 9b HeizkostenV 01/1981"* must never be printed as a Rechtsstand — which is exactly why item 6
+    keeps the degree-day footer label as the template's own fixed copy (VDI qualifier, no paragraph).
+    Resolving it needs the BGBl. history of the HeizkostenV; until then, no in-force date is asserted.
+  - **The `— verify before production` marker stays**, last, after the only em dash in the string, so
+    the existing "everything after the em dash is internal and never renders" rule keeps working.
 - The internal marker `— verify before production` is a developer note and **never renders**. Asserted
   absent from the PDF.
 
@@ -667,6 +685,135 @@ Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 01/1981 ·
   caller (`demo.py`, later the API) builds them from the `ResolvedRule`s it already holds. No engine
   change, no rules change — which is why this ships on its own.
 
+### The carried-intermediates contract (slice 3)
+
+> **Rechtsstand 08/2026** (transcribed 04.08.2026). Introduces **no legal value** into
+> `packages/rules-store` and changes **no arithmetic**: every field below is already computed inside
+> `engine.py` / `co2.py` and dropped before the result object is built. Slice 3 is therefore a pure
+> engine-package change (CLAUDE.md rule 1: no framework/DB/vendor import, `mypy --strict`, `Decimal` +
+> integer cents) and is **not demo-visible** — the rendered PDF must come out byte-identical, no golden
+> in `scripts/assert_statement_pdf.py` moves, nothing under `packages/pdf/` changes.
+
+Items 1–5 above name the figures in prose. This is the same list in the form the engine has to take, so
+that `engine-implementer` has no design decision left to make. Golden fixtures, written first and red
+on purpose: `packages/heating-engine/tests/test_heating_disclosure.py` plus the `source` assertions in
+`packages/rules-store/tests/test_rule_data.py`.
+
+**Rules that apply to all four tables below:**
+
+1. **Every new field is required — no default value.** A default lets a caller construct a result that
+   silently omits a legally required disclosure figure, and the omission then shows up as a blank on a
+   tenant's statement instead of as a `TypeError` in CI.
+2. **`None` means "this figure was not applied", never "not carried".** Where a branch did not run, its
+   operands are `None` and the fixtures assert that they are — a template that prints the wrong branch
+   then prints `None`, loudly, rather than a plausible wrong formula (item 3's hard rule).
+3. **Money is `Cents`.** Weights and areas keep the engine's existing fixed-point convention; a field
+   carrying a ×100 value **says so in its name**, because `docs/03`'s de-scaling warning is precisely
+   about values that look right as integers and render wrong (`18.250` vs `1.825.000`).
+4. **Nothing here is recomputed at render time**, and nothing is read from the engine *input* alongside
+   the result — the drift rule stated at the top of this section.
+5. **Two existing engine conventions stay exactly as they are in this slice.** The result *echoes what
+   the engine divided by*; it does not harmonise it. Namely: § 9's area fallback pro-rates over a flat
+   `365` while the CO₂ period factor anchors its reference year on `valid_from` (366 in a leap year).
+   That inconsistency is real and is recorded in the gaps below — **it is not fixed here**, because
+   changing it would move a euro figure in a slice whose whole point is that no euro figure moves.
+
+#### `WarmWaterSeparation` — new frozen dataclass (§ 9 HeizkostenV), item 3
+
+Lives in `packages/heating-engine/src/lokara_heating_engine/inputs.py` next to the other result shapes
+and is exported from the package. It records **which § 9 branch ran and with which operands** — today
+not recoverable from the result at all.
+
+| Field | Type | Demo value | Required by |
+| --- | --- | --- | --- |
+| `method` | `Literal["MEASURED", "AREA_FALLBACK"]` | `"MEASURED"` | item 3: the two branches print different text and the wrong one must be unprintable |
+| `q_ww_kwh` | `Decimal` | `5000` | § 9 Abs. 2 — the separated warm-water energy, the result of the printed formula |
+| `total_energy_kwh` | `Decimal` | `20000` | the denominator the copy prints (`… von 20.000 kWh Gesamtenergie`) |
+| `volume_m3` | `Decimal \| None` | `40` | measured branch operand |
+| `factor_kwh_per_m3_kelvin` | `Decimal \| None` | `2.5` | measured branch operand (`WarmWaterFormula`, resolved rule value — never a literal in the template) |
+| `hot_temp_c` | `Decimal \| None` | `60` | measured branch operand |
+| `cold_temp_c` | `Decimal \| None` | `10` | measured branch operand |
+| `area_fallback_kwh_per_sqm_year` | `Decimal \| None` | `None` | fallback branch operand (`32 kWh je m² und Jahr`) |
+| `heated_area_sqm` | `Decimal \| None` | `None` | fallback branch operand (`× 100 m²`) — the area the fallback actually used |
+| `period_days` | `int \| None` | `None` | fallback branch operand (`365 von 365 Tagen`, numerator) |
+| `reference_year_days` | `int \| None` | `None` | fallback branch operand (denominator — the flat `365` the engine divides by, per rule 5 above) |
+
+In the `AREA_FALLBACK` branch the four measured-branch fields are `None` and the four fallback fields
+are set; in the `MEASURED` branch, the other way round. `heated_area_sqm` is deliberately **not** hoisted
+onto `HeatingResult`: outside this branch no disclosure in this section needs a bare building area, and a
+field that is merely useful is a field that will drift.
+
+#### `HeatingResult` — the vertical half (Block A), items 2 and 3
+
+| Field | Type | Demo value | Required by |
+| --- | --- | --- | --- |
+| `billable_cost` | `Cents` | `1_024_000` | Block A's `= umlagefähige Kosten` line; equals `total` when `co2 is None` |
+| `heating_pot` | `Cents` | `768_000` | § 9 result — `→ Heizung 7.680,00 €` |
+| `ww_pot` | `Cents` | `256_000` | § 9 result — `→ Warmwasser 2.560,00 €`; `0` when there is no central warm water |
+| `heat_base_pot` | `Cents` | `230_400` | §§ 7/8 — `Heizung: Grundkosten 2.304,00 €` |
+| `heat_cons_pot` | `Cents` | `537_600` | §§ 7/8 — `Verbrauchskosten 5.376,00 €` |
+| `ww_base_pot` | `Cents` | `76_800` | § 8 — `Warmwasser: Grundkosten 768,00 €`; `0` without central warm water |
+| `ww_cons_pot` | `Cents` | `179_200` | § 8 — `Verbrauchskosten 1.792,00 €`; `0` without central warm water |
+| `applied_consumption_share` | `Decimal` | `0.7` | item 2 — *what was applied*, printed as `30 % / 70 %`, derived from the resolved rule value and never a template literal |
+| `split_bounds` | `HeatingSplitBounds` | `0.5 / 0.7` | item 2 — *what the law permits*, the second of the two facts; § 7 Abs. 1 HeizkostenV |
+| `warm_water_separation` | `WarmWaterSeparation \| None` | see above | item 3; `None` exactly when `HeatingInput.warm_water is None` |
+| `heat_fallback_to_area` | `bool` | `False` | § 9a Abs. 2 — Block B states an Umlageschlüssel **per column**, and today the result cannot say that the heating column fell back to Wohnfläche while warm water did not |
+| `ww_fallback_to_area` | `bool` | `False` | as above, for the warm-water column |
+
+`consumption_fallback_to_area` **stays and keeps its meaning** (`heat_fallback or ww_fallback`) — it is
+read by existing tests and by the PDF layer, and this slice moves nothing that renders.
+
+#### `HeatingLine` — the horizontal half (Blocks B and C), item 1 and item 4
+
+One row per party, so every field is per party.
+
+| Field | Type | Demo values (A · B-Mieter · B-Vermieter · C) | Required by |
+| --- | --- | --- | --- |
+| `days` | `int` | `365 · 181 · 184 · 365` | § 9b Abs. 3 Zeitanteile; Block C prints `181 von 365 Tagen` |
+| `unit_total_days` | `int` | `365 · 365 · 365 · 365` | the denominator that was applied (`von 365`), which is a per-unit sum, not the period length |
+| `base_weight_sqm_days_x100` | `Decimal` | `1_825_000 · 543_000 · 552_000 · 730_000` | Block B's `Fläche·Tage` Bemessung — §§ 7 Abs. 1 / 8 Abs. 1 HeizkostenV. **×100 fixed point**: ÷ 100 gives the printed `18.250 · 5.430 · 5.520 · 7.300`, Σ `36.500` |
+| `heat_consumption_weight` | `Decimal \| None` | `600 · 146.25 · 103.75 · 150` | the consumption Bemessung actually applied to the heating pot. `None` **iff** `heat_fallback_to_area` — then the applied Bemessung was Fläche·Tage and no consumption figure may be shown |
+| `ww_consumption_weight_m3` | `Decimal \| None` | `20 · 5.950684… · 6.049315… · 8` | Block B's `Verbrauch Warmwasser` Bemessung (m³, unscaled). `None` **iff** there is no central warm water or `ww_fallback_to_area` |
+| `degree_day_promille` | `Decimal` | `1000 · 585 · 415 · 1000` | Block C's `585 ‰` — § 9b Abs. 2 |
+| `unit_degree_day_promille_total` | `Decimal` | `1000 · 1000 · 1000 · 1000` | Block C's `von 1.000 ‰`. Never omit it: over a partial billing period a unit's parties sum to **less** than 1.000 and a bare `585 ‰` would then read as wrong |
+
+- `degree_day_promille` is carried for **every** party, including single-party units, exactly as
+  `_build_parties` already computes it; the template decides whether Block C renders (unit with > 1
+  party), the engine does not. `unit_degree_day_promille_total` is the sum over that unit's parties —
+  i.e. the denominator `_consumption_weights` divides by.
+- **The unit-level reading (`12 m³` in Block C) is deliberately not a field.** It is the exact sum of
+  that unit's parties' `ww_consumption_weight_m3` (the apportionment is `value × own/total`), so
+  carrying it again would create two sources for one number. The fixture asserts the identity.
+
+#### `Co2Result` — § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen, item 5
+
+| Field | Type | Demo value | Required by |
+| --- | --- | --- | --- |
+| `total_co2_kg` | `Decimal` | `2000` | § 7 Abs. 3 — the emissions the Einstufung was computed from |
+| `heated_area_sqm` | `Decimal` | `100` | § 7 Abs. 3 — the divisor. Repeated from `WarmWaterSeparation` on purpose: § 7 Abs. 3 is discharged by this object alone, and the two must be the same number (fixture asserts it) |
+| `co2_cost` | `Cents` | `30_000` | § 7 Abs. 3 — the amount being split, and the only way a tenant can check `240,00 + 60,00 = 300,00` |
+| `band_min_inclusive` | `Decimal \| None` | `17` | § 7 Abs. 3 *Einstufung*, printed as a band because `Co2Step` carries no ordinal. `None` = the first step, which has no lower bound (`unter 12`) |
+| `band_max_exclusive` | `Decimal \| None` | `22` | as above. `None` = the open-ended top step |
+| `period_days` | `int` | `365` | the short-period copy in item 5 prints `(181 von 365 Tagen)`, and `period_factor` alone cannot be un-divided back into it |
+| `reference_year_days` | `int` | `365` | as above — the denominator, anchored on `valid_from` (366 in a leap year, `docs/03`) |
+
+**How the band is derived — the one place this slice touches arithmetic-shaped code:**
+
+```
+band_max_exclusive = step.max_intensity_exclusive × period_factor   # None → None (open-ended, never scaled)
+band_min_inclusive = previous_step.max_intensity_exclusive × period_factor   # first step → None
+```
+
+- Both bounds are the ones **actually compared against**, i.e. already shortened by `period_factor`
+  (§ 5 Abs. 1 S. 4). The template must not multiply anything: a second implementation of a legal rule
+  in the template layer is how the two drift apart. For the demo year the factor is exactly 1 and the
+  band is `17` / `22` — the printed page does not move.
+- `landlord_share_percent_for_intensity` keeps its current signature and behaviour; it is public and
+  fixture-covered. The band is derived inside `split_co2_cost` from the same table and the same factor.
+- `period_factor` is unchanged and stays on the result (it landed with the § 5 Abs. 1 S. 4 slice); it
+  belongs to this picture rather than beside it, because the short-period copy in item 5 needs the
+  factor **and** the two day counts together.
+
 ### Typographic floor for legally required disclosure
 
 Measured on the current page (WCAG ratios against the `docs/05` tokens): the Umlageschlüssel +
@@ -726,10 +873,32 @@ a stylesheet-level assertion, deliberately not a pixel one.
   `meter_id`, no start, no end anywhere in `HeatingInput`. Rendering readings therefore needs a data
   path that does not exist (M3's Zähler slice), plus a decision on where the consistency check
   `Ende − Anfang == Verbrauch` lives. Named, not designed.
-- **CO₂ intensity over a non-annual period.** `split_co2_cost` divides `total_co2_kg` by area with no
-  pro-rating, while the Einstufung bands are *per year*. For a short (interim) or long period the
-  intensity — and therefore possibly the step — is off. Not touched by this spec; recorded in the open
-  questions below so it is not discovered on a real statement.
+- **CO₂ over a non-annual period — the pro-rating itself is implemented; what remains is the rounding.**
+  ~~`split_co2_cost` divides by area with no pro-rating~~ was true when this section was written and was
+  fixed on 04.08.2026: § 5 Abs. 1 S. 4 CO2KostAufG shortens the **Anlage table** by
+  `period_factor = min(1, days(period) / days(reference year))`, the emissions are *not* extrapolated,
+  and the disclosed intensity stays the period figure. Rule + conventions + edge cases:
+  `docs/03` → *"The Stufenmodell is a **per-year** table"*; fixtures
+  `packages/heating-engine/tests/test_co2_period_factor.py`; `Co2Result.period_factor` carries the
+  applied factor and the contract above adds the two day counts, so item 5's short-period copy renders
+  without the template recomputing law. What genuinely remains open:
+  - **§ 5 Abs. 1 S. 3 rounding before classification** — the statute requires the specific emission
+    value to be rounded to one decimal place (*"auf die erste Nachkommastelle zu runden"*); the engine
+    classifies the unrounded `Decimal`, and at a bound (11,96 → 12,0) that changes the Stufe.
+    Scheduled: `PLAN.md` execution order **row 4.5**; recorded in `docs/03` → *"Known gap, deliberately
+    not implemented here"*. Not folded into any slice of this section.
+  - **Two conventions that are conventions, not statute**: *anteilig* read day-exact rather than
+    month-exact, and S. 4 applied to a Rumpfperiode that was never *vereinbart*. A BMWSB Arbeitshilfe
+    or a Mietrechtler's sign-off would resolve both (`docs/03`).
+  - **A > 12-month period with a CO₂ split is refused**, which is lawful for Nichtwohngebäude
+    (CO2KostAufG § 8) — recorded as drift in `docs/03` → *"Additional fixtures to add"*.
+- **§ 9's area fallback divides by a flat 365, the CO₂ period factor does not.** `_separate_warm_water`
+  pro-rates the 32 kWh/m²/a Ersatzwert over `days / 365`, so a leap-year statement pro-rates to
+  366/365 = 1,0027 while `co2.py` anchors its reference year on `valid_from` and returns exactly 1. One
+  of the two is wrong for a full leap year; § 9 Abs. 2 does not define the divisor either. Named, not
+  guessed, and **not** changed by the carried-intermediates slice — the result echoes the divisor it
+  used (`WarmWaterSeparation.reference_year_days`) so the page states what happened. Resolving it needs
+  the same kind of source as the *anteilig* question above.
 - **§§ 7/8 with different shares for heating and warm water** — see item 2; the input cannot express it
   today.
 
@@ -782,7 +951,8 @@ suggestion would be invented law, not a convenience.
       standing in for; and the sub-questions that section names —
       **the unit of the heating-consumption Bemessung** (withhold vs. unit-free figure),
       **Zählerstände** (no data path into the engine),
-      **CO₂ intensity over a non-annual period** (no pro-rating in `split_co2_cost`),
+      **§ 5 Abs. 1 S. 3 rounding before the CO₂ classification** (`PLAN.md` row 4.5 — the period
+      factor itself shipped on 04.08.2026), **§ 9's flat-365 fallback divisor**,
       **§§ 7/8 with different shares for heating and warm water** (not expressible in the input)
 - [ ] What closes BGH minimum #3: a rendered per-party calculation (the operator, and the Bemessung
       derived from its factors) — see the ◐ note under the four-minimums table

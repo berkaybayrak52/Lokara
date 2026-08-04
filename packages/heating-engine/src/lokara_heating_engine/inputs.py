@@ -2,10 +2,25 @@
 
 Plain frozen dataclasses; every legal ratio/table arrives as a resolved rule
 value (lokara-domain shapes) — the engine never hardcodes a legal number.
+
+The result shapes carry, besides the money, every intermediate the statement's
+legally required disclosure has to show: the pots of the §§ 7/8/9 vertical
+split, the per-party Bemessungen of the horizontal one, which § 9 branch ran
+with which operands, and the § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen.
+Contract: `docs/08-statement-document.md` → "The carried-intermediates contract
+(slice 3)". Two rules hold throughout:
+
+* **Every disclosure field is required.** A default lets a caller build a result
+  that silently omits a legally required figure, and the omission surfaces as a
+  blank on a tenant's statement instead of as a `TypeError` in CI.
+* **`None` means "not applied", never "not carried".** Where a branch did not
+  run its operands are `None`, so a template printing the wrong branch prints
+  `None` loudly rather than a plausible wrong formula.
 """
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Literal
 
 from lokara_domain import (
     Cents,
@@ -68,8 +83,39 @@ class HeatingInput:
 
 
 @dataclass(frozen=True)
+class WarmWaterSeparation:
+    """§ 9 HeizkostenV — which branch separated the warm-water energy, and with
+    which operands. The two branches print different text, so the result has to
+    say which one ran; the wrong one must be unprintable rather than plausible.
+
+    In `MEASURED` the four fallback operands are `None`; in `AREA_FALLBACK` the
+    four measured ones are.
+    """
+
+    method: Literal["MEASURED", "AREA_FALLBACK"]
+    # § 9 Abs. 2 — the separated warm-water energy, the result of the formula.
+    q_ww_kwh: Decimal
+    # The denominator the copy prints ("… von 20.000 kWh Gesamtenergie").
+    total_energy_kwh: Decimal
+    # MEASURED operands — the resolved rule values, never template literals.
+    volume_m3: Decimal | None
+    factor_kwh_per_m3_kelvin: Decimal | None
+    hot_temp_c: Decimal | None
+    cold_temp_c: Decimal | None
+    # AREA_FALLBACK operands (§ 9 Abs. 2 Ersatzwert).
+    area_fallback_kwh_per_sqm_year: Decimal | None
+    heated_area_sqm: Decimal | None
+    period_days: int | None
+    # The divisor the engine actually used — a flat 365, deliberately *not* the
+    # anchored reference year the CO₂ factor uses. The result echoes what was
+    # divided by; harmonising the two moves a euro figure (docs/08, gaps).
+    reference_year_days: int | None
+
+
+@dataclass(frozen=True)
 class HeatingLine:
-    """One party's share. tenancy_id=None → landlord (vacancy/self-use)."""
+    """One party's share, plus the Bemessung that produced it in each column.
+    tenancy_id=None → landlord (vacancy/self-use)."""
 
     unit_id: str
     tenancy_id: str | None
@@ -78,6 +124,25 @@ class HeatingLine:
     ww_base: Cents
     ww_consumption: Cents
     total: Cents
+    # § 9b Abs. 3 Zeitanteile: this party's days, and the per-unit sum they are
+    # a share of (the applied denominator — not the billing period's length).
+    days: int
+    unit_total_days: int
+    # §§ 7 Abs. 1 / 8 Abs. 1 Fläche·Tage Bemessung. **×100 fixed point** (the
+    # scale is in the name on purpose): ÷ 100 gives the printed m²·Tage.
+    base_weight_sqm_days_x100: Decimal
+    # The consumption Bemessung applied to the heating pot. `None` iff the
+    # heating column fell back to the area key (§ 9a Abs. 2) — then no
+    # consumption figure was applied and none may be shown.
+    heat_consumption_weight: Decimal | None
+    # The warm-water Bemessung in m³ (unscaled). `None` iff there is no central
+    # warm water or that column fell back to the area key.
+    ww_consumption_weight_m3: Decimal | None
+    # § 9b Abs. 2 Gradtagszahlen: this party's promille and the per-unit total.
+    # Never print the promille bare — over a partial billing period a unit's
+    # parties sum to less than 1.000 and "585 ‰" alone would read as wrong.
+    degree_day_promille: Decimal
+    unit_degree_day_promille_total: Decimal
 
 
 @dataclass(frozen=True)
@@ -92,6 +157,24 @@ class Co2Result:
     renter_amount: Cents
     # e.g. "Rechtsstand 01/2023" — must appear on the statement.
     rechtsstand: str
+    # § 7 Abs. 3 Berechnungsgrundlagen — the two operands the intensity is
+    # reproducible from, and the amount being split. This object discharges
+    # § 7 Abs. 3 on its own, which is why the area is repeated here.
+    total_co2_kg: Decimal
+    heated_area_sqm: Decimal
+    co2_cost: Cents
+    # The Einstufung as the band actually compared against — already shortened
+    # by `period_factor`, so no renderer multiplies a legal rule a second time.
+    # `Co2Step` carries no ordinal, so a step *number* would be invented.
+    # `None` lower = the first step ("unter 12"); `None` upper = the open-ended
+    # top step, which is never scaled.
+    band_min_inclusive: Decimal | None
+    band_max_exclusive: Decimal | None
+    # The two day counts behind `period_factor` — "(181 von 365 Tagen)" is
+    # required copy and 0,4958904109589041… cannot be un-divided back into it.
+    period_days: int
+    # Anchored on `valid_from`, so a full leap year is 366 of 366 (docs/03).
+    reference_year_days: int
 
 
 @dataclass(frozen=True)
@@ -102,8 +185,27 @@ class HeatingResult:
     estimated_unit_ids: tuple[str, ...]
     # True when > 25 % of the area lacked readings and the consumption
     # portion was allocated by the fixed (area) key instead (§ 9a Abs. 2).
+    # Kept as heat-or-warm-water; the per-column flags below are what a
+    # statement needs, because Block B states an Umlageschlüssel per column.
     consumption_fallback_to_area: bool
+    heat_fallback_to_area: bool
+    ww_fallback_to_area: bool
     total: Cents
+    # The §§ 7/8/9 vertical split, top to bottom. `total` minus the landlord's
+    # CO₂ share; equals `total` when there is no CO₂ split.
+    billable_cost: Cents
+    heating_pot: Cents
+    ww_pot: Cents
+    heat_base_pot: Cents
+    heat_cons_pot: Cents
+    ww_base_pot: Cents
+    ww_cons_pot: Cents
+    # § 7 Abs. 1 HeizkostenV — two distinct facts the page states separately:
+    # what was applied, and what the law permits.
+    applied_consumption_share: Decimal
+    split_bounds: HeatingSplitBounds
+    # `None` exactly when there is no central warm water.
+    warm_water_separation: WarmWaterSeparation | None
 
 
 class HeatingInputError(ValueError):

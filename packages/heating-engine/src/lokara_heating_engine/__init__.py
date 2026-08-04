@@ -19,6 +19,7 @@ from .inputs import (
     HeatingRules,
     HeatingUnit,
     WarmWaterInput,
+    WarmWaterSeparation,
 )
 
 __version__ = "0.1.0"
@@ -33,6 +34,7 @@ __all__ = [
     "HeatingRules",
     "HeatingUnit",
     "WarmWaterInput",
+    "WarmWaterSeparation",
     "calculate_heating_statement",
     "degree_day_weight",
     "landlord_share_percent_for_intensity",

@@ -53,6 +53,40 @@ class TestDegreeDays:
         assert sum(table.promille_by_month) == 1000
         assert len(table.promille_by_month) == 12
 
+    def test_source_names_the_statute_the_method_rests_on(self) -> None:
+        """§ 9b Abs. 2 HeizkostenV is what permits apportioning an unread period
+        by Gradtagszahlen, Abs. 3 is what puts Grund- und Warmwasserkosten on
+        Zeitanteile — exactly what the engine does. The store carried only the
+        VDI table, so the statement could not cite the paragraph it applies:
+        the page must never cite a paragraph the store does not carry.
+        Spec + exact string: `docs/08-statement-document.md` → "The method's
+        statutory basis (§ 9b HeizkostenV) is a prerequisite, not an assumption".
+        """
+        source = get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).source
+        assert source == (
+            "§ 9b Abs. 2 und Abs. 3 HeizkostenV; Gradtagszahlen nach anerkannter "
+            "Promilletabelle (VDI-Konvention, keine Rechtsnorm) "
+            "— verify before production"
+        )
+
+    def test_the_statute_and_the_convention_stay_distinguishable(self) -> None:
+        """§ 9b is law; the promille numbers are not. A source that named only
+        the paragraph would present the VDI table as statutory — the failure
+        mode the "verify before production" marker exists to prevent."""
+        resolved = get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1))
+        assert "§ 9b" in resolved.source
+        assert "keine Rechtsnorm" in resolved.source
+        # The internal marker is last, after the only em dash in the string, so
+        # the renderer's "everything after the em dash never renders" rule holds.
+        assert resolved.source.count("—") == 1
+        assert resolved.source.endswith("— verify before production")
+
+    def test_the_rechtsstand_still_dates_the_table_and_not_the_paragraph(self) -> None:
+        """01/1981 is the promille table's stamp. § 9b's own in-force date is not
+        verified anywhere (it would need the BGBl. history of the HeizkostenV),
+        so no output may pair the paragraph with this date as its Rechtsstand."""
+        assert get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).rechtsstand == "Rechtsstand 01/1981"
+
 
 class TestWarmWater:
     def test_formula_yields_125_kwh_per_m3(self) -> None:
