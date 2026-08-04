@@ -40,9 +40,7 @@ def verify_supabase_token(token: str, secret: str) -> AuthContext:
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
     person_id = payload.get("sub")
-    account_id = payload.get("account_id") or (payload.get("app_metadata") or {}).get(
-        "account_id"
-    )
+    account_id = payload.get("account_id") or (payload.get("app_metadata") or {}).get("account_id")
     if not isinstance(person_id, str) or not isinstance(account_id, str) or not account_id:
         raise HTTPException(status_code=401, detail="Token carries no account context")
     return AuthContext(person_id=person_id, account_id=account_id)

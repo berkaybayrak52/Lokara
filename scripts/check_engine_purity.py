@@ -47,10 +47,30 @@ if sys.version_info < (3, 12):  # noqa: UP036 — guards the interpreter, not th
 
 # Modules no pure package may import, whatever the layer.
 VENDOR_AND_FRAMEWORK = {
-    "fastapi", "starlette", "uvicorn", "flask", "django",
-    "sqlalchemy", "alembic", "psycopg", "psycopg2", "asyncpg", "prisma",
-    "supabase", "redis", "celery", "arq", "boto3", "stripe", "playwright",
-    "httpx", "requests", "aiohttp", "urllib", "urllib3", "socket",
+    "fastapi",
+    "starlette",
+    "uvicorn",
+    "flask",
+    "django",
+    "sqlalchemy",
+    "alembic",
+    "psycopg",
+    "psycopg2",
+    "asyncpg",
+    "prisma",
+    "supabase",
+    "redis",
+    "celery",
+    "arq",
+    "boto3",
+    "stripe",
+    "playwright",
+    "httpx",
+    "requests",
+    "aiohttp",
+    "urllib",
+    "urllib3",
+    "socket",
 }
 
 # Modules that break determinism or purity of a golden-tested engine.
@@ -58,9 +78,16 @@ IO_AND_AMBIENT = {"os", "sys", "pathlib", "shutil", "subprocess", "tempfile", "r
 
 # Callables that read ambient state. Matched on the dotted call name.
 AMBIENT_CALLS = {
-    "datetime.now", "datetime.utcnow", "date.today", "datetime.today",
-    "time.time", "time.monotonic", "random.random", "random.choice",
-    "uuid.uuid4", "open",
+    "datetime.now",
+    "datetime.utcnow",
+    "date.today",
+    "datetime.today",
+    "time.time",
+    "time.monotonic",
+    "random.random",
+    "random.choice",
+    "uuid.uuid4",
+    "open",
 }
 
 
@@ -78,31 +105,56 @@ LAYERS: tuple[Layer, ...] = (
     Layer(
         "packages/domain/src",
         forbidden_internal=frozenset(
-            {"lokara_nk_engine", "lokara_heating_engine", "lokara_rules_store",
-             "lokara_adapters", "lokara_db", "lokara_api", "lokara_pdf"}
+            {
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+            }
         ),
     ),
     # The two crown-jewel engines: domain only. Never rules-store (docs/03).
     Layer(
         "packages/nk-engine/src",
         forbidden_internal=frozenset(
-            {"lokara_rules_store", "lokara_adapters", "lokara_db", "lokara_api",
-             "lokara_pdf", "lokara_heating_engine"}
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_heating_engine",
+            }
         ),
     ),
     Layer(
         "packages/heating-engine/src",
         forbidden_internal=frozenset(
-            {"lokara_rules_store", "lokara_adapters", "lokara_db", "lokara_api",
-             "lokara_pdf", "lokara_nk_engine"}
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_nk_engine",
+            }
         ),
     ),
     # rules-store is data + resolution. It may know domain shapes, nothing above.
     Layer(
         "packages/rules-store/src",
         forbidden_internal=frozenset(
-            {"lokara_nk_engine", "lokara_heating_engine", "lokara_adapters",
-             "lokara_db", "lokara_api", "lokara_pdf"}
+            {
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+            }
         ),
     ),
     # adapters own the vendor edge, so vendor SDKs are legal here — but they must not
@@ -184,9 +236,7 @@ def main(argv: list[str]) -> int:
     if argv:
         candidates = [Path(a).resolve() for a in argv]
     else:
-        candidates = [
-            p for layer in LAYERS for p in (REPO / layer.root).rglob("*.py")
-        ]
+        candidates = [p for layer in LAYERS for p in (REPO / layer.root).rglob("*.py")]
 
     problems: list[str] = []
     checked = 0

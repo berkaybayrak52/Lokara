@@ -89,9 +89,7 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
     # instead of a table of invented numbers.
     heating_lines = [
         StatementHeatingLine(
-            party_label=bundle.party_labels.get(
-                (line.unit_id, line.tenancy_id), f"{line.unit_id}"
-            ),
+            party_label=bundle.party_labels.get((line.unit_id, line.tenancy_id), f"{line.unit_id}"),
             is_landlord=line.tenancy_id is None,
             heating_base_eur=format_eur(line.heating_base),
             heating_consumption_eur=format_eur(line.heating_consumption),
@@ -138,9 +136,7 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
 
 
 @router.get("/statements/demo/pdf")
-def demo_statement_pdf(
-    account_id: str, auth: RequireAuth, session: PathAccountSession
-) -> Response:
+def demo_statement_pdf(account_id: str, auth: RequireAuth, session: PathAccountSession) -> Response:
     del account_id
     bundle = _bundle(session)
     landlord = bundle.building.landlord

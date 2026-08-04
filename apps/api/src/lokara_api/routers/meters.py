@@ -240,8 +240,7 @@ def create_reading(
         )
     )
     display = (
-        f"{format_number_de(consumption[meter.id].value)} "
-        f"{UNIT_SYMBOLS[meter.measurement_unit]}"
+        f"{format_number_de(consumption[meter.id].value)} {UNIT_SYMBOLS[meter.measurement_unit]}"
         if meter.id in consumption
         else None
     )
@@ -261,9 +260,7 @@ def _heating_cost_out(row: HeatingCostEntry) -> HeatingCostOut:
         period_to=row.period_to,
         co2_kg_x1000=row.co2_kg_x1000,
         co2_kg_display=(
-            format_number_de(_scaled(row.co2_kg_x1000))
-            if row.co2_kg_x1000 is not None
-            else None
+            format_number_de(_scaled(row.co2_kg_x1000)) if row.co2_kg_x1000 is not None else None
         ),
         co2_cost_cents=row.co2_cost_cents,
         co2_cost_eur=(
@@ -312,9 +309,7 @@ def create_heating_cost(
 
 
 @router.delete("/heating-costs/{heating_cost_id}", status_code=204)
-def delete_heating_cost(
-    account_id: str, heating_cost_id: str, session: PathAccountSession
-) -> None:
+def delete_heating_cost(account_id: str, heating_cost_id: str, session: PathAccountSession) -> None:
     del account_id
     row = session.get(HeatingCostEntry, heating_cost_id)
     if row is None:

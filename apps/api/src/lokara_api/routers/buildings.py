@@ -52,9 +52,7 @@ def _building_summary(building: Building) -> BuildingSummary:
 @router.get("/buildings")
 def list_buildings(account_id: str, session: PathAccountSession) -> BuildingListResponse:
     del account_id  # scoping happened in the dependency (RLS + membership)
-    buildings = session.scalars(
-        select(Building).order_by(Building.created_at, Building.id)
-    ).all()
+    buildings = session.scalars(select(Building).order_by(Building.created_at, Building.id)).all()
     return BuildingListResponse(buildings=[_building_summary(b) for b in buildings])
 
 
@@ -94,9 +92,7 @@ def building_detail(
             label=unit.label,
             area_sqm=unit.area_sqm_x100 / 100,
             tenancy_count=len(unit.tenancies),
-            occupied_today=any(
-                _is_active_today(t.valid_from, t.valid_to) for t in unit.tenancies
-            ),
+            occupied_today=any(_is_active_today(t.valid_from, t.valid_to) for t in unit.tenancies),
         )
         for unit in sorted(building.units, key=lambda u: u.label)
     ]
@@ -155,9 +151,7 @@ def _get_unit(session: PathAccountSession, unit_id: str) -> Unit:
 
 
 @router.get("/units/{unit_id}")
-def unit_detail(
-    account_id: str, unit_id: str, session: PathAccountSession
-) -> UnitDetailResponse:
+def unit_detail(account_id: str, unit_id: str, session: PathAccountSession) -> UnitDetailResponse:
     del account_id
     unit = _get_unit(session, unit_id)
     tenancies = sorted(unit.tenancies, key=lambda t: t.valid_from, reverse=True)

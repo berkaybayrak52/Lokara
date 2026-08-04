@@ -48,8 +48,7 @@ _REFERENCE_TOTAL_UNITS: dict[AllocationKey, str] = {
 }
 
 DISCLAIMER = (
-    "Dieses Dokument wurde rechtskonform erstellt; es stellt keine Rechts- "
-    "oder Steuerberatung dar."
+    "Dieses Dokument wurde rechtskonform erstellt; es stellt keine Rechts- oder Steuerberatung dar."
 )
 
 

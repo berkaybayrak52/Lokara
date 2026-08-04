@@ -323,9 +323,7 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(HeatingCostEntry)).all() == []
             assert session.scalars(select(Account.id)).all() == [seed.account_b]
 
-    def test_own_context_sees_own_rows(
-        self, engines: tuple[Engine, Engine], seed: _Seed
-    ) -> None:
+    def test_own_context_sees_own_rows(self, engines: tuple[Engine, Engine], seed: _Seed) -> None:
         """Non-vacuous control: the same query with A's context finds A's rows —
         so the empty results above are RLS at work, not an empty database."""
         _, app = engines
@@ -343,9 +341,7 @@ class TestCrossAccountIsolation:
             ]
             assert session.scalars(select(Meter.id)).all() == [seed.meter_a]
             assert session.scalars(select(MeterReading.id)).all() == [seed.reading_a]
-            assert session.scalars(select(HeatingCostEntry.id)).all() == [
-                seed.heating_cost_a
-            ]
+            assert session.scalars(select(HeatingCostEntry.id)).all() == [seed.heating_cost_a]
             assert session.scalars(select(Account.id)).all() == [seed.account_a]
 
     def test_missing_context_denies_by_default(
@@ -888,9 +884,7 @@ class TestGlobalPersonIsolation:
         with Session(app) as session:
             assert session.scalars(select(Person)).all() == []
 
-    def test_person_has_rls_enabled_and_forced(
-        self, engines: tuple[Engine, Engine]
-    ) -> None:
+    def test_person_has_rls_enabled_and_forced(self, engines: tuple[Engine, Engine]) -> None:
         """FORCE, not just ENABLE. Without FORCE the table owner bypasses the
         policy, and the table owner is exactly the connection a migration, a seed
         script or a careless admin task uses. Mirrors check 1 + 2 of

@@ -133,9 +133,7 @@ class TestExtraction:
         assert _field(body, "invoiceDate")["value"] == "15.12.2025"
         assert _field(body, "vendorName")["value"] == "Stadtreinigung Frankfurt GmbH"
 
-    def test_the_inferred_field_is_the_one_flagged_for_review(
-        self, client: TestClient
-    ) -> None:
+    def test_the_inferred_field_is_the_one_flagged_for_review(self, client: TestClient) -> None:
         """The review UI's purpose: send the eye to the weak value. The amount
         was read; the category was guessed."""
         body = _extract(client)
@@ -149,9 +147,7 @@ class TestExtraction:
         """No screen may imply a live OCR integration that does not exist."""
         assert "Stub" in _extract(client)["providerLabel"]
 
-    def test_the_allocation_key_is_reported_as_not_extracted(
-        self, client: TestClient
-    ) -> None:
+    def test_the_allocation_key_is_reported_as_not_extracted(self, client: TestClient) -> None:
         """The guard against inventing the BetrKV catalogue (docs/08).
 
         The document says nothing about how a cost is apportioned. The prefill
@@ -170,9 +166,7 @@ class TestExtraction:
         _extract(client)
         assert _costs(client) == before
 
-    def test_an_already_entered_invoice_is_flagged_as_a_duplicate(
-        self, client: TestClient
-    ) -> None:
+    def test_an_already_entered_invoice_is_flagged_as_a_duplicate(self, client: TestClient) -> None:
         """Same label, same amount, overlapping period — the seeded Müllabfuhr.
         A warning, not a block: the response still carries a full prefill."""
         body = _extract(client)
@@ -185,9 +179,7 @@ class TestExtraction:
 
 
 class TestConfirmGoesThroughTheNormalPath:
-    def test_the_prefill_creates_a_cost_via_the_ordinary_endpoint(
-        self, client: TestClient
-    ) -> None:
+    def test_the_prefill_creates_a_cost_via_the_ordinary_endpoint(self, client: TestClient) -> None:
         """Confirm is not a second write path: the review form posts the
         prefill (corrected or not) to Kosten erfassen, which applies the same
         validation and the same append-only allocation key."""
@@ -207,9 +199,7 @@ class TestConfirmGoesThroughTheNormalPath:
         finally:
             # Leave the seeded scenario exactly as found — a second Müllabfuhr
             # would double the € 1.200 golden for every other suite.
-            assert (
-                client.delete(f"{BASE}/costs/{cost['id']}", headers=DEMO).status_code == 204
-            )
+            assert client.delete(f"{BASE}/costs/{cost['id']}", headers=DEMO).status_code == 204
 
     def test_a_corrected_amount_is_what_gets_stored(self, client: TestClient) -> None:
         """The reviewer overrules the extraction — the whole point of the step."""

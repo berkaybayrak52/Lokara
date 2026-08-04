@@ -65,8 +65,7 @@ def client() -> Iterator[TestClient]:
         )
         session.execute(
             text(
-                "DELETE FROM cost_entry "
-                "WHERE account_id = :account AND id <> 'cost_demo_garbage'"
+                "DELETE FROM cost_entry WHERE account_id = :account AND id <> 'cost_demo_garbage'"
             ),
             {"account": DEMO_ACCOUNT_ID},
         )

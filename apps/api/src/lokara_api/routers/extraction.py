@@ -162,9 +162,7 @@ def _read_upload(file: UploadFile) -> SourceDocument:
     # over the limit is enough to know it is too large.
     content = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413, detail=f"Die Datei ist größer als {MAX_UPLOAD_MB} MB."
-        )
+        raise HTTPException(status_code=413, detail=f"Die Datei ist größer als {MAX_UPLOAD_MB} MB.")
     if not content:
         raise HTTPException(status_code=422, detail="Die Datei ist leer.")
     return SourceDocument(file_name=name, content=content)

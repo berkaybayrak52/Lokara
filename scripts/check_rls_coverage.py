@@ -84,8 +84,7 @@ def _is_named(table: str, test_src: str) -> bool:
     those longer identifiers counts as a mention of the shorter table any more.
     """
     return any(
-        re.search(rf"\b{re.escape(token)}\b", test_src)
-        for token in (table, _model_name(table))
+        re.search(rf"\b{re.escape(token)}\b", test_src) for token in (table, _model_name(table))
     )
 
 
@@ -103,9 +102,11 @@ def _url() -> str:
         )
         raise SystemExit(2)
     # SQLAlchemy 2.0 wants an explicit driver.
-    return url.replace("postgresql://", "postgresql+psycopg://", 1) if url.startswith(
-        "postgresql://"
-    ) else url
+    return (
+        url.replace("postgresql://", "postgresql+psycopg://", 1)
+        if url.startswith("postgresql://")
+        else url
+    )
 
 
 TENANT_TABLES = text(
@@ -149,8 +150,10 @@ def main() -> int:
         return 2
 
     if not all_tables:
-        print("check_rls_coverage: database has no tables — run alembic upgrade head first.",
-              file=sys.stderr)
+        print(
+            "check_rls_coverage: database has no tables — run alembic upgrade head first.",
+            file=sys.stderr,
+        )
         return 2
 
     test_src = ISOLATION_TEST.read_text(encoding="utf-8") if ISOLATION_TEST.exists() else ""
@@ -161,9 +164,7 @@ def main() -> int:
         if not enabled:
             problems.append(f"{name}: has account_id but RLS is NOT ENABLEd — silent leak")
         if not forced:
-            problems.append(
-                f"{name}: RLS not FORCEd — the table owner bypasses every policy"
-            )
+            problems.append(f"{name}: RLS not FORCEd — the table owner bypasses every policy")
         if policies == 0:
             problems.append(
                 f"{name}: RLS enabled but no policy exists — denies everything or nothing"

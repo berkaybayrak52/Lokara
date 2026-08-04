@@ -209,6 +209,7 @@ def downgrade() -> None:
         """
     )
     op.drop_index("ix_building_assignment_account", table_name="building_assignment")
-    op.drop_constraint("building_assignment_account_id_fkey", "building_assignment",
-                       type_="foreignkey")
+    op.drop_constraint(
+        "building_assignment_account_id_fkey", "building_assignment", type_="foreignkey"
+    )
     op.drop_column("building_assignment", "account_id")

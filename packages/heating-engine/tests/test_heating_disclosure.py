@@ -137,9 +137,7 @@ class TestNothingThatRendersToday_Moves:
 
     def test_the_worked_examples_party_totals_are_unchanged(self) -> None:
         result = statement()
-        rows = [
-            (line.unit_id, line.tenancy_id, int(line.total)) for line in result.lines
-        ]
+        rows = [(line.unit_id, line.tenancy_id, int(line.total)) for line in result.lines]
         assert rows == [
             ("unit-a", "ten-a", 565_760),
             ("unit-b", "ten-b", 150_984),
@@ -387,8 +385,7 @@ class TestBlockCNutzerwechsel:
         sum to less than 1.000 and the bare figure would read as wrong."""
         result = statement()
         assert [
-            (line.degree_day_promille, line.unit_degree_day_promille_total)
-            for line in result.lines
+            (line.degree_day_promille, line.unit_degree_day_promille_total) for line in result.lines
         ] == [
             (Decimal(1000), Decimal(1000)),
             (Decimal(585), Decimal(1000)),

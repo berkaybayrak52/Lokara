@@ -120,9 +120,7 @@ class TestCreateChain:
         assert body["occupiedToday"] is False
         TestCreateChain.unit_id = body["id"]
 
-        detail = client.get(
-            f"{BASE}/buildings/{TestCreateChain.building_id}", headers=DEMO
-        ).json()
+        detail = client.get(f"{BASE}/buildings/{TestCreateChain.building_id}", headers=DEMO).json()
         assert [u["label"] for u in detail["units"]] == ["Wohnung 1 (EG)"]
 
     def test_create_tenancy_and_read_timeline(self, client: TestClient) -> None:
@@ -183,9 +181,7 @@ class TestCreateChain:
 
 
 class TestIsolation:
-    def test_foreign_member_cannot_write_into_the_demo_account(
-        self, client: TestClient
-    ) -> None:
+    def test_foreign_member_cannot_write_into_the_demo_account(self, client: TestClient) -> None:
         response = client.post(
             f"{BASE}/buildings",
             headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID),

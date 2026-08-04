@@ -37,9 +37,7 @@ _READING_SOURCE = sa.Enum("MANUAL", "MDL", "RADIO", name="reading_source")
 
 
 def _timestamp(name: str) -> sa.Column[sa.types.DateTime]:
-    return sa.Column(
-        name, sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
+    return sa.Column(name, sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now())
 
 
 def upgrade() -> None:

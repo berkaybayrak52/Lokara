@@ -343,9 +343,7 @@ class MeterCreate(ApiModel):
         expected = CANONICAL_UNITS.get(self.kind)
         if expected is not None and self.measurement_unit is not expected:
             raise ValueError(f"{self.kind.value} is measured in {expected.value}")
-        if self.kind is MeterKind.HEAT and self.measurement_unit is (
-            MeasurementUnit.CUBIC_METRE
-        ):
+        if self.kind is MeterKind.HEAT and self.measurement_unit is (MeasurementUnit.CUBIC_METRE):
             raise ValueError("HEAT is measured in KWH or HKV_UNITS")
         return self
 

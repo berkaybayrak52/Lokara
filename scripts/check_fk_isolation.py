@@ -130,7 +130,7 @@ def _survey_rows(conn: Connection, edges: list[tuple[str, str, str]]) -> list[st
         sql = text(
             # Table/column names are interpolated because they come from pg_constraint,
             # not from user input — there is no parameter form for an identifier.
-            f'SELECT c.id, c.account_id AS child_account, p.account_id AS parent_account '
+            f"SELECT c.id, c.account_id AS child_account, p.account_id AS parent_account "
             f'FROM "{child}" c JOIN "{parent}" p ON c."{link}" = p.id '
             f"WHERE c.account_id IS DISTINCT FROM p.account_id "
             f"LIMIT 20"
@@ -154,9 +154,7 @@ def main() -> int:
     try:
         with engine.connect() as conn:
             scoped = {r[0] for r in conn.execute(ACCOUNT_SCOPED).all()}
-            nullable = {
-                (r[0], r[1]): (r[2] == "YES") for r in conn.execute(NULLABILITY).all()
-            }
+            nullable = {(r[0], r[1]): (r[2] == "YES") for r in conn.execute(NULLABILITY).all()}
             fks = conn.execute(FOREIGN_KEYS).all()
 
             if rows_mode:

@@ -27,9 +27,7 @@ FIXTURE_REQUEST = {
         },
         {"unitId": "unit-c", "tenancyId": "ten-c", "period": {"validFrom": "2024-01-01"}},
     ],
-    "costs": [
-        {"costId": "garbage", "label": "Müllabfuhr", "amountCents": 120000, "key": "AREA"}
-    ],
+    "costs": [{"costId": "garbage", "label": "Müllabfuhr", "amountCents": 120000, "key": "AREA"}],
 }
 
 

@@ -46,9 +46,7 @@ def reading(
 
 class TestConsumptionFold:
     def test_closing_minus_opening(self) -> None:
-        result = consumption_by_meter(
-            [reading("m1", JAN, "1200"), reading("m1", DEC, "1800")]
-        )
+        result = consumption_by_meter([reading("m1", JAN, "1200"), reading("m1", DEC, "1800")])
         assert result["m1"].value == Decimal(600)
         assert result["m1"].opening.read_at == JAN
         assert result["m1"].closing.read_at == DEC
@@ -93,9 +91,7 @@ class TestCorrectionSupersedes:
     def test_later_recorded_reading_wins_for_the_same_date(self) -> None:
         """A typo (18000 instead of 1800) is fixed by APPENDING a correction —
         the wrong row survives for the audit trail and stops counting."""
-        typo = reading(
-            "m1", DEC, "18000", recorded_at=datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
-        )
+        typo = reading("m1", DEC, "18000", recorded_at=datetime(2026, 1, 5, 9, 0, tzinfo=UTC))
         fix = reading(
             "m1",
             DEC,
@@ -109,9 +105,7 @@ class TestCorrectionSupersedes:
 
     def test_input_order_does_not_decide_the_winner(self) -> None:
         """recorded_at decides, not the order rows happen to arrive in."""
-        typo = reading(
-            "m1", DEC, "18000", recorded_at=datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
-        )
+        typo = reading("m1", DEC, "18000", recorded_at=datetime(2026, 1, 5, 9, 0, tzinfo=UTC))
         fix = reading(
             "m1",
             DEC,

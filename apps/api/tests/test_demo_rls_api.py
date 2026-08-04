@@ -38,9 +38,7 @@ def client() -> Iterator[TestClient]:
     try:
         owner = create_db_engine(settings.direct_url)
         with owner.connect() as conn:
-            conn.execute(
-                text((_DB_PACKAGE_DIR / "scripts" / "init-app-role.sql").read_text())
-            )
+            conn.execute(text((_DB_PACKAGE_DIR / "scripts" / "init-app-role.sql").read_text()))
             conn.commit()
     except OperationalError as exc:
         if os.environ.get("LOKARA_REQUIRE_DB"):
@@ -84,9 +82,7 @@ def _token(person_id: str, account_id: str) -> dict[str, str]:
 
 class TestDemoSummary:
     def test_owner_sees_the_seeded_demo(self, client: TestClient) -> None:
-        headers = {
-            "Authorization": f"Bearer {create_dev_token(ApiSettings().supabase_jwt_secret)}"
-        }
+        headers = {"Authorization": f"Bearer {create_dev_token(ApiSettings().supabase_jwt_secret)}"}
         response = client.get("/demo/summary", headers=headers)
         assert response.status_code == 200
         body = response.json()
@@ -94,9 +90,7 @@ class TestDemoSummary:
         assert body["buildingName"] == "Musterstraße 12"
         assert body["buildingAddress"] == "Musterstraße 12, 60311 Frankfurt am Main"
         assert body["unitCount"] == 3
-        bernd = next(
-            t for t in body["tenancies"] if t["renterNames"] == ["Bernd Muster"]
-        )
+        bernd = next(t for t in body["tenancies"] if t["renterNames"] == ["Bernd Muster"])
         assert bernd["validTo"] == "2025-07-01"  # exclusive — moves out 30 Jun
         assert bernd["baseRentEur"] == f"680,00{NBSP}€"
 
@@ -105,9 +99,7 @@ class TestApiIsolation:
     def test_no_membership_in_claimed_account_is_403(self, client: TestClient) -> None:
         """A valid JWT claiming the demo account, but the person holds no
         membership there — the app-logic check fires before any domain data."""
-        response = client.get(
-            "/demo/summary", headers=_token("per_stranger", DEMO_ACCOUNT_ID)
-        )
+        response = client.get("/demo/summary", headers=_token("per_stranger", DEMO_ACCOUNT_ID))
         assert response.status_code == 403
 
     def test_unknown_account_context_is_403(self, client: TestClient) -> None:
@@ -118,9 +110,7 @@ class TestApiIsolation:
         """The RLS backstop through the whole stack: a legitimate member of a
         different account gets an empty view (404 'no data'), never the demo
         account's building."""
-        response = client.get(
-            "/demo/summary", headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID)
-        )
+        response = client.get("/demo/summary", headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID))
         assert response.status_code == 404
 
 
@@ -129,9 +119,7 @@ class TestDemoReset:
     things worth proving are that it removes exactly the stray rows and that
     it cannot touch another account's data."""
 
-    def test_reset_removes_stray_rows_and_restores_the_scenario(
-        self, client: TestClient
-    ) -> None:
+    def test_reset_removes_stray_rows_and_restores_the_scenario(self, client: TestClient) -> None:
         headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
         base = f"/a/{DEMO_ACCOUNT_ID}"
 

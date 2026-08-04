@@ -166,8 +166,14 @@ class TestCo2TenStepSplit:
         assert co2.rechtsstand == "Rechtsstand 01/2023"
         # Billable = 1,030,000 - 6,000 = 1,024,000 → WW pot 256,000 / heating pot 768,000.
         rows = [
-            (line.unit_id, int(line.heating_base), int(line.heating_consumption),
-             int(line.ww_base), int(line.ww_consumption), int(line.total))
+            (
+                line.unit_id,
+                int(line.heating_base),
+                int(line.heating_consumption),
+                int(line.ww_base),
+                int(line.ww_consumption),
+                int(line.total),
+            )
             for line in result.lines
         ]
         assert rows == [
@@ -233,8 +239,15 @@ class TestDegreeDayApportionment:
             )
         )
         rows = [
-            (line.unit_id, line.tenancy_id, int(line.heating_base), int(line.heating_consumption),
-             int(line.ww_base), int(line.ww_consumption), int(line.total))
+            (
+                line.unit_id,
+                line.tenancy_id,
+                int(line.heating_base),
+                int(line.heating_consumption),
+                int(line.ww_base),
+                int(line.ww_consumption),
+                int(line.total),
+            )
             for line in result.lines
         ]
         assert rows == [

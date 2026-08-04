@@ -76,9 +76,7 @@ def _validate_direct_target(
 
 
 @router.get("/buildings/{building_id}/costs")
-def list_costs(
-    account_id: str, building_id: str, session: PathAccountSession
-) -> CostListResponse:
+def list_costs(account_id: str, building_id: str, session: PathAccountSession) -> CostListResponse:
     del account_id  # scoping happened in the dependency
     costs = session.scalars(
         select(CostEntry)

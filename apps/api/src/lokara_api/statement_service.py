@@ -136,9 +136,7 @@ def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
     § 9 denominator.
     """
     # Closed window: a period needs its opening AND its closing register value.
-    readings = gateway.list_readings(
-        building_id, BILLING_START, BILLING_END - timedelta(days=1)
-    )
+    readings = gateway.list_readings(building_id, BILLING_START, BILLING_END - timedelta(days=1))
     consumptions = consumption_by_meter(readings).values()
 
     total_energy: Decimal | None = None
@@ -194,9 +192,7 @@ def _co2_input(rows: tuple[HeatingCostEntry, ...]) -> Co2Input | None:
     total_cost = sum(r.co2_cost_cents or 0 for r in rows)
     if total_kg <= 0 or total_cost <= 0:
         return None
-    return Co2Input(
-        total_co2_kg=Decimal(total_kg) / Decimal(1000), co2_cost=cents(total_cost)
-    )
+    return Co2Input(total_co2_kg=Decimal(total_kg) / Decimal(1000), co2_cost=cents(total_cost))
 
 
 def _nk_costs(session: Session, building_id: str) -> tuple[CostItem, ...]:
@@ -255,9 +251,7 @@ def compute_statement(session: Session) -> StatementBundle:
     nk_result = calculate_nk_statement(
         NkInput(
             billing_period=BILLING_PERIOD,
-            units=tuple(
-                UnitBasis(unit_id=u.id, area_sqm_x100=u.area_sqm_x100) for u in units
-            ),
+            units=tuple(UnitBasis(unit_id=u.id, area_sqm_x100=u.area_sqm_x100) for u in units),
             occupancies=occupancies,
             costs=nk_costs,
         )

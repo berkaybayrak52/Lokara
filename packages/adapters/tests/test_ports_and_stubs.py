@@ -154,9 +154,7 @@ class TestMeterPort:
         readings = gateway.list_readings("bld_demo_muster12", date(2025, 1, 1), date(2025, 12, 31))
 
         def consumption(unit_id: str, kind: MeterKind) -> Decimal:
-            values = sorted(
-                r.value for r in readings if r.unit_id == unit_id and r.kind == kind
-            )
+            values = sorted(r.value for r in readings if r.unit_id == unit_id and r.kind == kind)
             assert len(values) == 2, f"expected opening+closing for {unit_id}/{kind}"
             return values[1] - values[0]
 

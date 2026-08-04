@@ -62,22 +62,16 @@ def client() -> Iterator[TestClient]:
         # invoice. Leftovers from an interrupted run (an extra reading, a second
         # heating cost) would break the exact golden assertions below.
         session.execute(
-            text(
-                "DELETE FROM meter_reading WHERE account_id = :a "
-                "AND id NOT LIKE 'mr_met_demo_%'"
-            ),
+            text("DELETE FROM meter_reading WHERE account_id = :a AND id NOT LIKE 'mr_met_demo_%'"),
+            {"a": DEMO_ACCOUNT_ID},
+        )
+        session.execute(
+            text("DELETE FROM meter WHERE account_id = :a AND id NOT LIKE 'met_demo_%'"),
             {"a": DEMO_ACCOUNT_ID},
         )
         session.execute(
             text(
-                "DELETE FROM meter WHERE account_id = :a AND id NOT LIKE 'met_demo_%'"
-            ),
-            {"a": DEMO_ACCOUNT_ID},
-        )
-        session.execute(
-            text(
-                "DELETE FROM heating_cost_entry WHERE account_id = :a "
-                "AND id <> 'hcost_demo_2025'"
+                "DELETE FROM heating_cost_entry WHERE account_id = :a AND id <> 'hcost_demo_2025'"
             ),
             {"a": DEMO_ACCOUNT_ID},
         )
@@ -250,9 +244,7 @@ class TestHeatingStatementFromRealReadings:
 
 
 class TestReadingsAreCreateOnly:
-    def test_there_is_no_update_or_patch_route_for_a_reading(
-        self, client: TestClient
-    ) -> None:
+    def test_there_is_no_update_or_patch_route_for_a_reading(self, client: TestClient) -> None:
         """Not a style preference: without an edit path, a billed reading can
         never be rewritten after the fact (GoBD / § 147 AO)."""
         paths: dict[str, dict[str, Any]] = create_app().openapi()["paths"]
@@ -308,8 +300,9 @@ class TestReadingsAreCreateOnly:
         assert len(after["readings"]) == readings_before + 2
         superseded = [r for r in after["readings"] if r["superseded"]]
         assert {r["valueX1000"] for r in superseded} == {3_650_000, 3_850_000}
-        effective = next(r for r in after["readings"] if not r["superseded"] and
-                         r["readAt"] == "2025-12-31")
+        effective = next(
+            r for r in after["readings"] if not r["superseded"] and r["readAt"] == "2025-12-31"
+        )
         assert effective["valueX1000"] == 3_650_000
         assert effective["reason"] == "CORRECTION"
         assert effective["note"] == "Zahlendreher korrigiert"
@@ -339,9 +332,7 @@ class TestMissingInputsRefuseRatherThanGuess:
         while the Betriebskosten still compute."""
         engine = create_db_engine(DbSettings().direct_url)
         with Session(engine) as session, session.begin():
-            session.execute(
-                text("DELETE FROM meter_reading WHERE meter_id = 'met_demo_heat_main'")
-            )
+            session.execute(text("DELETE FROM meter_reading WHERE meter_id = 'met_demo_heat_main'"))
         try:
             body = _statement(client)
             assert body["heatingLines"] == []

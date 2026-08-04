@@ -197,9 +197,7 @@ def _validate(heating_input: HeatingInput) -> None:
         )
 
 
-def _build_parties(
-    heating_input: HeatingInput, window_from: date, window_to: date
-) -> list[_Party]:
+def _build_parties(heating_input: HeatingInput, window_from: date, window_to: date) -> list[_Party]:
     """Units in input order; within a unit renter parties chronological
     (consecutive same-tenancy segments merged), then one aggregated landlord
     party — the same deterministic ordering as the NK engine."""
@@ -326,9 +324,7 @@ def _separate_warm_water(
             f"Warm-water energy {q_ww} kWh must lie inside (0, total energy "
             f"{heating_input.total_energy_kwh} kWh)"
         )
-    ww_pot, heating_pot = distribute_cents(
-        billable, [q_ww, heating_input.total_energy_kwh - q_ww]
-    )
+    ww_pot, heating_pot = distribute_cents(billable, [q_ww, heating_input.total_energy_kwh - q_ww])
     return ww_pot, heating_pot, separation
 
 
@@ -353,8 +349,8 @@ def _resolve_readings(
         if value is not None:
             resolved[unit.unit_id] = value
         else:
-            resolved[unit.unit_id] = measured_sum * Decimal(unit.area_sqm_x100) / Decimal(
-                measured_area
+            resolved[unit.unit_id] = (
+                measured_sum * Decimal(unit.area_sqm_x100) / Decimal(measured_area)
             )
             estimated.append(unit.unit_id)
     return resolved, tuple(estimated), False
