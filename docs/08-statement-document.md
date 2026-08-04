@@ -814,37 +814,38 @@ band_min_inclusive = previous_step.max_intensity_exclusive × period_factor   # 
   belongs to this picture rather than beside it, because the short-period copy in item 5 needs the
   factor **and** the two day counts together.
 
-### Typographic floor for legally required disclosure
+### Which text on the statement is legally required
 
-Measured on the current page (WCAG ratios against the `docs/05` tokens): the Umlageschlüssel +
-Gesamtbemessung line (`.key-label`) is **8,5 pt Slate on Mint = 4,81:1** — AA with 0,31 to spare, and
-the **smallest, lowest-contrast text on the page**. Legally required content must not be the hardest
-thing to read; a disclosure the tenant squints at is a disclosure in form only. Contrast of the
-available token pairs:
+**This section names the text. It does not set the thresholds.** The typographic rules for legally
+required disclosure — `legal-contrast` (≥ 7:1, WCAG 2.1 Level AAA, SC 1.4.6 *Contrast (Enhanced)*) and
+`legal-size` (never smaller than body copy) — live in `docs/05-design-system.md` §*Legally required
+disclosure is held to AAA, not AA*, together with the measured ratios of the brand pairs and the
+reason there is no absolute pt floor. A design-system rule with two homes is a rule waiting to
+disagree with itself, so the numbers are not repeated here.
 
-| Pair | Ratio | Use |
+On this document, the following is legally required and therefore falls under those rules:
+
+| Content | Carrier | Basis |
 | --- | --- | --- |
-| Petrol Ink on Mint | **13,91** | legally required text on a tinted surface — default |
-| Forest Deep on Mint | **10,01** | legally required text, secondary emphasis |
-| Petrol Ink on Paper | **15,72** | legally required text on the page ground |
-| Slate on Paper | **5,44** | non-legal secondary framing text only |
-| Slate on Mint | **4,81** | ⚠️ **not permitted** for legally required text |
-| Lokara Grün on Mint | 5,89 | decorative per `docs/05` — never body text |
+| The four BGH formal minimums — Gesamtkosten, Umlageschlüssel, Anteil des Mieters, Vorauszahlungen | the cost rows, `.key-label`, the `tfoot` totals | BGH-Mindestangaben, § 259 BGB |
+| Umlageschlüssel + Gesamtbemessung | `.key-label` | minimum #2, and the denominator #3 rests on |
+| The heating footer's reconciliation sentence | `tfoot .foot-note` | HeizkostenV disclosure |
+| § 9a estimation / fallback disclosure | `.note` | § 9a HeizkostenV |
+| The CO₂ split and its Berechnungsgrundlagen | `.co2` | § 7 Abs. 3 CO2KostAufG |
+| `Rechtsstand` stamps + the "keine Rechts- oder Steuerberatung" disclaimer | `footer` | `CLAUDE.md` cross-cutting rules |
 
-The floor, for everything this file marks as legally required (the four BGH minimums, every disclosure
-in this section, the `Rechtsstand` footer):
+Everything else on the page — the Vermieter/period meta line, column headings, decorative framing — is
+body or secondary copy and keeps the ordinary **AA** bar from `docs/05`.
 
-1. **Size ≥ 9 pt**, and never smaller than the smallest non-legal text on the page. The existing 8,5 pt
-   `.key-label` and `tfoot .foot-note` come up to 9 pt with it — same class, same rule.
-2. **Contrast ≥ 7:1** on its own background → Petrol Ink or Forest Deep. Slate is retired from
-   legally required text; it keeps its role for non-legal secondary text on Paper.
-3. **Line-height ≥ 1,4**, weight ≥ 400, no all-caps and no negative letter-spacing at these sizes.
-4. Numeric columns keep `font-variant-numeric: tabular-nums` so figures align for comparison.
-5. Tokens only (`docs/05`) — no ad-hoc hex, and no new colour is needed for any of the above.
+**The state of the page today** (this is the defect, not the rule): `.key-label` is **8,5 pt Slate on
+Mint = 4,81:1**, i.e. below body copy (10 pt) and AA-by-0,31 where AAA is owed; `tfoot .foot-note` is
+8,5 pt Slate, `.note` 9 pt Slate, `footer` 8 pt Slate — all below body copy, all Slate on Paper at
+5,44:1. Slate leaves legal text entirely; Petrol Ink and Forest Deep are the qualifying inks.
 
-Checkable in `packages/pdf/tests/` against `statement_html()`: the classes carrying legal disclosure
-are enumerated in the test, and each must declare a size ≥ 9 pt and an ink/forest colour token. This is
-a stylesheet-level assertion, deliberately not a pixel one.
+Checkable in `packages/pdf/tests/test_statement_legal_typography.py` against `statement_html()`: the
+carriers above are enumerated in the test, each is compared against the stylesheet's own body
+font-size and against the 7:1 floor computed from the tokens the template declares. A stylesheet-level
+assertion, deliberately not a pixel one — rendering and measuring glyphs would test Chromium.
 
 ### Gaps — not invented here
 
@@ -910,7 +911,7 @@ needed for the six items above, the fifth unblocks the one column they cannot sh
 | # | Lands | Lane | Independent? |
 | --- | --- | --- | --- |
 | 1 | `Rechtsstand` labels (item 6) | `app-implementer` (`packages/pdf/src`) | yes |
-| 2 | Typographic floor for legal disclosure | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
+| 2 | Legal disclosure meets `legal-contrast` + `legal-size` (`docs/05`) | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
 | 3 | `HeatingResult` carries its intermediates (+ `Co2Result` Berechnungsgrundlagen, + § 9b in the degree-day `source`) | `engine-implementer` (`packages/{heating-engine,rules-store}/src`) | yes |
 | 4 | Blocks A / B / C render (items 1–5) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
 | 5 | `MeasurementUnit` carried meter → statement; `Verbrauch Heizung` Bemessung column; NK `CONSUMPTION` reference total | `engine-implementer` then `app-implementer` | yes — strictly before the heating-consumption column |

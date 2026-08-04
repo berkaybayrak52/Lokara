@@ -1,7 +1,10 @@
 """Gate: legally required disclosure is not the hardest thing to read on the page.
 
-Spec: `docs/08` → "Heizkostenabrechnung — the heating table's disclosure" →
-"Typographic floor for legally required disclosure". Tokens: `docs/05`.
+Spec: `docs/05` → "Legally required disclosure is held to AAA, not AA" — the two
+named rules `legal-contrast` and `legal-size`, and the measured ratios of the
+brand pairs. `docs/08` → "Which text on the statement is legally required" names
+*which* text on this document those rules bind; it deliberately carries no
+thresholds.
 
 Today the **Umlageschlüssel + Gesamtbemessung** line — BGH formal minimum #2 plus
 the denominator that minimum #3 rests on — is the smallest and lowest-contrast
@@ -10,14 +13,18 @@ with 0,31 to spare and it is still the wrong way round: the decorative CO₂ pan
 is 10 pt Ink on Mint at 13,91:1, and the tenant's own money is 10 pt Ink at
 15,72:1. A disclosure a reader squints at is a disclosure in form only.
 
-The floor this file pins, for text `docs/08` marks as legally required (the four
-BGH minimums, every heating disclosure, the `Rechtsstand` footer):
+What this file pins, for text `docs/08` marks as legally required (the four BGH
+minimums, every heating disclosure, the `Rechtsstand` footer):
 
-1. **≥ 9 pt**, and never smaller than any other text on the page — asserted as a
-   stylesheet-wide floor, because "smallest" is a property of the whole page.
-2. **≥ 7:1 contrast** on its own background → Petrol Ink or Forest Deep. Slate
-   keeps its `docs/05` role (secondary text on Paper, 5,44:1) and leaves legal
-   text.
+1. `legal-size` — **never smaller than body copy**, read from the stylesheet's
+   own `body { font-size }`. Not an absolute point floor: DIN 1450 specifies
+   legibility by x-height and reading distance, so no point number falls out of
+   it, and the brand faces are not embedded in the PDF anyway. Not "not the
+   smallest text on the page" either — that is satisfiable by shrinking
+   everything else, which makes the page worse and turns this green.
+2. `legal-contrast` — **≥ 7:1** on its own background (WCAG 2.1 Level AAA, SC
+   1.4.6 *Contrast (Enhanced)*) → Petrol Ink or Forest Deep. Slate keeps its
+   `docs/05` role (secondary text on Paper, 5,44:1) and leaves legal text.
 3. **line-height ≥ 1,4** wherever one is declared.
 
 Deliberately a **stylesheet** assertion, not a pixel one. Rendering a PDF and
@@ -44,7 +51,8 @@ DOCS05_TOKENS = {
     "--color-paper": "#fbfbfa",
 }
 
-MIN_LEGAL_FONT_PT = 9.0
+# No absolute point floor exists to assert — see `docs/05`, "Why there is no
+# absolute pt floor". The size rule is comparative: body copy is the reference.
 MIN_LEGAL_CONTRAST = 7.0
 MIN_LEGAL_LINE_HEIGHT = 1.4
 
@@ -126,37 +134,34 @@ def test_backgrounds_are_as_this_file_assumes() -> None:
     assert _VAR.search(rules[".co2"]["background"]).group(1) == "--color-mint"  # type: ignore[union-attr]
 
 
-def test_legal_disclosure_meets_the_size_floor() -> None:
-    """docs/08: ≥ 9 pt. `.key-label` and `tfoot .foot-note` are 8,5 pt today."""
-    rules = _stylesheet()
+def test_legal_disclosure_is_never_smaller_than_body_copy() -> None:
+    """`legal-size` (docs/05). The reference is the stylesheet's own body
+    font-size — 10 pt today — not a constant, and not "the smallest text on the
+    page": anchoring to the page minimum would let a shrunken caption elsewhere
+    lower the bar for the tenant's legal disclosure.
 
+    Every violation is reported at once; the implementer needs the whole set, not
+    whichever selector `dict` order happens to reach first."""
+    rules = _stylesheet()
+    body = _pt(rules["body"]["font-size"], selector="body", prop="font-size")
+
+    too_small = []
     for selector in LEGAL_SURFACES:
         declared = rules[selector].get("font-size")
         if declared is None:
-            continue  # inherits body (10 pt) — above the floor by construction
+            continue  # inherits body — at the reference by construction
         size = _pt(declared, selector=selector, prop="font-size")
-        assert size >= MIN_LEGAL_FONT_PT, (
-            f"{selector} is {size} pt — legally required text has a {MIN_LEGAL_FONT_PT} pt floor"
-        )
+        if size < body:
+            too_small.append(f"{selector} is {size} pt")
 
-
-def test_no_text_on_the_page_is_smaller_than_the_legal_floor() -> None:
-    """The floor is also comparative: legally required content must not be the
-    smallest text on the page. Asserted page-wide so raising `.key-label` while
-    shrinking something else cannot satisfy the previous test hollowly."""
-    rules = _stylesheet()
-
-    for selector, declarations in rules.items():
-        declared = declarations.get("font-size")
-        if declared is None:
-            continue
-        size = _pt(declared, selector=selector, prop="font-size")
-        assert size >= MIN_LEGAL_FONT_PT, f"{selector} declares {size} pt"
+    assert not too_small, (
+        f"legally required text is set below the {body} pt body copy: " + ", ".join(too_small)
+    )
 
 
 def test_legal_disclosure_meets_the_contrast_floor() -> None:
-    """docs/08: ≥ 7:1 → Ink (13,91 on Mint) or Forest (10,01). Slate on Mint is
-    4,81 and is exactly what `.key-label` uses today."""
+    """`legal-contrast` (docs/05): ≥ 7:1 → Ink (13,91 on Mint) or Forest (10,01).
+    Slate on Mint is 4,81 and is exactly what `.key-label` uses today."""
     rules = _stylesheet()
     tokens = _tokens(rules)
 
@@ -184,8 +189,8 @@ def test_legal_disclosure_meets_the_line_height_floor() -> None:
 
 
 def test_numeric_columns_stay_tabular() -> None:
-    """Figures a tenant compares column-wise must align (docs/08 floor, item 4).
-    Already true — pinned so a font change does not quietly drop it."""
+    """Figures a tenant compares column-wise must align (docs/05, typographic
+    hygiene). Already true — pinned so a font change does not quietly drop it."""
     rules = _stylesheet()
 
     assert "tabular-nums" in rules["td.num, th.num"]["font-variant-numeric"]

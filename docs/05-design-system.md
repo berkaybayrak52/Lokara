@@ -24,6 +24,56 @@
 - Lokara Grün as a button background needs white/Paper text; verify ≥4.5:1 (it passes for normal text).
 - Green-on-mint is decorative/low-contrast — never use it for text that must be read.
 
+### Measured ratios of the brand pairs
+
+Computed with the WCAG 2.1 relative-luminance formula from the hexes above. A palette fact — cite it,
+don't re-derive it per surface.
+
+| Pair                | Ratio     | Role                                                        |
+| ------------------- | --------- | ----------------------------------------------------------- |
+| Petrol Ink on Paper | **15,72** | body copy on the page ground; legally required text         |
+| Petrol Ink on Mint  | **13,91** | text on a tinted surface; legally required text — default   |
+| Forest Deep on Paper| **11,32** | headings on the page ground                                  |
+| Forest Deep on Mint | **10,01** | legally required text, secondary emphasis                    |
+| Lokara Grün on Paper| 6,66      | AA text, links, icons — **not** legally required text        |
+| Lokara Grün on Mint | 5,89      | decorative only — never body text                            |
+| Slate on Paper      | 5,44      | non-legal secondary framing text only                        |
+| Slate on Mint       | 4,81      | AA by 0,31 — **not permitted** for legally required text     |
+
+### Legally required disclosure is held to AAA, not AA (two named rules)
+
+Body copy stays at **AA**; content the law compels us to show is held to **AAA**. The four BGH formal
+minimums, every heating disclosure, and the `Rechtsstand` footer are shown because a statute requires
+them — content a reader squints at is disclosure in form only. Which text on a given document is
+legally required is named by that document's spec (for the statement: `docs/08`); the thresholds live
+here and only here.
+
+**`legal-contrast` — ≥ 7:1 on its own background.**
+The provenance is **WCAG 2.1 Level AAA, Success Criterion 1.4.6 Contrast (Enhanced)**: 7:1 for normal
+text, 4.5:1 for large text (≥ 18 pt, or ≥ 14 pt bold). We do not take the large-text relaxation for
+legal disclosure — it is never set large. Qualifying token pairs, from the table above: **Petrol Ink
+on Paper (15,72)**, **Petrol Ink on Mint (13,91)**, **Forest Deep on Paper (11,32)**, **Forest Deep on
+Mint (10,01)**. Slate is retired from legally required text at both 5,44 and 4,81 and keeps its role
+as non-legal secondary text on Paper. Tokens only — no ad-hoc hex, and no new colour is needed.
+
+**`legal-size` — never smaller than body copy.**
+Legally required text is set at **≥ the document's own body font-size**, read from the stylesheet, not
+against a constant. Deliberately comparative and deliberately anchored to *body copy*, not to "the
+smallest text on the page": the latter is satisfiable by shrinking everything else, which makes the
+page worse and the check pass.
+
+> **Why there is no absolute pt floor.** **DIN 1450** (Schriften — Leserlichkeit), the German legibility
+> norm, specifies minimum sizes via **x-height and reading distance**, not point size; no point number
+> falls out of it, so none can be cited. And the brand typefaces are **not embedded** in the generated
+> PDF — it renders HelveticaNeue/ArialMT — so a pt floor asserted today would measure a font we do not
+> ship. Any absolute number would be fitted to the defect it was written to catch. If an absolute floor
+> is ever wanted, what would resolve it is an embedded-font decision plus a DIN-1450 x-height
+> calculation at a stated reading distance — not a round number.
+
+Both rules also carry the usual typographic hygiene at these sizes: **line-height ≥ 1,4**, weight
+≥ 400, no all-caps, no negative letter-spacing, and `font-variant-numeric: tabular-nums` on numeric
+columns so figures align for comparison.
+
 ## Typography
 
 | Role        | Typeface       | Usage                                                                 |
@@ -199,6 +249,8 @@ these, it's not done.
 ## Accessibility checklist (every screen)
 
 - [ ] Contrast ≥ 4.5:1 for text (≥3:1 for large text / UI components).
+- [ ] Legally required disclosure additionally meets `legal-contrast` (≥ 7:1, WCAG 2.1 AAA SC 1.4.6)
+      and `legal-size` (never smaller than body copy) — see *Legally required disclosure* above.
 - [ ] Visible focus states on all interactive elements (keyboard nav works end to end).
 - [ ] Labels are explicit and always visible (no icon-only critical actions without a label/aria-label).
 - [ ] Type scales with user zoom; layout survives 200% zoom.
