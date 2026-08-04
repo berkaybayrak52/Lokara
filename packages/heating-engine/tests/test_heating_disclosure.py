@@ -1,0 +1,579 @@
+"""The intermediates the Heizkostenabrechnung's disclosure needs — carried, not discarded.
+
+Spec: `docs/08-statement-document.md` → **"The carried-intermediates contract
+(slice 3)"**, under *"Heizkostenabrechnung — the heating table's disclosure"*.
+Rechtsstand 08/2026. Written before the engine change, red on purpose.
+
+`HeatingResult`, `HeatingLine` and `Co2Result` today carry only what the money
+table prints. Everything §§ 7, 8, 9, 9a, 9b HeizkostenV and § 7 Abs. 3
+CO2KostAufG require the tenant to be *shown* — the pots of the vertical split,
+the per-party Bemessungen of the horizontal one, which § 9 branch ran with which
+operands, and the CO₂ Berechnungsgrundlagen incl. the Einstufung band — is
+computed in `engine.py`/`co2.py` as a local and dropped. A tenant cannot
+re-perform a calculation from figures the result threw away.
+
+**This file must not move a single euro.** Every amount asserted here is the
+amount the engine already produces; the demo path and the rendered PDF are
+byte-identical after the change. The building is the worked example of `docs/08`
+(A 50 m², B 30 m², C 20 m², B vacant from 01.07.2025 → landlord party).
+"""
+
+from decimal import Decimal
+
+from lokara_domain import (
+    Co2Step,
+    Co2Table,
+    DegreeDayTable,
+    HeatingSplitBounds,
+    Occupancy,
+    Period,
+    WarmWaterFormula,
+    cents,
+    period,
+)
+from lokara_heating_engine import (
+    Co2Input,
+    HeatingInput,
+    HeatingResult,
+    HeatingRules,
+    HeatingUnit,
+    WarmWaterInput,
+    calculate_heating_statement,
+)
+
+YEAR_2025 = period("2025-01-01", "2026-01-01")  # 365 days
+LEAP_YEAR_2024 = period("2024-01-01", "2025-01-01")  # 366 days
+FIRST_HALF_2025 = period("2025-01-01", "2025-07-01")  # 181 days
+
+SPLIT_BOUNDS = HeatingSplitBounds(
+    min_consumption_share=Decimal("0.5"), max_consumption_share=Decimal("0.7")
+)
+WW_FORMULA = WarmWaterFormula(
+    factor_kwh_per_m3_kelvin=Decimal("2.5"),
+    hot_temp_c=Decimal(60),
+    cold_temp_c=Decimal(10),
+    area_fallback_kwh_per_sqm_year=Decimal(32),
+)
+DEGREE_DAYS = DegreeDayTable(
+    promille_by_month=(170, 150, 130, 80, 40, 15, 10, 10, 30, 80, 120, 165)
+)
+CO2_TABLE: Co2Table = (
+    Co2Step(max_intensity_exclusive=Decimal(12), landlord_share_percent=0),
+    Co2Step(max_intensity_exclusive=Decimal(17), landlord_share_percent=10),
+    Co2Step(max_intensity_exclusive=Decimal(22), landlord_share_percent=20),
+    Co2Step(max_intensity_exclusive=Decimal(27), landlord_share_percent=30),
+    Co2Step(max_intensity_exclusive=Decimal(32), landlord_share_percent=40),
+    Co2Step(max_intensity_exclusive=Decimal(37), landlord_share_percent=50),
+    Co2Step(max_intensity_exclusive=Decimal(42), landlord_share_percent=60),
+    Co2Step(max_intensity_exclusive=Decimal(47), landlord_share_percent=70),
+    Co2Step(max_intensity_exclusive=Decimal(52), landlord_share_percent=80),
+    Co2Step(max_intensity_exclusive=None, landlord_share_percent=95),
+)
+RULES = HeatingRules(
+    consumption_share=Decimal("0.7"),
+    split_bounds=SPLIT_BOUNDS,
+    warm_water_formula=WW_FORMULA,
+    degree_days=DEGREE_DAYS,
+    co2_table=CO2_TABLE,
+    co2_rechtsstand="Rechtsstand 01/2023",
+)
+
+# Bernd leaves unit B on 30.06.2025; Jul–Dec is a landlord (Leerstand) party.
+OCCUPANCIES = (
+    Occupancy("unit-a", "ten-a", period("2025-01-01")),
+    Occupancy("unit-b", "ten-b", period("2024-08-01", "2025-07-01")),
+    Occupancy("unit-c", "ten-c", period("2023-01-01")),
+)
+
+
+def units(
+    *,
+    heat_a: Decimal | None = Decimal(600),
+    heat_b: Decimal | None = Decimal(250),
+    heat_c: Decimal | None = Decimal(150),
+) -> tuple[HeatingUnit, ...]:
+    """50 + 30 + 20 = 100 m², so kg ÷ 100 is the CO₂ intensity by inspection."""
+    return (
+        HeatingUnit("unit-a", 5000, heat_consumption=heat_a, ww_consumption_m3=Decimal(20)),
+        HeatingUnit("unit-b", 3000, heat_consumption=heat_b, ww_consumption_m3=Decimal(12)),
+        HeatingUnit("unit-c", 2000, heat_consumption=heat_c, ww_consumption_m3=Decimal(8)),
+    )
+
+
+MEASURED_40_M3 = WarmWaterInput(volume_m3=Decimal(40))
+CO2_2000_KG = Co2Input(total_co2_kg=Decimal(2000), co2_cost=cents(30_000))
+
+
+def statement(
+    *,
+    billing_period: Period = YEAR_2025,
+    total_cost: int = 1_030_000,
+    total_energy_kwh: int = 20_000,
+    heating_units: tuple[HeatingUnit, ...] | None = None,
+    warm_water: WarmWaterInput | None = MEASURED_40_M3,
+    co2: Co2Input | None = CO2_2000_KG,
+) -> HeatingResult:
+    return calculate_heating_statement(
+        HeatingInput(
+            billing_period=billing_period,
+            total_cost=cents(total_cost),
+            total_energy_kwh=Decimal(total_energy_kwh),
+            units=units() if heating_units is None else heating_units,
+            occupancies=OCCUPANCIES,
+            rules=RULES,
+            warm_water=warm_water,
+            co2=co2,
+        )
+    )
+
+
+class TestNothingThatRendersToday_Moves:
+    """The guard on the whole slice: carrying intermediates changes no amount.
+
+    These are the worked example's party totals in `docs/08` and the figures
+    `scripts/assert_statement_pdf.py` pins. If this class ever goes red, the
+    slice has stopped being a pure carry.
+    """
+
+    def test_the_worked_examples_party_totals_are_unchanged(self) -> None:
+        result = statement()
+        rows = [
+            (line.unit_id, line.tenancy_id, int(line.total)) for line in result.lines
+        ]
+        assert rows == [
+            ("unit-a", "ten-a", 565_760),
+            ("unit-b", "ten-b", 150_984),
+            ("unit-b", None, 129_336),
+            ("unit-c", "ten-c", 177_920),
+        ]
+        co2 = result.co2
+        assert co2 is not None
+        assert sum(int(line.total) for line in result.lines) == 1_024_000
+        assert sum(int(line.total) for line in result.lines) + int(co2.landlord_amount) == 1_030_000
+        assert int(result.total) == 1_030_000
+
+
+class TestBlockAVerticalSplit:
+    """§§ 7, 8, 9 HeizkostenV — how 10.300,00 € became four pots.
+
+    `docs/08` → Block A. Every one of these is a local in
+    `calculate_heating_statement` today and reaches no reader.
+    """
+
+    def test_the_pots_of_the_vertical_split_are_carried(self) -> None:
+        result = statement()
+        assert int(result.billable_cost) == 1_024_000  # 10.300,00 minus 60,00 CO₂
+        assert int(result.ww_pot) == 256_000  # 2.560,00 €
+        assert int(result.heating_pot) == 768_000  # 7.680,00 €
+        assert int(result.heat_base_pot) == 230_400  # 2.304,00 €
+        assert int(result.heat_cons_pot) == 537_600  # 5.376,00 €
+        assert int(result.ww_base_pot) == 76_800  # 768,00 €
+        assert int(result.ww_cons_pot) == 179_200  # 1.792,00 €
+
+    def test_every_pot_reconciles_to_the_one_above_it(self) -> None:
+        """The vertical analogue of `sum(shares) == input_total`: a Block A the
+        tenant adds up must add up."""
+        result = statement()
+        co2 = result.co2
+        assert co2 is not None
+        assert int(result.heat_base_pot) + int(result.heat_cons_pot) == int(result.heating_pot)
+        assert int(result.ww_base_pot) + int(result.ww_cons_pot) == int(result.ww_pot)
+        assert int(result.heating_pot) + int(result.ww_pot) == int(result.billable_cost)
+        assert int(result.billable_cost) + int(co2.landlord_amount) == int(result.total)
+
+    def test_without_a_co2_split_the_billable_cost_is_the_total(self) -> None:
+        result = statement(total_cost=1_000_000, co2=None)
+        assert result.co2 is None
+        assert int(result.billable_cost) == int(result.total) == 1_000_000
+
+    def test_the_applied_ratio_and_the_legal_bounds_are_both_carried(self) -> None:
+        """Item 2: *what was applied* and *what the law permits* are two facts and
+        the page prints two. Both come from the result — never a template literal,
+        never the input passed alongside it."""
+        result = statement()
+        assert result.applied_consumption_share == Decimal("0.7")
+        assert result.split_bounds.min_consumption_share == Decimal("0.5")
+        assert result.split_bounds.max_consumption_share == Decimal("0.7")
+        assert (
+            result.split_bounds.min_consumption_share
+            <= result.applied_consumption_share
+            <= result.split_bounds.max_consumption_share
+        )
+
+
+class TestParagraph9WarmWaterSeparation:
+    """§ 9 HeizkostenV — which branch ran, and with which operands.
+
+    `docs/08` item 3: the two branches print *different* text and the measured
+    one must never render the word Ersatzwert. Today the result cannot say which
+    one ran, so the template would have to guess.
+    """
+
+    def test_the_measured_branch_carries_the_formula_it_applied(self) -> None:
+        result = statement()
+        separation = result.warm_water_separation
+        assert separation is not None
+        assert separation.method == "MEASURED"
+        assert separation.volume_m3 == Decimal(40)
+        assert separation.factor_kwh_per_m3_kelvin == Decimal("2.5")
+        assert separation.hot_temp_c == Decimal(60)
+        assert separation.cold_temp_c == Decimal(10)
+        assert separation.q_ww_kwh == Decimal(5000)
+        assert separation.total_energy_kwh == Decimal(20_000)
+        # The printed line is reproducible from its own operands:
+        # 2,5 × 40 m³ × (60 °C minus 10 °C) = 5.000 kWh von 20.000 kWh.
+        assert (
+            separation.factor_kwh_per_m3_kelvin
+            * separation.volume_m3
+            * (separation.hot_temp_c - separation.cold_temp_c)
+            == separation.q_ww_kwh
+        )
+
+    def test_the_measured_branch_carries_no_fallback_operand(self) -> None:
+        """A template that renders the Ersatzwert sentence here would print
+        `None`, loudly — which is the point of the Nones."""
+        result = statement()
+        separation = result.warm_water_separation
+        assert separation is not None
+        assert separation.area_fallback_kwh_per_sqm_year is None
+        assert separation.heated_area_sqm is None
+        assert separation.period_days is None
+        assert separation.reference_year_days is None
+
+    def test_the_area_fallback_branch_carries_its_own_operands(self) -> None:
+        """§ 9 Abs. 2 Ersatzwert: 32 kWh/m²/a × 100 m² × 365 von 365 Tagen."""
+        result = statement(
+            total_cost=1_000_000, warm_water=WarmWaterInput(volume_m3=None), co2=None
+        )
+        separation = result.warm_water_separation
+        assert separation is not None
+        assert separation.method == "AREA_FALLBACK"
+        assert separation.area_fallback_kwh_per_sqm_year == Decimal(32)
+        assert separation.heated_area_sqm == Decimal(100)
+        assert separation.period_days == 365
+        # The engine divides by a flat 365 here (it does *not* anchor a reference
+        # year the way the CO₂ factor does). The result echoes what was divided
+        # by; harmonising the two is a separate, euro-moving decision — see the
+        # gap "§ 9's area fallback divides by a flat 365" in docs/08.
+        assert separation.reference_year_days == 365
+        assert separation.q_ww_kwh == Decimal(3200)
+        assert separation.total_energy_kwh == Decimal(20_000)
+        assert separation.volume_m3 is None
+        assert separation.factor_kwh_per_m3_kelvin is None
+        assert separation.hot_temp_c is None
+        assert separation.cold_temp_c is None
+        # 3.200 von 20.000 kWh → 16 % of the billable cost is warm water.
+        assert int(result.ww_pot) == 160_000
+        assert int(result.heating_pot) == 840_000
+
+    def test_the_fallback_area_is_the_area_the_co2_split_used(self) -> None:
+        """Two fields, one building: § 7 Abs. 3 needs `Co2Result` to be
+        self-contained, § 9 Abs. 2 needs the operand it pro-rated. They must
+        never be two different numbers on one page."""
+        result = statement(warm_water=WarmWaterInput(volume_m3=None))
+        separation = result.warm_water_separation
+        co2 = result.co2
+        assert separation is not None
+        assert co2 is not None
+        assert separation.heated_area_sqm == co2.heated_area_sqm == Decimal(100)
+
+    def test_no_central_warm_water_carries_no_separation_at_all(self) -> None:
+        result = statement(total_cost=1_000_000, warm_water=None, co2=None)
+        assert result.warm_water_separation is None
+        assert int(result.ww_pot) == 0
+        assert int(result.ww_base_pot) == 0
+        assert int(result.ww_cons_pot) == 0
+        assert int(result.heating_pot) == int(result.billable_cost) == 1_000_000
+
+
+class TestBlockBBemessungen:
+    """The horizontal half — one Bemessung per party per money column.
+
+    `docs/08` → Block B. Invariant, per column: the parties' Bemessungen sum
+    exactly to the Gesamtbemessung.
+    """
+
+    def test_base_weight_is_x100_scaled_and_the_name_says_so(self) -> None:
+        """⚠️ `docs/03`: engine weights are ×100 fixed point. `18.250 m²·Tage`
+        renders as `1.825.000` if the render boundary forgets to de-scale, and an
+        integer comparison stays green through exactly that bug. This fixture
+        pins **both** the carried scale and the de-scaled display value."""
+        result = statement()
+        carried = [line.base_weight_sqm_days_x100 for line in result.lines]
+        assert carried == [
+            Decimal(5000 * 365),  # A: 50 m² × 365 d
+            Decimal(3000 * 181),  # B, Bernd: 30 m² × 181 d
+            Decimal(3000 * 184),  # B, Leerstand → Vermieter: 30 m² × 184 d
+            Decimal(2000 * 365),  # C: 20 m² × 365 d
+        ]
+        assert carried == [
+            Decimal(1_825_000),
+            Decimal(543_000),
+            Decimal(552_000),
+            Decimal(730_000),
+        ]
+        # De-scaled once, at the render boundary — never per line and never twice.
+        assert [w / 100 for w in carried] == [
+            Decimal(18_250),
+            Decimal(5_430),
+            Decimal(5_520),
+            Decimal(7_300),
+        ]
+
+    def test_the_base_bemessungen_sum_to_the_gesamtbemessung(self) -> None:
+        result = statement()
+        total = sum((line.base_weight_sqm_days_x100 for line in result.lines), Decimal(0))
+        assert total == Decimal(3_650_000)
+        assert total / 100 == Decimal(36_500)  # 36.500 m²·Tage, the printed figure
+
+    def test_the_warm_water_bemessungen_sum_to_the_measured_total(self) -> None:
+        result = statement()
+        weights = [line.ww_consumption_weight_m3 for line in result.lines]
+        assert None not in weights
+        assert weights == [
+            Decimal(20),
+            Decimal(12) * Decimal(181) / Decimal(365),
+            Decimal(12) * Decimal(184) / Decimal(365),
+            Decimal(8),
+        ]
+        assert sum((w for w in weights if w is not None), Decimal(0)) == Decimal(40)
+
+    def test_a_fractional_bemessung_displays_at_two_decimals(self) -> None:
+        """`docs/08`: `5,950684931506849…` prints as `5,95`. The engine carries
+        the exact value; rounding is the renderer's job and needs the exact one."""
+        result = statement()
+        weights = [line.ww_consumption_weight_m3 for line in result.lines]
+        rounded = [None if w is None else w.quantize(Decimal("0.01")) for w in weights]
+        assert rounded == [
+            Decimal("20.00"),
+            Decimal("5.95"),
+            Decimal("6.05"),
+            Decimal("8.00"),
+        ]
+
+    def test_the_heat_bemessungen_sum_to_the_units_readings(self) -> None:
+        result = statement()
+        weights = [line.heat_consumption_weight for line in result.lines]
+        assert None not in weights
+        assert weights == [
+            Decimal(600),
+            Decimal("146.25"),  # 250 × 585 ‰
+            Decimal("103.75"),  # 250 × 415 ‰
+            Decimal(150),
+        ]
+        # Σ 1.000 — the Gesamtbemessung the page may not print until the
+        # measurement unit is carried (slice 5), but that the engine must carry.
+        assert sum((w for w in weights if w is not None), Decimal(0)) == Decimal(1000)
+
+    def test_days_and_the_denominator_they_are_a_share_of(self) -> None:
+        result = statement()
+        assert [(line.days, line.unit_total_days) for line in result.lines] == [
+            (365, 365),
+            (181, 365),
+            (184, 365),
+            (365, 365),
+        ]
+
+
+class TestBlockCNutzerwechsel:
+    """§ 9b HeizkostenV — Gradtagszahlen for the consumption, Zeitanteile for the rest.
+
+    `docs/08` → Block C: `01.01.–30.06.2025 585 ‰ von 1.000 ‰`, and
+    `12 m³ × 181 von 365 Tagen = 5,95 m³`.
+    """
+
+    def test_promille_is_carried_with_its_per_unit_total(self) -> None:
+        """Never a bare `585 ‰`: over a partial billing period a unit's parties
+        sum to less than 1.000 and the bare figure would read as wrong."""
+        result = statement()
+        assert [
+            (line.degree_day_promille, line.unit_degree_day_promille_total)
+            for line in result.lines
+        ] == [
+            (Decimal(1000), Decimal(1000)),
+            (Decimal(585), Decimal(1000)),
+            (Decimal(415), Decimal(1000)),
+            (Decimal(1000), Decimal(1000)),
+        ]
+
+    def test_the_unit_total_is_the_denominator_that_was_applied(self) -> None:
+        result = statement()
+        unit_b = [line for line in result.lines if line.unit_id == "unit-b"]
+        assert len(unit_b) == 2
+        assert sum((line.degree_day_promille for line in unit_b), Decimal(0)) == (
+            unit_b[0].unit_degree_day_promille_total
+        )
+        weights = [line.heat_consumption_weight for line in unit_b]
+        assert weights == [
+            Decimal(250) * Decimal(585) / Decimal(1000),
+            Decimal(250) * Decimal(415) / Decimal(1000),
+        ]
+
+    def test_the_printed_derivation_is_reproducible_from_the_carried_fields(self) -> None:
+        """`12 m³ × 181 von 365 Tagen = 5,95 m³` — every operand of that sentence
+        comes off the line, and the unit's reading is the exact sum of its
+        parties' Bemessungen (which is why it is not carried a second time)."""
+        result = statement()
+        unit_b = [line for line in result.lines if line.unit_id == "unit-b"]
+        shares = [line.ww_consumption_weight_m3 for line in unit_b]
+        assert None not in shares
+        unit_reading = sum((s for s in shares if s is not None), Decimal(0))
+        assert unit_reading == Decimal(12)
+        for line, share in zip(unit_b, shares, strict=True):
+            assert share is not None
+            assert share == unit_reading * Decimal(line.days) / Decimal(line.unit_total_days)
+
+
+class TestParagraph9aFallbackWithholdsAConsumptionBemessung:
+    """§ 9a Abs. 2 — when a column falls back to the area key, its consumption
+    Bemessung was not applied and must not be shown.
+
+    Block B states an Umlageschlüssel **per column**, so the result has to say
+    per column which key was used. `consumption_fallback_to_area` (heat *or* warm
+    water) cannot express the mixed case below.
+    """
+
+    def test_heating_falls_back_while_warm_water_does_not(self) -> None:
+        result = statement(
+            total_cost=1_000_000,
+            heating_units=units(heat_b=None, heat_c=None),  # 50 % of the area
+            co2=None,
+        )
+        assert result.heat_fallback_to_area is True
+        assert result.ww_fallback_to_area is False
+        assert result.consumption_fallback_to_area is True  # unchanged meaning: heat or ww
+        assert [line.heat_consumption_weight for line in result.lines] == [None] * 4
+        ww = [line.ww_consumption_weight_m3 for line in result.lines]
+        assert None not in ww
+        assert sum((w for w in ww if w is not None), Decimal(0)) == Decimal(40)
+        # The Fläche·Tage Bemessung is still carried — it is what was applied to
+        # *both* heating columns in this case.
+        assert sum(
+            (line.base_weight_sqm_days_x100 for line in result.lines), Decimal(0)
+        ) == Decimal(3_650_000)
+        assert sum(int(line.total) for line in result.lines) == 1_000_000
+
+    def test_no_central_warm_water_is_not_a_fallback(self) -> None:
+        """No warm-water column exists at all — that is not § 9a Abs. 2, and the
+        page must not claim a fallback happened."""
+        result = statement(total_cost=1_000_000, warm_water=None, co2=None)
+        assert result.ww_fallback_to_area is False
+        assert result.heat_fallback_to_area is False
+        assert [line.ww_consumption_weight_m3 for line in result.lines] == [None] * 4
+
+
+class TestCo2Berechnungsgrundlagen:
+    """§ 7 Abs. 3 CO2KostAufG — the Einstufung *and* the grounds it was computed on.
+
+    `docs/08` item 5: `CO₂-Emissionen des Gebäudes 2.000 kg · beheizte Fläche
+    100 m² → 20 kg CO₂/m²/Jahr · Einstufung: 17 bis unter 22 · CO₂-Kosten
+    300,00 €`. Three of those four inputs reach `Co2Result` nowhere today.
+    """
+
+    def test_the_inputs_of_the_einstufung_are_carried(self) -> None:
+        result = statement()
+        co2 = result.co2
+        assert co2 is not None
+        assert co2.total_co2_kg == Decimal(2000)
+        assert co2.heated_area_sqm == Decimal(100)
+        assert int(co2.co2_cost) == 30_000
+        # The disclosed intensity is reproducible from the two disclosed operands.
+        assert co2.intensity_kg_per_sqm == co2.total_co2_kg / co2.heated_area_sqm
+        # …and the split of the disclosed cost adds up for the reader.
+        assert int(co2.landlord_amount) + int(co2.renter_amount) == int(co2.co2_cost)
+
+    def test_the_einstufung_is_a_band_not_a_step_number(self) -> None:
+        """`Co2Step` carries no ordinal, so a step number would be invented. The
+        band is the pair of bounds the intensity was actually compared against."""
+        result = statement()
+        co2 = result.co2
+        assert co2 is not None
+        assert co2.landlord_share_percent == 20
+        lower, upper = co2.band_min_inclusive, co2.band_max_exclusive
+        assert lower is not None and upper is not None
+        assert lower == Decimal(17)
+        assert upper == Decimal(22)
+        assert lower <= co2.intensity_kg_per_sqm < upper
+
+    def test_the_first_step_has_no_lower_bound(self) -> None:
+        """`unter 12 kg CO₂/m²/Jahr` — the Anlage's first step has no lower bound
+        and the engine must not invent a 0."""
+        result = statement(co2=Co2Input(total_co2_kg=Decimal(1000), co2_cost=cents(30_000)))
+        co2 = result.co2
+        assert co2 is not None
+        assert co2.intensity_kg_per_sqm == Decimal(10)
+        assert co2.landlord_share_percent == 0
+        assert co2.band_min_inclusive is None
+        assert co2.band_max_exclusive == Decimal(12)
+
+    def test_the_open_ended_top_step_has_no_upper_bound(self) -> None:
+        result = statement(co2=Co2Input(total_co2_kg=Decimal(5500), co2_cost=cents(30_000)))
+        co2 = result.co2
+        assert co2 is not None
+        assert co2.intensity_kg_per_sqm == Decimal(55)
+        assert co2.landlord_share_percent == 95
+        assert co2.band_min_inclusive == Decimal(52)
+        assert co2.band_max_exclusive is None
+
+    def test_the_full_year_days_are_carried_alongside_the_factor(self) -> None:
+        """`period_factor` alone cannot be un-divided back into `181 von 365`."""
+        result = statement()
+        co2 = result.co2
+        assert co2 is not None
+        assert co2.period_days == 365
+        assert co2.reference_year_days == 365
+        assert co2.period_factor == Decimal(1)
+
+    def test_a_leap_year_is_366_of_366_and_not_shortened(self) -> None:
+        result = statement(billing_period=LEAP_YEAR_2024)
+        co2 = result.co2
+        assert co2 is not None
+        assert co2.period_days == 366
+        assert co2.reference_year_days == 366
+        assert co2.period_factor == Decimal(1)
+        assert co2.band_min_inclusive == Decimal(17)
+        assert co2.band_max_exclusive == Decimal(22)
+
+
+class TestCo2BandOverAShortPeriod:
+    """§ 5 Abs. 1 S. 4 CO2KostAufG — the band that is disclosed is the *shortened* one.
+
+    01.01.–01.07.2025 = 181 of 365 days; 1.950 kg over 100 m² = 19,5 kg/m² for
+    the period. Against the shortened table that is Stufe 37 – < 42 (Vermieter
+    60 %), and `docs/08` item 5 requires the page to print
+    `Einstufung: 18,3 bis unter 20,8 … anteilig gekürzt`. The renderer must not
+    multiply the bounds itself — a second implementation of a legal rule in the
+    template layer is how the two drift apart.
+    """
+
+    def _result(self) -> HeatingResult:
+        return statement(
+            billing_period=FIRST_HALF_2025,
+            total_cost=530_000,
+            total_energy_kwh=10_000,
+            warm_water=WarmWaterInput(volume_m3=Decimal(20)),
+            co2=Co2Input(total_co2_kg=Decimal(1950), co2_cost=cents(30_000)),
+        )
+
+    def test_the_carried_band_is_the_shortened_one(self) -> None:
+        co2 = self._result().co2
+        assert co2 is not None
+        assert co2.landlord_share_percent == 60
+        assert co2.intensity_kg_per_sqm == Decimal("19.5")  # the period figure, not annualised
+        lower, upper = co2.band_min_inclusive, co2.band_max_exclusive
+        assert lower is not None and upper is not None
+        # Shortened by the *carried* factor — not by one the template recomputes.
+        assert lower == Decimal(37) * co2.period_factor
+        assert upper == Decimal(42) * co2.period_factor
+        assert lower.quantize(Decimal("0.001")) == Decimal("18.348")
+        assert upper.quantize(Decimal("0.001")) == Decimal("20.827")
+        assert lower <= co2.intensity_kg_per_sqm < upper
+
+    def test_the_days_behind_the_factor_are_carried(self) -> None:
+        """`(181 von 365 Tagen)` is required copy; it is not recoverable from
+        0,4958904109589041095890410959."""
+        co2 = self._result().co2
+        assert co2 is not None
+        assert co2.period_days == 181
+        assert co2.reference_year_days == 365
+        assert co2.period_factor == Decimal(181) / Decimal(365)
