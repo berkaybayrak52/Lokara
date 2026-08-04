@@ -40,39 +40,90 @@ don't re-derive it per surface.
 | Slate on Paper      | 5,44      | non-legal secondary framing text only                        |
 | Slate on Mint       | 4,81      | AA by 0,31 — **not permitted** for legally required text     |
 
-### Legally required disclosure is held to AAA, not AA (two named rules)
+### Legally required disclosure — two tiers, split by what the content is *for*
 
-Body copy stays at **AA**; content the law compels us to show is held to **AAA**. The four BGH formal
-minimums, every heating disclosure, and the `Rechtsstand` footer are shown because a statute requires
-them — content a reader squints at is disclosure in form only. Which text on a given document is
-legally required is named by that document's spec (for the statement: `docs/08`); the thresholds live
-here and only here.
+Body copy stays at **AA**. Content we show because a statute (or our own compliance rule) compels it
+is held higher — but **not to one flat bar**. An earlier version of this section had a single tier
+(`legal-contrast` ≥ 7:1 + `legal-size` ≥ body copy) over everything legally required; that was ruled
+wrong on **04.08.2026** and is superseded by the two tiers below. The split is **by the job the text
+does for the reader**, never by a size band or a word count.
 
-**`legal-contrast` — ≥ 7:1 on its own background.**
-The provenance is **WCAG 2.1 Level AAA, Success Criterion 1.4.6 Contrast (Enhanced)**: 7:1 for normal
-text, 4.5:1 for large text (≥ 18 pt, or ≥ 14 pt bold). We do not take the large-text relaxation for
-legal disclosure — it is never set large. Qualifying token pairs, from the table above: **Petrol Ink
-on Paper (15,72)**, **Petrol Ink on Mint (13,91)**, **Forest Deep on Paper (11,32)**, **Forest Deep on
-Mint (10,01)**. Slate is retired from legally required text at both 5,44 and 4,81 and keeps its role
-as non-legal secondary text on Paper. Tokens only — no ad-hoc hex, and no new colour is needed.
+Which text on a given document belongs to which tier is named by that document's spec (for the
+statement: `docs/08`). The **thresholds live here and only here** — a design-system rule with two
+homes is a rule waiting to disagree with itself.
 
-**`legal-size` — never smaller than body copy.**
-Legally required text is set at **≥ the document's own body font-size**, read from the stylesheet, not
-against a constant. Deliberately comparative and deliberately anchored to *body copy*, not to "the
-smallest text on the page": the latter is satisfiable by shrinking everything else, which makes the
-page worse and the check pass.
+#### Tier 1 — verification content (`legal-t1-size`, `legal-t1-contrast`)
 
-> **Why there is no absolute pt floor.** **DIN 1450** (Schriften — Leserlichkeit), the German legibility
-> norm, specifies minimum sizes via **x-height and reading distance**, not point size; no point number
-> falls out of it, so none can be cited. And the brand typefaces are **not embedded** in the generated
-> PDF — it renders HelveticaNeue/ArialMT — so a pt floor asserted today would measure a font we do not
-> ship. Any absolute number would be fitted to the defect it was written to catch. If an absolute floor
-> is ever wanted, what would resolve it is an embedded-font decision plus a DIN-1450 x-height
-> calculation at a stated reading distance — not a round number.
+**What it is.** The **four BGH formal minimums** — Gesamtkosten, Umlageschlüssel, Anteil des Mieters,
+Vorauszahlungen — **and anything that explains them**: the Umlageschlüssel, the Bemessung, the
+Gesamtbemessung, the amounts, the CO₂ reconciliation. Anything a reader needs in order to *recompute
+their own share*.
 
-Both rules also carry the usual typographic hygiene at these sizes: **line-height ≥ 1,4**, weight
-≥ 400, no all-caps, no negative letter-spacing, and `font-variant-numeric: tabular-nums` on numeric
-columns so figures align for comparison.
+**Why it is held highest.** German case law requires the statement to be **verständlich für einen
+durchschnittlichen Mieter** — an average tenant must be able to follow it without expert help
+(BGH-Mindestangaben on the formal validity of a Betriebskostenabrechnung, § 259 BGB). Tier 1 *is*
+precisely the content that requirement is about. Text a reader squints at is disclosure in form only.
+
+- **`legal-t1-size` — never smaller than body copy.** Set at **≥ the document's own body font-size**,
+  read from the stylesheet, not against a constant. Deliberately comparative and deliberately
+  anchored to *body copy*, not to "the smallest text on the page": the latter is satisfiable by
+  shrinking everything else, which makes the page worse and the check pass.
+- **`legal-t1-contrast` — ≥ 7:1 on its own background.** Provenance: **WCAG 2.1 Level AAA, Success
+  Criterion 1.4.6 *Contrast (Enhanced)*** — 7:1 for normal text, 4.5:1 for large text (≥ 18 pt, or
+  ≥ 14 pt bold). We do **not** take the large-text relaxation for tier 1: it is never set large.
+  Qualifying token pairs, from the table above: **Petrol Ink on Paper (15,72)**, **Petrol Ink on Mint
+  (13,91)**, **Forest Deep on Paper (11,32)**, **Forest Deep on Mint (10,01)**. Slate is retired from
+  tier 1 at both 5,44 and 4,81. Tokens only — no ad-hoc hex, and no new colour is needed.
+
+#### Tier 2 — provenance and attestation (`legal-t2-contrast`, `legal-t2-scale`)
+
+**What it is.** The `Rechtsstand` stamps and the *"rechtskonform, keine Rechts- oder Steuerberatung"*
+disclaimer. These state **where the rules came from** and **what the document is not**. They are
+**not** part of the BGH minimums — no court requires a `Rechtsstand` line; it is **our own rule**,
+from `CLAUDE.md` (*"Show `Rechtsstand MM/JJJJ` in every legal output"*, *"Tool, not advice"*). A
+reader does not recompute anything from them.
+
+**The bar: present and legible, not prominent.**
+
+- **`legal-t2-contrast` — ≥ 4,5:1 on its own background.** Provenance: **WCAG 2.1 Level AA, SC 1.4.3
+  *Contrast (Minimum)*** — the same bar as body copy, i.e. tier 2 is never *below* the page's ordinary
+  standard. Slate on Paper (5,44) qualifies; Slate on Mint (4,81) qualifies numerically but is a
+  0,31 margin and is discouraged for any surface that may be re-tinted.
+- **`legal-t2-scale` — must scale.** It respects user zoom / text-size settings like everything else
+  (`rem`, no capped scaling) — the BFSG requirement in *Typography* above. In a print PDF this is
+  discharged by the medium: the viewer zooms the whole page. It is therefore **stated, not asserted**
+  against a print stylesheet.
+- **No size floor. Deliberately.** In the lead's words, recorded because it *is* the rule and not a
+  footnote to it: *"I am not inventing a second magic number, and any ratio I picked would land
+  conveniently on the current 8 pt, which is the same error as the 9,0 pt floor."* A tier-2 threshold
+  derived by picking a fraction of body copy would be fitted to the page that already exists — that is
+  the defect, not the fix. **Tier 2 has no size assertion, and a check that adds one is wrong until
+  this paragraph changes.**
+
+> **Why there is no absolute pt floor** (applies to both tiers). **DIN 1450** (Schriften —
+> Leserlichkeit), the German legibility norm, specifies minimum sizes via **x-height and reading
+> distance**, not point size; no point number falls out of it, so none can be cited. And the brand
+> typefaces are **not embedded** in the generated PDF — it renders HelveticaNeue/ArialMT — so a pt
+> floor asserted today would measure a font we do not ship. Any absolute number would be fitted to the
+> defect it was written to catch. If an absolute floor is ever wanted, what would resolve it is an
+> embedded-font decision plus a DIN-1450 x-height calculation at a stated reading distance — not a
+> round number.
+
+#### Assigning a carrier to a tier
+
+Every carrier of legally required text belongs to **exactly one** tier — unassigned is not a state.
+The question is not "how important does this look" but: **can the reader verify a number with it?**
+If yes → tier 1. If it only says where the rule came from or what the document is not → tier 2.
+Statutory *notices that change how a figure must be read* (e.g. "this Verbrauch is an estimate", "the
+consumption key was replaced by the area key") are **tier 1**, because without them the printed
+Umlageschlüssel is not the one that was applied.
+
+Both tiers carry the usual typographic hygiene at these sizes: **line-height ≥ 1,4**, weight ≥ 400,
+no all-caps, no negative letter-spacing, and `font-variant-numeric: tabular-nums` on numeric columns
+so figures align for comparison.
+
+**Rechtsstand 08/2026** for the legal basis cited here (BGH-Mindestangaben / § 259 BGB). WCAG 2.1 and
+DIN 1450 are standards, not statute, and carry no `Rechtsstand`.
 
 ## Typography
 
@@ -249,8 +300,12 @@ these, it's not done.
 ## Accessibility checklist (every screen)
 
 - [ ] Contrast ≥ 4.5:1 for text (≥3:1 for large text / UI components).
-- [ ] Legally required disclosure additionally meets `legal-contrast` (≥ 7:1, WCAG 2.1 AAA SC 1.4.6)
-      and `legal-size` (never smaller than body copy) — see *Legally required disclosure* above.
+- [ ] **Tier 1** (verification content — BGH minimums and anything that explains them) meets
+      `legal-t1-contrast` (≥ 7:1, WCAG 2.1 AAA SC 1.4.6) **and** `legal-t1-size` (never smaller than
+      body copy) — see *Legally required disclosure — two tiers* above.
+- [ ] **Tier 2** (provenance/attestation — `Rechtsstand`, disclaimer) meets `legal-t2-contrast`
+      (≥ 4,5:1, WCAG 2.1 AA SC 1.4.3) and `legal-t2-scale`. **No size floor** — do not add one.
+- [ ] Every carrier of legally required text is assigned to exactly one tier.
 - [ ] Visible focus states on all interactive elements (keyboard nav works end to end).
 - [ ] Labels are explicit and always visible (no icon-only critical actions without a label/aria-label).
 - [ ] Type scales with user zoom; layout survives 200% zoom.

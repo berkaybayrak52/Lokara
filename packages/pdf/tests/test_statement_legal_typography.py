@@ -1,31 +1,49 @@
-"""Gate: legally required disclosure is not the hardest thing to read on the page.
+"""Gate: legally required disclosure is readable — at the bar its *job* earns.
 
-Spec: `docs/05` → "Legally required disclosure is held to AAA, not AA" — the two
-named rules `legal-contrast` and `legal-size`, and the measured ratios of the
-brand pairs. `docs/08` → "Which text on the statement is legally required" names
-*which* text on this document those rules bind; it deliberately carries no
+Spec: `docs/05` → "Legally required disclosure — two tiers, split by what the
+content is for", the four named rules (`legal-t1-size`, `legal-t1-contrast`,
+`legal-t2-contrast`, `legal-t2-scale`) and the measured ratios of the brand
+pairs. `docs/08` → "Which text on the statement is legally required" names
+*which* text on this document carries which tier; it deliberately carries no
 thresholds.
 
-Today the **Umlageschlüssel + Gesamtbemessung** line — BGH formal minimum #2 plus
-the denominator that minimum #3 rests on — is the smallest and lowest-contrast
-text on the statement: 8,5 pt Slate on Mint, a measured **4,81:1**. It clears AA
-with 0,31 to spare and it is still the wrong way round: the decorative CO₂ panel
-is 10 pt Ink on Mint at 13,91:1, and the tenant's own money is 10 pt Ink at
-15,72:1. A disclosure a reader squints at is a disclosure in form only.
+**Two tiers, not one flat bar.** An earlier version of this file held everything
+legally required to a single AAA + body-size rule. That was ruled wrong on
+04.08.2026: the bar follows what the content is *for*, never a number.
 
-What this file pins, for text `docs/08` marks as legally required (the four BGH
-minimums, every heating disclosure, the `Rechtsstand` footer):
+**Tier 1 — verification content.** The four BGH formal minimums and anything
+that explains them: Umlageschlüssel, Bemessung, Gesamtbemessung, the amounts,
+the CO₂ reconciliation. German case law requires the statement to be
+*verständlich für einen durchschnittlichen Mieter*, and this is precisely the
+content that requirement is about.
 
-1. `legal-size` — **never smaller than body copy**, read from the stylesheet's
-   own `body { font-size }`. Not an absolute point floor: DIN 1450 specifies
-   legibility by x-height and reading distance, so no point number falls out of
-   it, and the brand faces are not embedded in the PDF anyway. Not "not the
-   smallest text on the page" either — that is satisfiable by shrinking
+1. `legal-t1-size` — **never smaller than body copy**, read from the
+   stylesheet's own `body { font-size }`. Not an absolute point floor: DIN 1450
+   specifies legibility by x-height and reading distance, so no point number
+   falls out of it, and the brand faces are not embedded in the PDF anyway. Not
+   "not the smallest text on the page" either — that is satisfiable by shrinking
    everything else, which makes the page worse and turns this green.
-2. `legal-contrast` — **≥ 7:1** on its own background (WCAG 2.1 Level AAA, SC
-   1.4.6 *Contrast (Enhanced)*) → Petrol Ink or Forest Deep. Slate keeps its
-   `docs/05` role (secondary text on Paper, 5,44:1) and leaves legal text.
-3. **line-height ≥ 1,4** wherever one is declared.
+2. `legal-t1-contrast` — **≥ 7:1** on its own background (WCAG 2.1 Level AAA,
+   SC 1.4.6 *Contrast (Enhanced)*) → Petrol Ink or Forest Deep. Slate keeps its
+   `docs/05` role (secondary text on Paper, 5,44:1) and leaves tier 1.
+
+**Tier 2 — provenance and attestation.** The `Rechtsstand` stamps and the
+disclaimer. These are *not* part of the BGH minimums — `Rechtsstand` is our own
+rule from `CLAUDE.md`. They must be present and legible, not prominent.
+
+3. `legal-t2-contrast` — **≥ 4,5:1** (WCAG 2.1 Level AA, SC 1.4.3 *Contrast
+   (Minimum)*), i.e. never below the page's ordinary bar.
+4. **No size floor, deliberately.** Quoting the ruling, because it is the rule
+   and not a footnote to it: *"I am not inventing a second magic number, and any
+   ratio I picked would land conveniently on the current 8 pt, which is the same
+   error as the 9,0 pt floor."* The tier-2 code path below therefore has **no
+   size branch at all** — see `test_tier2_provenance_is_legible_not_prominent`.
+   Adding one is a spec change in `docs/05` first, a test change second.
+5. `legal-t2-scale` is **not** asserted here: it is a user-zoom / text-scaling
+   rule and a print PDF discharges it by the medium (the viewer zooms the whole
+   page). Stated in `docs/05`, not measurable against this stylesheet.
+
+Both tiers carry **line-height ≥ 1,4** wherever one is declared.
 
 Deliberately a **stylesheet** assertion, not a pixel one. Rendering a PDF and
 measuring glyphs would test Chromium; what is being fixed here is a declaration.
@@ -51,14 +69,22 @@ DOCS05_TOKENS = {
     "--color-paper": "#fbfbfa",
 }
 
-# No absolute point floor exists to assert — see `docs/05`, "Why there is no
-# absolute pt floor". The size rule is comparative: body copy is the reference.
-MIN_LEGAL_CONTRAST = 7.0
+# WCAG 2.1 SC 1.4.6 (AAA) for tier 1, SC 1.4.3 (AA) for tier 2. No size constant
+# exists to declare for either tier — see `docs/05`, "Why there is no absolute pt
+# floor". Tier 1's size rule is comparative (body copy is the reference); tier 2
+# has no size rule.
+MIN_TIER1_CONTRAST = 7.0
+MIN_TIER2_CONTRAST = 4.5
 MIN_LEGAL_LINE_HEIGHT = 1.4
 
 # Selector → the token its text actually sits on. Hand-mapped because CSS
 # inheritance is not resolvable from a stylesheet alone; `test_backgrounds_are_
 # as_this_file_assumes` keeps the mapping honest.
+#
+# This is the *carrier list* from `docs/08` → "Which text on the statement is
+# legally required". The tiers below must partition it exactly; a carrier added
+# here without a tier fails `test_every_legal_carrier_is_in_exactly_one_tier`
+# rather than sliding through untested.
 LEGAL_SURFACES = {
     ".key-label": "--color-mint",  # Umlageschlüssel + Gesamtbemessung (BGH #2/#3)
     "tfoot .foot-note": "--color-paper",  # the heating footer's reconciliation
@@ -66,6 +92,28 @@ LEGAL_SURFACES = {
     ".co2": "--color-mint",  # CO2KostAufG § 7 Abs. 3
     "footer": "--color-paper",  # Rechtsstand + disclaimer
 }
+
+# Tier 1 — verification content. A reader recomputes their own share from this.
+#
+# `.note` is here on purpose. Its two strings are both § 9a HeizkostenV notices,
+# and both change how the renter must read their own Bemessung: one says the
+# Verbrauch figure is an *estimate, not a reading*, the other says the
+# consumption key was *replaced by the area key* — i.e. the Umlageschlüssel
+# printed in `.key-label` is not the one that was applied. Neither is incidental
+# copy; both sit inside BGH minimums #2 and #3. (docs/08, "Why `.note` is tier 1")
+TIER_1_VERIFICATION = frozenset(
+    {
+        ".key-label",
+        "tfoot .foot-note",
+        ".note",
+        ".co2",
+    }
+)
+
+# Tier 2 — provenance and attestation. States where the rules came from and what
+# the document is not. No number is recomputed from it, and no court requires it:
+# `Rechtsstand` is our own rule (`CLAUDE.md`).
+TIER_2_PROVENANCE = frozenset({"footer"})
 
 _STYLE = re.compile(r"<style>(.*?)</style>", re.DOTALL)
 _RULE = re.compile(r"([^{}]+)\{([^{}]*)\}", re.DOTALL)
@@ -119,6 +167,31 @@ def contrast(foreground: str, background: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _contrast_violations(
+    rules: dict[str, dict[str, str]], selectors: frozenset[str], floor: float
+) -> list[str]:
+    """Every selector in `selectors` below `floor`, as report lines.
+
+    Accumulating rather than asserting per selector is the point: an implementer
+    fixing this needs the whole set in one run, not whichever selector the
+    iteration order trips on first.
+    """
+    tokens = _tokens(rules)
+    violations = []
+    for selector in sorted(selectors):
+        declared = rules[selector].get("color")
+        if declared is None:
+            continue  # inherits body → Petrol Ink, the highest pair available
+        match = _VAR.search(declared)
+        assert match is not None, f"{selector} {{ color: {declared} }} — tokens only (docs/05)"
+        ratio = contrast(tokens[match.group(1)], tokens[LEGAL_SURFACES[selector]])
+        if ratio < floor:
+            violations.append(
+                f"{selector}: {match.group(1)} on {LEGAL_SURFACES[selector]} is {ratio:.2f}:1"
+            )
+    return violations
+
+
 def test_the_tokens_are_the_docs05_palette() -> None:
     """The contrast maths below is only meaningful against the real palette."""
     assert _tokens(_stylesheet()) == DOCS05_TOKENS
@@ -134,19 +207,46 @@ def test_backgrounds_are_as_this_file_assumes() -> None:
     assert _VAR.search(rules[".co2"]["background"]).group(1) == "--color-mint"  # type: ignore[union-attr]
 
 
-def test_legal_disclosure_is_never_smaller_than_body_copy() -> None:
-    """`legal-size` (docs/05). The reference is the stylesheet's own body
+def test_every_legal_carrier_is_in_exactly_one_tier() -> None:
+    """No carrier of legally required text may be untiered.
+
+    `docs/05` → "Every carrier of legally required text belongs to exactly one
+    tier — unassigned is not a state." Without this, adding a carrier to
+    `LEGAL_SURFACES` (or to the template, and then here) while forgetting the
+    tier would give it *no* assertions at all and still show green.
+    """
+    tiered = TIER_1_VERIFICATION | TIER_2_PROVENANCE
+
+    untiered = sorted(set(LEGAL_SURFACES) - tiered)
+    assert not untiered, (
+        "legally required carriers with no tier: "
+        + ", ".join(untiered)
+        + " — assign each in docs/08 (verification content → 1, provenance → 2)"
+    )
+
+    unknown = sorted(tiered - set(LEGAL_SURFACES))
+    assert not unknown, (
+        "tiered selectors missing from LEGAL_SURFACES (so their background is "
+        "unmapped): " + ", ".join(unknown)
+    )
+
+    both = sorted(TIER_1_VERIFICATION & TIER_2_PROVENANCE)
+    assert not both, "selectors claimed by both tiers: " + ", ".join(both)
+
+
+def test_tier1_verification_content_is_never_smaller_than_body_copy() -> None:
+    """`legal-t1-size` (docs/05). The reference is the stylesheet's own body
     font-size — 10 pt today — not a constant, and not "the smallest text on the
     page": anchoring to the page minimum would let a shrunken caption elsewhere
-    lower the bar for the tenant's legal disclosure.
+    lower the bar for the tenant's verification content.
 
     Every violation is reported at once; the implementer needs the whole set, not
-    whichever selector `dict` order happens to reach first."""
+    whichever selector iteration order happens to reach first."""
     rules = _stylesheet()
     body = _pt(rules["body"]["font-size"], selector="body", prop="font-size")
 
     too_small = []
-    for selector in LEGAL_SURFACES:
+    for selector in sorted(TIER_1_VERIFICATION):
         declared = rules[selector].get("font-size")
         if declared is None:
             continue  # inherits body — at the reference by construction
@@ -155,37 +255,59 @@ def test_legal_disclosure_is_never_smaller_than_body_copy() -> None:
             too_small.append(f"{selector} is {size} pt")
 
     assert not too_small, (
-        f"legally required text is set below the {body} pt body copy: " + ", ".join(too_small)
+        f"tier-1 verification content is set below the {body} pt body copy: " + ", ".join(too_small)
     )
 
 
-def test_legal_disclosure_meets_the_contrast_floor() -> None:
-    """`legal-contrast` (docs/05): ≥ 7:1 → Ink (13,91 on Mint) or Forest (10,01).
-    Slate on Mint is 4,81 and is exactly what `.key-label` uses today."""
-    rules = _stylesheet()
-    tokens = _tokens(rules)
+def test_tier1_verification_content_meets_the_aaa_contrast_floor() -> None:
+    """`legal-t1-contrast` (docs/05): ≥ 7:1 → Ink (13,91 on Mint, 15,72 on Paper)
+    or Forest (10,01 / 11,32). Slate on Mint is 4,81 and is exactly what
+    `.key-label` uses today; Slate on Paper is 5,44 and is what `tfoot
+    .foot-note` and `.note` use."""
+    violations = _contrast_violations(_stylesheet(), TIER_1_VERIFICATION, MIN_TIER1_CONTRAST)
 
-    for selector, background in LEGAL_SURFACES.items():
-        declared = rules[selector].get("color")
-        if declared is None:
-            continue  # inherits body → Petrol Ink, the highest pair available
-        match = _VAR.search(declared)
-        assert match is not None, f"{selector} {{ color: {declared} }} — tokens only (docs/05)"
-        ratio = contrast(tokens[match.group(1)], tokens[background])
-        assert ratio >= MIN_LEGAL_CONTRAST, (
-            f"{selector}: {match.group(1)} on {background} is {ratio:.2f}:1 — "
-            f"legally required text needs {MIN_LEGAL_CONTRAST}:1"
-        )
+    assert not violations, (
+        f"tier-1 verification content needs {MIN_TIER1_CONTRAST}:1 "
+        "(WCAG 2.1 AAA, SC 1.4.6): " + "; ".join(violations)
+    )
+
+
+def test_tier2_provenance_is_legible_not_prominent() -> None:
+    """`legal-t2-contrast` (docs/05): ≥ 4,5:1, WCAG 2.1 AA SC 1.4.3 — the same
+    bar as body copy, so provenance text is never *below* the page's ordinary
+    standard. Slate on Paper is 5,44 and clears it.
+
+    **There is no size branch in this test and there must not be one.** `docs/05`:
+    the `Rechtsstand` stamps and the disclaimer are not BGH minimums, and no
+    honest size threshold exists for them — *"any ratio I picked would land
+    conveniently on the current 8 pt, which is the same error as the 9,0 pt
+    floor."* `legal-t2-scale` is likewise absent: user zoom is a viewer property
+    of a print PDF, not a stylesheet declaration this file can read. Adding
+    either assertion means changing `docs/05` first.
+    """
+    violations = _contrast_violations(_stylesheet(), TIER_2_PROVENANCE, MIN_TIER2_CONTRAST)
+
+    assert not violations, (
+        f"tier-2 provenance text needs {MIN_TIER2_CONTRAST}:1 "
+        "(WCAG 2.1 AA, SC 1.4.3): " + "; ".join(violations)
+    )
 
 
 def test_legal_disclosure_meets_the_line_height_floor() -> None:
+    """Typographic hygiene, both tiers (docs/05)."""
     rules = _stylesheet()
 
-    for selector in LEGAL_SURFACES:
+    cramped = []
+    for selector in sorted(LEGAL_SURFACES):
         declared = rules[selector].get("line-height")
         if declared is None:
             continue
-        assert float(declared) >= MIN_LEGAL_LINE_HEIGHT, f"{selector}: line-height {declared}"
+        if float(declared) < MIN_LEGAL_LINE_HEIGHT:
+            cramped.append(f"{selector}: line-height {declared}")
+
+    assert not cramped, (
+        f"legally required text needs line-height ≥ {MIN_LEGAL_LINE_HEIGHT}: " + ", ".join(cramped)
+    )
 
 
 def test_numeric_columns_stay_tabular() -> None:
