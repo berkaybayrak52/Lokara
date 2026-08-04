@@ -29,6 +29,7 @@ run() {
 
 # --- always ------------------------------------------------------------------------
 run "ruff"                uv run ruff check .
+run "ruff format"         uv run ruff format --check .
 run "mypy --strict"       uv run mypy
 run "engine purity"       uv run python scripts/check_engine_purity.py
 
