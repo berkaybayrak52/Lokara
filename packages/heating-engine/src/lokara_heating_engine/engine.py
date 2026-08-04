@@ -217,6 +217,7 @@ def _apply_co2(heating_input: HeatingInput) -> tuple[Co2Result | None, Cents]:
         heated_area_sqm=heated_area_sqm,
         table=table,
         rechtsstand=rechtsstand,
+        billing_period=heating_input.billing_period,
     )
     billable = cents(int(heating_input.total_cost) - int(co2_result.landlord_amount))
     return co2_result, billable
