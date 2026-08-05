@@ -115,7 +115,13 @@ def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
                 co2_rechtsstand=co2_table.rechtsstand,
             ),
             warm_water=WarmWaterInput(volume_m3=Decimal(40)),
-            co2=Co2Input(total_co2_kg=Decimal(2000), co2_cost=cents(30000)),
+            # Both figures are copied off the supplier's invoice (§ 3 Abs. 1
+            # CO2KostAufG) — no price is held anywhere and nothing multiplies by
+            # one. 4.000 kg on 20.000 kWh is 0,200 kg CO₂/kWh (Erdgas) and
+            # 261,80 € on 4 t is 65,45 €/t (55,00 € per § 10 Abs. 2 BEHG + 19 %
+            # USt). `docs/06` → "Scenario 2 — the fuel, the emissions and the
+            # CO₂ price"; the same pair is seeded in `packages/db`.
+            co2=Co2Input(total_co2_kg=Decimal(4000), co2_cost=cents(26180)),
         )
     )
     # Label + date per rule, in resolution order. The citations come from the

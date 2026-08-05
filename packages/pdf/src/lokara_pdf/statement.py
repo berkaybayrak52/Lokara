@@ -297,6 +297,16 @@ def statement_html(data: StatementData) -> str:
   .band {{ height: 3mm; background: var(--color-green); margin-bottom: 8mm; }}
   .meta {{ color: var(--color-slate); margin: 0 0 6mm; line-height: 1.5; }}
   table {{ width: 100%; border-collapse: collapse; }}
+  /* Pagination (docs/08 → 4b): break at the seams, never inside a statement.
+     `break-inside: avoid` belongs on the SMALLEST element that is one
+     indivisible claim and is wrong on every container above it. A row is one
+     claim — a party's label and their figure; split across a sheet, a reader
+     gets a figure with no name or a name with no figure. */
+  tr {{ break-inside: avoid; }}
+  /* A column header separated from its first row leaves a page of unlabelled
+     numbers. In the disclosure block the FIRST table is also what gives the
+     second's columns their meaning. */
+  thead {{ break-after: avoid; }}
   th {{
     background: var(--color-ink); color: var(--color-paper);
     font-weight: 600; text-align: left; padding: 2mm 2.5mm; font-size: 9pt;
@@ -344,20 +354,33 @@ def statement_html(data: StatementData) -> str:
      through weight and a hairline rule, never through a lighter ink. Declared
      one selector each, because a grouped rule is not addressable per carrier.
      Keep every comment in this stylesheet English: it ships inside the document
-     and the text-occurrence gates count the whole file. */
+     and the text-occurrence gates count the whole file.
+     All three GROW with the number of parties, so none of them may refuse to
+     break (docs/08 → 4b): a block that cannot split cannot be laid out beyond
+     one sheet, and long before that it strands the page above it and lands the
+     justification on a different sheet from the figures it justifies. Splitting
+     such a block is normal; stranding it is the defect. `orphans`/`widows` keep
+     a lone line of running prose off a sheet on its own. */
   .cost-split {{
     color: var(--color-forest); line-height: 1.5; margin-top: 6mm;
-    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint); break-inside: avoid;
+    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint);
+    orphans: 2; widows: 2;
   }}
   .basis-table {{
     color: var(--color-forest); line-height: 1.5; margin-top: 6mm;
     padding-top: 4mm; border-top: 0.5pt solid var(--color-mint);
+    orphans: 2; widows: 2;
   }}
   .party-change {{
     color: var(--color-forest); line-height: 1.5; margin-top: 6mm;
-    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint); break-inside: avoid;
+    padding-top: 4mm; border-top: 0.5pt solid var(--color-mint);
+    orphans: 2; widows: 2;
   }}
-  .disclosure-title {{ font-size: 10.5pt; font-weight: 600; margin: 0 0 2.5mm; }}
+  /* A heading alone at the foot of a sheet is the same defect at its smallest
+     scale, and the cheapest one to prevent. */
+  .disclosure-title {{
+    font-size: 10.5pt; font-weight: 600; margin: 0 0 2.5mm; break-after: avoid;
+  }}
   .cost-split p, .party-change p {{ margin: 0 0 1.5mm; }}
   /* Which rule was applied, then what the rule permits: the second is quieter
      by weight alone, so both stay at the tier-1 pair. */
@@ -380,8 +403,32 @@ def statement_html(data: StatementData) -> str:
   .basis-table tfoot td {{
     font-weight: 600; border-top: 0.5pt solid var(--color-forest);
   }}
+  /* The column table names a money column, its key and its denominator. The
+     first column holds the shortest phrases, so it gets just enough width to
+     keep them on one line; the key is prose and may wrap. */
+  .basis-table .columns th:first-child, .basis-table .columns td:first-child {{ width: 29%; }}
+  .basis-table .columns th:last-child, .basis-table .columns td:last-child {{ width: 24%; }}
+  /* The one cell in the reference-total column that holds prose instead of a
+     figure. Left-aligned and with tabular figures switched off, so it cannot be
+     mistaken for a broken number in a column of denominators. */
+  .basis-table td .withheld {{
+    display: block; text-align: left; font-variant-numeric: normal;
+  }}
+  /* Both notes sit directly beneath the table they qualify — adjacency is part
+     of the rule, not a layout preference. Tier 1, so no font-size and no
+     lighter ink: they recede by weight and by the space above them. */
+  .basis-table .withheld-note, .basis-table .rounding-note {{
+    margin: 0 0 4mm; font-weight: 400;
+  }}
+  .basis-table .rounding-note {{ margin-bottom: 0; }}
+  /* The sentence that says what the list below it is. Separated from the list
+     by a break it leaves bare derivation lines on a fresh sheet with nothing
+     naming what was apportioned — the same defect the headings are held to,
+     one scale down. */
+  .apportionment-lead {{ break-after: avoid; }}
   .apportionment {{ margin: 0 0 2mm; padding-left: 5mm; list-style: none; }}
-  .apportionment li {{ margin-bottom: 0.8mm; }}
+  /* One derivation line is one statement and is never legible in halves. */
+  .apportionment li {{ margin-bottom: 0.8mm; break-inside: avoid; }}
   .party-change .caveat {{ margin-top: 2.5mm; }}
   .co2-grounds {{ display: block; margin-top: 2mm; }}
   footer {{
