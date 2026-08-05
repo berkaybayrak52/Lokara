@@ -5,8 +5,12 @@ Spec: `docs/08` → "Heating table footer — the figure is the Gesamtkosten, no
 column's sum".
 
 The heating `tfoot` prints the Gesamtkosten (10.300,00 €). The party amounts
-above it sum to 10.240,00 €, because the CO₂-Vermieteranteil is deducted before
+above it sum to 10.142,92 €, because the CO₂-Vermieteranteil is deducted before
 the renter-facing split (§ 7 Abs. 1 CO2KostAufG) and is not a row in the table.
+(That figure was 10.240,00 € until the demo's CO₂ fixture was corrected on
+05.08.2026 — `docs/06` → "Scenario 2 — the fuel, the emissions and the CO₂
+price". Every assertion below reads both figures off the engine result, so the
+re-base moves nothing in this file except this sentence.)
 The old wording — "(inkl. CO₂-Vermieteranteil, stimmt centgenau mit den
 Gesamtkosten überein)" — is literally true about the *figure* and reads as a
 claim about the *column*, which is false. It is also the Betriebskosten footer's

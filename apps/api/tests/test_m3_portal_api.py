@@ -150,16 +150,16 @@ class TestDemoStatement:
         bernd = next(line for line in lines if "Bernd Muster" in line["partyLabel"])
         vacancy = next(line for line in lines if line["isLandlord"])
         # 585/415 ‰ degree-day apportionment of unit B's annual consumption.
-        assert bernd["heatingConsumptionEur"] == f"786,24{NBSP}€"
-        assert vacancy["heatingConsumptionEur"] == f"557,76{NBSP}€"
+        assert bernd["heatingConsumptionEur"] == f"778,79{NBSP}€"
+        assert vacancy["heatingConsumptionEur"] == f"552,47{NBSP}€"
         assert "Auszug 30.06.2025" in bernd["partyLabel"]
 
         assert body["heatingTotalCents"] == 1_030_000
         assert body["heatingTotalCents"] == body["heatingInputTotalCents"]
 
         co2 = body["co2"]
-        assert co2["landlordSharePercent"] == 20
-        assert co2["landlordAmountEur"] == f"60,00{NBSP}€"
+        assert co2["landlordSharePercent"] == 60
+        assert co2["landlordAmountEur"] == f"157,08{NBSP}€"
         assert co2["rechtsstand"] == "Rechtsstand 01/2023"
         assert "Rechtsstand 01/2023" in body["rechtsstaende"]
         assert "keine Rechts- oder Steuerberatung" in body["disclaimer"]

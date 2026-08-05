@@ -1,8 +1,13 @@
 """Zähler + the heating statement built from real readings.
 
-THE test in this file: the heating goldens — 585/415 ‰, € 786,24 / € 557,76 and
+THE test in this file: the heating goldens — 585/415 ‰, € 778,79 / € 552,47 and
 the CO₂ block — must come out of `meter_reading` and `heating_cost_entry` rows,
-not out of a constant. The last four fixtures in statement_service.py
+not out of a constant. (Those two euro figures were € 786,24 / € 557,76 until
+05.08.2026, when the demo's CO₂ fixture was corrected: 4.000 kg / 261,80 €
+instead of 2.000 kg / 300,00 €, which had implied 150 €/t and half the emission
+factor of any fuel. The CO₂-Vermieteranteil is deducted before the renter-facing
+split, so every heating euro followed. `docs/06` → "Scenario 2 — the fuel, the
+emissions and the CO₂ price"; the **585 : 415 ratio itself did not move**.) The last four fixtures in statement_service.py
 (€ 10.300 / 20.000 kWh / 40 m³ / CO₂) are gone, so this is what stops them from
 being reintroduced by accident.
 
@@ -38,8 +43,8 @@ DEMO_BUILDING_ID = "bld_demo_muster12"
 
 # docs/06 Scenario 2 — unit B's heating consumption splits Mieter/Vermieter by
 # degree days at the 30.06. move-out. These are the pitch numbers.
-GOLDEN_B_RENTER_CENTS = 78624
-GOLDEN_B_LANDLORD_CENTS = 55776
+GOLDEN_B_RENTER_CENTS = 77879
+GOLDEN_B_LANDLORD_CENTS = 55247
 GOLDEN_HEATING_TOTAL_CENTS = 1_030_000
 
 
@@ -192,8 +197,8 @@ class TestHeatingStatementFromRealReadings:
         renter, landlord = _unit_b_heating(client)
         assert renter["isLandlord"] is False
         assert landlord["isLandlord"] is True
-        assert renter["heatingConsumptionEur"] == f"786,24{NBSP}€"
-        assert landlord["heatingConsumptionEur"] == f"557,76{NBSP}€"
+        assert renter["heatingConsumptionEur"] == f"778,79{NBSP}€"
+        assert landlord["heatingConsumptionEur"] == f"552,47{NBSP}€"
 
         renter_cents, landlord_cents = GOLDEN_B_RENTER_CENTS, GOLDEN_B_LANDLORD_CENTS
         total = renter_cents + landlord_cents
@@ -211,11 +216,13 @@ class TestHeatingStatementFromRealReadings:
 
     def test_co2_block_carries_its_rechtsstand(self, client: TestClient) -> None:
         co2 = _statement(client)["co2"]
-        # 2.000 kg over 100 m² → 20 kg/m²/a → step 17-22 → 20 % landlord.
-        assert co2["intensityDisplay"] == "20"
-        assert co2["landlordSharePercent"] == 20
-        assert co2["landlordAmountEur"] == f"60,00{NBSP}€"
-        assert co2["renterAmountEur"] == f"240,00{NBSP}€"
+        # 4.000 kg over 100 m² → 40 kg/m²/a → step 37-42 → 60 % landlord.
+        # `docs/06`: 200 kWh/m²/a of Erdgas lands near 40 kg CO₂/m²/a, so the
+        # band moved with the corrected fixture rather than being chosen.
+        assert co2["intensityDisplay"] == "40"
+        assert co2["landlordSharePercent"] == 60
+        assert co2["landlordAmountEur"] == f"157,08{NBSP}€"
+        assert co2["renterAmountEur"] == f"104,72{NBSP}€"
         assert co2["rechtsstand"] == "Rechtsstand 01/2023"
 
     def test_nk_goldens_are_untouched_by_the_meter_work(self, client: TestClient) -> None:
@@ -279,7 +286,7 @@ class TestReadingsAreCreateOnly:
         assert typo.status_code == 201
         assert typo.json()["periodConsumptionDisplay"] == "450 Einheiten"
         # The statement really recomputed — B's consumption share moved.
-        assert _unit_b_heating(client)[0]["heatingConsumptionEur"] != f"786,24{NBSP}€"
+        assert _unit_b_heating(client)[0]["heatingConsumptionEur"] != f"778,79{NBSP}€"
 
         # ── the fix is an APPEND, not an edit ───────────────────────────────
         fixed = client.post(
@@ -309,8 +316,8 @@ class TestReadingsAreCreateOnly:
 
         # ── and the goldens are back, to the cent ───────────────────────────
         renter, landlord = _unit_b_heating(client)
-        assert renter["heatingConsumptionEur"] == f"786,24{NBSP}€"
-        assert landlord["heatingConsumptionEur"] == f"557,76{NBSP}€"
+        assert renter["heatingConsumptionEur"] == f"778,79{NBSP}€"
+        assert landlord["heatingConsumptionEur"] == f"552,47{NBSP}€"
 
         # Clean up so the module's other tests keep their exact fixture.
         with Session(create_db_engine(DbSettings().direct_url)) as session, session.begin():

@@ -35,6 +35,37 @@ Four rules this file exists to hold, all from `docs/08`:
 
 The fixtures are compositions of the **real** engines with rules resolved from
 `packages/rules-store`, like `demo.py`: no hand-written `HeatingResult`.
+
+---
+
+**Re-based 05.08.2026 — three defects found by `statement-reviewer` in slice 4,
+each with its own `docs/08` section. Written before the template change, red on
+purpose.**
+
+* **F1** — `docs/08` item 1 → *"All four rows render"*, *"The withheld cell is a
+  sentence, not a blank"*, *"The `Verbrauch Heizung` row under § 9a Abs. 2"*. The
+  first render dropped the whole `Verbrauch Heizung` row, so the **largest pot on
+  the page** (5.325,03 €, 52 % of the umlagefähige Kosten) had no Umlageschlüssel
+  named anywhere in a block titled *Bemessungsgrundlagen*. What is genuinely not
+  derivable is the **unit**, which blocks one *cell*, not a row — and under
+  § 9a Abs. 2 it blocks nothing at all, because the applied key is then Wohnfläche
+  and its denominator is already printed two rows above. The two Wohnfläche rows
+  also lost their `§ 7 Abs. 1` / `§ 8 Abs. 1` citations.
+* **F2** — `docs/08` item 1 → *"The rounding is disclosed — `rd.`, one sentence,
+  and an operator that is the operation"*. `12 m³ × 181 von 365 Tagen = 5,95 m³`
+  asserted a false identity (5,9506849…), disclosed the rounding nowhere — the
+  printed price per m³ reproduces the two uncontested lines exactly and misses
+  **both Nutzerwechsel parties by ~3 ct** — and printed an operator that is not
+  the operation performed.
+* **I1** — `docs/08` → **4b**, pinned separately in
+  `packages/pdf/tests/test_statement_pagination.py`.
+
+**And the demo's CO₂ fixture moved** (`docs/06` → *"Scenario 2 — the fuel, the
+emissions and the CO₂ price"*): 2.000 kg / 300,00 € implied 150 €/t and
+0,1 kg CO₂/kWh. It is now **4.000 kg / 261,80 €** — 65,45 €/t (55,00 € per
+§ 10 Abs. 2 BEHG + 19 % USt per § 3 Abs. 3 CO2KostAufG) and 0,200 kg CO₂/kWh
+(Erdgas). The CO₂-Vermieteranteil is deducted **before** the renter-facing split,
+so every heating euro below moved with it; no Bemessung and no ‰ did.
 """
 
 import re
@@ -78,9 +109,41 @@ BLOCK_CO2 = "co2"  # the existing CO₂ block, unchanged in position
 MINUS = chr(0x2212)
 
 # `docs/08` → the gap "the unit of the heating-consumption Bemessung": no
-# Gesamtbemessung and no Bemessung column for Verbrauch Heizung until the
+# *Gesamtbemessung* and no Bemessung *column* for Verbrauch Heizung until the
 # measurement unit is carried. That is **slice 5** and must not be pulled forward.
-WITHHELD_HEAT_COLUMN = "Verbrauch Heizung"
+# The **row** is not withheld — see F1 above.
+HEAT_COLUMN = "Verbrauch Heizung"
+
+# The Umlageschlüssel copy, from `docs/08` item 1's table. The citations were
+# assigned there and dropped by the first render; § 7 Abs. 1 governs the heating
+# split, § 8 Abs. 1 the warm-water split — separate paragraphs, separate pots.
+AREA_KEY_HEATING = "Wohnfläche (m²·Tage) — § 7 Abs. 1 HeizkostenV"
+AREA_KEY_WARM_WATER = "Wohnfläche (m²·Tage) — § 8 Abs. 1 HeizkostenV"
+# § 9a Abs. 2 replaced the consumption key. The citation is the paragraph that
+# decided *this* share, not § 7 Abs. 1, which is only why a consumption pot exists.
+AREA_KEY_FALLBACK = "Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV"
+HEAT_KEY = "Erfasster Wärmeverbrauch"
+HEAT_KEY_WITH_CHANGE = "Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen)"
+WARM_WATER_KEY = "Erfasster Warmwasserverbrauch (m³)"
+
+# The withheld Gesamtbemessung cell and its explanation. No digit, no dash used
+# as a figure: `—`, `0` or a blank all read as *zero* in a numeric column, and a
+# zero denominator makes the renter's own share look undefined.
+WITHHELD_CELL = "ohne Maßeinheit — nicht ausgewiesen"
+WITHHELD_NOTE = (
+    "Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit "
+    "der Erfassungsgeräte (kWh oder Einheiten eines Heizkostenverteilers) liegt dieser "
+    "Abrechnung nicht vor. Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten "
+    "verteilt."
+)
+
+# F2. One sentence, one place: directly beneath Block B's party table, where the
+# rounded figures originate. `rd.` marks the instance; this states the convention.
+ROUNDING_NOTE = (
+    "Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, "
+    "sodass eine Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann."
+)
+ROUNDED = "rd."
 
 _TAG = re.compile(r"<[^>]+>")
 _ROW = re.compile(r"<tr[^>]*>(.*?)</tr>", re.DOTALL)
@@ -215,8 +278,12 @@ def _pct(share: Decimal) -> str:
 
 
 def _de(figure: str) -> Decimal:
-    """`5,95 m³` → `Decimal("5.95")`. Reads the page, not the engine."""
-    match = re.match(r"-?[\d.]+(?:,\d+)?", figure.strip())
+    """`rd. 5,95 m³` → `Decimal("5.95")`. Reads the page, not the engine.
+
+    The `rd.` marker is stripped, not required: whether a given figure carries it
+    is the subject of its own assertions, and the sum invariant has to hold over
+    what is printed either way."""
+    match = re.match(r"-?[\d.]+(?:,\d+)?", figure.strip().removeprefix(ROUNDED).strip())
     assert match is not None, f"not a German figure: {figure!r}"
     return Decimal(match.group(0).replace(".", "").replace(",", "."))
 
@@ -422,11 +489,11 @@ class TestBlockACostSplit:
         text = block_text(statement_html(build_demo_statement()), BLOCK_A)
 
         assert "10.300,00 €" in text
-        assert "60,00 €" in text
-        assert "10.240,00 €" in text
-        assert "2.560,00 €" in text and "7.680,00 €" in text
-        assert "2.304,00 €" in text and "5.376,00 €" in text
-        assert "768,00 €" in text and "1.792,00 €" in text
+        assert "157,08 €" in text
+        assert "10.142,92 €" in text
+        assert "2.535,73 €" in text and "7.607,19 €" in text
+        assert "2.282,16 €" in text and "5.325,03 €" in text
+        assert "760,72 €" in text and "1.775,01 €" in text
 
     def test_paragraph_9_prints_the_formula_with_its_operands(self) -> None:
         """Item 3, measured branch: the line is reproducible from what it prints."""
@@ -522,13 +589,18 @@ class TestBlockACostSplit:
         assert (
             "Warmwasserverbrauch nicht gemessen — Ersatzwert nach § 9 Abs. 2 HeizkostenV:"
         ) in text
+        # F2: the day share is parenthesised here for the same reason as in
+        # Block C, and the result is **exact**, so it carries no `rd.` — the
+        # marker doing its job in the one branch where a reader could not
+        # otherwise tell (docs/08 → "The rounding is disclosed", ruling 3).
         assert (
             f"{_n(separation.area_fallback_kwh_per_sqm_year)} kWh je m² Wohnfläche und Jahr "
             f"× {_n(separation.heated_area_sqm)} m² "
-            f"× {_n(Decimal(separation.period_days))} von "
-            f"{_n(Decimal(separation.reference_year_days))} Tagen "
+            f"× ({_n(Decimal(separation.period_days))} von "
+            f"{_n(Decimal(separation.reference_year_days))} Tagen) "
             f"= {_n(separation.q_ww_kwh)} kWh von {_n(separation.total_energy_kwh)} kWh"
         ) in text
+        assert ROUNDED not in text
         # The measured branch's formula is not a plausible alternative here.
         assert "Q(WW) =" not in text
         assert "kWh/(m³·K)" not in text
@@ -570,22 +642,76 @@ class TestBlockBBemessungsgrundlagen:
     """
 
     def test_each_money_column_states_its_umlageschluessel_and_gesamtbemessung(self) -> None:
+        """**F1.** All **four** money columns get a row — the heating table's four
+        columns do not share a denominator, and a column with no row named is a
+        column with no Umlageschlüssel anywhere on the page (BGH minimum #2).
+
+        The two Wohnfläche rows carry their citations. `Rechtsstand: § 7 Abs. 1
+        HeizkostenV 03/1989` in the footer dates a rule; it does not attach it to
+        a column, and a renter checking *why their base costs go by area* has
+        nowhere else to look."""
         table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
 
         assert has_row(table, "Spalte", "Umlageschlüssel", "Gesamtbemessung")
-        assert has_row(table, "Grundkosten Heizung", "Wohnfläche (m²·Tage)", "36.500 m²·Tage")
-        assert has_row(table, "Grundkosten Warmwasser", "Wohnfläche (m²·Tage)", "36.500 m²·Tage")
-        assert has_row(table, "Verbrauch Warmwasser", "Erfasster Warmwasserverbrauch (m³)", "40 m³")
+        assert has_row(table, "Grundkosten Heizung", AREA_KEY_HEATING, "36.500 m²·Tage")
+        assert has_row(table, HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL)
+        assert has_row(table, "Grundkosten Warmwasser", AREA_KEY_WARM_WATER, "36.500 m²·Tage")
+        assert has_row(table, "Verbrauch Warmwasser", WARM_WATER_KEY, "40 m³")
+
+    def test_the_column_rows_follow_the_money_tables_column_order(self) -> None:
+        """A renter reads across the money table and down this one. `docs/08`:
+        Grundkosten Heizung → Verbrauch Heizung → Grundkosten Warmwasser →
+        Verbrauch Warmwasser."""
+        expected = [
+            "Grundkosten Heizung",
+            HEAT_COLUMN,
+            "Grundkosten Warmwasser",
+            "Verbrauch Warmwasser",
+        ]
+        table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
+
+        assert [row[0] for row in table if row and row[0] in set(expected)] == expected
 
     def test_every_party_prints_its_bemessung_per_column(self) -> None:
+        """**F2**: `rd.` marks the two Bemessungen that were rounded and only
+        those. `20 m³` and `8 m³` are exact readings — `rd. 20 m³` would state a
+        rounding that did not happen, and a marker on every figure is decoration
+        rather than a fact."""
         table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
 
         assert has_row(table, "Partei", "Fläche·Tage", "Verbrauch Warmwasser")
         assert has_row(table, "Wohnung A — Anna Beispiel", "18.250", "20 m³")
-        assert has_row(table, "Wohnung B — Bernd Muster (Auszug 30.06.2025)", "5.430", "5,95 m³")
-        assert has_row(table, "Wohnung B — Leerstand ab 01.07.2025 → Vermieter", "5.520", "6,05 m³")
+        assert has_row(
+            table, "Wohnung B — Bernd Muster (Auszug 30.06.2025)", "5.430", "rd. 5,95 m³"
+        )
+        assert has_row(
+            table, "Wohnung B — Leerstand ab 01.07.2025 → Vermieter", "5.520", "rd. 6,05 m³"
+        )
         assert has_row(table, "Wohnung C — Clara Vorlage", "7.300", "8 m³")
         assert has_row(table, "Gesamtbemessung", "36.500", "40 m³")
+
+    def test_the_rounding_is_disclosed_once_and_under_the_table_it_qualifies(self) -> None:
+        """**F2**, `docs/08` → "The rounding is disclosed".
+
+        The printed Verbrauchskosten Warmwasser ÷ the printed 40 m³ reproduces
+        Wohnung A and Wohnung C to the cent and misses **both** Nutzerwechsel
+        parties by ~3 ct: the renter checking the uncontested line succeeds, the
+        renter checking the contested line fails. The last clause of the sentence
+        is that, said out loud, before they discover it.
+
+        One sentence, one place — a caveat repeated per block is a caveat nobody
+        reads — and directly beneath the party table, not two paragraphs away."""
+        html = statement_html(build_demo_statement())
+        text = block_text(html, BLOCK_B)
+
+        assert ROUNDING_NOTE in text
+        assert text.index("Gesamtbemessung 36.500") < text.index(ROUNDING_NOTE)
+        assert _plain(_text(html)).count(ROUNDING_NOTE) == 1, (
+            "the rounding disclosure is one sentence in one place (docs/08)"
+        )
+        # It states a display convention, so it does not branch on whether a
+        # figure happened to need it — one code path, nothing to be wrong about.
+        assert ROUNDING_NOTE in block_text(statement_html(single_party_statement()), BLOCK_B)
 
     def test_the_bemessungen_are_de_scaled(self) -> None:
         """⚠️ `docs/03`: the engine carries m²·Tage ×100. `18.250` renders as
@@ -647,19 +773,100 @@ class TestBlockBBemessungsgrundlagen:
         ]
         assert sum(printed) == Decimal(40)
         assert has_row(table, "Gesamtbemessung", "36.500", "40 m³")
+        # F2: the three rounded ones are marked, the two exact ones are not.
+        assert [row[2].startswith(ROUNDED) for row in party_rows] == [
+            False,
+            True,
+            True,
+            True,
+            False,
+        ]
 
-    def test_the_heating_consumption_column_is_withheld(self) -> None:
-        """`docs/08` gap: `HeatingUnit.heat_consumption` is kWh at a
+    def test_only_the_heating_gesamtbemessung_is_withheld_never_the_row(self) -> None:
+        """**F1.** `docs/08` gap: `HeatingUnit.heat_consumption` is kWh at a
         Wärmemengenzähler and dimensionless HKV-Einheiten at a Heizkostenverteiler,
-        and nothing distinguishes them. **Slice 5**, not this one — a guessed unit
-        on a Verbrauchsabrechnung is a defect that reaches a tenant, and a
-        unit-free `1.000` invites the assumption."""
+        and nothing distinguishes them. That is **slice 5** and blocks the
+        *figure* — a guessed unit on a Verbrauchsabrechnung is a defect that
+        reaches a tenant, and a unit-free `1.000` invites the assumption.
+
+        It does **not** block the Umlageschlüssel, which is a name and is BGH
+        formal minimum #2 in its own right. Dropping the row left 5.325,03 € —
+        52 % of the umlagefähige Kosten — with no key named anywhere on a page
+        headed *Bemessungsgrundlagen*."""
         text = block_text(statement_html(build_demo_statement()), BLOCK_B)
 
-        assert WITHHELD_HEAT_COLUMN not in text
-        assert "Erfasster Wärmeverbrauch" not in text
+        assert HEAT_COLUMN in text  # the row is on the page
+        assert HEAT_KEY_WITH_CHANGE in text  # with the key that was applied
+        assert WITHHELD_CELL in text  # and only the figure withheld
         assert "1.000" not in text  # Σ of the heat Bemessungen, withheld
         assert "146,25" not in text  # Bernd's heat Bemessung, withheld
+        assert "103,75" not in text  # the landlord party's, withheld
+
+    def test_the_withheld_cell_can_be_read_as_neither_zero_nor_an_oversight(self) -> None:
+        """**F1**, `docs/08` → "The withheld cell is a sentence, not a blank".
+
+        The cell sits in a column of denominators. Anything that parses as a
+        figure — `0`, a bare `—`, an empty cell — tells the renter their own
+        share is undefined. `nicht ausgewiesen` is an act of the landlord's in
+        the register § 7 Abs. 3 CO2KostAufG uses; `ohne Maßeinheit` is the only
+        reason that makes a figure unprintable rather than merely absent."""
+        table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
+        heat_row = next(row for row in table if row and row[0] == HEAT_COLUMN)
+
+        assert heat_row == [HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL]
+        assert not re.search(r"\d", heat_row[2]), (
+            f"the withheld cell {heat_row[2]!r} contains a digit and will be read as a figure"
+        )
+        assert heat_row[2] not in {"", "—", "–", "-", "0", "n/a", "k. A."}
+
+    def test_the_withholding_is_explained_directly_beneath_the_column_table(self) -> None:
+        """The note carries two facts, and the second is not optional: without
+        *"Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten
+        verteilt"* a renter can read a withheld denominator as a withheld
+        **method** and conclude the pot was never consumption-allocated — a § 7
+        Abs. 1 HeizkostenV defect rather than a display gap.
+
+        Adjacency is part of the rule (`docs/08`): the note sits between the two
+        tables, not at the end of the block."""
+        rendered = block(statement_html(build_demo_statement()), BLOCK_B)
+        text = _text(rendered)
+
+        assert WITHHELD_NOTE in text
+        assert text.index(WITHHELD_CELL) < text.index(WITHHELD_NOTE) < text.index("Partei")
+        # No claim about who owed the unit, and no right of inspection asserted:
+        # both would be claims this document has not transcribed (docs/08).
+        assert "Messdienst" not in text
+        assert "Einsicht" not in text
+
+    def test_the_heating_row_states_the_area_key_when_9a_abs_2_replaced_it(self) -> None:
+        """**F1**, `docs/08` → "The `Verbrauch Heizung` row under § 9a Abs. 2".
+
+        With `heat_fallback_to_area` the applied Umlageschlüssel of that column
+        **is** Wohnfläche and its denominator is the 36.500 m²·Tage already
+        printed above — the measurement-unit problem evaporated with the key it
+        applied to, so nothing is withheld. The citation is § 9a Abs. 2, the rule
+        that decided this share; § 7 Abs. 1 would send the renter to a paragraph
+        that does not contain it."""
+        data = heat_key_fallback_statement()
+        heating = _heating(data)
+        assert heating.heat_fallback_to_area is True
+        table = rows(block(statement_html(data), BLOCK_B))
+
+        assert has_row(table, HEAT_COLUMN, AREA_KEY_FALLBACK, "36.500 m²·Tage")
+        text = block_text(statement_html(data), BLOCK_B)
+        assert WITHHELD_CELL not in text
+        assert HEAT_KEY not in text  # the key that was *not* applied
+        assert "Gradtagszahlen" not in text
+
+    def test_the_nutzerwechsel_parenthetical_renders_only_at_a_nutzerwechsel(self) -> None:
+        """`(Nutzerwechsel: Gradtagszahlen)` names the method that split one
+        unit's reading between two parties. With one party per unit it was never
+        applied, and the row states the bare key — the rule the whole block is
+        built on (`docs/08` → "states no fact the data does not carry")."""
+        table = rows(block(statement_html(single_party_statement()), BLOCK_B))
+
+        assert has_row(table, HEAT_COLUMN, HEAT_KEY, WITHHELD_CELL)
+        assert not has_row(table, HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL)
 
     def test_a_warm_water_key_fallback_withholds_the_consumption_bemessung(self) -> None:
         """§ 9a Abs. 2: the area key was applied to that column, so Block B states
@@ -672,9 +879,12 @@ class TestBlockBBemessungsgrundlagen:
         rendered = block(statement_html(data), BLOCK_B)
         table = rows(rendered)
 
-        assert has_row(table, "Verbrauch Warmwasser", "Wohnfläche (m²·Tage)", "36.500 m²·Tage")
+        assert has_row(table, "Verbrauch Warmwasser", AREA_KEY_FALLBACK, "36.500 m²·Tage")
         assert "Erfasster Warmwasserverbrauch" not in _text(rendered)
         assert "m³" not in _text(rendered)
+        # The heating column did *not* fall back, so its row keeps the withheld
+        # cell — the two absences have different causes and different copy.
+        assert has_row(table, HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL)
 
     def test_without_central_warm_water_no_warm_water_column_appears(self) -> None:
         """No warm-water column exists at all — that is not § 9a Abs. 2 and the
@@ -686,7 +896,9 @@ class TestBlockBBemessungsgrundlagen:
         assert "Verbrauch Warmwasser" not in text
         assert "Grundkosten Warmwasser" not in text
         assert "m³" not in text
-        assert "Grundkosten Heizung" in text  # the column that does exist
+        # The two columns that do exist, both stated (F1).
+        assert "Grundkosten Heizung" in text
+        assert HEAT_COLUMN in text and WITHHELD_CELL in text
 
 
 # --- Block C -----------------------------------------------------------------
@@ -748,9 +960,16 @@ class TestBlockCNutzerwechsel:
             ) in text
 
     def test_the_day_apportionment_is_printed_with_its_operands(self) -> None:
-        """Item 4: `12 m³ × 181 von 365 Tagen = 5,95 m³` — the derivation is the
-        exact figure, the 2-decimal one is the readable figure, and the unit's
-        reading is the sum of its parties' Bemessungen (never carried twice)."""
+        """**F2**, `docs/08` → "The rounding is disclosed": the line is
+        `12 m³ × (181 von 365 Tagen) = rd. 5,95 m³`.
+
+        Three things at once. The **parentheses** make `181 von 365 Tagen` one
+        operand — unparenthesised, `×` binds to `181` and the line reads
+        `12 × 181 = 2.172`. **`rd.`** turns an identity that is false
+        (5,9506849…) into a statement that is true, without printing a second
+        figure for one quantity (the lead's ruling: reuse Block B's). And the
+        unit's reading is still the **sum of its parties' Bemessungen**, never
+        carried twice."""
         data = build_demo_statement()
         heating = _heating(data)
         unit_b = [line for line in heating.lines if line.unit_id == "unit-b"]
@@ -764,10 +983,21 @@ class TestBlockCNutzerwechsel:
             assert weight is not None
             label = PARTY_LABELS[(line.unit_id, line.tenancy_id)]
             assert (
-                f"{label}: {_n(reading)} m³ × {_n(Decimal(line.days))} von "
-                f"{_n(Decimal(line.unit_total_days))} Tagen "
-                f"= {_n(weight.quantize(Decimal('0.01')))} m³"
+                f"{label}: {_n(reading)} m³ × ({_n(Decimal(line.days))} von "
+                f"{_n(Decimal(line.unit_total_days))} Tagen) "
+                f"= {ROUNDED} {_n(weight.quantize(Decimal('0.01')))} m³"
             ) in text
+
+    def test_no_derivation_line_asserts_a_bare_equality(self) -> None:
+        """**F2**, the defect itself: `= 5,95 m³` claims `12 × 181 ÷ 365` equals
+        5,95, and it does not. Asserted as an absence, because the wrong form is
+        one character away from the right one and only an absence catches a
+        revert."""
+        text = block_text(statement_html(build_demo_statement()), BLOCK_C)
+
+        for exact, printed in ((181, "5,95"), (184, "6,05")):
+            assert f"({exact} von 365 Tagen) = {printed} m³" not in text
+            assert f"× {exact} von 365 Tagen" not in text  # unparenthesised operand
 
     def test_the_convention_caveat_renders_where_the_promille_does(self) -> None:
         """Item 4, and the point of it: a disclosure that presents a convention as
@@ -848,8 +1078,8 @@ class TestCo2Berechnungsgrundlagen:
         ) in text
 
     def test_the_reader_can_add_the_split_up(self) -> None:
-        """`240,00 + 60,00 = 300,00`: the amount being split is on the page, which
-        is the only way the two shares are checkable."""
+        """`104,72 + 157,08 = 261,80`: the amount being split is on the page,
+        which is the only way the two shares are checkable."""
         data = build_demo_statement()
         co2 = _heating(data).co2
         assert co2 is not None
@@ -864,8 +1094,92 @@ class TestCo2Berechnungsgrundlagen:
         """`Co2Step` carries no ordinal, so a step *number* would be invented."""
         text = block_text(statement_html(build_demo_statement()), BLOCK_CO2)
 
-        assert "Einstufung: 17 bis unter 22" in text
-        assert "Stufe 3" not in text
+        assert "Einstufung: 37 bis unter 42" in text
+        assert "Stufe 7" not in text
+
+
+class TestTheDemosCo2FixtureIsPlausibleOnItsFace:
+    """`docs/06` → "Scenario 2 — the fuel, the emissions and the CO₂ price";
+    statutory figures transcribed in `docs/03` → "Where `total_co2_kg` and
+    `co2_cost` come from". Found by `statement-reviewer` (**I9**), promoted by
+    the lead 05.08.2026.
+
+    The demo printed `2.000 kg` and `300,00 €` — **150 €/t**, nearly three times
+    the 2025 rate — and, against its own 20.000 kWh, **0,1 kg CO₂/kWh**, about
+    half of Erdgas. Both are readable off the page in one step by anyone with a
+    property background, which is who this document goes in front of.
+
+    These assertions are deliberately **derived, not literal**: they recompute
+    the implied price and the implied emission factor from the figures the page
+    prints, so a future fixture edit that breaks the plausibility fails here
+    rather than surviving as a plausible-looking pair of numbers.
+    """
+
+    # § 10 Abs. 2 BEHG: 55,00 € je Emissionszertifikat (= 1 t CO₂) für 2025.
+    # § 3 Abs. 3 CO2KostAufG: der Preisbestandteil ist der Zertifikatspreis
+    # "zuzüglich einer auf diesen Betrag anfallenden Umsatzsteuer" → 19 %.
+    BEHG_2025_NET_PER_TONNE = Decimal("55.00")
+    GROSS_PER_TONNE = Decimal("65.45")
+    # Anlage 2 Teil 4 EBeV 2030: Erdgas 0,0558 t CO₂/GJ = 0,20088 kg CO₂/kWh
+    # (heizwertbezogen, as § 3 Abs. 1 Nr. 3 CO2KostAufG requires).
+    EBEV_ERDGAS_KG_PER_KWH = Decimal("0.20088")
+    DEMO_ENERGY_KWH = Decimal(20_000)
+
+    def test_the_co2_cost_implies_the_2025_behg_rate_including_ust(self) -> None:
+        co2 = _heating(build_demo_statement()).co2
+        assert co2 is not None
+
+        tonnes = co2.total_co2_kg / Decimal(1000)
+        per_tonne = (Decimal(int(co2.co2_cost)) / Decimal(100) / tonnes).quantize(Decimal("0.01"))
+
+        assert per_tonne == self.GROSS_PER_TONNE, (
+            f"{per_tonne} €/t is not the 2025 rate. § 10 Abs. 2 BEHG gives "
+            f"{self.BEHG_2025_NET_PER_TONNE} € je Zertifikat and § 3 Abs. 3 CO2KostAufG adds USt "
+            f"→ {self.GROSS_PER_TONNE} €/t (docs/03)"
+        )
+        assert (
+            self.BEHG_2025_NET_PER_TONNE * Decimal("1.19")
+        ).quantize(Decimal("0.01")) == self.GROSS_PER_TONNE
+
+    def test_the_emission_factor_implied_by_the_demo_is_that_of_erdgas(self) -> None:
+        """`docs/06` fixes the fuel: Erdgas. The demo's 0,200 kg CO₂/kWh is 0,44 %
+        below the EBeV standard value, which is inside the spread of real
+        Erdgas-H qualities and inside what a supplier states under § 3 Abs. 1
+        Nr. 3 CO2KostAufG. Half of it — the old fixture — is no fuel at all."""
+        co2 = _heating(build_demo_statement()).co2
+        assert co2 is not None
+
+        factor = co2.total_co2_kg / self.DEMO_ENERGY_KWH
+        deviation = abs(factor - self.EBEV_ERDGAS_KG_PER_KWH) / self.EBEV_ERDGAS_KG_PER_KWH
+
+        assert deviation < Decimal("0.01"), (
+            f"{factor} kg CO₂/kWh is {deviation:.1%} off the EBeV 2030 Anlage 2 standard value "
+            f"for Erdgas ({self.EBEV_ERDGAS_KG_PER_KWH} kg CO₂/kWh) — docs/03"
+        )
+
+    def test_the_page_prints_the_corrected_figures(self) -> None:
+        """The literals, once, so a report can be checked against the page."""
+        text = block_text(statement_html(build_demo_statement()), BLOCK_CO2)
+
+        assert "CO₂-Emissionen des Gebäudes 4.000 kg" in text
+        assert "CO₂-Kosten 261,80 €" in text
+        assert "40 kg CO₂/m²/Jahr" in text
+        assert "Vermieteranteil 60 %" in text
+        assert "2.000 kg" not in text and "300,00 €" not in text
+
+    def test_the_intensity_is_not_a_boundary_case_of_its_band(self) -> None:
+        """`docs/06`: the band moved 17–22 → 37–42 because the physics forced it
+        (200 kWh/m²/a of any fossil fuel lands near 40 kg CO₂/m²/a). It has to
+        stay an *unambiguous* golden, so the intensity sits clear of both bounds
+        — and at one decimal place, so the demo does not depend on the
+        unimplemented § 5 Abs. 1 S. 3 rounding (`docs/03`, `PLAN.md` row 4.5)."""
+        co2 = _heating(build_demo_statement()).co2
+        assert co2 is not None
+        assert co2.band_min_inclusive is not None and co2.band_max_exclusive is not None
+
+        intensity = co2.intensity_kg_per_sqm
+        assert co2.band_min_inclusive + 1 < intensity < co2.band_max_exclusive - 1
+        assert intensity == intensity.quantize(Decimal("0.1"))
 
 
 class TestPlacement:
@@ -898,23 +1212,55 @@ class TestPlacement:
             assert position > heating_heading > nk_heading
 
 
-class TestNothingThatAlreadyRendersMoves:
-    """Guard: this slice adds disclosure and moves no amount. The party totals and
-    the reconciliation `scripts/assert_statement_pdf.py` pins stay as they are."""
+class TestOnlyTheCo2FixtureMovedTheAmounts:
+    """Guard on the blast radius of the CO₂ re-base (`docs/06`).
 
-    def test_the_worked_examples_party_totals_are_unchanged(self) -> None:
+    The CO₂-Vermieteranteil is deducted **before** the renter-facing split
+    (§ 7 Abs. 1 CO2KostAufG), so correcting 300,00 € → 261,80 € and 20 % → 60 %
+    moves every heating euro. Nothing else may move with it: no Bemessung, no ‰,
+    no Gesamtkosten, and — the `CLAUDE.md` definition-of-done — not one cent of
+    the canonical €1.200 garbage allocation, which shares this statement's
+    building and is independent of heating by construction.
+    """
+
+    def test_the_worked_examples_party_totals_follow_the_new_billable_cost(self) -> None:
         heating = _heating(build_demo_statement())
 
         assert [int(line.total) for line in heating.lines] == [
-            565_760,
-            150_984,
-            129_336,
-            177_920,
+            560_397,
+            149_553,
+            128_110,
+            176_232,
         ]
-        assert int(heating.total) == 1_030_000
+        assert int(heating.total) == 1_030_000  # the invoice did not move
+        assert int(heating.billable_cost) == 1_014_292
 
     def test_the_heating_footer_still_reconciles(self) -> None:
         html = _plain(statement_html(build_demo_statement()))
 
         assert "Gesamtkosten Heizung und Warmwasser (inkl. CO₂-Vermieteranteil)" in html
-        assert "Summe der oben ausgewiesenen Anteile: 10.240,00 €" in html
+        assert "Summe der oben ausgewiesenen Anteile: 10.142,92 €" in html
+        assert "Die Differenz von 157,08 €" in html
+
+    def test_the_canonical_1200_garbage_allocation_is_byte_identical(self) -> None:
+        """`CLAUDE.md` definition-of-done #3. The NK engine never sees a CO₂
+        figure; this asserts that as text on the page, because the two sections
+        share one building and one occupancy timeline."""
+        html = _plain(statement_html(build_demo_statement()))
+
+        for golden in ("1.200,00 €", "600,00 €", "178,52 €", "181,48 €", "240,00 €"):
+            assert golden in html, f"the canonical €1.200 allocation moved: {golden} is gone"
+        assert "Summe Betriebskosten (stimmt centgenau mit den Gesamtkosten überein)" in html
+
+    def test_the_degree_day_ratio_did_not_move(self) -> None:
+        """585 : 415 is a property of the Gradtagszahl table, not of the CO₂
+        split. `docs/06` promises the demo beat survives the re-base; 778,79 /
+        552,47 is still exactly 585 : 415."""
+        heating = _heating(build_demo_statement())
+        unit_b = [line for line in heating.lines if line.unit_id == "unit-b"]
+
+        mieter, vermieter = (int(line.heating_consumption) for line in unit_b)
+        assert (mieter, vermieter) == (77_879, 55_247)
+        # Within the cent the pot-level largest remainder can move it — the
+        # ratio is the invariant, the last cent belongs to `distribute_cents`.
+        assert abs(Decimal(mieter) - Decimal("0.585") * (mieter + vermieter)) <= 1

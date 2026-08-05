@@ -102,6 +102,54 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - Missing/incorrect CO₂ split = tenant's **3% reduction right** (§7 Abs. 4 CO2KostAufG) — so this is
   correctness-critical, not cosmetic.
 
+#### Where `total_co2_kg` and `co2_cost` come from — § 3 CO2KostAufG, and never from us
+
+> **Rechtsstand 08/2026** (transcribed 05.08.2026). Sources checked against the consolidated texts on
+> gesetze-im-internet.de on 05.08.2026: **§ 3 Abs. 1 und Abs. 3 CO2KostAufG**, **§ 10 Abs. 2 BEHG**,
+> **Anlage 2 Teil 4 EBeV 2030**. **No value in this section enters `packages/rules-store`, and no
+> engine reads any of them** — that is the point of the section. Standard caveat of `docs/07` applies.
+
+**The engine must never derive the CO₂ cost from a price.** § 3 Abs. 1 CO2KostAufG puts both figures on
+the **fuel or heat supplier's invoice**, and the landlord copies them:
+
+| § 3 Abs. 1 Nr. | The supplier states | Our input |
+| --- | --- | --- |
+| 1 | *"die Brennstoffemissionen der Brennstoff- oder Wärmelieferung in Kilogramm Kohlendioxid"* | `Co2Input.total_co2_kg` |
+| 2 | *"den … Preisbestandteil der Kohlendioxidkosten"* | `Co2Input.co2_cost` (cents) |
+| 3 | *"den heizwertbezogenen Emissionsfaktor … in Kilogramm Kohlendioxid pro Kilowattstunde"* | not carried today — see the gap in `docs/08` |
+| 4 | *"den Energiegehalt … in Kilowattstunden"* | `HeatingInput.total_energy_kwh` |
+
+So a certificate price **must not** become a rules-store value that an engine multiplies by. A landlord
+who is billed a different figure than the national fixed price (fixed-price prepayment, a Wärmeliefer­
+vertrag, an installment plan) would then receive a statement that contradicts the invoice he is
+required to pass through. Any price table we hold is **fixture provenance and plausibility checking**,
+never a computation input.
+
+**The reference figures, for checking a fixture's plausibility only.**
+
+| Quantity | Value | Legal basis |
+| --- | --- | --- |
+| Preis je Emissionszertifikat 2025 (= 1 t CO₂) | **55,00 €** | § 10 Abs. 2 BEHG — *"im Zeitraum vom 1. Januar 2025 bis zum 31. Dezember 2025: 55 Euro"* |
+| 2026 | **kein Festpreis** — Versteigerung im Preiskorridor 55,00 € bis 65,00 € | § 10 Abs. 2 BEHG |
+| Umsatzsteuer auf diesen Betrag | **+ 19 %** ⇒ **65,45 €/t** für 2025 | § 3 Abs. 3 CO2KostAufG — der Preisbestandteil ergibt sich *"durch Multiplikation der Brennstoffemissionen … mit dem … Preis der Emissionszertifikate … **zuzüglich einer auf diesen Betrag anfallenden Umsatzsteuer**"* |
+| Emissionsfaktor Erdgas (heizwertbezogen, H<sub>i</sub>) | **0,0558 t CO₂/GJ = 0,20088 kg CO₂/kWh** | Anlage 2 Teil 4 EBeV 2030 (in Kraft seit 01.01.2023) |
+| Emissionsfaktor Gasöl zu Heizzwecken (Heizöl EL) | **0,074 t CO₂/GJ = 0,2664 kg CO₂/kWh** | as above |
+| Emissionsfaktor Flüssiggas | **0,0655 t CO₂/GJ = 0,2358 kg CO₂/kWh** | as above |
+
+- **The figure a renter sees on a heating invoice is the gross one.** § 3 Abs. 3 says *zuzüglich
+  Umsatzsteuer* in so many words, so for 2025 the invoice rate is **65,45 €/t**, not 55,00 €/t. A
+  fixture that implies the bare certificate price is understating the cost being split by 16 %.
+- Conversion: `t CO₂/GJ × 3,6 = kg CO₂/kWh` (1 kWh = 3,6 MJ). The invoice factor is **heizwertbezogen**
+  (H<sub>i</sub>) because § 3 Abs. 1 Nr. 3 says so; the brennwertbezogene figure (Erdgas 0,1820
+  kg CO₂/kWh<sub>Hs</sub>) belongs to energy certificates and must not be used here.
+- Real supplier factors vary with gas quality (Erdgas H/L) around the EBeV standard value; a demo
+  fixture within roughly ±1 % of it is plausible, one at half of it is not.
+
+**⚠️ Not verified, deliberately:** whether the *renter's* share of the CO₂ cost is itself subject to
+USt when the landlord passes it on (kalte vs. warme Betriebskosten, Kleinunternehmer, gewerbliche
+Vermietung). Nothing in the engine depends on it and nothing on the statement asserts it. Resolving it
+needs a Steuerberater, not reasoning.
+
 #### The Stufenmodell is a **per-year** table — a short Abrechnungszeitraum shortens the table
 
 > **Rechtsstand 01/2023** (CO2KostAufG of 05.12.2022, in force 01.01.2023; text checked against

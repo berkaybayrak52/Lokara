@@ -259,10 +259,11 @@ none is fixture-tested; a guessed unit on a Verbrauchsabrechnung is a defect tha
 **The defect.** The heating `tfoot` currently reads *"Summe Heiz- und Warmwasserkosten (inkl.
 CO₂-Vermieteranteil, stimmt centgenau mit den Gesamtkosten überein)" — 10.300,00 €*. The sentence is
 literally true: 10.300,00 € **is** the Gesamtkosten. But it sits under a column of four party amounts
-that sum to **10.240,00 €** (5.657,60 + 1.509,84 + 1.293,36 + 1.779,20). The 60,00 € difference is the
+that sum to **10.142,92 €** (5.603,97 + 1.495,53 + 1.281,10 + 1.762,32). The 157,08 € difference is the
 CO₂-Vermieteranteil, which is deducted **before** the renter-facing split (§ 7 Abs. 1 CO2KostAufG) and
 is **not a row in the table**. So the column visibly does not add up while the footer appears to assert
-that it does.
+that it does. (Figures re-based 05.08.2026 with the CO₂ fixture — see *"The worked example"* below;
+the defect and the wording that fixes it are unchanged.)
 
 Two things make it worse than a loose phrase:
 
@@ -280,7 +281,7 @@ With a CO₂ split (`heating.co2` present):
 
 ```
 Gesamtkosten Heizung und Warmwasser (inkl. CO₂-Vermieteranteil)          10.300,00 €
-Summe der oben ausgewiesenen Anteile: 10.240,00 €. Die Differenz von 60,00 € ist der
+Summe der oben ausgewiesenen Anteile: 10.142,92 €. Die Differenz von 157,08 € ist der
 CO₂-Vermieteranteil; er wird vor der Umlage abgezogen (§ 7 Abs. 1 CO2KostAufG).
 ```
 
@@ -380,28 +381,39 @@ state a ratio that was not the one applied. This is the same rule the heating fo
 
 ### The worked example (the demo building, 01.01.–31.12.2025)
 
-Every figure below is the real output of `packages/pdf/src/lokara_pdf/demo.py` re-run on 03.08.2026 —
-not a hand calculation. It is the source for the golden fixtures of the slices below.
+Every figure below is the real output of the two engines on the demo inputs. It is the source for the
+golden fixtures of the slices below.
+
+> **⚠️ Re-based 05.08.2026 — the CO₂ figures of the demo were wrong on their face.** `2.000 kg` and
+> `300,00 €` implied **150 €/t** (2025: 55,00 € + USt = 65,45 €/t) and, against the demo's own
+> 20.000 kWh, **0,1 kg CO₂/kWh** — about half of Erdgas. The corrected fixture, its fuel and the
+> statutory figures it was checked against: `docs/06` → *"Scenario 2 — the fuel, the emissions and the
+> CO₂ price"* and `docs/03` → *"Where `total_co2_kg` and `co2_cost` come from"*. Because the
+> CO₂-Vermieteranteil is deducted **before** the renter-facing split, every heating euro below moved;
+> the **585/415 ‰ ratio, every Bemessung and the canonical €1.200 NK example did not**.
 
 Building: A 50 m², B 30 m², C 20 m²; Bernd Muster leaves B on 30.06.2025 (B vacant Jul–Dec).
-Gesamtkosten Heizung + Warmwasser **10.300,00 €**; Gesamtenergie **20.000 kWh**; Warmwasser
+Gesamtkosten Heizung + Warmwasser **10.300,00 €**; Gesamtenergie **20.000 kWh** Erdgas; Warmwasser
 **40 m³** gemessen; Wärmeverbrauch A/B/C **600 / 250 / 150** (Anzeige der Erfassungsgeräte);
-Warmwasserverbrauch A/B/C **20 / 12 / 8 m³**; CO₂ **2.000 kg**, CO₂-Kosten **300,00 €**.
+Warmwasserverbrauch A/B/C **20 / 12 / 8 m³**; CO₂ **4.000 kg**, CO₂-Kosten **261,80 €**.
 
 | Stage | Figures |
 | --- | --- |
-| CO₂ (§ 7 CO2KostAufG) | Intensität 2.000 kg ÷ 100 m² = **20 kg CO₂/m²/a** → Vermieteranteil **20 %** = **60,00 €**, Mieteranteil **240,00 €** |
-| umlagefähig nach Abzug | **10.240,00 €** |
-| § 9 Trennung | Q(WW) = 2,5 × 40 × (60 − 10) = **5.000 kWh** von 20.000 kWh → Warmwasser **2.560,00 €**, Heizung **7.680,00 €** |
-| §§ 7/8 bei 30/70 | Heizung: Grund **2.304,00 €** / Verbrauch **5.376,00 €** · Warmwasser: Grund **768,00 €** / Verbrauch **1.792,00 €** |
+| CO₂ (§ 7 CO2KostAufG) | Intensität 4.000 kg ÷ 100 m² = **40 kg CO₂/m²/a** → Vermieteranteil **60 %** = **157,08 €**, Mieteranteil **104,72 €** |
+| umlagefähig nach Abzug | **10.142,92 €** |
+| § 9 Trennung | Q(WW) = 2,5 × 40 × (60 − 10) = **5.000 kWh** von 20.000 kWh → Warmwasser **2.535,73 €**, Heizung **7.607,19 €** |
+| §§ 7/8 bei 30/70 | Heizung: Grund **2.282,16 €** / Verbrauch **5.325,03 €** · Warmwasser: Grund **760,72 €** / Verbrauch **1.775,01 €** |
 | Grundkosten-Bemessung | A 18.250 · B-Mieter 5.430 · B-Vermieter 5.520 · C 7.300 · **Σ 36.500 m²·Tage** |
 | Wärmeverbrauchs-Bemessung | A 600 · B-Mieter 146,25 · B-Vermieter 103,75 · C 150 · **Σ 1.000** (Einheit noch nicht mitgeführt — siehe Lücke) |
-| Warmwasser-Bemessung | A 20 · B-Mieter 5,95 · B-Vermieter 6,05 · C 8 · **Σ 40 m³** |
+| Warmwasser-Bemessung | A 20 · B-Mieter 5,950684… · B-Vermieter 6,049315… · C 8 · **Σ 40 m³** |
 | Gradtagszahlen B | 01.01.–30.06. **585 ‰ von 1.000 ‰** · 01.07.–31.12. **415 ‰ von 1.000 ‰** |
 | Tage B (Grund + WW) | **181 von 365** bzw. **184 von 365** |
 
-Party totals (already rendered): 5.657,60 / 1.509,84 / 1.293,36 / 1.779,20 € — Σ 10.240,00 €, plus the
-60,00 € CO₂-Vermieteranteil = 10.300,00 €.
+Party totals: 5.603,97 / 1.495,53 / 1.281,10 / 1.762,32 € — Σ 10.142,92 €, plus the 157,08 €
+CO₂-Vermieteranteil = 10.300,00 €.
+
+Unit B's heating-consumption cells — the figures `DEMO-RUNBOOK.md` and `docs/06` point at — are
+**778,79 € / 552,47 €**, still exactly 585 : 415.
 
 ### 1 — Umlageschlüssel and Gesamtbemessung per money column
 
@@ -411,9 +423,98 @@ NK solution (one label appended to the cost header row) does not transfer:
 | Money column | Umlageschlüssel | Gesamtbemessung (demo) |
 | --- | --- | --- |
 | Grundkosten Heizung | Wohnfläche (m²·Tage) — § 7 Abs. 1 HeizkostenV | 36.500 m²·Tage |
-| Verbrauch Heizung | Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen) | **withheld** — unit not carried, see gap |
+| Verbrauch Heizung | Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen) | **withheld** — unit not carried, see gap; the cell's copy is fixed in *"The withheld cell is a sentence, not a blank"* below |
 | Grundkosten Warmwasser | Wohnfläche (m²·Tage) — § 8 Abs. 1 HeizkostenV | 36.500 m²·Tage |
 | Verbrauch Warmwasser | Erfasster Warmwasserverbrauch (m³) | 40 m³ |
+
+**All four rows render. The withholding is of one cell, never of a row.**
+
+> **Rechtsstand 08/2026** (transcribed 05.08.2026, after `statement-reviewer` finding **F1**). A
+> **document-copy rule**: it introduces nothing into `packages/rules-store`, resolves no rule and
+> computes nothing. The statutory references are the ones the table above already carries.
+
+The first render of Block B dropped the whole `Verbrauch Heizung` row, and the consequence was worse
+than the gap it was avoiding: the **largest pot on the page** — 5.325,03 €, **52 %** of the umlagefähige
+Kosten — then had **no Umlageschlüssel named anywhere**, in a block titled *Bemessungsgrundlagen*. Four
+money columns, three rows. A renter comparing the two cannot tell whether the column was forgotten or
+allocated by a key nobody wrote down.
+
+What is genuinely not derivable is the **unit** of the heating-consumption Bemessung (kWh at a
+Wärmemengenzähler, dimensionless HKV-Einheiten at a Heizkostenverteiler — the gap at the end of this
+section). That blocks **one cell**: the Gesamtbemessung. It does not block the Umlageschlüssel, which
+is a name, not a figure, and which is BGH formal minimum **#2** in its own right.
+
+#### The withheld cell is a sentence, not a blank
+
+The cell prints, verbatim:
+
+```
+ohne Maßeinheit — nicht ausgewiesen
+```
+
+and directly beneath the column table, once, whenever that row rendered in this form:
+
+```
+Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit der
+Erfassungsgeräte (kWh oder Einheiten eines Heizkostenverteilers) liegt dieser Abrechnung nicht vor.
+Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten verteilt.
+```
+
+Every word of the cell is carrying something:
+
+- **It contains no digit and no dash used as a figure.** `—`, `0`, `–` or an empty cell all read as
+  *zero* in a numeric column, and a zero denominator is not merely wrong, it is unreadable — it would
+  make the renter's own share look undefined.
+- **`nicht ausgewiesen`** is an act of the landlord's, in the same register § 7 Abs. 3 CO2KostAufG uses
+  for *ausweisen*. It says *this was not stated*, which is true, rather than *there is none*, which is
+  false: the denominator exists and the engine divided by it.
+- **`ohne Maßeinheit`** is the reason, in two words, and it is the only reason that makes a figure
+  unprintable rather than merely absent. Without it the cell is exactly the *"omission a renter would
+  take for an error"*.
+- **The second sentence of the note is not optional.** Without it a renter can read the withheld
+  denominator as a withheld *method* and conclude the column was not consumption-allocated at all —
+  which would be a § 7 Abs. 1 HeizkostenV defect rather than a display gap.
+- The note says **nothing** about who should have supplied the unit and asserts **no** right of
+  inspection. Both would be claims this document has not transcribed.
+
+**Rejected: printing the unit-free figure `1.000`.** The gap below left this open as a sub-question for
+the lead and the conservative reading applies until it is answered — a bare `1.000` in a column headed
+*Gesamtbemessung*, between two rows reading `36.500 m²·Tage` and `40 m³`, invites the renter to assume
+a unit, and the two candidate units differ by three orders of magnitude in what they mean. The
+withholding stays; only its wording is fixed here.
+
+#### The `Verbrauch Heizung` row under § 9a Abs. 2 — it states Wohnfläche, not Wärmeverbrauch
+
+`heat_fallback_to_area` means the consumption key **was replaced**: more than 25 % of the area had no
+reading and § 9a Abs. 2 HeizkostenV put that pot on the area key. Then the applied Umlageschlüssel of
+the `Verbrauch Heizung` column **is Wohnfläche (m²·Tage)**, its denominator is the `36.500 m²·Tage`
+already printed two rows above, and there is no measurement-unit problem at all — the withholding
+reason has evaporated with the key it applied to.
+
+| `heat_fallback_to_area` | Umlageschlüssel cell | Gesamtbemessung cell |
+| --- | --- | --- |
+| `False` | `Erfasster Wärmeverbrauch` (+ `(Nutzerwechsel: Gradtagszahlen)`, see below) | `ohne Maßeinheit — nicht ausgewiesen` |
+| `True` | `Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` | `36.500 m²·Tage` |
+
+- The citation in the fallback branch is **§ 9a Abs. 2**, not § 7 Abs. 1: § 7 Abs. 1 is why there is a
+  consumption pot at all, § 9a Abs. 2 is why *this* pot was distributed by area. Naming § 7 Abs. 1
+  there would send a renter to a paragraph that does not contain the rule that decided their share.
+- The same rule applies to the **`Verbrauch Warmwasser`** row under `ww_fallback_to_area`, which 4a
+  already put on `Wohnfläche (m²·Tage)`: it carries the same **`— § 9a Abs. 2 HeizkostenV`** citation,
+  for the same reason. The `.note` at the foot of the section says the same thing in prose; the row is
+  where a renter looks for the key of *their* column, and the two must agree.
+- **`(Nutzerwechsel: Gradtagszahlen)` renders only when a Nutzerwechsel happened** — i.e. exactly when
+  Block C renders its ‰ lines. On a building with one party per unit the parenthetical names a method
+  that was not applied, which is the rule this whole section is built on.
+
+**The two Wohnfläche rows carry their citations.** `— § 7 Abs. 1 HeizkostenV` on *Grundkosten Heizung*,
+`— § 8 Abs. 1 HeizkostenV` on *Grundkosten Warmwasser*, exactly as the table above assigns them. The
+first render dropped both. They are separate paragraphs for separate pots (see item 2), and a renter
+who wants to check *why* their base costs go by area has nowhere else on the page to look —
+`Rechtsstand: § 7 Abs. 1 HeizkostenV 03/1989` in the footer dates a rule, it does not attach it to a
+column. **`Verbrauch Warmwasser` carries no citation** in the measured branch, because the table above
+assigns it none; § 8 Abs. 1 governs that split too, but transcribing a citation the spec did not write
+is inventing law, and the place to fix it is this table, not the renderer.
 
 **Decision: two disclosure blocks beneath the table, not more columns.** Four Umlageschlüssel + four
 Gesamtbemessungen + up to three per-party Bemessung values cannot go into a table that already carries
@@ -438,17 +539,17 @@ German UI copy (CLAUDE.md). Amounts via `format_eur`, other figures via `format_
 Aufteilung der Gesamtkosten (HeizkostenV)
 
 Gesamtkosten Heizung und Warmwasser                                  10.300,00 €
-− CO₂-Vermieteranteil (§ 7 Abs. 1 CO2KostAufG)                           60,00 €
-= umlagefähige Kosten                                                10.240,00 €
+− CO₂-Vermieteranteil (§ 7 Abs. 1 CO2KostAufG)                          157,08 €
+= umlagefähige Kosten                                                10.142,92 €
 
 § 9 HeizkostenV — Trennung von Heizung und Warmwasser
 Q(WW) = 2,5 kWh/(m³·K) × 40 m³ × (60 °C − 10 °C) = 5.000 kWh von 20.000 kWh Gesamtenergie
-→ Warmwasser 2.560,00 € · Heizung 7.680,00 €
+→ Warmwasser 2.535,73 € · Heizung 7.607,19 €
 
 §§ 7, 8 HeizkostenV — Grund- und Verbrauchskosten: angewendet 30 % Grundkosten / 70 % Verbrauch
 (zulässiger Rahmen: 50 % bis 70 % Verbrauchskosten, § 7 Abs. 1 HeizkostenV)
-Heizung:     Grundkosten 2.304,00 € · Verbrauchskosten 5.376,00 €
-Warmwasser:  Grundkosten   768,00 € · Verbrauchskosten 1.792,00 €
+Heizung:     Grundkosten 2.282,16 € · Verbrauchskosten 5.325,03 €
+Warmwasser:  Grundkosten   760,72 € · Verbrauchskosten 1.775,01 €
 ```
 
 Rules the copy encodes:
@@ -469,26 +570,44 @@ Rules the copy encodes:
 ```
 Bemessungsgrundlagen
 
-Spalte                    Umlageschlüssel                       Gesamtbemessung
-Grundkosten Heizung       Wohnfläche (m²·Tage)                  36.500 m²·Tage
-Grundkosten Warmwasser    Wohnfläche (m²·Tage)                  36.500 m²·Tage
-Verbrauch Warmwasser      Erfasster Warmwasserverbrauch (m³)    40 m³
+Spalte                    Umlageschlüssel                              Gesamtbemessung
+Grundkosten Heizung       Wohnfläche (m²·Tage) — § 7 Abs. 1 Heizkos…   36.500 m²·Tage
+Verbrauch Heizung         Erfasster Wärmeverbrauch                     ohne Maßeinheit —
+                          (Nutzerwechsel: Gradtagszahlen)              nicht ausgewiesen
+Grundkosten Warmwasser    Wohnfläche (m²·Tage) — § 8 Abs. 1 Heizkos…   36.500 m²·Tage
+Verbrauch Warmwasser      Erfasster Warmwasserverbrauch (m³)           40 m³
+
+Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit der
+Erfassungsgeräte (kWh oder Einheiten eines Heizkostenverteilers) liegt dieser Abrechnung nicht vor.
+Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten verteilt.
 
 Partei                                        Fläche·Tage   Verbrauch Warmwasser
 Wohnung A — Anna Beispiel                          18.250                  20 m³
-Wohnung B — Bernd Muster (Auszug 30.06.2025)        5.430                5,95 m³
-Wohnung B — Leerstand ab 01.07.2025 → Vermieter     5.520                6,05 m³
+Wohnung B — Bernd Muster (Auszug 30.06.2025)        5.430            rd. 5,95 m³
+Wohnung B — Leerstand ab 01.07.2025 → Vermieter     5.520            rd. 6,05 m³
 Wohnung C — Clara Vorlage                           7.300                   8 m³
 Gesamtbemessung                                    36.500                  40 m³
+
+Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, sodass eine
+Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
 ```
+
+(The `§ 7 Abs. 1 Heizkos…` above is this file's column width, not an ellipsis on the page — the row
+prints the citation in full.)
 
 - The token stays **`Bemessung` / `Gesamtbemessung`**, matching the NK table — same concept, same word.
 - The de-scaling rule of the reference-totals section applies unchanged: `36.500`, never `3.650.000`;
   the **sum** is de-scaled once, never per line.
 - **Invariant, asserted over rendered text:** each Bemessung column's printed values sum exactly to the
   printed Gesamtbemessung of that column. Same invariant as the NK reference totals.
-- The **Verbrauch Heizung** column is absent from both halves of Block B until the measurement unit is
-  carried (gap below). Its euro column stays in the money table; only its Bemessung is withheld.
+- The **`Verbrauch Heizung` row is present in the column table and absent from the party table.** The
+  row states the key that was applied (BGH #2); only its Gesamtbemessung cell and its Bemessung column
+  are withheld, and only for the measurement-unit gap. See *"All four rows render"* above for the
+  copy and *"The `Verbrauch Heizung` row under § 9a Abs. 2"* for the branch where nothing is withheld
+  at all.
+- **Row order is the money table's column order** — Grundkosten Heizung, Verbrauch Heizung, Grundkosten
+  Warmwasser, Verbrauch Warmwasser. A renter reads across the money table and down this one; a
+  different order makes them search.
 
 #### Display rounding of a fractional Bemessung (new — the NK weights were all integral)
 
@@ -501,8 +620,100 @@ every NK weight is an integer. The rule:
    (`docs/03` → Rounding), ties by stable party order. Rounding each value independently breaks the
    invariant above on a document that is supposed to add up.
 3. Where a value was **derived** rather than measured (an apportionment at a Nutzerwechsel), the
-   derivation is printed in Block C (`12 m³ × 181 von 365 Tagen`). The 2-decimal figure is the readable
-   one; the derivation is the exact one, so the tenant can reproduce the cent.
+   derivation is printed in Block C. The 2-decimal figure is the readable one; the derivation shows
+   the operands, so the tenant can reproduce it.
+4. A rounded figure is marked **`rd.`** and the rounding is disclosed **once**, in one place. Rules
+   below.
+
+#### The rounding is disclosed — `rd.`, one sentence, and an operator that is the operation
+
+> **Rechtsstand 08/2026** (transcribed 05.08.2026, after `statement-reviewer` finding **F2**). A
+> **document-copy rule**: nothing enters `packages/rules-store`, no rule is resolved, no figure moves.
+> The legal purpose is BGH minimum **#3** — a *Berechnung* the renter re-performs — and the copy
+> ruling is this file's, per the lead's instruction of 05.08.2026.
+
+**The three defects, and the one the lead already ruled on.** Block C printed
+`12 m³ × 181 von 365 Tagen = 5,95 m³`.
+
+1. `12 × 181 ÷ 365 = 5,9506849…`, so **`=` states a false identity**. **Lead's ruling (05.08.2026):**
+   keep reusing Block B's rounded figure — *two different figures for one quantity is worse than one
+   rounded figure*. What comes out is the **assertion of equality**, not the figure.
+2. **The rounding was disclosed nowhere**, and the arithmetic makes that expensive. The printed
+   Verbrauchskosten Warmwasser ÷ the printed Gesamtbemessung 40 m³ gives a price per m³ that
+   reproduces Wohnung A and Wohnung C **exactly** and misses **both Nutzerwechsel parties by ~3 ct**.
+   The renter checking the uncontested line succeeds; the renter checking the contested line fails.
+   That is the worst possible distribution of that error and it is *why* the disclosure is mandatory
+   rather than tidy.
+3. `× 181 von 365 Tagen` **is not multiplication by a number.** Read literally it says `12 × 181 =
+   2.172`.
+
+**Ruling 1 — the operator is `= rd.`, not `≈`.**
+
+```
+Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
+```
+
+- **`rd.`** is the conventional German abbreviation for *rund* and is what a renter already meets on
+  bank, utility and insurance statements. It is a **word**, in the document's own language, and needs
+  no notation to be known.
+- **`= rd. X` is not a false identity.** `rd.` qualifies the figure, so the sentence reads *"ergibt
+  gerundet 5,95 m³"* — which is true. Removing `=` entirely would also remove the statement that the
+  left side *produces* the right side, and that statement is exactly what BGH #3 asks for.
+- **`≈` is rejected.** It is a glyph, not a word: it presumes mathematical notation the reader is not
+  required to know, it has no spoken German form on a legal document, and U+2248 is one more code
+  point that has to survive PDF font subsetting. Every other glyph this document fixes (`−`, `·`, `→`)
+  is typographic; none carries meaning a word could carry.
+- **`rd.` marks the value, not the line.** It renders **only where the printed value differs from the
+  exact one**. Wohnung A's `20 m³` is exact and prints bare; `rd. 20 m³` would state a rounding that
+  did not happen — the same discipline as *`None` means not applied*. This is the rule that makes the
+  marker informative: `rd.` on every figure is decoration, `rd.` on the two derived ones is a fact.
+- It applies **wherever a rounded Bemessung is printed** — Block C's derivation lines *and* Block B's
+  party table. It is a property of the figure, so it travels with the figure.
+
+**Ruling 2 — one disclosure sentence, in Block B, directly beneath the party table:**
+
+```
+Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, sodass eine
+Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
+```
+
+- **One sentence, one place.** Not one per block: a caveat repeated per block is a caveat nobody
+  reads, and it invites the two copies to drift.
+- **Why Block B and not Block C.** The rounded figures *originate* in Block B — it is the Bemessung
+  table, and `warm_water_display_weights` is computed once there and re-read by Block C. Block C is
+  conditional (it renders only at a Nutzerwechsel) while a raw meter reading can be fractional without
+  any Nutzerwechsel at all, so a sentence living in Block C would be missing exactly when it is still
+  needed.
+- **Directly beneath the table it qualifies**, not two paragraphs away. The reviewer's note on the VDI
+  caveat sitting away from the ‰ lines it qualifies is the mistake being avoided; adjacency is part of
+  the rule, not layout preference.
+- **It renders whenever Block B prints a Bemessung column at all** — one code path, no branch. It
+  states the *display convention*, which is true whether or not a given figure needed it; `rd.` is
+  what marks the instance. A conditional caveat is a branch that can be wrong about itself.
+- **The last clause is the point.** *"…sodass eine Nachrechnung aus dem angezeigten Wert um wenige Cent
+  abweichen kann"* is what defect 2 above costs the renter, said out loud, before they discover it on
+  the one line they are most likely to contest.
+
+**Ruling 3 — `× (N von M Tagen)`, parenthesised.**
+
+The document's single share idiom is `A von B` — `585 ‰ von 1.000 ‰`, `5.000 kWh von 20.000 kWh`,
+`365 von 365 Tagen`. The defect is not the idiom, it is **operator binding**: `×` binds to `181`
+instead of to the share. Parentheses fix precisely that and teach the renter nothing new:
+
+```
+12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
+```
+
+- Rejected: `12 m³ × 181/365 Tage` (the unit dangles off a fraction and the "von" idiom is abandoned in
+  one place only) and `12 m³ × 181 ÷ 365 Tage` (two operators where one share is meant, and `÷` is a
+  glyph again).
+- **The same fix applies to § 9's area-fallback line in Block A**, which has the identical defect:
+  `32 kWh je m² Wohnfläche und Jahr × 100 m² × (365 von 365 Tagen) = 3.200 kWh von 20.000 kWh`. That
+  result is exact, so it carries **no `rd.`** — which is the marker doing its job in the one branch
+  where a reader could otherwise not tell.
+- `585 ‰ von 1.000 ‰` and `5.000 kWh von 20.000 kWh Gesamtenergie` are **not** parenthesised and must
+  not be: no `×` precedes them, so nothing binds wrongly, and bracketing them would imply an operator
+  that is not there.
 
 ### 2 — §§ 7/8 HeizkostenV: the applied ratio, stated
 
@@ -538,9 +749,11 @@ Operands from `WarmWaterFormula` (`hkvo.warm-water-formula`, source *§ 9 Abs. 2
 
 ```
 Warmwasserverbrauch nicht gemessen — Ersatzwert nach § 9 Abs. 2 HeizkostenV:
-32 kWh je m² Wohnfläche und Jahr × 100 m² × 365 von 365 Tagen = 3.200 kWh von 20.000 kWh
+32 kWh je m² Wohnfläche und Jahr × 100 m² × (365 von 365 Tagen) = 3.200 kWh von 20.000 kWh
 ```
 
+- The parentheses around the day share, and the absence of `rd.` on an exact result, are the rule of
+  *"The rounding is disclosed"* above; this line is one of the two places it applies.
 - The fallback is **legally weaker than a measurement and must read as one** — the words
   *"nicht gemessen"* and *"Ersatzwert"* carry that; the tenant is entitled to know the number was not
   measured. The measured branch must never render the word Ersatzwert and vice versa.
@@ -688,11 +901,15 @@ erfasste Wärmeverbrauch wurde nach monatlichen Gradtagszahlen auf die Nutzungsz
 Wohnung B — Bernd Muster (Auszug 30.06.2025): 585 ‰ von 1.000 ‰
 Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 415 ‰ von 1.000 ‰
 Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:
-Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × 181 von 365 Tagen = 5,95 m³
-Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 12 m³ × 184 von 365 Tagen = 6,05 m³
+Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
+Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 12 m³ × (184 von 365 Tagen) = rd. 6,05 m³
 
 Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gesetzliche Vorgabe.
 ```
+
+The parenthesised day share and the `rd.` marker are the ruling in *"The rounding is disclosed —
+`rd.`, one sentence, and an operator that is the operation"* above; the disclosure **sentence** does
+not repeat here — it lives once, under Block B's party table.
 
 Three parts, each rendered only when it was applied:
 
@@ -718,9 +935,13 @@ contract's `None` rule exists to prevent.
   deduction was made instead of having to notice a missing line.
 - **Block B when a column fell back to the area key (§ 9a Abs. 2).** `ww_fallback_to_area` ⇒
   `ww_consumption_weight_m3` is `None` on every line, so the `Verbrauch Warmwasser` row states
-  **`Wohnfläche (m²·Tage)` / `36.500 m²·Tage`** — the key that *was* applied — and no m³ Bemessung is
-  printed anywhere in the block. `Verbrauch Heizung` has no Bemessung either, for the unrelated reason
-  that its measurement unit is not carried (slice 5); the two absences must not be read as one.
+  **`Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` / `36.500 m²·Tage`** — the key that *was* applied,
+  with the paragraph that replaced the original one — and no m³ Bemessung is printed anywhere in the
+  block. `Verbrauch Heizung` has no *Gesamtbemessung* either, for the unrelated reason that its
+  measurement unit is not carried (slice 5); the two absences must not be read as one, which is why
+  one is a citation-carrying figure and the other is the sentence `ohne Maßeinheit — nicht
+  ausgewiesen`. (Superseded in one respect: the `Verbrauch Heizung` **row** renders. See *"All four
+  rows render"* under item 1.)
 
 #### Not in this slice, deliberately
 
@@ -728,6 +949,66 @@ Item 5's **short-period** wording (`… im Abrechnungszeitraum (181 von 365 Tage
 `anteilig gekürzt` band) — item 5 assigns it a rendering slice of its own, the demo period is a full
 calendar year and nothing on the demo path exercises it. What *is* in this slice from item 5 is the
 full-year `Berechnungsgrundlagen:` line appended to the existing `.co2` block.
+
+### 4b — Pagination: which blocks may break, and what may never be separated
+
+> **Rechtsstand 08/2026** (transcribed 05.08.2026, after `statement-reviewer` finding **I1**, promoted
+> by the lead). A **layout rule**: nothing enters `packages/rules-store`, no rule is resolved, no
+> figure moves. The legal purpose is BGH minimum **#3** — the calculation and the figure it justifies
+> have to be readable together. Thresholds and inks stay in `docs/05`; this section fixes only which
+> element may be split by a page break.
+
+**The defect.** The rendered demo is **3 pages and roughly 40 % blank**: page 1 ends at ~78 % height,
+page 2 at ~57 %, page 3 at ~48 %. Cause: `break-inside: avoid` on `.cost-split` and `.party-change`.
+Each block refuses to split, does not fit the remaining space, and takes a fresh page — pushing itself
+down and leaving the space above it empty.
+
+**The consequence is legal, not cosmetic.** BGH minimum #3 ends up on a **different sheet of paper**
+from the numbers it justifies: a renter reads their share in the money table on page 1 and must turn
+the page to find the basis it was computed from. A statement whose *Berechnung* is not next to its
+result is the formal defect this whole section exists to close, reintroduced by a stylesheet
+declaration.
+
+**And it is backwards.** `.basis-table` — the carrier of minimums #2 **and** #3, and the only block
+containing *two* tables where the second's column meanings are defined by the first — was the one
+carrier **without** `break-inside: avoid`. It was not triggered on this fixture. It will be as soon as
+a real building has eight parties.
+
+#### The rule
+
+| Element | Declaration | Why |
+| --- | --- | --- |
+| `.cost-split`, `.basis-table`, `.party-change` | **must not declare `break-inside: avoid`** | These blocks grow with the number of parties. A block that may not split cannot be laid out at all beyond one page, and long before that it strands the page above it. Breaking a disclosure block across pages is *normal*; stranding it is the defect. |
+| every `tr` | `break-inside: avoid` | A party's label and their Bemessung are one statement. Split across a page boundary, a renter reads a figure with no name or a name with no figure. |
+| every `thead` | `break-after: avoid` | A column header separated from its first row leaves a page of unlabelled numbers — and in `.basis-table` the *first* table is what gives the second's `Fläche·Tage` / `Verbrauch Warmwasser` columns their meaning. |
+| `.disclosure-title` (Blocks A, B, C) | `break-after: avoid` | A heading alone at the foot of a page is the "justification separated from its figures" defect at its smallest scale, and the cheapest one to prevent. |
+| `.apportionment li` | `break-inside: avoid` | One derivation line — `… × (181 von 365 Tagen) = rd. 5,95 m³` — is one statement and is never legible in halves. |
+| the disclosure carriers | `orphans: 2; widows: 2` | A single stranded line of running prose carries no verification content and reads as an error. |
+
+The shape of the rule is *"break at the seams, never inside a statement"*. `break-inside: avoid` is
+correct on the **smallest** element that is one indivisible claim (a row, a list item) and wrong on
+every container above it.
+
+#### What is pinned, and what honestly cannot be
+
+Pinned in `packages/pdf/tests/test_statement_pagination.py`, over the template's own stylesheet — the
+same idiom as `test_statement_legal_typography.py`, and for the same reason: rendering the PDF and
+measuring boxes would be testing Chromium, and a page-count golden over one demo fixture is deleted
+the first time a real building has eight units.
+
+**Not pinned, deliberately — say so rather than fake it:**
+
+- **"The money table and its disclosure are on the same sheet."** This is the property the defect
+  actually violates, and it is **not expressible**: it depends on the party count, and for a building
+  with enough parties it is simply false — the money table alone will exceed a page. It cannot be a
+  test, so it is a *design constraint* on any future change: nothing may be inserted between the
+  heating money table and Block A.
+- **A page-count or fill-ratio assertion on the demo PDF.** Brittle by construction (it encodes the
+  fixture's size, not a rule) and it would go red for a *correct* reason — an extra unit — which is
+  how a gate gets deleted instead of fixed.
+- **Whether the corrected stylesheet actually produces a denser document.** That is a rendering
+  outcome, verified by looking at `packages/pdf/output/nk-heating-statement-demo.pdf` after the
+  change, not by a golden.
 
 ### 5 — § 7 Abs. 3 CO2KostAufG: what already works, and the remainder only
 
@@ -737,18 +1018,18 @@ share, the building's **Einstufung**, and the **Berechnungsgrundlagen** of that 
 **Already discharged by the existing `co2_block`** (`statement.py` → `.co2`) — do not respec, do not
 re-render:
 
-- the tenant's and the landlord's amounts (240,00 € / 60,00 €) and that the landlord's is deducted
+- the tenant's and the landlord's amounts (104,72 € / 157,08 €) and that the landlord's is deducted
   before allocation;
-- the landlord percentage (20 %);
-- the intensity (20 kg CO₂/m²/Jahr);
+- the landlord percentage (60 %);
+- the intensity (40 kg CO₂/m²/Jahr);
 - the citation *CO2KostAufG* with `Rechtsstand 01/2023`.
 
 **The remainder** — the Berechnungsgrundlagen, i.e. the two inputs the intensity was computed from and
 the band it selected. Appended to the existing block, same surface, no new block:
 
 ```
-Berechnungsgrundlagen: CO₂-Emissionen des Gebäudes 2.000 kg · beheizte Fläche 100 m²
-→ 20 kg CO₂/m²/Jahr · Einstufung: 17 bis unter 22 kg CO₂/m²/Jahr · CO₂-Kosten 300,00 €
+Berechnungsgrundlagen: CO₂-Emissionen des Gebäudes 4.000 kg · beheizte Fläche 100 m²
+→ 40 kg CO₂/m²/Jahr · Einstufung: 37 bis unter 42 kg CO₂/m²/Jahr · CO₂-Kosten 261,80 €
 ```
 
 - **The Einstufung is printed as its intensity band, not as a step number.** `Co2Step` carries
@@ -879,13 +1160,13 @@ field that is merely useful is a field that will drift.
 
 | Field | Type | Demo value | Required by |
 | --- | --- | --- | --- |
-| `billable_cost` | `Cents` | `1_024_000` | Block A's `= umlagefähige Kosten` line; equals `total` when `co2 is None` |
-| `heating_pot` | `Cents` | `768_000` | § 9 result — `→ Heizung 7.680,00 €` |
-| `ww_pot` | `Cents` | `256_000` | § 9 result — `→ Warmwasser 2.560,00 €`; `0` when there is no central warm water |
-| `heat_base_pot` | `Cents` | `230_400` | §§ 7/8 — `Heizung: Grundkosten 2.304,00 €` |
-| `heat_cons_pot` | `Cents` | `537_600` | §§ 7/8 — `Verbrauchskosten 5.376,00 €` |
-| `ww_base_pot` | `Cents` | `76_800` | § 8 — `Warmwasser: Grundkosten 768,00 €`; `0` without central warm water |
-| `ww_cons_pot` | `Cents` | `179_200` | § 8 — `Verbrauchskosten 1.792,00 €`; `0` without central warm water |
+| `billable_cost` | `Cents` | `1_014_292` | Block A's `= umlagefähige Kosten` line; equals `total` when `co2 is None` |
+| `heating_pot` | `Cents` | `760_719` | § 9 result — `→ Heizung 7.607,19 €` |
+| `ww_pot` | `Cents` | `253_573` | § 9 result — `→ Warmwasser 2.535,73 €`; `0` when there is no central warm water |
+| `heat_base_pot` | `Cents` | `228_216` | §§ 7/8 — `Heizung: Grundkosten 2.282,16 €` |
+| `heat_cons_pot` | `Cents` | `532_503` | §§ 7/8 — `Verbrauchskosten 5.325,03 €` |
+| `ww_base_pot` | `Cents` | `76_072` | § 8 — `Warmwasser: Grundkosten 760,72 €`; `0` without central warm water |
+| `ww_cons_pot` | `Cents` | `177_501` | § 8 — `Verbrauchskosten 1.775,01 €`; `0` without central warm water |
 | `applied_consumption_share` | `Decimal` | `0.7` | item 2 — *what was applied*, printed as `30 % / 70 %`, derived from the resolved rule value and never a template literal |
 | `split_bounds` | `HeatingSplitBounds` | `0.5 / 0.7` | item 2 — *what the law permits*, the second of the two facts; § 7 Abs. 1 HeizkostenV |
 | `warm_water_separation` | `WarmWaterSeparation \| None` | see above | item 3; `None` exactly when `HeatingInput.warm_water is None` |
@@ -921,11 +1202,11 @@ One row per party, so every field is per party.
 
 | Field | Type | Demo value | Required by |
 | --- | --- | --- | --- |
-| `total_co2_kg` | `Decimal` | `2000` | § 7 Abs. 3 — the emissions the Einstufung was computed from |
+| `total_co2_kg` | `Decimal` | `4000` | § 7 Abs. 3 — the emissions the Einstufung was computed from |
 | `heated_area_sqm` | `Decimal` | `100` | § 7 Abs. 3 — the divisor. Repeated from `WarmWaterSeparation` on purpose: § 7 Abs. 3 is discharged by this object alone, and the two must be the same number (fixture asserts it) |
-| `co2_cost` | `Cents` | `30_000` | § 7 Abs. 3 — the amount being split, and the only way a tenant can check `240,00 + 60,00 = 300,00` |
-| `band_min_inclusive` | `Decimal \| None` | `17` | § 7 Abs. 3 *Einstufung*, printed as a band because `Co2Step` carries no ordinal. `None` = the first step, which has no lower bound (`unter 12`) |
-| `band_max_exclusive` | `Decimal \| None` | `22` | as above. `None` = the open-ended top step |
+| `co2_cost` | `Cents` | `26_180` | § 7 Abs. 3 — the amount being split, and the only way a tenant can check `104,72 + 157,08 = 261,80` |
+| `band_min_inclusive` | `Decimal \| None` | `37` | § 7 Abs. 3 *Einstufung*, printed as a band because `Co2Step` carries no ordinal. `None` = the first step, which has no lower bound (`unter 12`) |
+| `band_max_exclusive` | `Decimal \| None` | `42` | as above. `None` = the open-ended top step |
 | `period_days` | `int` | `365` | the short-period copy in item 5 prints `(181 von 365 Tagen)`, and `period_factor` alone cannot be un-divided back into it |
 | `reference_year_days` | `int` | `365` | as above — the denominator, anchored on `valid_from` (366 in a leap year, `docs/03`) |
 
@@ -939,7 +1220,7 @@ band_min_inclusive = previous_step.max_intensity_exclusive × period_factor   # 
 - Both bounds are the ones **actually compared against**, i.e. already shortened by `period_factor`
   (§ 5 Abs. 1 S. 4). The template must not multiply anything: a second implementation of a legal rule
   in the template layer is how the two drift apart. For the demo year the factor is exactly 1 and the
-  band is `17` / `22` — the printed page does not move.
+  band is `37` / `42` — the printed page does not move.
 - `landlord_share_percent_for_intensity` keeps its current signature and behaviour; it is public and
   fixture-covered. The band is derived inside `split_co2_cost` from the same table and the same factor.
 - `period_factor` is unchanged and stays on the result (it landed with the § 5 Abs. 1 S. 4 slice); it
@@ -968,7 +1249,7 @@ fails on it.
 | Block C — the Nutzerwechsel apportionment (Gradtagszahlen, Zeitanteile) | `.party-change` | **1** | § 9b Abs. 2/Abs. 3 HeizkostenV; it derives the Bemessung a renter checks |
 | The heating footer's reconciliation sentence | `tfoot .foot-note` | **1** | HeizkostenV disclosure; it reconciles the Gesamtkosten a reader adds up |
 | § 9a estimation / fallback disclosure | `.note` | **1** | § 9a HeizkostenV — see *Why `.note` is tier 1* below |
-| The CO₂ split and its Berechnungsgrundlagen | `.co2` | **1** | § 7 Abs. 3 CO2KostAufG — the reconciliation `240,00 + 60,00 = 300,00` |
+| The CO₂ split and its Berechnungsgrundlagen | `.co2` | **1** | § 7 Abs. 3 CO2KostAufG — the reconciliation `104,72 + 157,08 = 261,80` |
 | `Rechtsstand` stamps + the "keine Rechts- oder Steuerberatung" disclaimer | `footer` | **2** | `CLAUDE.md` cross-cutting rules — **not** a BGH minimum, our own rule |
 
 Everything else on the page — the Vermieter/period meta line, column headings, decorative framing — is
@@ -1077,6 +1358,8 @@ needed for the six items above, the fifth unblocks the one column they cannot sh
 | 3 | `HeatingResult` carries its intermediates (+ `Co2Result` Berechnungsgrundlagen, + § 9b in the degree-day `source`) | `engine-implementer` (`packages/{heating-engine,rules-store}/src`) | yes |
 | 4 | Blocks A / B / C render (items 1–5; rendered form, carriers and branch cases in **4a**) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
 | 5 | `MeasurementUnit` carried meter → statement; `Verbrauch Heizung` Bemessung column; NK `CONSUMPTION` reference total | `engine-implementer` then `app-implementer` | yes — strictly before the heating-consumption column |
+| 6 | The slice-4 defects: the `Verbrauch Heizung` row + its two branches and the two missing citations (item 1, *"All four rows render"*), the `rd.` / `(N von M Tagen)` / one-sentence rounding disclosure (item 1, *"The rounding is disclosed"*), the page-break rules (**4b**) | `app-implementer` (`packages/pdf/src`) | yes — after 4, independent of 5 |
+| 7 | The demo's CO₂ fixture: `total_co2_kg` 2.000 → **4.000 kg**, `co2_cost` 300,00 → **261,80 €**, in `packages/pdf/src/lokara_pdf/demo.py` **and** `packages/db/src/lokara_db/seed.py` together | `app-implementer` + `db` lane, one commit | yes — but the two files must move together, or the PDF demo and the API demo state different numbers for one building (`docs/06` → "One occupancy timeline drives every engine") |
 
 Slice 3 is **deliberately not demo-visible**; that is the cost of the seam, and it is the right cost.
 The alternative — pairing each disclosure with the fields it needs — means four separate edits to the
