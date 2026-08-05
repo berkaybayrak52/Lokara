@@ -270,10 +270,16 @@ def seed_demo(session: Session) -> None:
         )
     )
 
-    # The heating-system invoice: € 10.300,00 total, of which € 300,00 is the
-    # CO₂ price on 2.000 kg — the numbers the CO2KostAufG split runs on. Held
-    # apart from CostEntry on purpose: §§ 7-9 HeizkostenV dictate the split, so
-    # a heating cost never carries an Umlageschlüssel.
+    # The heating-system invoice: € 10.300,00 total, of which € 261,80 is the
+    # CO₂ price on 4.000 kg — the numbers the CO2KostAufG split runs on. Those
+    # two are the supplier's § 3 Abs. 1 CO2KostAufG disclosure for a 20.000 kWh
+    # Erdgas delivery: 4.000 kg ÷ 20.000 kWh = 0,200 kg CO₂/kWh, and 261,80 € ÷
+    # 4,000 t = 65,45 €/t = 55,00 €/t (§ 10 Abs. 2 BEHG, 2025) + 19 % USt. They
+    # replace 2.000 kg / 300,00 € on 05.08.2026, which had implied 150 €/t and
+    # an emission factor no fuel has — docs/06 → "Scenario 2 — the fuel, the
+    # emissions and the CO₂ price". Held apart from CostEntry on purpose:
+    # §§ 7-9 HeizkostenV dictate the split, so a heating cost never carries an
+    # Umlageschlüssel.
     session.merge(
         HeatingCostEntry(
             id="hcost_demo_2025",
@@ -283,8 +289,8 @@ def seed_demo(session: Session) -> None:
             amount_cents=1_030_000,
             period_from=date(2025, 1, 1),
             period_to=date(2026, 1, 1),
-            co2_kg_x1000=2_000_000,
-            co2_cost_cents=30_000,
+            co2_kg_x1000=4_000_000,  # 4.000 kg × 1000
+            co2_cost_cents=26_180,  # 261,80 €
         )
     )
 
