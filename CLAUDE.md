@@ -144,6 +144,12 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
   it from `README.md`.
 - **If a new spec contradicts `docs/`, stop and ask.** Don't silently pick one; a `docs/` rule may
   encode a decision the newer spec hasn't caught up with.
-- **Write your end-of-task summary to `LAST_OUTPUT.md`** at the repo root, overwriting it each time —
-  same content as the chat summary (what was built, decisions worth knowing, gates, what's next). It's
-  the handoff other tools read. Gitignored on purpose: it's scratch, not project history.
+- **The session writes its end-of-task summary to `LAST_OUTPUT.md`** at the repo root, overwriting it
+  each time — same content as the chat summary (what was built, decisions worth knowing, gates,
+  what's next). It's the handoff other tools read. Gitignored on purpose: it's scratch, not project
+  history.
+  **This is the session's file, not an agent's.** A subagent reports to the session and never writes
+  it: it sees one lane, and a handoff composed from one lane is the stale handoff `check_handoff.sh`
+  exists to catch. `.claude/hooks/write-scope.sh` therefore blocks every agent from creating it, and
+  that is correct — an agent that hits the block should report the conflict, not widen its lane.
+  Composing the agents' reports into one handoff is the session's job.
