@@ -1137,9 +1137,9 @@ class TestTheDemosCo2FixtureIsPlausibleOnItsFace:
             f"{self.BEHG_2025_NET_PER_TONNE} € je Zertifikat and § 3 Abs. 3 CO2KostAufG adds USt "
             f"→ {self.GROSS_PER_TONNE} €/t (docs/03)"
         )
-        assert (
-            self.BEHG_2025_NET_PER_TONNE * Decimal("1.19")
-        ).quantize(Decimal("0.01")) == self.GROSS_PER_TONNE
+        assert (self.BEHG_2025_NET_PER_TONNE * Decimal("1.19")).quantize(
+            Decimal("0.01")
+        ) == self.GROSS_PER_TONNE
 
     def test_the_emission_factor_implied_by_the_demo_is_that_of_erdgas(self) -> None:
         """`docs/06` fixes the fuel: Erdgas. The demo's 0,200 kg CO₂/kWh is 0,44 %

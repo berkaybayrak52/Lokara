@@ -7,9 +7,9 @@ not out of a constant. (Those two euro figures were € 786,24 / € 557,76 unti
 instead of 2.000 kg / 300,00 €, which had implied 150 €/t and half the emission
 factor of any fuel. The CO₂-Vermieteranteil is deducted before the renter-facing
 split, so every heating euro followed. `docs/06` → "Scenario 2 — the fuel, the
-emissions and the CO₂ price"; the **585 : 415 ratio itself did not move**.) The last four fixtures in statement_service.py
-(€ 10.300 / 20.000 kWh / 40 m³ / CO₂) are gone, so this is what stops them from
-being reintroduced by accident.
+emissions and the CO₂ price"; the **585 : 415 ratio itself did not move**.) The
+last four fixtures in statement_service.py (€ 10.300 / 20.000 kWh / 40 m³ / CO₂)
+are gone, so this is what stops them from being reintroduced by accident.
 
 Second theme: readings are **create-only**. A correction is an appended row
 that supersedes an earlier one for the same date; the wrong value stays
