@@ -245,8 +245,10 @@ class TestHeatingStatementFromRealReadings:
         ).json()["heatingCosts"]
         [entry] = heating_costs
         assert entry["amountEur"] == f"10.300,00{NBSP}€"
-        assert entry["co2KgDisplay"] == "2.000"
-        assert entry["co2CostEur"] == f"300,00{NBSP}€"
+        # Re-based 05.08.2026 with the demo's CO₂ fixture, like the two goldens
+        # this module's docstring describes — these two were missed then.
+        assert entry["co2KgDisplay"] == "4.000"
+        assert entry["co2CostEur"] == f"261,80{NBSP}€"
         assert "key" not in entry
 
 

@@ -77,8 +77,12 @@ def test_statement_shows_co2_split_and_party_labels() -> None:
     html = statement_html(build_demo_statement())
 
     assert "CO₂-Kostenaufteilung" in html
-    assert "Vermieteranteil 20" in html  # 20 kg/m²/a → step 17–22
-    assert f"60,00{NBSP}€" in html  # landlord CO₂ share, deducted pre-split
+    # 40 kg/m²/a → step 37–42. Moved from 20 % / 60,00 € on 05.08.2026 with the
+    # demo's CO₂ fixture: docs/06 → "Scenario 2 — the fuel, the emissions and the
+    # CO₂ price". The sibling golden in this file was re-based then and this one
+    # was missed.
+    assert "Vermieteranteil 60" in html
+    assert f"157,08{NBSP}€" in html  # landlord CO₂ share, deducted pre-split
     assert "Wohnung B — Leerstand ab 01.07.2025 → Vermieter" in html
     assert "Müllabfuhr" in html
     assert "Umlageschlüssel: Wohnfläche" in html
