@@ -55,6 +55,12 @@ MUST_APPEAR: dict[str, str] = {
     "100 m²": "heated_area_sqm de-scaled from area_sqm_x100 (leak form: 10.000)",
     "4.000 kg": "total_co2_kg de-scaled from co2_kg_x1000 (leak form: 4.000.000)",
     "40 m³": "ww_consumption_weight_m3 de-scaled from value_x1000 (leak form: 40.000)",
+    # --- slice 5: the Massainheit travels meter -> statement. Without these the whole
+    # Verbrauch Heizung column could regress to the withheld sentence and this gate would
+    # stay green -- and that column is 5.325,03 EUR, 52 % of the umlagefaehige Kosten.
+    "1.000 HKV-Einheiten": "docs/08 slice 5: Verbrauch Heizung Gesamtbemessung (BGH #3 denominator)",
+    "600 HKV-Einheiten": "docs/08 slice 5: unit A's own heat Bemessung",
+    "Heizkostenverteiler": "docs/08 rule 6: the device named once (BGH #2 Erlaeuterung)",
     # CLAUDE.md: every legal output shows its Rechtsstand
     "Rechtsstand": "CLAUDE.md: legal outputs carry Rechtsstand MM/JJJJ",
     # --- the de-scaling canaries: these are the *human* figures, not the scaled ints
@@ -80,6 +86,12 @@ MUST_NOT_APPEAR: dict[str, str] = {
     # because no legitimate figure on this statement is in the millions; its x100
     # siblings (10.000, 40.000) are deliberately NOT listed, see MUST_APPEAR above.
     "4.000.000": "scaled integer leaked: total_co2_kg not divided by 1000",
+    "1.000.000": "scaled integer leaked: heat Bemessung total not divided by 1000",
+    # `600.000` is NOT listed, deliberately, for the same reason 10.000 and 40.000 are not:
+    # six digits is a plausible euro amount on a larger building, so a negative canary
+    # there would fire falsely one day. `600 HKV-Einheiten` in MUST_APPEAR catches the same
+    # regression from the other side. Worth noting LONG_DIGIT_RUN misses it twice over --
+    # six digits is under the 7+ threshold, and the grouped form is not a digit run at all.
 }
 
 # No legitimate figure on this statement has seven or more consecutive digits.
