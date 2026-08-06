@@ -20,8 +20,14 @@
 > they appear — NK allocation, heating, and the statement. (A seed once had Bernd Muster occupying all
 > year in the heating section but moving out in June in the NK section.) Deriving both engines from the
 > same tenancy rows isn't just consistency: it makes the **degree-day split visible on the statement**
-> — unit B's heating row splits Mieter/Vermieter **585/415 ‰** (786,24 € / 557,76 €), which is exactly
+> — unit B's heating row splits Mieter/Vermieter **585/415 ‰** (778,79 € / 552,47 €), which is exactly
 > the domain depth the competitors don't show. Keep it in the demo.
+>
+> ⚠️ **Those two euro figures moved on 05.08.2026** (they were 786,24 € / 557,76 €) and nothing about
+> the degree-day split changed. The CO₂ figures of the demo building were wrong on their face — see
+> *"Scenario 2 … the fuel, the emissions and the CO₂ price"* below — and the CO₂-Vermieteranteil is
+> deducted **before** the renter-facing split, so correcting it moves every heating euro downstream.
+> The **585/415 ‰ ratio itself is unchanged**: 778,79 / 552,47 is still exactly 585 : 415.
 
 ## Scenario 1 — Solo landlord, clean NK + vacancy (⭐ the crown jewel)
 
@@ -40,6 +46,70 @@ Mirrors the canonical €1,200 golden fixture so the live demo matches the teste
 - **Demo beat:** show §7/8 base/consumption split + §9 WW separation, then the **CO₂ 10-step**
   landlord/renter split. Point out: get this wrong and the tenant has a 3% reduction right — Lokara
   handles it as standard.
+
+### Scenario 2 — the fuel, the emissions and the CO₂ price
+
+> **Rechtsstand 08/2026** (transcribed 05.08.2026). This section fixes **demo fixture values**, not
+> legal values: the statutory figures it checks against are transcribed in `docs/03` →
+> *"Where `total_co2_kg` and `co2_cost` come from"*, with their legal basis. Nothing here enters
+> `packages/rules-store` and no engine reads it.
+
+**The defect this replaces.** The demo printed `CO₂-Emissionen des Gebäudes 2.000 kg` and
+`CO₂-Kosten 300,00 €`. That implies **150 €/t** — nearly three times the 2025 rate — and, against the
+demo's own `20.000 kWh`, an emission factor of **0,1 kg CO₂/kWh**, about half of natural gas. Both are
+readable off the page in one step by anyone with a property background. Found by `statement-reviewer`,
+promoted by the lead on 05.08.2026.
+
+**The demo building burns Erdgas** (central gas boiler, one Wärmemengenzähler per unit, one shared
+warm-water meter). Stated here because the emission factor is meaningless without it, and because
+`HeatingInput` carries no fuel field — the fuel is a property of the *scenario*, not of the engine.
+
+| Figure | Value | Where it comes from |
+| --- | --- | --- |
+| Energiegehalt der Lieferung | **20.000 kWh** | unchanged — it is also § 9's denominator |
+| Emissionsfaktor (implied) | **0,200 kg CO₂/kWh** (heizwertbezogen) | 4.000 kg ÷ 20.000 kWh |
+| Brennstoffemissionen | **4.000 kg** | `Co2Input.total_co2_kg`; § 3 Abs. 1 Nr. 1 CO2KostAufG figure |
+| CO₂-Kosten | **261,80 €** | 4,000 t × **65,45 €/t** = 55,00 €/t (§ 10 Abs. 2 BEHG, 2025) + 19 % USt (§ 3 Abs. 3 CO2KostAufG) |
+| beheizte Fläche | **100 m²** | 50 + 30 + 20, unchanged |
+| Emissionsintensität | **40,0 kg CO₂/m²/Jahr** | 4.000 ÷ 100 |
+| Einstufung | **37 bis unter 42 kg CO₂/m²/Jahr** → Vermieteranteil **60 %** | Anlage CO2KostAufG via `packages/rules-store` |
+| CO₂-Vermieteranteil / Mieteranteil | **157,08 € / 104,72 €** | 60 / 40 of 261,80 €, exact — no rounding remainder |
+| umlagefähige Kosten | **10.142,92 €** | 10.300,00 € − 157,08 € |
+
+Every one of those checks in one step, which is the whole requirement:
+
+- 261,80 € ÷ 4,000 t = **65,45 €/t** → 55 € + 19 % USt → the 2025 BEHG rate, gross, as a renter's
+  invoice states it.
+- 4.000 kg ÷ 20.000 kWh = **0,200 kg CO₂/kWh** → Erdgas. The EBeV 2030 Anlage 2 standard value is
+  0,20088 kg CO₂/kWh (`docs/03`); the demo is **0,44 % below** it, which is inside the spread of real
+  Erdgas-H qualities and inside what a supplier states under § 3 Abs. 1 Nr. 3 CO2KostAufG. It is a
+  supplier figure, not the standard value, and the demo does not claim otherwise.
+- 4.000 kg ÷ 100 m² = **40,0 kg CO₂/m²/Jahr** → Stufe 7 of the Anlage (37 bis unter 42) → 60 %.
+
+**The Einstufung moved from *17 bis unter 22* (20 %) to *37 bis unter 42* (60 %), and that is forced,
+not chosen.** The demo building burns 20.000 kWh on 100 m² = 200 kWh/m²/a. With *any* fossil fuel that
+lands near 40 kg CO₂/m²/a; the old 20 kg/m²/a was only reachable by an emission factor no fuel has.
+Per the lead's constraint — *"do not bend the physics to protect a fixture"* — the band moves. Both
+bounds are comfortably clear of 40,0, so the step selection stays an unambiguous golden, and 40,0 is
+already at one decimal place, so the demo does **not** depend on the unimplemented § 5 Abs. 1 S. 3
+rounding (`docs/03` → *"Known gap"*, `PLAN.md` row 4.5).
+
+**Story value, unexpectedly better.** A building at 40 kg CO₂/m²/a is a Sanierungsfall, the statute
+puts **60 %** of the CO₂ cost on the landlord, and that is exactly the incentive the CO2KostAufG was
+written to create. The demo now shows the law biting instead of a token 20 %.
+
+**Two figures the reviewer flagged that are still implausible, and were deliberately not changed:**
+
+- **Heizkosten 10.300,00 € on 100 m² = 103 €/m²/a** (typical 15–25). Worse: 10.300 € for 20.000 kWh is
+  0,515 €/kWh, roughly four times a gas tariff, and only part of the invoice is fuel.
+- **Müllabfuhr 1.200,00 € on 100 m² = 12 €/m²/a** (typical ~2).
+
+Both were left alone on purpose. The €1.200 garbage figure is the **canonical allocation example** of
+`docs/03` and a `CLAUDE.md` definition-of-done — it may not move. Fixing the heating total means
+choosing a new `total_cost`, which moves every heating euro a second time and re-bases the goldens in
+`scripts/assert_statement_pdf.py`, `DEMO-RUNBOOK.md` and four test files again. **What it would take:**
+one decision on a plausible invoice (≈ 2.400 € Brennstoff + ≈ 600 € Wartung/Betriebsstrom/Messdienst ⇒
+`total_cost` ≈ 3.000 €, i.e. 30 €/m²/a), then the same cascade in one pass. Not done unasked.
 
 ## Scenario 3 — Flexible allocation keys without data loss
 

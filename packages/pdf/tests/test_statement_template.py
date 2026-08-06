@@ -27,9 +27,14 @@ def test_statement_contains_the_canonical_amounts() -> None:
     assert f"240,00{NBSP}€" in html
     assert f"1.200,00{NBSP}€" in html  # the reconciled total
 
-    # Heating totals of the CO₂ golden fixture (docs/03 hand-computed table):
-    # unit A's line total is 565,760 cents; the reconciled grand total €10,300.00.
-    assert f"5.657,60{NBSP}€" in html
+    # Heating totals of the CO₂ golden fixture: unit A's line total is 560,397
+    # cents; the reconciled grand total €10,300.00. Unit A's figure moved from
+    # 5.657,60 € on 05.08.2026 with the demo's CO₂ fixture — the CO₂-Vermieteranteil
+    # is deducted before the renter-facing split, so a corrected CO₂ cost moves
+    # every heating euro. `docs/06` → "Scenario 2 — the fuel, the emissions and the
+    # CO₂ price". The **invoice total** did not move, which is why it is asserted
+    # beside it.
+    assert f"5.603,97{NBSP}€" in html
     assert f"10.300,00{NBSP}€" in html
 
 
@@ -72,8 +77,12 @@ def test_statement_shows_co2_split_and_party_labels() -> None:
     html = statement_html(build_demo_statement())
 
     assert "CO₂-Kostenaufteilung" in html
-    assert "Vermieteranteil 20" in html  # 20 kg/m²/a → step 17–22
-    assert f"60,00{NBSP}€" in html  # landlord CO₂ share, deducted pre-split
+    # 40 kg/m²/a → step 37–42. Moved from 20 % / 60,00 € on 05.08.2026 with the
+    # demo's CO₂ fixture: docs/06 → "Scenario 2 — the fuel, the emissions and the
+    # CO₂ price". The sibling golden in this file was re-based then and this one
+    # was missed.
+    assert "Vermieteranteil 60" in html
+    assert f"157,08{NBSP}€" in html  # landlord CO₂ share, deducted pre-split
     assert "Wohnung B — Leerstand ab 01.07.2025 → Vermieter" in html
     assert "Müllabfuhr" in html
     assert "Umlageschlüssel: Wohnfläche" in html

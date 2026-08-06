@@ -142,7 +142,17 @@ class TestBaseConsumptionAndWarmWaterSplit:
 
 
 class TestCo2TenStepSplit:
-    """CO2KostAufG: 2,000 kg over 100 m² → 20 kg/m²/a → landlord 20 %."""
+    """CO2KostAufG: 2,000 kg over 100 m² → 20 kg/m²/a → landlord 20 %.
+
+    These are **synthetic engine values**, chosen so the step selection and the
+    pre-split deduction are legible (20 % of 300,00 € = 60,00 €). They are not a
+    plausible building: 300,00 € for 2.000 kg implies 150 €/t against the 2025
+    BEHG rate of 65,45 €/t incl. USt. The *demo's* fixture is a different thing
+    and is required to be plausible on its face — `docs/06` → "Scenario 2 — the
+    fuel, the emissions and the CO₂ price", statutory figures in `docs/03` →
+    "Where `total_co2_kg` and `co2_cost` come from". Do not copy these numbers
+    into a demo or a seed.
+    """
 
     def test_landlord_share_is_deducted_before_the_renter_split(self) -> None:
         result = calculate_heating_statement(

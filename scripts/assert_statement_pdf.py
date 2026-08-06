@@ -39,8 +39,22 @@ MUST_APPEAR: dict[str, str] = {
     "240,00": "docs/03: Unit C / Renter 3 (20 m2, 365 d)",
     # docs/06 heating + CO2 demo figures
     "10.300,00": "docs/06: heating invoice total",
-    "786,24": "docs/06: unit B heating, Mieter share (585 permille)",
-    "557,76": "docs/06: unit B heating, Vermieter share (415 permille)",
+    # Re-based when the demo CO2 fixture was corrected (2.000 kg / 300,00 EUR implied
+    # 150 EUR/t against the 2025 statutory 55 EUR/t). The 585:415 ratio did NOT move --
+    # 778,79 / 1.331,26 = 0,5850 exactly. Only the pot moved, because the
+    # CO2-Vermieteranteil is deducted before the renter-facing split.
+    "778,79": "docs/06: unit B heating, Mieter share (585 permille)",
+    "552,47": "docs/06: unit B heating, Vermieter share (415 permille)",
+    # --- de-scaled forms of the fields slice 4 newly put on the page (I7).
+    # Asserted POSITIVELY rather than as absence-of-the-leak-form, on purpose. The leak
+    # forms of two of these are `10.000` and `40.000`, which are entirely plausible euro
+    # amounts on a larger building -- a negative canary on those would fire falsely the
+    # first time someone bills a 40.000,00 EUR heating invoice. The de-scaled form is
+    # unambiguous, so requiring it catches the same regression without planting a
+    # future false positive.
+    "100 m²": "heated_area_sqm de-scaled from area_sqm_x100 (leak form: 10.000)",
+    "4.000 kg": "total_co2_kg de-scaled from co2_kg_x1000 (leak form: 4.000.000)",
+    "40 m³": "ww_consumption_weight_m3 de-scaled from value_x1000 (leak form: 40.000)",
     # CLAUDE.md: every legal output shows its Rechtsstand
     "Rechtsstand": "CLAUDE.md: legal outputs carry Rechtsstand MM/JJJJ",
     # --- the de-scaling canaries: these are the *human* figures, not the scaled ints
@@ -60,6 +74,12 @@ MUST_NOT_APPEAR: dict[str, str] = {
     "3.650.000": "scaled integer leaked: total AREA weight not divided by 100",
     "120000": "scaled integer leaked: NK total printed in cents",
     "1030000": "scaled integer leaked: heating total printed in cents",
+    # x1000 scaling is nastier than x100: 4.000.000 and 4.000 differ only by punctuation
+    # a German reader skims past, and LONG_DIGIT_RUN below only catches the UNFORMATTED
+    # 4000000 -- the grouped form is what would actually reach the page. Listed here
+    # because no legitimate figure on this statement is in the millions; its x100
+    # siblings (10.000, 40.000) are deliberately NOT listed, see MUST_APPEAR above.
+    "4.000.000": "scaled integer leaked: total_co2_kg not divided by 1000",
 }
 
 # No legitimate figure on this statement has seven or more consecutive digits.

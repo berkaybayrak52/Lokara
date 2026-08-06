@@ -16,6 +16,16 @@ re-perform a calculation from figures the result threw away.
 amount the engine already produces; the demo path and the rendered PDF are
 byte-identical after the change. The building is the worked example of `docs/08`
 (A 50 m², B 30 m², C 20 m², B vacant from 01.07.2025 → landlord party).
+
+**Re-based 05.08.2026 — the amounts moved, and no engine behaviour did.** The
+demo's CO₂ *input* was wrong on its face (2.000 kg / 300,00 € ⇒ 150 €/t and
+0,1 kg CO₂/kWh); it is now 4.000 kg / 261,80 €. Because the CO₂-Vermieteranteil
+is deducted before the renter-facing split, every euro below follows the input.
+The rule above still holds in the form that matters: **this file changes no
+engine behaviour**, and every figure here is still what the engine produces from
+the fixture `docs/08` → "The worked example" states. Provenance of the new
+figures: `docs/06` → "Scenario 2 — the fuel, the emissions and the CO₂ price";
+statutory basis in `docs/03` → "Where `total_co2_kg` and `co2_cost` come from".
 """
 
 from decimal import Decimal
@@ -101,7 +111,13 @@ def units(
 
 
 MEASURED_40_M3 = WarmWaterInput(volume_m3=Decimal(40))
-CO2_2000_KG = Co2Input(total_co2_kg=Decimal(2000), co2_cost=cents(30_000))
+# The demo's CO₂ fixture, re-based 05.08.2026: 4.000 kg Brennstoffemissionen and
+# 261,80 € Kohlendioxidkosten ⇒ 65,45 €/t (55,00 € je Zertifikat, § 10 Abs. 2
+# BEHG 2025, + 19 % USt per § 3 Abs. 3 CO2KostAufG) and 0,200 kg CO₂/kWh against
+# the demo's 20.000 kWh Erdgas. The previous 2.000 kg / 300,00 € implied 150 €/t
+# and half the emission factor of any fuel — `docs/06` → "Scenario 2 — the fuel,
+# the emissions and the CO₂ price", statutory figures in `docs/03`.
+CO2_4000_KG = Co2Input(total_co2_kg=Decimal(4000), co2_cost=cents(26_180))
 
 
 def statement(
@@ -111,7 +127,7 @@ def statement(
     total_energy_kwh: int = 20_000,
     heating_units: tuple[HeatingUnit, ...] | None = None,
     warm_water: WarmWaterInput | None = MEASURED_40_M3,
-    co2: Co2Input | None = CO2_2000_KG,
+    co2: Co2Input | None = CO2_4000_KG,
 ) -> HeatingResult:
     return calculate_heating_statement(
         HeatingInput(
@@ -139,14 +155,14 @@ class TestNothingThatRendersToday_Moves:
         result = statement()
         rows = [(line.unit_id, line.tenancy_id, int(line.total)) for line in result.lines]
         assert rows == [
-            ("unit-a", "ten-a", 565_760),
-            ("unit-b", "ten-b", 150_984),
-            ("unit-b", None, 129_336),
-            ("unit-c", "ten-c", 177_920),
+            ("unit-a", "ten-a", 560_397),
+            ("unit-b", "ten-b", 149_553),
+            ("unit-b", None, 128_110),
+            ("unit-c", "ten-c", 176_232),
         ]
         co2 = result.co2
         assert co2 is not None
-        assert sum(int(line.total) for line in result.lines) == 1_024_000
+        assert sum(int(line.total) for line in result.lines) == 1_014_292
         assert sum(int(line.total) for line in result.lines) + int(co2.landlord_amount) == 1_030_000
         assert int(result.total) == 1_030_000
 
@@ -160,13 +176,13 @@ class TestBlockAVerticalSplit:
 
     def test_the_pots_of_the_vertical_split_are_carried(self) -> None:
         result = statement()
-        assert int(result.billable_cost) == 1_024_000  # 10.300,00 minus 60,00 CO₂
-        assert int(result.ww_pot) == 256_000  # 2.560,00 €
-        assert int(result.heating_pot) == 768_000  # 7.680,00 €
-        assert int(result.heat_base_pot) == 230_400  # 2.304,00 €
-        assert int(result.heat_cons_pot) == 537_600  # 5.376,00 €
-        assert int(result.ww_base_pot) == 76_800  # 768,00 €
-        assert int(result.ww_cons_pot) == 179_200  # 1.792,00 €
+        assert int(result.billable_cost) == 1_014_292  # 10.300,00 minus 157,08 CO₂
+        assert int(result.ww_pot) == 253_573  # 2.535,73 €
+        assert int(result.heating_pot) == 760_719  # 7.607,19 €
+        assert int(result.heat_base_pot) == 228_216  # 2.282,16 €
+        assert int(result.heat_cons_pot) == 532_503  # 5.325,03 €
+        assert int(result.ww_base_pot) == 76_072  # 760,72 €
+        assert int(result.ww_cons_pot) == 177_501  # 1.775,01 €
 
     def test_every_pot_reconciles_to_the_one_above_it(self) -> None:
         """The vertical analogue of `sum(shares) == input_total`: a Block A the
@@ -462,18 +478,18 @@ class TestParagraph9aFallbackWithholdsAConsumptionBemessung:
 class TestCo2Berechnungsgrundlagen:
     """§ 7 Abs. 3 CO2KostAufG — the Einstufung *and* the grounds it was computed on.
 
-    `docs/08` item 5: `CO₂-Emissionen des Gebäudes 2.000 kg · beheizte Fläche
-    100 m² → 20 kg CO₂/m²/Jahr · Einstufung: 17 bis unter 22 · CO₂-Kosten
-    300,00 €`. Three of those four inputs reach `Co2Result` nowhere today.
+    `docs/08` item 5: `CO₂-Emissionen des Gebäudes 4.000 kg · beheizte Fläche
+    100 m² → 40 kg CO₂/m²/Jahr · Einstufung: 37 bis unter 42 · CO₂-Kosten
+    261,80 €`. Three of those four inputs reach `Co2Result` nowhere today.
     """
 
     def test_the_inputs_of_the_einstufung_are_carried(self) -> None:
         result = statement()
         co2 = result.co2
         assert co2 is not None
-        assert co2.total_co2_kg == Decimal(2000)
+        assert co2.total_co2_kg == Decimal(4000)
         assert co2.heated_area_sqm == Decimal(100)
-        assert int(co2.co2_cost) == 30_000
+        assert int(co2.co2_cost) == 26_180
         # The disclosed intensity is reproducible from the two disclosed operands.
         assert co2.intensity_kg_per_sqm == co2.total_co2_kg / co2.heated_area_sqm
         # …and the split of the disclosed cost adds up for the reader.
@@ -485,11 +501,11 @@ class TestCo2Berechnungsgrundlagen:
         result = statement()
         co2 = result.co2
         assert co2 is not None
-        assert co2.landlord_share_percent == 20
+        assert co2.landlord_share_percent == 60
         lower, upper = co2.band_min_inclusive, co2.band_max_exclusive
         assert lower is not None and upper is not None
-        assert lower == Decimal(17)
-        assert upper == Decimal(22)
+        assert lower == Decimal(37)
+        assert upper == Decimal(42)
         assert lower <= co2.intensity_kg_per_sqm < upper
 
     def test_the_first_step_has_no_lower_bound(self) -> None:
@@ -528,8 +544,8 @@ class TestCo2Berechnungsgrundlagen:
         assert co2.period_days == 366
         assert co2.reference_year_days == 366
         assert co2.period_factor == Decimal(1)
-        assert co2.band_min_inclusive == Decimal(17)
-        assert co2.band_max_exclusive == Decimal(22)
+        assert co2.band_min_inclusive == Decimal(37)
+        assert co2.band_max_exclusive == Decimal(42)
 
 
 class TestCo2BandOverAShortPeriod:
