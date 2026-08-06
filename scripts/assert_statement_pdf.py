@@ -58,7 +58,7 @@ MUST_APPEAR: dict[str, str] = {
     # --- slice 5: the Massainheit travels meter -> statement. Without these the whole
     # Verbrauch Heizung column could regress to the withheld sentence and this gate would
     # stay green -- and that column is 5.325,03 EUR, 52 % of the umlagefaehige Kosten.
-    "1.000 HKV-Einheiten": "docs/08 slice 5: Verbrauch Heizung Gesamtbemessung (BGH #3 denominator)",
+    "1.000 HKV-Einheiten": "docs/08 slice 5: Verbrauch Heizung Gesamtbemessung (BGH #3)",
     "600 HKV-Einheiten": "docs/08 slice 5: unit A's own heat Bemessung",
     "Heizkostenverteiler": "docs/08 rule 6: the device named once (BGH #2 Erlaeuterung)",
     # CLAUDE.md: every legal output shows its Rechtsstand
