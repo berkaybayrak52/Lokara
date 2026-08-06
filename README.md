@@ -16,10 +16,18 @@ uv run alembic -c packages/db/alembic.ini upgrade head   # schema incl. RLS
 uv run lokara-seed-demo                                 # demo scenario (Musterstraße 12)
 ```
 
+> **On Linux, add `--with-deps`:** `uv run playwright install --with-deps chromium`. The flag also
+> installs the system libraries headless Chromium needs, and it is what CI runs
+> (`.github/workflows/ci.yml`). **macOS does not need it** — the plain command above is enough there.
+
+> **Reusing a Postgres volume created before this repo mounted `init-app-role.sql`?** Then the
+> `lokara_app` role does not exist, the API cannot connect, and the web app shows
+> **`Keine Verbindung zur API.`** One command fixes it — see [Troubleshooting](#troubleshooting).
+
 Then start the two servers in separate terminals:
 
 ```bash
-DEMO_SEED_ENABLED=true uv run lokara-api    # FastAPI on 127.0.0.1:3001
+uv run lokara-api                           # FastAPI on 127.0.0.1:3001
 bun run --filter @lokara/web dev            # web on :3000
 ```
 
@@ -42,21 +50,96 @@ Other commands: `bun run test` · `bun run lint` · `bun run typecheck` · `bun 
 > until credentials exist, docker-compose Postgres + the dev-token endpoint
 > (`AUTH_DEV_TOKEN=true`) stand in. Search for `TODO(supabase)`.
 
+## Troubleshooting
+
+### `Keine Verbindung zur API.` — usually a missing `lokara_app` role, not an API bug
+
+The app connects to Postgres as **`lokara_app`**, a non-superuser, so the `FORCE`d RLS policies
+actually bind (`DATABASE_URL="postgresql://lokara_app:lokara@localhost:54322/lokara"` in
+`.env.example`; migrations run as the owner `lokara` via `DIRECT_URL`). If that role does not exist,
+the API cannot open a connection, `GET /me` fails, and the web portal renders the red
+**`Keine Verbindung zur API.`** note. It reads like the API is down. It usually isn't.
+
+Why the role can be missing: `docker-compose.yml` mounts `packages/db/scripts/init-app-role.sql` into
+the container as `/docker-entrypoint-initdb.d/10-init-app-role.sql`, and Postgres runs
+`docker-entrypoint-initdb.d` scripts **only when it initialises a fresh data directory** — i.e. only
+when the `lokara-pgdata` volume is created. A volume that already existed before that mount was added
+never saw the script, and `docker compose up -d` will never run it on that volume.
+
+Run it by hand against the existing database:
+
+```bash
+docker compose exec -T db psql -U lokara -d lokara \
+  -f /docker-entrypoint-initdb.d/10-init-app-role.sql
+```
+
+**Running it after `alembic upgrade head` is fine — better, even.** The script's
+`GRANT … ON ALL TABLES IN SCHEMA public` then covers the tables Alembic has already created; the
+`ALTER DEFAULT PRIVILEGES` lines only reach tables created *afterwards*, so a role created before the
+migrations relies on those defaults alone.
+
+**It is idempotent, so re-run it whenever you are unsure.** `CREATE ROLE` sits behind an
+`IF NOT EXISTS` check and the rest are re-grants; the script's own header says it is *"safe to re-run
+manually on an existing database"*.
+
+(`scripts/verify_demo_path.sh --fresh` destroys and recreates the volume, so the init script runs and
+this failure cannot occur there. Without `--fresh` it uses the volume you already have.)
+
+### Four checks, in order
+
+Each answers one question; the first bad answer is your problem.
+
+1. **`docker compose ps`** — is the db container up and healthy?
+   Anything other than `running (healthy)` for `lokara-db` (missing, restarting, `unhealthy`) means
+   Postgres never came up; read `docker compose logs db`. Nothing below can pass until this does.
+
+2. **`docker compose exec -T db psql -U lokara -d lokara -c '\du'`** — does `lokara_app` exist?
+   If the role list does not contain `lokara_app`, this is exactly the case above: run the init
+   script. (A connection error here instead means step 1 lied — the container is up but Postgres is
+   not accepting connections.)
+
+3. **`curl -s localhost:3001/health`** — is the API process up?
+   Expect `{"status":"ok","service":"lokara-api","timestamp":"…"}`. *Connection refused* → the API is
+   not running: `uv run lokara-api`. Note this endpoint does **not** touch the database — a green
+   `/health` next to a broken portal is the normal picture when the role is missing, which is why
+   step 2 comes first.
+
+4. **`curl -s -X POST localhost:3001/auth/dev-token`** — does the auth path work?
+   Expect `{"accessToken":"eyJ…","expiresIn":…}` — camelCase, the API's wire convention, not the
+   `access_token` of the OAuth spec. This is the endpoint the web app's `/api/session` route proxies
+   to mint the session cookie. `403 {"detail":"Dev tokens are disabled"}` means the API was started without
+   `AUTH_DEV_TOKEN=true` — `.env.example` sets it, so the usual cause is a missing or stale `.env`
+   (step 1 of the setup block is `cp .env.example .env`).
+
 ---
 
-# Kickoff docs
+# The specs, and the order to read them
 
-The planning + spec set to bootstrap the **Lokara web app** with Claude Code (Fable 5).
-Put this whole folder at your repo root and open Claude Code there.
+Lokara is specified before it is built: `CLAUDE.md` forbids implementing a calculation from memory or
+from a pasted spec, so every number that reaches a statement traces back to a file below. Read them
+top to bottom.
 
 ## Read order
 
-1. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + locked tech.
-2. **`PLAN.md`** — milestones M0→M10; the pitch cutline is **M0→M3 + a canned M4**.
-   **Start here for current work.**
-3. **`MIGRATION-PLAN.md`** — the record of the v4 rebuild that produced the current tree.
-4. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
-5. **`docs/`** — modular specs:
+1. **`LAST_OUTPUT.md`** — the session's end-of-task handoff, overwritten every task and gitignored:
+   scratch, not project history. **Read it first** — it is the only file that says where things stand
+   *right now*. `scripts/check_handoff.sh` fails the gate unless it names HEAD, so it cannot quietly
+   go stale.
+2. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + the locked
+   tech decisions + the two Definitions of Done.
+3. **`AGENTS.md`** — how work is actually executed here: six agents with **disjoint write scopes**
+   (no agent may both write a test and satisfy it), and the deterministic gates underneath them —
+   `scripts/gate.sh`, `scripts/verify_demo_path.sh`, and the engine-purity / RLS-coverage /
+   FK-isolation / PDF-fingerprint checks. Gates are trusted; agents are not.
+4. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
+   M0–M4 are built and green; work since then follows PLAN's **execution order** (investor value ÷
+   risk) and its cut list rather than the milestone numbering. Its dates come from `lokara-arch.md`:
+   pitch **06.08**, public launch **~08.09** (web + native iOS/Android together).
+5. **`MIGRATION-PLAN.md`** — the record of the v4 rebuild that produced the current tree (Phases A–H;
+   only **G**, the Expo skeleton, is outstanding).
+6. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
+7. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
+8. **`docs/`** — modular specs:
    - `00-product-overview.md` — what/why/who, competitive thesis, pitch framing
    - `01-tech-stack-and-decisions.md` — locked defaults for every flagged decision (ADR-style)
    - `02-data-model.md` — identity three-layer model, temporal core, allocation keys, two time-axes
@@ -65,11 +148,21 @@ Put this whole folder at your repo root and open Claude Code there.
    - `05-design-system.md` — brand tokens (colors, Montserrat/Manrope) + WCAG/BFSG
    - `06-demo-scenarios.md` — seeded example cases for the investor demo
    - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
-   - `08-statement-document.md` — the Abrechnung's formal content (⏳ awaiting the Notion spec)
+   - `08-statement-document.md` — **the largest spec here (~1,700 lines):** what a legally complete
+     Abrechnung must *contain*, as opposed to what the engines compute. The four BGH formal minimums
+     and exactly which are rendered today; the Gesamtbemessung reference totals per allocation key;
+     the whole **Heizkostenabrechnung disclosure** — Blocks A/B/C, the Umlageschlüssel and
+     Gesamtbemessung per money column, the §§ 7/8 ratio as applied, § 9 warm-water separation,
+     degree-day apportionment at a Nutzerwechsel, § 7 Abs. 3 CO2KostAufG; the
+     **carried-intermediates contract**, naming every value `HeatingResult` computes and discards
+     today; the **`MeasurementUnit` travels with the value** plumbing decision; slice **4b**'s
+     page-break rules (*break at the seams, never inside a statement*); and the labelled
+     `Rechtsstand` form — `§ 7 Abs. 1 HeizkostenV 03/1989 · …` — that supersedes a bare stamp.
+     It also keeps its open questions and gaps explicit, so they are not silently invented.
 
 ## The one-paragraph version
 
 Build the money/legal math as **pure, golden-tested engine packages**; keep everything
 **immutable + versioned** and **`accountId`-scoped (app + RLS)**; **stub every paid API behind an
-adapter**; ship a **correct CO₂-compliant NK/heating statement to PDF** with seeded demo scenarios for
-the **06.08 pitch**; then stage in the full foundation milestone by milestone.
+adapter**; ship a **correct CO₂-compliant NK/heating statement to PDF** with seeded demo scenarios;
+then stage in the full foundation milestone by milestone toward public launch.
