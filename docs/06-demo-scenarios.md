@@ -60,9 +60,17 @@ demo's own `20.000 kWh`, an emission factor of **0,1 kg CO₂/kWh**, about half 
 readable off the page in one step by anyone with a property background. Found by `statement-reviewer`,
 promoted by the lead on 05.08.2026.
 
-**The demo building burns Erdgas** (central gas boiler, one Wärmemengenzähler per unit, one shared
-warm-water meter). Stated here because the emission factor is meaningless without it, and because
-`HeatingInput` carries no fuel field — the fuel is a property of the *scenario*, not of the engine.
+**The demo building burns Erdgas** (central gas boiler; **one** Wärmemengenzähler for the
+Liegenschaft, **Heizkostenverteiler** in the three flats, one warm-water meter per flat plus a shared
+one). Stated here because the emission factor is meaningless without it, and because `HeatingInput`
+carries no fuel field — the fuel is a property of the *scenario*, not of the engine.
+
+> Corrected 06.08.2026. This sentence previously read *"one Wärmemengenzähler per unit"*, which
+> contradicted `packages/adapters/.../meter.py` `_SPEC` and `DEMO-RUNBOOK.md` — the flats carry
+> `MeasurementUnit.HKV_UNITS`, only `met_heat_main` is `KWH`. No figure moved: the 20.000 kWh that
+> feeds the emission factor and § 9's denominator is the *building* meter either way. The distinction
+> became load-bearing with slice 5, because the unit of the flats' Bemessung is now printed
+> (`docs/08` → *"`MeasurementUnit` travels with the value"*), and it would have been printed wrong.
 
 | Figure | Value | Where it comes from |
 | --- | --- | --- |
