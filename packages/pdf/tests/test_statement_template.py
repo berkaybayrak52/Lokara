@@ -73,6 +73,50 @@ def test_co2_block_cites_its_rule_and_the_page_carries_the_disclaimer() -> None:
     assert "keine Rechts- oder Steuerberatung" in DISCLAIMER
 
 
+# `docs/08` → "The disclaimer states what Lokara is, never that this Abrechnung
+# is complete". Transcribed, not paraphrased: one sentence, the subject is the
+# product, and nothing in it points at this artifact.
+EXPECTED_DISCLAIMER = (
+    "Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, "
+    "keine Rechts- oder Steuerberatung."
+)
+
+# The form that must never return. `Dieses Dokument` + a perfect passive is a
+# per-document warranty, and this page cannot make one: BGH formal minimum #4
+# (Abzug der geleisteten Vorauszahlungen) is not rendered at all, by decision,
+# until the M6 ledger (`docs/08` → "#4 is blocked on the M6 ledger").
+ATTESTATION_FORMS = (
+    "Dieses Dokument wurde",
+    "rechtskonform erstellt",
+    "Rechtskonform erstellt",
+)
+
+
+def test_the_disclaimer_claims_something_about_lokara_not_about_this_document() -> None:
+    """`CLAUDE.md` mandates a *positioning* claim — "rechtskonform, keine Rechts-
+    oder Steuerberatung" — and `docs/07` already writes it as one ("Lokara ist
+    ein Werkzeug, …"). The rendered string had drifted into an attestation that
+    *this* Abrechnung is legally complete, which it is not.
+
+    Three assertions, and each covers a different way back to the defect:
+    the constant is the transcribed sentence; the page really renders it (a
+    constant nothing prints is not a disclaimer); and the attestation form is
+    gone from the *whole* page, not merely from `DISCLAIMER` — a second copy in
+    a template string would otherwise slip through.
+    """
+    html = statement_html(build_demo_statement())
+
+    assert DISCLAIMER == EXPECTED_DISCLAIMER
+    assert DISCLAIMER in html
+
+    present = [form for form in ATTESTATION_FORMS if form in html]
+    assert not present, (
+        "the page attests to its own legal completeness: "
+        + ", ".join(repr(form) for form in present)
+        + " — the claim is about Lokara, never about this Abrechnung (docs/08)"
+    )
+
+
 def test_statement_shows_co2_split_and_party_labels() -> None:
     html = statement_html(build_demo_statement())
 

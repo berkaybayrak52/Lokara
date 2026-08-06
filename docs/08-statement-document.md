@@ -119,6 +119,80 @@ advance after every statement — recorded as a named defect in `docs/02` → *"
 The ledger design is **not** re-derived here; `docs/02` → "Payment Ledger" already sketches it. What
 this section fixes is only that the gap is deliberate and what would close it.
 
+## The disclaimer states what Lokara is, never that this Abrechnung is complete
+
+> **Rechtsstand 08/2026** (transcribed 06.08.2026, lead's ruling of the same day). A
+> **document-copy rule**: it introduces nothing into `packages/rules-store`, resolves no dated rule
+> and moves no euro. What it discharges is `CLAUDE.md` → *"Tool, not advice"* and `docs/07` →
+> *"Tool, not advice (product-wide)"* — **our own rule, not a BGH minimum**. Standard caveat of this
+> file applies (`docs/07`).
+
+**The defect.** `packages/pdf/src/lokara_pdf/statement.py` (`DISCLAIMER`) renders, in the `footer`:
+
+```
+Dieses Dokument wurde rechtskonform erstellt; es stellt keine Rechts- oder Steuerberatung dar.
+```
+
+The first half is a **per-document warranty**. *Dieses Dokument* + *wurde … erstellt* attests that
+**this** Abrechnung was produced in conformity with the law. The table at the head of this file says
+it was not: **#4 — Abzug der geleisteten Vorauszahlungen — is ❌**, by decision, until the M6 ledger;
+and before *"`Ihr Anteil gesamt`"* below, the addressee's own total was on no page at all. A
+statement that warrants its own completeness while a formal minimum is missing is wrong **about
+itself**, in the one sentence a reader would quote back.
+
+What `CLAUDE.md` asks for points the other way: *"Every legal/tax output carries a consistent
+'rechtskonform, keine Rechts- oder Steuerberatung' disclaimer"* — a **positioning claim about the
+product**. `docs/07` already writes it as one: *"Lokara ist ein Werkzeug, keine Rechts- oder
+Steuerberatung."* The rendered string had drifted from `docs/07`, and that drift is exactly what
+turned a claim about the tool into an attestation about the artifact.
+
+**The constraint, and it is the whole ruling:** the sentence must not assert that this Abrechnung is
+legally complete.
+
+### The chosen string
+
+```
+Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, keine Rechts- oder Steuerberatung.
+```
+
+One sentence, one line, no internal line break; `DISCLAIMER` keeps its name, its place in the
+`footer` and its **tier 2** classification (see *"Which text on the statement is legally required"*).
+
+- **The subject is `Lokara`.** Every word after it says what the *tool* is for. There is no
+  demonstrative pointing at this artifact and no perfect passive about how this page came to be, so
+  there is nothing left that can be read as an attestation about this Abrechnung.
+- **Both halves `CLAUDE.md` names survive.** `rechtskonform` is the positioning word (`docs/07`:
+  *"rechtskonform / nach aktueller Rechtslage"*, **never** *"rechtssicher"*); `keine Rechts- oder
+  Steuerberatung` is `docs/07`'s wording verbatim. `docs/05` identifies this carrier's content as
+  *"rechtskonform, keine Rechts- oder Steuerberatung"* — dropping either half would leave that
+  description describing a page that no longer says it.
+- **It names this document's own subject matter.** `Betriebs- und Heizkostenabrechnung` is the `<h1>`
+  of the page. The register stays provenance, not hedging: a landlord can send it.
+- **The StBerG line stays out** (`CLAUDE.md`, `docs/07`). It is correctly absent today and nothing
+  here adds it.
+
+### Alternatives, and why each was rejected
+
+| Rejected | Why |
+| --- | --- |
+| The current sentence | It is the defect. |
+| `docs/07`'s sentence verbatim — *"Lokara ist ein Werkzeug, keine Rechts- oder Steuerberatung."* | The closest candidate, and honest. It drops `rechtskonform`, which `CLAUDE.md`'s cross-cutting rule names and `docs/05` uses to identify this carrier. The chosen string **is** this sentence with the positioning half restored — not a different one. |
+| *"Erstellt mit Lokara — rechtskonforme Betriebs- und Heizkostenabrechnung nach aktueller Rechtslage. Lokara ist ein Werkzeug, keine Rechts- oder Steuerberatung."* | Two sentences, and the first re-creates the defect: a noun phrase apposed to *"Erstellt mit Lokara"* reads as *this* document being the rechtskonforme Abrechnung. The footer already prints `Erstellt mit Lokara.` beside the `Rechtsstand` stamps (item 6). |
+| Anything containing `rechtssicher` | Forbidden outright by `docs/07` — the liability trap. |
+| *"Diese Abrechnung wurde nach aktueller Rechtslage erstellt."* | The same per-document attestation, softened. Same class of error, harder to spot. |
+| *"Für die Richtigkeit wird keine Gewähr übernommen"* / *"ohne Gewähr"* | Defensive register, and it disclaims the wrong thing. The arithmetic reconciles to the cent and *is* the product; a sentence casting doubt on the figures invites a renter to distrust what is correct and a landlord not to send the document. |
+| Naming the missing minimum inside the disclaimer (*"… Vorauszahlungen sind nicht berücksichtigt"*) | Right fact, wrong carrier. It is a statement about the **calculation**, so it renders where the calculation is — beneath the per-party totals, tier 1 (*"`Ihr Anteil gesamt`"* below). The footer is tier-2 provenance; completeness content there lands under the one heading a reader skips. |
+
+**The same form survives outside this document.** `apps/web/src/app/styleguide/page.tsx` shows
+*"Rechtskonform erstellt — keine Rechts- oder Steuerberatung."* as sample disclaimer copy. That file
+is `app-implementer`'s lane; it is named here so the ruling reaches it instead of being rediscovered
+later. `scripts/assert_statement_pdf.py` asserts no disclaimer string at all, so nothing under
+`scripts/` moves with this.
+
+Gate: `packages/pdf/tests/test_statement_template.py` — the new string is pinned, the existing
+`keine Rechts- oder Steuerberatung` assertion is untouched, and the attestation form is asserted
+**absent from the rendered page**, so it cannot come back through a later edit.
+
 ## Two documents from one calculation ⚠️
 
 The first render shows **every party's name and share to everyone**. That is right for the landlord and
