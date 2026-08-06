@@ -427,6 +427,14 @@ def statement_html(data: StatementData) -> str:
     padding: 1.5mm 2.5mm; border-bottom: 0.5pt solid var(--color-forest);
   }}
   .basis-table td {{ padding: 1.5mm 2.5mm; }}
+  /* A figure and the unit it is in are one token and may not be split. The
+     compact unit spellings contain U+002D, which is a break opportunity, so a
+     cell wrapped mid-token — leaving a trailing hyphen that reads for a beat as
+     a minus sign in a right-aligned column, above a dangling remainder. On the
+     summary row, the one a reader uses to confirm the column adds up, that is
+     the most visibly broken thing on the page. The withheld cell below opts
+     back out: it is prose, and prose must wrap. */
+  .basis-table td.num {{ white-space: nowrap; }}
   .basis-table tfoot td {{
     font-weight: 600; border-top: 0.5pt solid var(--color-forest);
   }}
@@ -440,6 +448,7 @@ def statement_html(data: StatementData) -> str:
      mistaken for a broken number in a column of denominators. */
   .basis-table td .withheld {{
     display: block; text-align: left; font-variant-numeric: normal;
+    white-space: normal;
   }}
   /* Both notes sit directly beneath the table they qualify — adjacency is part
      of the rule, not a layout preference. Tier 1, so no font-size and no
