@@ -33,10 +33,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from html import escape
 
-from lokara_domain import Cents, format_eur
+from lokara_domain import Cents, MeasurementUnit, format_eur
 from lokara_heating_engine import Co2Result, HeatingLine, HeatingResult, WarmWaterSeparation
 
 from .formatting import display_figure, format_number_de, largest_remainder_display
+from .measurement_units import HEAT_KEY_BY_UNIT, UNIT_SYMBOLS
 
 # Glyphs are copy, not decoration (docs/08 → 4a). Written as escapes: a literal
 # U+2212 trips RUF001, and a hyphen in its place turns a deduction into a dash.
@@ -58,18 +59,25 @@ AREA_KEY_WARM_WATER = f"{AREA_KEY_LABEL} — § 8 Abs. 1 HeizkostenV"
 # paragraph that decided this share; § 7 Abs. 1 is only why a consumption pot
 # exists at all, and naming it here sends a reader to the wrong paragraph.
 AREA_KEY_REPLACED = f"{AREA_KEY_LABEL} — § 9a Abs. 2 HeizkostenV"
+# The bare label, kept for the branch where no Maßeinheit is recorded: naming a
+# device while the cell beside it says the unit is unknown would be the page
+# contradicting itself in one row (`docs/08` rule 6). Where the unit *is* known
+# the label names the device — `HEAT_KEY_BY_UNIT`.
 HEAT_KEY_LABEL = "Erfasster Wärmeverbrauch"
 # Renders only where a unit really had more than one party — otherwise it names a
 # method that was not applied, which is the rule this whole block is built on.
-HEAT_KEY_WITH_CHANGE = f"{HEAT_KEY_LABEL} (Nutzerwechsel: Gradtagszahlen)"
+NUTZERWECHSEL_SUFFIX = " (Nutzerwechsel: Gradtagszahlen)"
+HEAT_KEY_WITH_CHANGE = f"{HEAT_KEY_LABEL}{NUTZERWECHSEL_SUFFIX}"
 # `docs/08` assigns this column no citation in the measured branch; transcribing
 # one the spec did not write would be inventing law at the render boundary.
 WARM_WATER_KEY_LABEL = "Erfasster Warmwasserverbrauch (m³)"
 
-# `docs/08` → "The withheld cell is a sentence, not a blank". The measurement
-# unit of the heat-meter readings is not carried into the statement, so the
-# denominator cannot be printed with one. Every alternative — a blank, a dash, a
-# zero, a unit-free figure — is read as a number in a column of denominators.
+# `docs/08` → "The withheld cell is a sentence, not a blank". Since slice 5 the
+# unit travels with the value, so this branch is reached only where a building
+# records no Maßeinheit at all — the cause was removed, the branch was not. The
+# denominator then cannot be printed with a unit, and every alternative — a
+# blank, a dash, a zero, a unit-free figure — reads as a number in a column of
+# denominators.
 WITHHELD_TOTAL = "ohne Maßeinheit — nicht ausgewiesen"
 WITHHELD_NOTE = (
     "Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: "
@@ -316,28 +324,63 @@ def _has_party_change(heating: HeatingResult) -> bool:
     return len(unit_ids) != len(set(unit_ids))
 
 
-def _heat_column_row(heating: HeatingResult, area_total_text: str) -> str:
+def _heat_key_label(heating: HeatingResult) -> str:
+    """The Umlageschlüssel of the `Verbrauch Heizung` column.
+
+    With a Maßeinheit on the result the label names the **device** — the long
+    form of `docs/08` rule 6, which is the *Erläuterung* half of BGH formal
+    minimum #2: `Erfasster Wärmeverbrauch` says what was measured, `… in
+    Einheiten eines Heizkostenverteilers` says by what. Without one it stays the
+    bare label, because naming a device beside a cell that says the unit is
+    unknown would be the page contradicting itself in one row.
+
+    The long form carries no parentheses of its own, so the Nutzerwechsel
+    parenthetical remains the only bracket in the cell.
+    """
+    unit = heating.heat_consumption_unit
+    label = HEAT_KEY_LABEL if unit is None else _heat_key_for(unit)
+    return f"{label}{NUTZERWECHSEL_SUFFIX}" if _has_party_change(heating) else label
+
+
+def _heat_key_for(unit: MeasurementUnit) -> str:
+    """`docs/08` rule 6 assigns a long form to the two units a heat device can
+    count in. A third would be copy invented for a configuration the API schema
+    already rejects (`HEAT` + `CUBIC_METRE`), so it is unprintable rather than
+    guessed — the same discipline as *the wrong branch must be unprintable*.
+    """
+    label = HEAT_KEY_BY_UNIT.get(unit)
+    if label is None:
+        raise DisclosureDataError(
+            f"heating result carries {unit.value} as the unit of its consumption Bemessung, "
+            "which docs/08 assigns no spelling on this column"
+        )
+    return label
+
+
+def _heat_column_row(heating: HeatingResult, area_total_text: str, heat_total_text: str) -> str:
     """The `Verbrauch Heizung` row — always present, and only ever *one cell* of
     it withheld (`docs/08` → "All four rows render").
 
     Dropping the row left the largest pot on the page (52 % of the umlagefähige
     Kosten) with no Umlageschlüssel named anywhere, in a block titled
-    *Bemessungsgrundlagen*. What is genuinely not derivable is the **unit** of the
-    heat-meter readings, and that blocks the Gesamtbemessung alone — the
-    Umlageschlüssel is a name, not a figure, and is BGH minimum #2 in its own
-    right.
+    *Bemessungsgrundlagen*. The Umlageschlüssel is a name, not a figure, and is
+    BGH minimum #2 in its own right.
+
+    Since slice 5 the Gesamtbemessung is printed whenever the building records
+    the Maßeinheit its devices count in, because the unit now travels with the
+    value instead of being guessed at this boundary. Where none is recorded the
+    figure is still withheld: a unit-free `1.000` in a column of denominators
+    invites the renter to assume one, and the candidates differ by three orders
+    of magnitude in what they mean.
 
     Under `heat_fallback_to_area` nothing is withheld at all: § 9a Abs. 2 put
     this pot on the area key, so the applied key is Wohnfläche and its
-    denominator is the figure already printed one row above. The
-    measurement-unit problem evaporated with the key it applied to.
+    denominator is the figure already printed one row above. The two absences
+    have different causes and must stay distinguishable.
     """
     if heating.heat_fallback_to_area:
         return _column_row("Verbrauch Heizung", AREA_KEY_REPLACED, area_total_text)
-    key = HEAT_KEY_WITH_CHANGE if _has_party_change(heating) else HEAT_KEY_LABEL
-    # Prose in a column of denominators, so it is set as prose: right-aligning
-    # this sentence against the figures above it makes it read as a broken one.
-    return _column_row("Verbrauch Heizung", key, f'<span class="withheld">{WITHHELD_TOTAL}</span>')
+    return _column_row("Verbrauch Heizung", _heat_key_label(heating), heat_total_text)
 
 
 def _column_row(column: str, key_label: str, total: str) -> str:
@@ -346,9 +389,30 @@ def _column_row(column: str, key_label: str, total: str) -> str:
     return _cells([column, escape(key_label), total], numeric_from=2)
 
 
+@dataclass(frozen=True)
+class UnitColumn:
+    """A Bemessung column together with the Maßeinheit its figures are in.
+
+    The pair is carried as one object for the same reason `docs/08` puts the
+    unit on the row that carries the value: a column and its unit resolved by
+    two routes can disagree, and the disagreement surfaces as a *wrong* unit on
+    a Verbrauchsabrechnung — worse than the withheld cell it replaced.
+    """
+
+    column: BemessungColumn
+    symbol: str
+
+    def cell(self, index: int) -> str:
+        return self.column.cell(index, self.symbol)
+
+    def total_cell(self) -> str:
+        return self.column.total_cell(self.symbol)
+
+
 def basis_table_block(
     heating: HeatingResult,
     party_labels: Sequence[str],
+    heat: UnitColumn | None,
     warm_water: BemessungColumn | None,
 ) -> str:
     """Block B — the Umlageschlüssel and Gesamtbemessung of every money column,
@@ -361,7 +425,7 @@ def basis_table_block(
     and down this one.
 
     Only the `Verbrauch Heizung` *Gesamtbemessung* and its *Bemessung column* are
-    withheld, and only for the measurement-unit gap (docs/08 → gaps). That
+    ever withheld, and only where the building records no Maßeinheit. That
     absence is unrelated to a § 9a Abs. 2 fallback and must not be read as one —
     which is why one is a citation-carrying figure and the other is a sentence.
     """
@@ -374,10 +438,15 @@ def basis_table_block(
         [line.base_weight_sqm_days_x100 / _AREA_WEIGHT_DIVISOR for line in lines]
     )
     area_total_text = area.total_cell(AREA_UNIT)
+    # Prose in a column of denominators, so it is set as prose: right-aligning
+    # this sentence against the figures above it makes it read as a broken one.
+    heat_total_text = (
+        f'<span class="withheld">{WITHHELD_TOTAL}</span>' if heat is None else heat.total_cell()
+    )
 
     column_rows = [
         _column_row("Grundkosten Heizung", AREA_KEY_HEATING, area_total_text),
-        _heat_column_row(heating, area_total_text),
+        _heat_column_row(heating, area_total_text, heat_total_text),
     ]
     if has_warm_water:
         column_rows.append(
@@ -398,28 +467,40 @@ def basis_table_block(
                 _column_row("Verbrauch Warmwasser", AREA_KEY_REPLACED, area_total_text)
             )
 
+    # Column order is the money table's: Fläche·Tage, Verbrauch Heizung,
+    # Verbrauch Warmwasser. A withheld heat column takes its header with it —
+    # a column of unit-less figures under a withheld total is exactly the
+    # assumption the withheld cell exists to prevent.
     party_head = ["Partei", "Fläche·Tage"]
+    if heat is not None:
+        party_head.append("Verbrauch Heizung")
     if warm_water is not None:
         party_head.append("Verbrauch Warmwasser")
     party_rows = []
     for index, label in enumerate(party_labels):
         cells = [escape(label), area.cell(index)]
+        if heat is not None:
+            cells.append(heat.cell(index))
         if warm_water is not None:
             cells.append(warm_water.cell(index, CUBIC_METRE))
         party_rows.append(_cells(cells))
     total_cells = ["Gesamtbemessung", area.total_cell()]
+    if heat is not None:
+        total_cells.append(heat.total_cell())
     if warm_water is not None:
         total_cells.append(warm_water.total_cell(CUBIC_METRE))
 
-    # The second sentence of the note is not optional: without it a renter can
-    # read a withheld denominator as a withheld *method* and conclude the pot was
-    # never consumption-allocated — a § 7 Abs. 1 HeizkostenV defect rather than a
-    # display gap. It sits between the two tables, not at the end of the block,
-    # because adjacency is part of the rule.
+    # Only where the figure really is withheld — the note explains an absence,
+    # so it may not stand under a printed denominator. The second sentence of it
+    # is not optional: without it a renter can read a withheld denominator as a
+    # withheld *method* and conclude the pot was never consumption-allocated — a
+    # § 7 Abs. 1 HeizkostenV defect rather than a display gap. It sits between
+    # the two tables, not at the end of the block, because adjacency is part of
+    # the rule.
     withheld_note = (
-        ""
-        if heating.heat_fallback_to_area
-        else f'<p class="withheld-note">{escape(WITHHELD_NOTE)}</p>'
+        f'<p class="withheld-note">{escape(WITHHELD_NOTE)}</p>'
+        if heat is None and not heating.heat_fallback_to_area
+        else ""
     )
 
     return f"""<section class="basis-table">
@@ -610,13 +691,41 @@ def warm_water_display_weights(heating: HeatingResult) -> BemessungColumn | None
     )
 
 
+def heat_display_weights(heating: HeatingResult) -> UnitColumn | None:
+    """The printed heat Bemessung per party, with the Maßeinheit it is counted
+    in — read off the result, never told to this layer by a second party.
+
+    ``None`` where no figure may be printed, and `docs/08` gives that two
+    distinct causes which need not be told apart here:
+
+    * **§ 9a Abs. 2** replaced the consumption key with the area key, so no
+      consumption Bemessung was applied at all (`heat_fallback_to_area`, and
+      `heat_consumption_weight` is `None` on every line for the same reason).
+      That row states the area key and its already-printed denominator instead.
+    * **no Maßeinheit is recorded** for the building's devices. The Bemessungen
+      exist but cannot be labelled, and a unit-free column of denominators
+      invites the renter to assume a unit — so the figures are withheld and the
+      note beneath the table says so.
+    """
+    unit = heating.heat_consumption_unit
+    if unit is None or heating.heat_fallback_to_area:
+        return None
+    return UnitColumn(
+        column=BemessungColumn.of(
+            [_required(line.heat_consumption_weight, "Wärmebemessung") for line in heating.lines]
+        ),
+        symbol=UNIT_SYMBOLS[unit],
+    )
+
+
 def heating_disclosure_html(heating: HeatingResult, party_labels: Sequence[str]) -> str:
     """Blocks A, B and C in document order, directly beneath the money table."""
+    heat = heat_display_weights(heating)
     warm_water = warm_water_display_weights(heating)
     return "".join(
         (
             cost_split_block(heating),
-            basis_table_block(heating, party_labels, warm_water),
+            basis_table_block(heating, party_labels, heat, warm_water),
             party_change_blocks(heating, party_labels, warm_water),
         )
     )
