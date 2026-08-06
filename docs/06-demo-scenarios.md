@@ -60,9 +60,17 @@ demo's own `20.000 kWh`, an emission factor of **0,1 kg CO₂/kWh**, about half 
 readable off the page in one step by anyone with a property background. Found by `statement-reviewer`,
 promoted by the lead on 05.08.2026.
 
-**The demo building burns Erdgas** (central gas boiler, one Wärmemengenzähler per unit, one shared
-warm-water meter). Stated here because the emission factor is meaningless without it, and because
-`HeatingInput` carries no fuel field — the fuel is a property of the *scenario*, not of the engine.
+**The demo building burns Erdgas** (central gas boiler; **one** Wärmemengenzähler for the
+Liegenschaft, **Heizkostenverteiler** in the three flats, one warm-water meter per flat plus a shared
+one). Stated here because the emission factor is meaningless without it, and because `HeatingInput`
+carries no fuel field — the fuel is a property of the *scenario*, not of the engine.
+
+> Corrected 06.08.2026. This sentence previously read *"one Wärmemengenzähler per unit"*, which
+> contradicted `packages/adapters/.../meter.py` `_SPEC` and `DEMO-RUNBOOK.md` — the flats carry
+> `MeasurementUnit.HKV_UNITS`, only `met_heat_main` is `KWH`. No figure moved: the 20.000 kWh that
+> feeds the emission factor and § 9's denominator is the *building* meter either way. The distinction
+> became load-bearing with slice 5, because the unit of the flats' Bemessung is now printed
+> (`docs/08` → *"`MeasurementUnit` travels with the value"*), and it would have been printed wrong.
 
 | Figure | Value | Where it comes from |
 | --- | --- | --- |
@@ -98,18 +106,48 @@ rounding (`docs/03` → *"Known gap"*, `PLAN.md` row 4.5).
 puts **60 %** of the CO₂ cost on the landlord, and that is exactly the incentive the CO2KostAufG was
 written to create. The demo now shows the law biting instead of a token 20 %.
 
-**Two figures the reviewer flagged that are still implausible, and were deliberately not changed:**
+### The two implausible totals — SETTLED, they stay
+
+> **DECISION (settled, 06.08.2026, lead).** *"103 €/m²/a is wrong, the €1.200 Müll fixture cannot move
+> because it is a `CLAUDE.md` definition-of-done, and re-basing every heating euro a second time is not
+> worth it before a real spec lands."* Both figures **stay exactly as they are**. This is a closed
+> decision, not a pending item: it does not get re-derived, re-argued or "quickly fixed" in a later
+> session. The one thing that reopens it is named at the end of this section.
+
+The two figures, and why a reviewer flags them:
 
 - **Heizkosten 10.300,00 € on 100 m² = 103 €/m²/a** (typical 15–25). Worse: 10.300 € for 20.000 kWh is
   0,515 €/kWh, roughly four times a gas tariff, and only part of the invoice is fuel.
 - **Müllabfuhr 1.200,00 € on 100 m² = 12 €/m²/a** (typical ~2).
 
-Both were left alone on purpose. The €1.200 garbage figure is the **canonical allocation example** of
-`docs/03` and a `CLAUDE.md` definition-of-done — it may not move. Fixing the heating total means
-choosing a new `total_cost`, which moves every heating euro a second time and re-bases the goldens in
-`scripts/assert_statement_pdf.py`, `DEMO-RUNBOOK.md` and four test files again. **What it would take:**
-one decision on a plausible invoice (≈ 2.400 € Brennstoff + ≈ 600 € Wartung/Betriebsstrom/Messdienst ⇒
-`total_cost` ≈ 3.000 €, i.e. 30 €/m²/a), then the same cascade in one pass. Not done unasked.
+The analysis stays on the record because it is **what makes the decision defensible**, not because the
+question is still open:
+
+- The €1.200 garbage figure is the **canonical allocation example** of `docs/03` and a `CLAUDE.md`
+  definition-of-done. It may not move, full stop — no cost/benefit weighing enters here.
+- Fixing the heating total means choosing a new `total_cost`, which moves **every heating euro a second
+  time** and re-bases the goldens in `scripts/assert_statement_pdf.py`, `DEMO-RUNBOOK.md` and four test
+  files again. The CO₂ re-base of 05.08.2026 already spent that cascade once.
+- **What a fix would cost, priced out so nobody has to price it again:** one decision on a plausible
+  invoice (≈ 2.400 € Brennstoff + ≈ 600 € Wartung/Betriebsstrom/Messdienst ⇒ `total_cost` ≈ 3.000 €,
+  i.e. 30 €/m²/a), then the same cascade in one pass.
+
+**What reopens it — and it is the only thing that does:** a **real heating-invoice spec** landing, i.e.
+a transcribed breakdown of what a Heizkostenabrechnung invoice actually contains (Brennstoff, Wartung,
+Betriebsstrom, Messdienst, Schornsteinfeger …) with its legal basis, in `docs/03`. At that point the
+demo's `total_cost` is derived from the spec rather than chosen, the cascade is paid once against a
+committed source, and the pitch figure becomes defensible instead of merely stable. Until that spec
+exists, changing the number would be swapping one invented figure for another — and `PLAN.md` hard
+rule 1 says the invented one is the defect, not the unfixed one.
+
+Two consequences worth stating out loud, because both are argued from every few sessions:
+
+- **The pitch narration does not have to hide it.** The demo is *the landlord's calculation view*
+  (`docs/08` → "Interim framing"), and the invoice total is an input a landlord types in — not a figure
+  Lokara computes. Nothing on the page claims 10.300,00 € is typical.
+- **Nothing downstream is wrong because of it.** Every ratio the demo exists to show — 30/70, the § 9
+  separation, 585 : 415, the CO₂ Einstufung — is scale-free, so an implausible input scales the euro
+  amounts and falsifies no rule.
 
 ## Scenario 3 — Flexible allocation keys without data loss
 

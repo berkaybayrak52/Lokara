@@ -183,7 +183,7 @@ Derived from `packages/nk-engine/src/lokara_nk_engine/engine.py` (`_segment_part
 | `PERSONS` | `Personen × Tage` | Σ weights | **Personen·Tage** | 1 |
 | `UNITS` | `1 × Tage` | Σ weights | **Einheiten·Tage** | 1 |
 | `MEA` | `mea_x10000 × Tage` | Σ weights ÷ 10000 | **MEA·Tage** | 10000 |
-| `CONSUMPTION` | the metered value (already period-resolved upstream — **no day weighting**) | Σ weights | ⚠️ **unit not derivable — see gap below** | 1 |
+| `CONSUMPTION` | the metered value (already period-resolved upstream — **no day weighting**) | Σ weights | the key's own `MeasurementUnit`, compact spelling — `kWh` / `m³` / `HKV-Einheiten` ([how it gets there](#measurementunit-travels-with-the-value--the-plumbing-decision-slice-5)) | 1 |
 | `DIRECT` → a tenancy | `1` (single party) | **none** | — | — |
 | `DIRECT` → a unit | `1 × Tage` per segment | Σ weights | **Tage** | 1 |
 
@@ -236,17 +236,258 @@ The Mieter-Einzelabrechnung shows **the tenant's own** Bemessung plus the Gesamt
 is the whole point, and it leaks nothing about other tenants. The Vermieter-Gesamtübersicht keeps it
 as the column total it already visually implies.
 
-### Gap — not invented here
+### The gap this was blocked on — closed by slice 5
 
-The **unit of a `CONSUMPTION` reference total is not derivable from the engine result.**
-`ConsumptionValue` (`nk-engine/inputs.py`) carries `unit_id`, `tenancy_id`, `value` — no unit of
-measure — and `_ALLOCATION_KEY_LABELS` spells `CONSUMPTION` as bare `"Verbrauch"` with no unit.
-`MeasurementUnit` (`domain/meter.py`: `KWH`, `CUBIC_METRE`, `HKV_UNITS`) is the right type, but
-nothing carries it from the meter into the statement, and it has no German display spelling anywhere
-(`kWh` / `m³` / `Einheiten` are unwritten). **Resolution:** the caller (which resolves meters) passes
-the display unit into `StatementData` per cost, and the German spellings of `MeasurementUnit` are
-written down — in this file — first. Until then no `CONSUMPTION` reference total is specified and
-none is fixture-tested; a guessed unit on a Verbrauchsabrechnung is a defect that reaches a tenant.
+**Was:** the *unit* of a `CONSUMPTION` reference total was not derivable from the engine result.
+`ConsumptionValue` (`nk-engine/inputs.py`) carried `unit_id`, `tenancy_id`, `value` — no unit of
+measure — and `_ALLOCATION_KEY_LABELS` spelled `CONSUMPTION` as bare `"Verbrauch"` with no unit.
+`MeasurementUnit` (`domain/meter.py`: `KWH`, `CUBIC_METRE`, `HKV_UNITS`) was the right type, but
+nothing carried it from the meter into the statement and it had no German display spelling anywhere.
+No `CONSUMPTION` reference total was specified and none was fixture-tested, because a guessed unit on
+a Verbrauchsabrechnung is a defect that reaches a tenant.
+
+**Now:** the unit is carried on `ConsumptionValue` and surfaced on `NkResult`, and the German
+spellings are fixed. See *["`MeasurementUnit` travels with the value — the plumbing decision (slice
+5)"](#measurementunit-travels-with-the-value--the-plumbing-decision-slice-5)* below, which also
+records **why the resolution written here first — "the caller passes the display unit into
+`StatementData` per cost" — was refined rather than implemented as written.**
+
+## `MeasurementUnit` travels with the value — the plumbing decision (slice 5)
+
+> **Rechtsstand 08/2026** (transcribed 06.08.2026, lead's decision of the same day). This is a
+> **carrying/contract decision, not a calculation** — the same standing as the *"Heating table
+> footer"* section: it introduces **nothing** into `packages/rules-store`, resolves **no** dated rule,
+> and moves **no euro**. Every figure it lets onto the page is one the engine already divided by; all
+> it adds is the unit that figure was always in. The legal purpose is BGH formal minimum **#2/#3** — a
+> denominator a renter is meant to check has to be a *quantity*, and a quantity has a unit. The German
+> display copy below is this file's ruling, per the lead's instruction of 06.08.2026. Standard caveat
+> of this file applies (`docs/07`).
+
+**The defect this closes, in one line:** a value travelled from the meter to the statement **without
+its unit**, so the document could print the denominator only by guessing what it meant — and withheld
+it instead (*"The withheld cell is a sentence, not a blank"*).
+
+### 1 — The unit travels with the value, on the dataclass that carries the value
+
+| Where | Field | Type |
+| --- | --- | --- |
+| `packages/heating-engine/.../inputs.py` → `HeatingUnit` | `heat_consumption_unit` | `MeasurementUnit \| None = None` |
+| `packages/heating-engine/.../inputs.py` → `HeatingResult` | `heat_consumption_unit` | `MeasurementUnit \| None` (**required**, no default) |
+| `packages/nk-engine/.../inputs.py` → `ConsumptionValue` | `measurement_unit` | `MeasurementUnit \| None = None` |
+| `packages/nk-engine/.../inputs.py` → `NkResult` | `consumption_unit` | `MeasurementUnit \| None` (**required**, no default) |
+
+**Why on the value's own dataclass, and not beside it.** The defect being closed *is* a value that
+travelled without its unit. A side channel — a per-cost `dict[str, MeasurementUnit]` handed to
+`StatementData` by the caller — reintroduces exactly that failure mode one layer up: the value and its
+unit then arrive by two routes, and two routes can disagree. The disagreement is silent, survives
+every integer-comparing test, and surfaces as a *wrong unit* on a Verbrauchsabrechnung, which is worse
+than the withheld cell it replaced. Carrying the unit on the row that carries the number makes the
+pair inseparable by construction.
+
+> ⚠️ **This refines an earlier sentence of this file.** The *"Gap — not invented here"* note above
+> proposed: *"the caller (which resolves meters) passes the display unit into `StatementData` per
+> cost."* That resolution is **superseded**: the unit is carried on the **engine input** and
+> *surfaced* on the **engine result**, so the renderer **reads** the unit off the result rather than
+> being **told** it by a second party. Two reasons, both already rules of this file: the disclosure
+> figures come from the engine result and never from something passed alongside it (the drift rule at
+> the head of *"Heizkostenabrechnung — the heating table's disclosure"*), and a statement may not
+> state a unit the engine did not divide in. Recorded as a refinement, with its reason, so the change
+> of direction is visible rather than quietly applied.
+
+**`MeasurementUnit` lives in `packages/domain`** (`lokara_domain.meter`), which both engines already
+import; nothing about this crosses a purity boundary (`scripts/check_engine_purity.py` forbids an
+engine importing `rules-store`, not `domain`).
+
+**The input default is `None`, and that is a deliberate exception** to the carried-intermediates
+rule *"every new field is required — no default value"*. That rule exists because a default lets a
+caller silently omit a legally required disclosure figure. Here the omission is **not** silent: by
+rule 3 below an absent unit propagates to the printed sentence *"ohne Maßeinheit — nicht
+ausgewiesen"* plus its explaining paragraph. A default that lands the renter on an honest disclosure
+is a different thing from a default that lands them on a blank. On the **result** the field keeps the
+contract's rule and carries no default.
+
+### 2 — One key, one unit; a mixed key is an input error
+
+**All parties supplying a value for the same consumption key must agree on the unit.** Two or more
+distinct units on one key → `HeatingInputError` / `NkInputError`. Never a silent pick, never a
+majority vote, never "the first one wins".
+
+**Why it is an error and not a display problem.** The Gesamtbemessung is a **sum**. `600 kWh + 250
+HKV-Einheiten` is a number that means nothing, and BGH formal minimum #3 requires the denominator to
+be *checkable* — a denominator that cannot lawfully be summed fails it before it is ever printed. A
+statement that picked one of the two units would state a false unit for some parties' Bemessung and a
+false total for all of them.
+
+**And it is a real configuration, not a hypothetical.** `MeterKind.HEAT` covers **both** a building
+Wärmemengenzähler counting kWh **and** flat Heizkostenverteiler counting dimensionless Einheiten —
+`packages/domain/src/lokara_domain/meter.py` says exactly that, and `CANONICAL_UNITS` deliberately
+gives `HEAT` no default unit for that reason. A building that swapped some flats' allocators for
+heat-meters mid-modernisation produces this input.
+
+Resolution, in the order the engine applies it:
+
+| Heating — `HeatingResult.heat_consumption_unit` | |
+| --- | --- |
+| two or more distinct `heat_consumption_unit` values among `HeatingInput.units` | raise `HeatingInputError` (in `_validate`, i.e. **before** any branch runs — validation that depends on which branch ran can be skipped by an unrelated data problem) |
+| `heat_fallback_to_area` is `True` (§ 9a Abs. 2) | `None` — see rule 4 |
+| every unit that supplied a `heat_consumption` value carries a unit, and at least one unit carries one | that unit |
+| otherwise | `None` — see rule 3 |
+
+| NK — `NkResult.consumption_unit` | |
+| --- | --- |
+| two or more distinct non-`None` `measurement_unit` values in `NkInput.consumptions` | raise `NkInputError` |
+| any row of `consumptions` carries no unit | `None` |
+| exactly one distinct unit and no row missing it | that unit |
+| `consumptions` is empty | `None` |
+
+- **The two rules differ in one place, on purpose.** In heating, a unit with `heat_consumption=None`
+  contributes **no measured value**: § 9a estimates it from the measured units, so the estimate is by
+  construction in *their* unit and that row need not declare one. NK has no estimation branch — every
+  `ConsumptionValue` row is a supplied value — so every row must carry the unit. The *mixing* check,
+  by contrast, runs over **declarations** in both engines, including a heating unit with no reading:
+  a declared kWh device in a building of HKV allocators makes next period's denominator unsummable
+  and would label this period's estimate with the wrong unit.
+- **`NkResult.consumption_unit` is one field because `NkInput.consumptions` is one flat tuple**,
+  shared by every `CONSUMPTION` cost on the statement — "one key" is literally true today. **Named,
+  not designed:** when a second, independently-metered consumption key becomes expressible, this
+  field becomes a mapping keyed by that key's identity, and the reference-totals rule *"one per
+  allocation key, and they are not interchangeable"* is what it has to satisfy.
+
+### 3 — Absence propagates, and the withholding branch survives
+
+**If any contributing value lacks a unit, the resolved unit for that key is `None`, and the renderer
+withholds exactly as it does today.** The existing copy — the cell `ohne Maßeinheit — nicht
+ausgewiesen` and the explaining paragraph beneath the column table — stays **byte-identical**, keeps
+its place, and keeps a golden fixture that exercises it.
+
+> **Lead, 06.08.2026:** *"The placeholder copy is good and should not simply vanish. If a building
+> genuinely has no Maßeinheit recorded, the honest disclosure still has to appear — slice 5 removes
+> the cause, not the branch."*
+
+That is the whole shape of this slice: the demo building stops reaching the branch because it now
+records its Maßeinheit (rule 6), and a building that records none still gets the sentence rather than
+a blank, a dash or a zero. The fixture for the branch therefore moves off the demo composition onto a
+deliberately unit-less one; it is not deleted, and none of its assertions is weakened.
+
+### 4 — Under § 9a Abs. 2 the resolved unit is `None`, and that is *not* the withholding branch
+
+When `heat_fallback_to_area` is `True`, no consumption Bemessung was applied at all: the pot went on
+the area key. `HeatingLine.heat_consumption_weight` is already `None` in that branch for exactly that
+reason, and `heat_consumption_unit` follows it — **`None` means "not applied", never "not carried"**,
+the contract's own rule. A unit stated there would be the unit of a Bemessung that determined no euro.
+
+The two `None`s never collide on the page, because the renderer branches on `heat_fallback_to_area`
+**first**: that row then states `Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` and the
+`36.500 m²·Tage` printed two rows above, and nothing is withheld (*"The `Verbrauch Heizung` row under
+§ 9a Abs. 2"*). The withheld sentence and the § 9a row must stay distinguishable — they have
+different causes, and one of them is a legal fact about the allocation.
+
+### 5 — The open sub-question is answered: withhold
+
+The gap note below (*"The unit of the heating-consumption Bemessung"*) left one sub-question open for
+the lead: whether the withholding rule extends to a **unit-free figure** (`Gesamtbemessung 1.000`, no
+unit), which states nothing false but invites an assumption. **Answered 06.08.2026: withhold.**
+
+With rules 1–3 the unit is known whenever it exists, so the question now arises **only** where the
+Maßeinheit genuinely is not recorded — and there the conservative reading the note already named is
+the right one, for the reason it already gave: a bare `1.000` in a column headed *Gesamtbemessung*,
+between two rows reading `36.500 m²·Tage` and `40 m³`, invites the renter to assume a unit, and the
+two candidate units differ by three orders of magnitude in what they mean. The sub-question is
+**closed**, not deferred.
+
+### 6 — Which spelling goes where
+
+Two forms of every unit, and they are not interchangeable.
+
+| `MeasurementUnit` | Compact (a numeric cell) | Long (names the device) |
+| --- | --- | --- |
+| `KWH` | `kWh` | `Erfasster Wärmeverbrauch in kWh am Wärmemengenzähler` |
+| `HKV_UNITS` | `HKV-Einheiten` | `Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers` |
+| `CUBIC_METRE` | `m³` | — not reachable on the heating column, see below |
+
+**The Bemessung cells use the compact form**, because they are numeric cells: `1.000 HKV-Einheiten`
+sits in a column beside `36.500 m²·Tage` and `40 m³`, and the long form wraps a figure column into
+prose. **The long form appears exactly once, in the `Verbrauch Heizung` Umlageschlüssel cell** —
+naming the device is what BGH minimum #2 means by *Angabe **und Erläuterung** des Verteilerschlüssels*.
+`Erfasster Wärmeverbrauch` alone says *what* was measured; `… in Einheiten eines
+Heizkostenverteilers` says *by what*, and that is the difference between a renter who can check the
+key and one who cannot.
+
+Exact rendered German, settled here:
+
+| Cell | Unit known | Unit not recorded (unchanged) |
+| --- | --- | --- |
+| Block B, `Verbrauch Heizung` **Umlageschlüssel** | `Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers` (`HKV_UNITS`) · `Erfasster Wärmeverbrauch in kWh am Wärmemengenzähler` (`KWH`) | `Erfasster Wärmeverbrauch` |
+| … with a Nutzerwechsel | the same, then ` (Nutzerwechsel: Gradtagszahlen)` | `Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen)` |
+| Block B, `Verbrauch Heizung` **Gesamtbemessung** | `1.000 HKV-Einheiten` | `ohne Maßeinheit — nicht ausgewiesen` |
+| Block B, party table **column header** | `Verbrauch Heizung` | column absent |
+| Block B, party **Bemessung** cell | `600 HKV-Einheiten` · `146,25 HKV-Einheiten` | cell absent |
+| NK cost header **Umlageschlüssel** (`CONSUMPTION`) | `Verbrauch (m³)` · `Verbrauch (kWh)` · `Verbrauch (HKV-Einheiten)` | `Verbrauch` |
+| NK cost header **Gesamtbemessung** | `Gesamtbemessung: 40 m³` | no reference total printed |
+
+- **No parentheses in the long form**, so it composes with the `(Nutzerwechsel: Gradtagszahlen)`
+  parenthetical without producing a second bracket or a nested one. That constraint is what picked
+  *"in kWh am Wärmemengenzähler"* over *"(kWh, Wärmemengenzähler)"*.
+- **The party Bemessung cells repeat the unit**, exactly as the `Verbrauch Warmwasser` column already
+  does (`20 m³`, `rd. 5,95 m³`). One idiom, two columns; a figure column whose unit appears only in
+  its footer is a column a renter has to reconstruct.
+- **The withheld branch keeps the bare key label.** Naming a device in the Umlageschlüssel cell while
+  the cell beside it says *ohne Maßeinheit* would be the page contradicting itself in one row.
+- **`CUBIC_METRE` gets no long form and no heating spelling.** A m³ device is not a heat meter:
+  `MeterCreate._unit_matches_kind` (`apps/api/.../schemas.py`) already rejects `HEAT` + `CUBIC_METRE`,
+  so the combination cannot reach an engine. Inventing a third spelling for a rejected configuration
+  is inventing copy for a case that does not exist.
+- **The NK label names no device**, and that is deliberate: outside the heating column the
+  `MeasurementUnit` does **not** determine the device — `m³` is a Kalt- *or* a Warmwasserzähler — so
+  a device name there would be a fact the data does not carry. In the heating column the pair
+  (`MeterKind.HEAT`, unit) *does* determine it, which is precisely the point `docs/02` →
+  *"Meters: `MeterKind` and `MeasurementUnit` are independent axes"* makes.
+- **Scope: this table is the statement document's copy.** The meter screen's `unit_symbol`
+  (`apps/api/.../routers/meters.py`, `UNIT_SYMBOLS`) spells `HKV_UNITS` as bare `Einheiten` beside a
+  device whose type is on the same screen; that is a different surface with a different context and
+  is **not** harmonised by this table.
+- **Warm water is unaffected, and is derived rather than guessed.** `ww_consumption_m3` /
+  `volume_m3` fix m³ by type, `CANONICAL_UNITS` maps `WARM_WATER → CUBIC_METRE`, and § 9's formula is
+  defined per m³. The `Erfasster Warmwasserverbrauch (m³)` copy does not change.
+
+### 7 — The demo values this is worked against
+
+Verified 06.08.2026 against `packages/adapters/src/lokara_adapters/meter.py` → `_SPEC`, which is the
+demo building's register values:
+
+| Meter | Unit | Opening → closing | Verbrauch |
+| --- | --- | --- | --- |
+| `met_heat_a` | `HKV_UNITS` | 1200 → 1800 | **600** |
+| `met_heat_b` | `HKV_UNITS` | 3400 → 3650 | **250** |
+| `met_heat_c` | `HKV_UNITS` | 880 → 1030 | **150** |
+| `met_heat_main` | `KWH` | 148500 → 168500 | 20.000 (the § 9 denominator, not a Bemessung) |
+
+- Flat heat allocators, `MeasurementUnit.HKV_UNITS`: **600 / 250 / 150**, Σ **1.000** → the cell reads
+  **`Gesamtbemessung: 1.000 HKV-Einheiten`**, and after the Nutzerwechsel split the party column reads
+  `600` · `146,25` · `103,75` · `150` HKV-Einheiten, Σ `1.000`.
+- Flat warm water, `CUBIC_METRE`: 20 / 12 / 8, Σ **40 m³** — unchanged, already on the page.
+- **The demo's Σ 1.000 could not have been kWh anyway.** The building's own meter reads 20.000 kWh
+  over the same period; three flats whose devices counted kWh would sum to roughly that, not to
+  1.000. The fixture was HKV-Einheiten all along — it simply could not say so.
+
+⚠️ **Flagged, not resolved here:** `docs/06` → *"Scenario 2 — the fuel, the emissions and the CO₂
+price"* describes the demo building as having *"one Wärmemengenzähler per unit, one shared
+warm-water meter"*. Both halves disagree with `_SPEC` (the flats carry **Heizkostenverteiler**, and
+each flat has its **own** warm-water meter beside the building one), and `DEMO-RUNBOOK.md` →
+*"Screen 4 — Zähler"* agrees with `_SPEC`, not with `docs/06`: *"the building's **Wärmemengenzähler**
+(20.000 kWh) and one flat's **Heizkostenverteiler** (600 Einheiten)"*. The device type is a fixture
+fact, not a legal one, and the code, the runbook and the arithmetic above all point one way — but per
+`CLAUDE.md` the contradiction is **reported to the lead, not silently rewritten** in either
+direction.
+
+### 8 — What this section does not do
+
+- **It does not print Zählerstände.** Start/end readings remain the separate, unspecified gap below;
+  the engine still takes a resolved consumption value and knows of no reading at all.
+- **It does not touch the § 9 energy denominator.** `total_energy_kwh` is kWh by type and by statute
+  and was never part of this gap.
+- **It moves no euro.** Every Bemessung it lets onto the page is a weight the engine already
+  allocated by; the party totals, the pots and the canonical €1.200 allocation are byte-identical.
 
 ## Heating table footer — the figure is the Gesamtkosten, not the column's sum
 
@@ -404,7 +645,7 @@ Warmwasserverbrauch A/B/C **20 / 12 / 8 m³**; CO₂ **4.000 kg**, CO₂-Kosten 
 | § 9 Trennung | Q(WW) = 2,5 × 40 × (60 − 10) = **5.000 kWh** von 20.000 kWh → Warmwasser **2.535,73 €**, Heizung **7.607,19 €** |
 | §§ 7/8 bei 30/70 | Heizung: Grund **2.282,16 €** / Verbrauch **5.325,03 €** · Warmwasser: Grund **760,72 €** / Verbrauch **1.775,01 €** |
 | Grundkosten-Bemessung | A 18.250 · B-Mieter 5.430 · B-Vermieter 5.520 · C 7.300 · **Σ 36.500 m²·Tage** |
-| Wärmeverbrauchs-Bemessung | A 600 · B-Mieter 146,25 · B-Vermieter 103,75 · C 150 · **Σ 1.000** (Einheit noch nicht mitgeführt — siehe Lücke) |
+| Wärmeverbrauchs-Bemessung | A 600 · B-Mieter 146,25 · B-Vermieter 103,75 · C 150 · **Σ 1.000 HKV-Einheiten** (die Maßeinheit wird seit Slice 5 mitgeführt) |
 | Warmwasser-Bemessung | A 20 · B-Mieter 5,950684… · B-Vermieter 6,049315… · C 8 · **Σ 40 m³** |
 | Gradtagszahlen B | 01.01.–30.06. **585 ‰ von 1.000 ‰** · 01.07.–31.12. **415 ‰ von 1.000 ‰** |
 | Tage B (Grund + WW) | **181 von 365** bzw. **184 von 365** |
@@ -423,7 +664,7 @@ NK solution (one label appended to the cost header row) does not transfer:
 | Money column | Umlageschlüssel | Gesamtbemessung (demo) |
 | --- | --- | --- |
 | Grundkosten Heizung | Wohnfläche (m²·Tage) — § 7 Abs. 1 HeizkostenV | 36.500 m²·Tage |
-| Verbrauch Heizung | Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen) | **withheld** — unit not carried, see gap; the cell's copy is fixed in *"The withheld cell is a sentence, not a blank"* below |
+| Verbrauch Heizung | Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers (Nutzerwechsel: Gradtagszahlen) | 1.000 HKV-Einheiten — **withheld** where a building records no Maßeinheit, see *"The withheld cell is a sentence, not a blank"* below |
 | Grundkosten Warmwasser | Wohnfläche (m²·Tage) — § 8 Abs. 1 HeizkostenV | 36.500 m²·Tage |
 | Verbrauch Warmwasser | Erfasster Warmwasserverbrauch (m³) | 40 m³ |
 
@@ -439,12 +680,22 @@ Kosten — then had **no Umlageschlüssel named anywhere**, in a block titled *B
 money columns, three rows. A renter comparing the two cannot tell whether the column was forgotten or
 allocated by a key nobody wrote down.
 
-What is genuinely not derivable is the **unit** of the heating-consumption Bemessung (kWh at a
-Wärmemengenzähler, dimensionless HKV-Einheiten at a Heizkostenverteiler — the gap at the end of this
-section). That blocks **one cell**: the Gesamtbemessung. It does not block the Umlageschlüssel, which
-is a name, not a figure, and which is BGH formal minimum **#2** in its own right.
+What was not derivable when this was written is the **unit** of the heating-consumption Bemessung (kWh
+at a Wärmemengenzähler, dimensionless HKV-Einheiten at a Heizkostenverteiler). That blocked **one
+cell**: the Gesamtbemessung. It never blocked the Umlageschlüssel, which is a name, not a figure, and
+which is BGH formal minimum **#2** in its own right.
+
+**Slice 5 carries the unit** (*"`MeasurementUnit` travels with the value"* above), so on a building
+that records its Maßeinheit the cell now prints its figure. The withholding branch **stays** for a
+building that records none, with its copy unchanged — the cause is removed, not the branch.
 
 #### The withheld cell is a sentence, not a blank
+
+**When this branch renders (updated 06.08.2026):** only where the Maßeinheit of the heat-recording
+devices is **genuinely not recorded** — i.e. `HeatingResult.heat_consumption_unit is None` while
+`heat_fallback_to_area` is `False`. Slice 5 removed the *cause* on any building that records its
+devices (*"`MeasurementUnit` travels with the value"*), and deliberately kept the *branch*: an
+unrecorded unit is an honest disclosure, not a blank. Every word below is unchanged.
 
 The cell prints, verbatim:
 
@@ -477,11 +728,13 @@ Every word of the cell is carrying something:
 - The note says **nothing** about who should have supplied the unit and asserts **no** right of
   inspection. Both would be claims this document has not transcribed.
 
-**Rejected: printing the unit-free figure `1.000`.** The gap below left this open as a sub-question for
-the lead and the conservative reading applies until it is answered — a bare `1.000` in a column headed
+**Rejected: printing the unit-free figure `1.000`.** A bare `1.000` in a column headed
 *Gesamtbemessung*, between two rows reading `36.500 m²·Tage` and `40 m³`, invites the renter to assume
 a unit, and the two candidate units differ by three orders of magnitude in what they mean. The
-withholding stays; only its wording is fixed here.
+withholding stays; only its wording is fixed here. **This was the open sub-question for the lead, and
+it is answered — withhold** (06.08.2026, *"`MeasurementUnit` travels with the value"* → rule 5). With
+the unit now carried, the branch is reached only where no Maßeinheit is recorded at all, and there
+this reasoning is the whole of it.
 
 #### The `Verbrauch Heizung` row under § 9a Abs. 2 — it states Wohnfläche, not Wärmeverbrauch
 
@@ -567,29 +820,41 @@ Rules the copy encodes:
 
 #### Required rendered text — Block B
 
+The demo building, which records its Maßeinheit (slice 5):
+
 ```
 Bemessungsgrundlagen
 
 Spalte                    Umlageschlüssel                              Gesamtbemessung
 Grundkosten Heizung       Wohnfläche (m²·Tage) — § 7 Abs. 1 Heizkos…   36.500 m²·Tage
-Verbrauch Heizung         Erfasster Wärmeverbrauch                     ohne Maßeinheit —
-                          (Nutzerwechsel: Gradtagszahlen)              nicht ausgewiesen
+Verbrauch Heizung         Erfasster Wärmeverbrauch in Einheiten        1.000 HKV-Einheiten
+                          eines Heizkostenverteilers
+                          (Nutzerwechsel: Gradtagszahlen)
 Grundkosten Warmwasser    Wohnfläche (m²·Tage) — § 8 Abs. 1 Heizkos…   36.500 m²·Tage
 Verbrauch Warmwasser      Erfasster Warmwasserverbrauch (m³)           40 m³
+
+Partei                             Fläche·Tage  Verbrauch Heizung  Verbrauch Warmwasser
+Wohnung A — Anna Beispiel               18.250   600 HKV-Einheiten                20 m³
+Wohnung B — Bernd Muster (Ausz…)         5.430   146,25 HKV-Einh…           rd. 5,95 m³
+Wohnung B — Leerstand ab 01.07.…         5.520   103,75 HKV-Einh…           rd. 6,05 m³
+Wohnung C — Clara Vorlage                7.300   150 HKV-Einheiten                 8 m³
+Gesamtbemessung                         36.500  1.000 HKV-Einheiten               40 m³
+
+Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, sodass eine
+Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
+```
+
+A building that records **no** Maßeinheit — the branch slice 5 kept (*"The withheld cell is a
+sentence, not a blank"*). Only the two heat cells differ; the `Verbrauch Heizung` Bemessung column is
+absent from the party table, and the note sits between the two tables:
+
+```
+Verbrauch Heizung         Erfasster Wärmeverbrauch                     ohne Maßeinheit —
+                          (Nutzerwechsel: Gradtagszahlen)              nicht ausgewiesen
 
 Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit der
 Erfassungsgeräte (kWh oder Einheiten eines Heizkostenverteilers) liegt dieser Abrechnung nicht vor.
 Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten verteilt.
-
-Partei                                        Fläche·Tage   Verbrauch Warmwasser
-Wohnung A — Anna Beispiel                          18.250                  20 m³
-Wohnung B — Bernd Muster (Auszug 30.06.2025)        5.430            rd. 5,95 m³
-Wohnung B — Leerstand ab 01.07.2025 → Vermieter     5.520            rd. 6,05 m³
-Wohnung C — Clara Vorlage                           7.300                   8 m³
-Gesamtbemessung                                    36.500                  40 m³
-
-Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, sodass eine
-Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
 ```
 
 (The `§ 7 Abs. 1 Heizkos…` above is this file's column width, not an ellipsis on the page — the row
@@ -600,11 +865,14 @@ prints the citation in full.)
   the **sum** is de-scaled once, never per line.
 - **Invariant, asserted over rendered text:** each Bemessung column's printed values sum exactly to the
   printed Gesamtbemessung of that column. Same invariant as the NK reference totals.
-- The **`Verbrauch Heizung` row is present in the column table and absent from the party table.** The
-  row states the key that was applied (BGH #2); only its Gesamtbemessung cell and its Bemessung column
-  are withheld, and only for the measurement-unit gap. See *"All four rows render"* above for the
-  copy and *"The `Verbrauch Heizung` row under § 9a Abs. 2"* for the branch where nothing is withheld
-  at all.
+- **The `Verbrauch Heizung` row is always in the column table.** Its Gesamtbemessung cell and its
+  party-table Bemessung column are present when the Maßeinheit is recorded (slice 5) and withheld
+  together when it is not — the row itself states the key that was applied (BGH #2) in either case.
+  See *"All four rows render"* above for the copy and *"The `Verbrauch Heizung` row under § 9a Abs. 2"*
+  for the branch where the consumption key was replaced and nothing is withheld at all.
+- **The party table's Bemessung columns follow the same order**: `Fläche·Tage` (the denominator of
+  both Grundkosten columns), then `Verbrauch Heizung`, then `Verbrauch Warmwasser`. Each column is
+  present exactly when its Gesamtbemessung is.
 - **Row order is the money table's column order** — Grundkosten Heizung, Verbrauch Heizung, Grundkosten
   Warmwasser, Verbrauch Warmwasser. A renter reads across the money table and down this one; a
   different order makes them search.
@@ -937,11 +1205,12 @@ contract's `None` rule exists to prevent.
   `ww_consumption_weight_m3` is `None` on every line, so the `Verbrauch Warmwasser` row states
   **`Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` / `36.500 m²·Tage`** — the key that *was* applied,
   with the paragraph that replaced the original one — and no m³ Bemessung is printed anywhere in the
-  block. `Verbrauch Heizung` has no *Gesamtbemessung* either, for the unrelated reason that its
-  measurement unit is not carried (slice 5); the two absences must not be read as one, which is why
-  one is a citation-carrying figure and the other is the sentence `ohne Maßeinheit — nicht
-  ausgewiesen`. (Superseded in one respect: the `Verbrauch Heizung` **row** renders. See *"All four
-  rows render"* under item 1.)
+  block. The `Verbrauch Heizung` row is unaffected by that fallback and states its own key and its own
+  Gesamtbemessung. (Superseded in two respects, both later: the `Verbrauch Heizung` **row** renders —
+  *"All four rows render"* under item 1 — and its Gesamtbemessung is withheld only where no Maßeinheit
+  is recorded, since slice 5 carries the unit. Where both absences do occur at once they must still not
+  be read as one: a § 9a fallback is a citation-carrying figure, an unrecorded unit is the sentence
+  `ohne Maßeinheit — nicht ausgewiesen`.)
 
 #### Not in this slice, deliberately
 
@@ -1172,6 +1441,7 @@ field that is merely useful is a field that will drift.
 | `warm_water_separation` | `WarmWaterSeparation \| None` | see above | item 3; `None` exactly when `HeatingInput.warm_water is None` |
 | `heat_fallback_to_area` | `bool` | `False` | § 9a Abs. 2 — Block B states an Umlageschlüssel **per column**, and today the result cannot say that the heating column fell back to Wohnfläche while warm water did not |
 | `ww_fallback_to_area` | `bool` | `False` | as above, for the warm-water column |
+| `heat_consumption_unit` *(slice 5)* | `MeasurementUnit \| None` | `HKV_UNITS` | the Maßeinheit the heating-consumption Bemessung is *in* — Block B's `1.000 HKV-Einheiten` and the device named in its Umlageschlüssel cell. `None` = not applied (§ 9a Abs. 2) or not recorded; resolution and both spellings in *"`MeasurementUnit` travels with the value"* |
 
 `consumption_fallback_to_area` **stays and keeps its meaning** (`heat_fallback or ww_fallback`) — it is
 read by existing tests and by the PDF layer, and this slice moves nothing that renders.
@@ -1283,24 +1553,28 @@ a pixel one — rendering and measuring glyphs would test Chromium.
 
 ### Gaps — not invented here
 
-- **The unit of the heating-consumption Bemessung.** `HeatingUnit.heat_consumption` is a bare `Decimal`
-  documented as "heat-meter units": at a Wärmemengenzähler that is **kWh**, at a Heizkostenverteiler it
-  is dimensionless **HKV-Einheiten**, and nothing in the input distinguishes them. This is the same gap
-  the NK `CONSUMPTION` reference total is blocked on, and the same resolution applies: **no
-  Gesamtbemessung and no Bemessung column for `Verbrauch Heizung` until the unit is carried.** Warm
-  water is *not* affected — `ww_consumption_m3` / `volume_m3` fix m³ by type, `CANONICAL_UNITS` maps
+- ~~**The unit of the heating-consumption Bemessung.**~~ **Closed 06.08.2026 by slice 5** —
+  *"`MeasurementUnit` travels with the value — the plumbing decision"* above. `HeatingUnit` and
+  `ConsumptionValue` carry the unit, `HeatingResult` and `NkResult` surface it, a mixed key is an
+  input error, an absent unit still prints the withholding sentence, and the **sub-question the lead
+  had left open** (withhold vs. a unit-free `1.000`) is **answered: withhold**. Warm water was never
+  affected — `ww_consumption_m3` / `volume_m3` fix m³ by type, `CANONICAL_UNITS` maps
   `WARM_WATER → CUBIC_METRE`, and § 9's formula is defined per m³; that unit is derived, not guessed.
-  **Sub-question for the lead, deliberately left open:** whether the withholding rule extends to a
-  *unit-free* figure (`Gesamtbemessung 1.000`, no unit), which states nothing false but invites an
-  assumption. Until it is answered, the conservative reading applies — withhold.
-- **German spellings of `MeasurementUnit`** (display copy, no legal value, no `Rechtsstand`; this
-  closes the *spellings* half of the `CONSUMPTION` gap recorded above — the *plumbing* half stays open):
+- **German spellings of `MeasurementUnit`** (display copy, no legal value, no `Rechtsstand`; the
+  *spellings* half of the `CONSUMPTION` gap, closed 05.08.2026 — the *plumbing* half closed
+  06.08.2026, and **which spelling goes in which cell** is settled in *"Which spelling goes where"*
+  above):
 
   | `MeasurementUnit` | Rendered | Note |
   | --- | --- | --- |
   | `KWH` | `kWh` | Wärmemengenzähler; the § 9 energy denominator |
   | `CUBIC_METRE` | `m³` | Wasserzähler |
   | `HKV_UNITS` | `Einheiten (Heizkostenverteiler)`, short `HKV-Einheiten` | dimensionless allocator reading |
+
+  On the statement the **compact** form (`kWh` / `m³` / `HKV-Einheiten`) is what a numeric cell takes;
+  the long form appears once, as the device name in the `Verbrauch Heizung` Umlageschlüssel cell, in
+  the parenthesis-free wording fixed above (`… in Einheiten eines Heizkostenverteilers`, `… in kWh am
+  Wärmemengenzähler`).
 
 - **Zählerstände (start/end readings) are not specified here and must not be improvised.** HeizkostenV
   gives the tenant a right to check the readings, and the gap is listed under *"Also missing from the
@@ -1357,7 +1631,7 @@ needed for the six items above, the fifth unblocks the one column they cannot sh
 | 2 | Tier-1 disclosure meets `legal-t1-size` + `legal-t1-contrast`; tier 2 stays as it is (`docs/05`) | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
 | 3 | `HeatingResult` carries its intermediates (+ `Co2Result` Berechnungsgrundlagen, + § 9b in the degree-day `source`) | `engine-implementer` (`packages/{heating-engine,rules-store}/src`) | yes |
 | 4 | Blocks A / B / C render (items 1–5; rendered form, carriers and branch cases in **4a**) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
-| 5 | `MeasurementUnit` carried meter → statement; `Verbrauch Heizung` Bemessung column; NK `CONSUMPTION` reference total | `engine-implementer` then `app-implementer` | yes — strictly before the heating-consumption column |
+| 5 | **Specified 06.08.2026** — *"`MeasurementUnit` travels with the value"*. `MeasurementUnit` carried meter → engine input → engine result → statement; `Verbrauch Heizung` Gesamtbemessung + Bemessung column; NK `CONSUMPTION` reference total; the withholding branch kept for a building that records no unit | `engine-implementer` (`packages/{heating,nk}-engine/src`) **then** `app-implementer` (`packages/pdf/src`, `packages/pdf/src/lokara_pdf/demo.py`, `apps/api/src/lokara_api/statement_service.py`) | yes — and it is what unblocked the heating-consumption column |
 | 6 | The slice-4 defects: the `Verbrauch Heizung` row + its two branches and the two missing citations (item 1, *"All four rows render"*), the `rd.` / `(N von M Tagen)` / one-sentence rounding disclosure (item 1, *"The rounding is disclosed"*), the page-break rules (**4b**) | `app-implementer` (`packages/pdf/src`) | yes — after 4, independent of 5 |
 | 7 | The demo's CO₂ fixture: `total_co2_kg` 2.000 → **4.000 kg**, `co2_cost` 300,00 → **261,80 €**, in `packages/pdf/src/lokara_pdf/demo.py` **and** `packages/db/src/lokara_db/seed.py` together | `app-implementer` + `db` lane, one commit | yes — but the two files must move together, or the PDF demo and the API demo state different numbers for one building (`docs/06` → "One occupancy timeline drives every engine") |
 
@@ -1389,13 +1663,15 @@ suggestion would be invented law, not a convenience.
       supplies the *geleistete* figure; `advance × months` is rejected, see "#4 is blocked on the M6
       ledger, by decision")
 - [x] Which reference totals accompany each allocation key → **"Reference totals (Gesamtbemessung)"**
-      above. One open sub-question remains: the **unit** of a `CONSUMPTION` total (see the gap there).
+      above. The one open sub-question — the **unit** of a `CONSUMPTION` total — is closed by
+      **"`MeasurementUnit` travels with the value — the plumbing decision (slice 5)"** (06.08.2026).
 - [x] Heating: how consumption values and the CO₂ split are presented to the tenant →
       **"Heizkostenabrechnung — the heating table's disclosure"** above (Umlageschlüssel +
       Gesamtbemessung per column, §§ 7/8, § 9, Gradtagszahlen, § 7 Abs. 3 CO2KostAufG). Still open:
       **the CO₂-Vermieteranteil as a visible row** in the heating table, which the footer reword is
       standing in for; and the sub-questions that section names —
-      **the unit of the heating-consumption Bemessung** (withhold vs. unit-free figure),
+      ~~the unit of the heating-consumption Bemessung~~ (**closed 06.08.2026**: the unit is carried,
+      and withhold-vs-unit-free is answered *withhold*),
       **Zählerstände** (no data path into the engine),
       **§ 5 Abs. 1 S. 3 rounding before the CO₂ classification** (`PLAN.md` row 4.5 — the period
       factor itself shipped on 04.08.2026), **§ 9's flat-365 fallback divisor**,

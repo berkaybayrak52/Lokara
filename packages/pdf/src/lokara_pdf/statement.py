@@ -11,12 +11,13 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from html import escape
 
-from lokara_domain import AllocationKey, cents, format_eur
+from lokara_domain import AllocationKey, MeasurementUnit, cents, format_eur
 from lokara_heating_engine import HeatingResult
 from lokara_nk_engine import CostItem, NkResult, ShareLine
 
 from .formatting import format_number_de
 from .heating_disclosure import co2_grounds, heating_disclosure_html
+from .measurement_units import UNIT_SYMBOLS
 
 # (unit_id, tenancy_id) as they appear on result lines; tenancy_id=None is the
 # landlord side (vacancy/self-use) of that unit.
@@ -39,10 +40,8 @@ _WEIGHT_DISPLAY_DIVISORS: dict[AllocationKey, Decimal] = {
 }
 
 # Unit of the reference total (Gesamtbemessung) per key — docs/08 table. Keys
-# absent here print no reference total: CONSUMPTION because its unit of measure
-# is not derivable from the engine result (docs/08 gap — a guessed kWh/m³ on a
-# Verbrauchsabrechnung is a defect that reaches a tenant), DIRECT because it
-# depends on the target and is resolved in _reference_total_unit().
+# absent here are resolved in _reference_total_unit(): CONSUMPTION reads the
+# Maßeinheit off the engine result, DIRECT depends on the target.
 _REFERENCE_TOTAL_UNITS: dict[AllocationKey, str] = {
     AllocationKey.AREA: "m²·Tage",
     AllocationKey.PERSONS: "Personen·Tage",
@@ -88,18 +87,43 @@ def _display_weight(key: AllocationKey, weight: Decimal) -> Decimal:
     return weight / _WEIGHT_DISPLAY_DIVISORS.get(key, Decimal(1))
 
 
-def _reference_total_unit(cost: CostItem) -> str | None:
+def _reference_total_unit(cost: CostItem, consumption_unit: MeasurementUnit | None) -> str | None:
     """Unit of this cost's Gesamtbemessung, or None if none is printed.
 
     docs/08: DIRECT → a tenancy has a denominator of 1 (noise, no row); DIRECT →
     a unit is day-split inside that unit and does have one, in Tage.
+
+    CONSUMPTION takes the Maßeinheit the engine divided in, read off the result
+    (docs/08 → "`MeasurementUnit` travels with the value"). Where the rows
+    supplied none the engine resolves None and no denominator is printed at all:
+    a guessed unit on a Verbrauchsabrechnung is a defect that reaches a tenant,
+    and a unit-free figure in this column invites the renter to assume one.
     """
     if cost.key is AllocationKey.DIRECT:
         return None if cost.direct_tenancy_id is not None else "Tage"
+    if cost.key is AllocationKey.CONSUMPTION:
+        return None if consumption_unit is None else UNIT_SYMBOLS[consumption_unit]
     return _REFERENCE_TOTAL_UNITS.get(cost.key)
 
 
-def _reference_total(cost: CostItem, lines: list[ShareLine]) -> str:
+def _key_label(cost: CostItem, consumption_unit: MeasurementUnit | None) -> str:
+    """The Umlageschlüssel, with the unit where the key has one (docs/08).
+
+    A figure column whose unit appears only in its denominator is a column the
+    renter has to reconstruct. The label names the **unit**, never a device:
+    outside the heating column the Maßeinheit does not determine the device —
+    m³ is a cold- or a hot-water meter — so a device name here would state a
+    fact the data does not carry.
+    """
+    label = _ALLOCATION_KEY_LABELS[cost.key]
+    if cost.key is AllocationKey.CONSUMPTION and consumption_unit is not None:
+        return f"{label} ({UNIT_SYMBOLS[consumption_unit]})"
+    return label
+
+
+def _reference_total(
+    cost: CostItem, lines: list[ShareLine], consumption_unit: MeasurementUnit | None
+) -> str:
     """`· Gesamtbemessung: 36.500 m²·Tage` — the denominator the engine divided
     by, so the tenant can check their share (docs/08, BGH minimum #2/#3).
 
@@ -109,7 +133,7 @@ def _reference_total(cost: CostItem, lines: list[ShareLine]) -> str:
     Figure and unit are joined by a non-breaking space, as ``format_eur`` joins
     the amount and the euro sign.
     """
-    unit = _reference_total_unit(cost)
+    unit = _reference_total_unit(cost, consumption_unit)
     if unit is None or not lines:
         return ""
     total = _display_weight(cost.key, sum((line.weight for line in lines), Decimal(0)))
@@ -132,13 +156,16 @@ def _party(labels: Mapping[PartyKey, str], unit_id: str | None, tenancy_id: str 
 
 def _nk_section(data: StatementData) -> str:
     rows: list[str] = []
+    # One field today, because `NkInput.consumptions` is one flat tuple shared by
+    # every CONSUMPTION cost — "one key, one unit" is literally true (docs/08).
+    consumption_unit = data.nk_result.consumption_unit
     for cost in data.nk_costs:
         lines = [line for line in data.nk_result.lines if line.cost_id == cost.cost_id]
         rows.append(
             f'<tr class="cost-row"><td colspan="3">{escape(cost.label)}'
             f'<span class="key-label">Umlageschlüssel: '
-            f"{escape(_ALLOCATION_KEY_LABELS[cost.key])}"
-            f"{_reference_total(cost, lines)}</span></td>"
+            f"{escape(_key_label(cost, consumption_unit))}"
+            f"{_reference_total(cost, lines, consumption_unit)}</span></td>"
             f'<td class="num">{escape(format_eur(cost.amount))}</td></tr>'
         )
         for line in lines:
@@ -400,6 +427,14 @@ def statement_html(data: StatementData) -> str:
     padding: 1.5mm 2.5mm; border-bottom: 0.5pt solid var(--color-forest);
   }}
   .basis-table td {{ padding: 1.5mm 2.5mm; }}
+  /* A figure and the unit it is in are one token and may not be split. The
+     compact unit spellings contain U+002D, which is a break opportunity, so a
+     cell wrapped mid-token — leaving a trailing hyphen that reads for a beat as
+     a minus sign in a right-aligned column, above a dangling remainder. On the
+     summary row, the one a reader uses to confirm the column adds up, that is
+     the most visibly broken thing on the page. The withheld cell below opts
+     back out: it is prose, and prose must wrap. */
+  .basis-table td.num {{ white-space: nowrap; }}
   .basis-table tfoot td {{
     font-weight: 600; border-top: 0.5pt solid var(--color-forest);
   }}
@@ -413,6 +448,7 @@ def statement_html(data: StatementData) -> str:
      mistaken for a broken number in a column of denominators. */
   .basis-table td .withheld {{
     display: block; text-align: left; font-variant-numeric: normal;
+    white-space: normal;
   }}
   /* Both notes sit directly beneath the table they qualify — adjacency is part
      of the rule, not a layout preference. Tier 1, so no font-size and no

@@ -55,7 +55,12 @@ def calculate_nk(body: NkCalcRequest, _auth: RequireAuth) -> NkCalcResponse:
             for p in body.person_counts
         ),
         consumptions=tuple(
-            ConsumptionValue(unit_id=v.unit_id, tenancy_id=v.tenancy_id, value=v.value)
+            ConsumptionValue(
+                unit_id=v.unit_id,
+                tenancy_id=v.tenancy_id,
+                value=v.value,
+                measurement_unit=v.measurement_unit,
+            )
             for v in body.consumptions
         ),
     )

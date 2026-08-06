@@ -124,6 +124,12 @@ class MeterFacts:
     # Per unit; a missing entry is a missing reading → § 9a estimate.
     heat_by_unit: dict[str, Decimal]
     ww_by_unit: dict[str, Decimal]
+    # The Maßeinheit the flat's heat devices count in, so the value never
+    # travels to the statement without it (docs/08 → "`MeasurementUnit` travels
+    # with the value"). A missing entry means the unit could not be established
+    # for that flat, which propagates to the withheld disclosure rather than to
+    # a guess.
+    heat_unit_by_unit: dict[str, MeasurementUnit]
 
 
 def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
@@ -143,6 +149,7 @@ def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
     ww_volume: Decimal | None = None
     heat_by_unit: dict[str, Decimal] = {}
     ww_by_unit: dict[str, Decimal] = {}
+    heat_units_by_unit: dict[str, set[MeasurementUnit]] = {}
     for c in consumptions:
         if c.unit_id is None:
             if c.kind is MeterKind.HEAT and c.measurement_unit is MeasurementUnit.KWH:
@@ -151,6 +158,7 @@ def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
                 ww_volume = (ww_volume or Decimal(0)) + c.value
         elif c.kind is MeterKind.HEAT:
             heat_by_unit[c.unit_id] = heat_by_unit.get(c.unit_id, Decimal(0)) + c.value
+            heat_units_by_unit.setdefault(c.unit_id, set()).add(c.measurement_unit)
         elif c.kind is MeterKind.WARM_WATER:
             ww_by_unit[c.unit_id] = ww_by_unit.get(c.unit_id, Decimal(0)) + c.value
 
@@ -164,6 +172,16 @@ def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
         has_warm_water=any(r.kind is MeterKind.WARM_WATER for r in readings),
         heat_by_unit=heat_by_unit,
         ww_by_unit=ww_by_unit,
+        # Only where the flat's heat devices agree. Two devices on one flat
+        # counting in different units make the sum above meaningless; the
+        # honest answer is to declare no unit for that flat, which propagates
+        # to the withheld disclosure. Picking one of them would label a summed
+        # figure with a unit that is true of only part of it.
+        heat_unit_by_unit={
+            unit_id: next(iter(units))
+            for unit_id, units in heat_units_by_unit.items()
+            if len(units) == 1
+        },
     )
 
 
@@ -283,6 +301,10 @@ def compute_statement(session: Session) -> StatementBundle:
                         area_sqm_x100=u.area_sqm_x100,
                         heat_consumption=facts.heat_by_unit.get(u.id),
                         ww_consumption_m3=facts.ww_by_unit.get(u.id),
+                        # The unit rides with the value all the way from the
+                        # meter: the DB row and the adapter both carry it, and
+                        # dropping it here is what left the statement guessing.
+                        heat_consumption_unit=facts.heat_unit_by_unit.get(u.id),
                     )
                     for u in units
                 ),

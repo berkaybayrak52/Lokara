@@ -87,9 +87,21 @@ class NkPersonCountIn(ApiModel):
 
 
 class NkConsumptionIn(ApiModel):
+    """A supplied consumption value, with the Maßeinheit it was counted in.
+
+    The unit rides on the row that carries the value (docs/08 →
+    "`MeasurementUnit` travels with the value"): a side channel lets the two
+    disagree, and the disagreement surfaces as a wrong unit on a
+    Verbrauchsabrechnung. Optional, and absence is not silent — the engine
+    resolves the key's unit to None and the statement prints no denominator at
+    all rather than a guessed one. Mixed units on one key are an engine input
+    error, which this router answers with 422.
+    """
+
     unit_id: str
     tenancy_id: str | None
     value: Decimal
+    measurement_unit: MeasurementUnit | None = None
 
 
 class NkCostIn(ApiModel):

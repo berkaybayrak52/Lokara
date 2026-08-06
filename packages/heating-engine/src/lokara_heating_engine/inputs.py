@@ -27,6 +27,7 @@ from lokara_domain import (
     Co2Table,
     DegreeDayTable,
     HeatingSplitBounds,
+    MeasurementUnit,
     Occupancy,
     Period,
     WarmWaterFormula,
@@ -41,6 +42,18 @@ class HeatingUnit:
     heat_consumption: Decimal | None
     # Measured warm-water volume (m³). None → §9a estimation (if WW exists).
     ww_consumption_m3: Decimal | None = None
+    # The Maßeinheit `heat_consumption` is counted in, carried on the row that
+    # carries the value (docs/08 rule 1). `MeterKind.HEAT` covers both a
+    # Wärmemengenzähler counting kWh and a Heizkostenverteiler counting
+    # dimensionless Einheiten, so the unit is not derivable from the kind.
+    #
+    # Defaulting to `None` is a deliberate exception to this module's
+    # "every disclosure field is required" rule: an absent unit is not silently
+    # dropped, it propagates to the printed disclosure "ohne Maßeinheit — nicht
+    # ausgewiesen". A unit may declare its device without supplying a reading —
+    # the § 9a estimate is then in the measured units' unit — but a *conflicting*
+    # declaration is still an input error.
+    heat_consumption_unit: MeasurementUnit | None = None
 
 
 @dataclass(frozen=True)
@@ -206,6 +219,13 @@ class HeatingResult:
     split_bounds: HeatingSplitBounds
     # `None` exactly when there is no central warm water.
     warm_water_separation: WarmWaterSeparation | None
+    # The Maßeinheit of the `heat_consumption_weight` Bemessungen — the label on
+    # the Gesamtbemessung the renter checks the denominator by. `None` when the
+    # heating column fell back to the area key (§ 9a Abs. 2 — no consumption
+    # Bemessung was applied, exactly as `heat_consumption_weight` is `None`
+    # there) or when any supplied value carried no unit; the statement then
+    # withholds the unit rather than guessing one (docs/08 rules 2–4).
+    heat_consumption_unit: MeasurementUnit | None
 
 
 class HeatingInputError(ValueError):

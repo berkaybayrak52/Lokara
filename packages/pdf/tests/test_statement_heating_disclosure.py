@@ -60,6 +60,27 @@ purpose.**
 * **I1** — `docs/08` → **4b**, pinned separately in
   `packages/pdf/tests/test_statement_pagination.py`.
 
+---
+
+**Extended 06.08.2026 — slice 5, `docs/08` → "`MeasurementUnit` travels with the
+value — the plumbing decision".** The defect: a value travelled from the meter to
+the statement **without its unit**, so the largest denominator on the page could
+be printed only by guessing what `1.000` meant — and was withheld instead. The
+unit now rides on `HeatingUnit.heat_consumption_unit` and is surfaced on
+`HeatingResult.heat_consumption_unit`, so the renderer *reads* it rather than
+being told it by a second party that could disagree.
+
+Two things this adds to the file, and they are a pair:
+
+* the **positive** case — the demo building's allocators are `HKV_UNITS`
+  (`packages/adapters` `_SPEC`), so Block B prints `Gesamtbemessung: 1.000
+  HKV-Einheiten`, a `Verbrauch Heizung` Bemessung column, and the device name in
+  the Umlageschlüssel cell;
+* the **withholding** case, unchanged and not weakened — every assertion about
+  `ohne Maßeinheit — nicht ausgewiesen` and its explaining sentence now runs
+  against `unitless_statement()`, a building that records no Maßeinheit. Slice 5
+  removes the *cause*, not the *branch*.
+
 **And the demo's CO₂ fixture moved** (`docs/06` → *"Scenario 2 — the fuel, the
 emissions and the CO₂ price"*): 2.000 kg / 300,00 € implied 150 €/t and
 0,1 kg CO₂/kWh. It is now **4.000 kg / 261,80 €** — 65,45 €/t (55,00 € per
@@ -73,7 +94,15 @@ from collections.abc import Mapping
 from decimal import Decimal
 from html.parser import HTMLParser
 
-from lokara_domain import AllocationKey, Cents, Occupancy, cents, format_eur, period
+from lokara_domain import (
+    AllocationKey,
+    Cents,
+    MeasurementUnit,
+    Occupancy,
+    cents,
+    format_eur,
+    period,
+)
 from lokara_heating_engine import (
     Co2Input,
     HeatingInput,
@@ -108,10 +137,10 @@ BLOCK_CO2 = "co2"  # the existing CO₂ block, unchanged in position
 # copy"). A literal here also trips RUF001.
 MINUS = chr(0x2212)
 
-# `docs/08` → the gap "the unit of the heating-consumption Bemessung": no
-# *Gesamtbemessung* and no Bemessung *column* for Verbrauch Heizung until the
-# measurement unit is carried. That is **slice 5** and must not be pulled forward.
-# The **row** is not withheld — see F1 above.
+# `docs/08` → "`MeasurementUnit` travels with the value — the plumbing decision
+# (slice 5)". The *Gesamtbemessung* and the Bemessung *column* for Verbrauch
+# Heizung print once the measurement unit is carried, and are withheld together
+# where a building records none. The **row** is never withheld — see F1 above.
 HEAT_COLUMN = "Verbrauch Heizung"
 
 # The Umlageschlüssel copy, from `docs/08` item 1's table. The citations were
@@ -126,9 +155,25 @@ HEAT_KEY = "Erfasster Wärmeverbrauch"
 HEAT_KEY_WITH_CHANGE = "Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen)"
 WARM_WATER_KEY = "Erfasster Warmwasserverbrauch (m³)"
 
+# Slice 5, `docs/08` → "Which spelling goes where". **Long form in the
+# Umlageschlüssel cell**, because naming the device is what BGH minimum #2 means
+# by *Angabe und Erläuterung* des Verteilerschlüssels: `Erfasster Wärmeverbrauch`
+# says *what* was measured, `… in Einheiten eines Heizkostenverteilers` says *by
+# what*. Parenthesis-free on purpose, so it composes with the Nutzerwechsel
+# parenthetical without nesting or doubling a bracket.
+HEAT_KEY_HKV = "Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers"
+HEAT_KEY_HKV_WITH_CHANGE = f"{HEAT_KEY_HKV} (Nutzerwechsel: Gradtagszahlen)"
+HEAT_KEY_KWH = "Erfasster Wärmeverbrauch in kWh am Wärmemengenzähler"
+# **Compact form in a numeric cell**: it sits in a column beside `36.500 m²·Tage`
+# and `40 m³`, and the long form would wrap a figure column into prose.
+HKV_UNIT = "HKV-Einheiten"
+HEAT_TOTAL_CELL = f"1.000 {HKV_UNIT}"
+
 # The withheld Gesamtbemessung cell and its explanation. No digit, no dash used
 # as a figure: `—`, `0` or a blank all read as *zero* in a numeric column, and a
-# zero denominator makes the renter's own share look undefined.
+# zero denominator makes the renter's own share look undefined. Slice 5 removes
+# the *cause* (the demo building records its Maßeinheit) and keeps the *branch*:
+# a building that records none still owes the renter this disclosure.
 WITHHELD_CELL = "ohne Maßeinheit — nicht ausgewiesen"
 WITHHELD_NOTE = (
     "Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit "
@@ -298,11 +343,45 @@ def _heating(data: StatementData) -> HeatingResult:
 # The canonical building of `docs/03`/`docs/08`: A 50 m², B 30 m², C 20 m²;
 # Bernd leaves B on 30.06.2025, B vacant Jul–Dec → a landlord party.
 
-DEMO_UNITS = (
-    HeatingUnit("unit-a", 5000, heat_consumption=Decimal(600), ww_consumption_m3=Decimal(20)),
-    HeatingUnit("unit-b", 3000, heat_consumption=Decimal(250), ww_consumption_m3=Decimal(12)),
-    HeatingUnit("unit-c", 2000, heat_consumption=Decimal(150), ww_consumption_m3=Decimal(8)),
-)
+HKV = MeasurementUnit.HKV_UNITS
+
+
+def heating_units(
+    *,
+    heat: tuple[Decimal | None, Decimal | None, Decimal | None] = (
+        Decimal(600),
+        Decimal(250),
+        Decimal(150),
+    ),
+    ww: tuple[Decimal | None, Decimal | None, Decimal | None] = (
+        Decimal(20),
+        Decimal(12),
+        Decimal(8),
+    ),
+    heat_unit: MeasurementUnit | None = HKV,
+) -> tuple[HeatingUnit, ...]:
+    """The demo building's three units, with the Maßeinheit of their heat
+    allocators (`docs/08` rule 7: `_SPEC` gives all three `HKV_UNITS`).
+
+    Built by a function rather than as a module constant so this file still
+    *collects* while `heat_consumption_unit` does not exist yet — the assertions
+    then fail one by one with their own message instead of the module erroring
+    out at import time.
+    """
+    return tuple(
+        HeatingUnit(
+            unit_id=unit_id,
+            area_sqm_x100=area,
+            heat_consumption=heat_value,
+            ww_consumption_m3=ww_value,
+            heat_consumption_unit=heat_unit,
+        )
+        for unit_id, area, heat_value, ww_value in zip(
+            ("unit-a", "unit-b", "unit-c"), (5000, 3000, 2000), heat, ww, strict=True
+        )
+    )
+
+
 DEMO_OCCUPANCIES = (
     Occupancy("unit-a", "ten-a", period("2025-01-01")),
     Occupancy("unit-b", "ten-b", period("2024-08-01", "2025-07-01")),
@@ -314,7 +393,7 @@ CO2_2000_KG = Co2Input(total_co2_kg=Decimal(2000), co2_cost=cents(30_000))
 
 def build_statement(
     *,
-    units: tuple[HeatingUnit, ...] = DEMO_UNITS,
+    units: tuple[HeatingUnit, ...] | None = None,
     occupancies: tuple[Occupancy, ...] = DEMO_OCCUPANCIES,
     party_labels: Mapping[PartyKey, str] | None = None,
     total_cost: int = 1_030_000,
@@ -324,6 +403,7 @@ def build_statement(
 ) -> StatementData:
     """The demo composition, parameterised — both real engines, rules resolved
     from the store for `AS_OF`, one NK cost so the page keeps both sections."""
+    units = heating_units() if units is None else units
     split_bounds = get_rule(HEATING_SPLIT_BOUNDS, AS_OF)
     warm_water_rule = get_rule(WARM_WATER_FORMULA, AS_OF)
     degree_days = get_rule(DEGREE_DAY_TABLE, AS_OF)
@@ -404,22 +484,31 @@ def no_warm_water_statement() -> StatementData:
 def ww_key_fallback_statement() -> StatementData:
     """§ 9a Abs. 2 on the warm-water column only: B + C (50 % of the area) have
     no reading, the heating column keeps its measured Bemessung."""
-    units = (
-        DEMO_UNITS[0],
-        HeatingUnit("unit-b", 3000, heat_consumption=Decimal(250), ww_consumption_m3=None),
-        HeatingUnit("unit-c", 2000, heat_consumption=Decimal(150), ww_consumption_m3=None),
-    )
+    units = heating_units(ww=(Decimal(20), None, None))
     return build_statement(units=units, total_cost=1_000_000, co2=None)
 
 
 def heat_key_fallback_statement() -> StatementData:
-    """§ 9a Abs. 2 on the heating column only — the mirror image."""
-    units = (
-        DEMO_UNITS[0],
-        HeatingUnit("unit-b", 3000, heat_consumption=None, ww_consumption_m3=Decimal(12)),
-        HeatingUnit("unit-c", 2000, heat_consumption=None, ww_consumption_m3=Decimal(8)),
-    )
+    """§ 9a Abs. 2 on the heating column only — the mirror image.
+
+    The devices still declare their Maßeinheit; § 9a Abs. 2 replaced the *key*,
+    so no consumption Bemessung was applied and none may be labelled (`docs/08`
+    rule 4 — `None` means *not applied*)."""
+    units = heating_units(heat=(Decimal(600), None, None))
     return build_statement(units=units, total_cost=1_000_000, co2=None)
+
+
+def unitless_statement() -> StatementData:
+    """A building that records **no** Maßeinheit for its heat allocators — the
+    withholding branch `docs/08` deliberately keeps (rule 3).
+
+    Every assertion that used to run against the demo composition lives here
+    now: slice 5 removed the *cause* on the demo building, not the branch, and
+    an unrecorded unit still owes the renter the honest disclosure. Nothing was
+    weakened in the move — the copy, the absence checks and the adjacency rule
+    are the same assertions against a fixture that still reaches the branch.
+    """
+    return build_statement(units=heating_units(heat_unit=None))
 
 
 def single_party_statement() -> StatementData:
@@ -654,7 +743,7 @@ class TestBlockBBemessungsgrundlagen:
 
         assert has_row(table, "Spalte", "Umlageschlüssel", "Gesamtbemessung")
         assert has_row(table, "Grundkosten Heizung", AREA_KEY_HEATING, "36.500 m²·Tage")
-        assert has_row(table, HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL)
+        assert has_row(table, HEAT_COLUMN, HEAT_KEY_HKV_WITH_CHANGE, HEAT_TOTAL_CELL)
         assert has_row(table, "Grundkosten Warmwasser", AREA_KEY_WARM_WATER, "36.500 m²·Tage")
         assert has_row(table, "Verbrauch Warmwasser", WARM_WATER_KEY, "40 m³")
 
@@ -679,16 +768,40 @@ class TestBlockBBemessungsgrundlagen:
         rather than a fact."""
         table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
 
-        assert has_row(table, "Partei", "Fläche·Tage", "Verbrauch Warmwasser")
-        assert has_row(table, "Wohnung A — Anna Beispiel", "18.250", "20 m³")
+        assert has_row(table, "Partei", "Fläche·Tage", HEAT_COLUMN, "Verbrauch Warmwasser")
+        assert has_row(table, "Wohnung A — Anna Beispiel", "18.250", f"600 {HKV_UNIT}", "20 m³")
         assert has_row(
-            table, "Wohnung B — Bernd Muster (Auszug 30.06.2025)", "5.430", "rd. 5,95 m³"
+            table,
+            "Wohnung B — Bernd Muster (Auszug 30.06.2025)",
+            "5.430",
+            f"146,25 {HKV_UNIT}",
+            "rd. 5,95 m³",
         )
         assert has_row(
-            table, "Wohnung B — Leerstand ab 01.07.2025 → Vermieter", "5.520", "rd. 6,05 m³"
+            table,
+            "Wohnung B — Leerstand ab 01.07.2025 → Vermieter",
+            "5.520",
+            f"103,75 {HKV_UNIT}",
+            "rd. 6,05 m³",
         )
-        assert has_row(table, "Wohnung C — Clara Vorlage", "7.300", "8 m³")
-        assert has_row(table, "Gesamtbemessung", "36.500", "40 m³")
+        assert has_row(table, "Wohnung C — Clara Vorlage", "7.300", f"150 {HKV_UNIT}", "8 m³")
+        assert has_row(table, "Gesamtbemessung", "36.500", HEAT_TOTAL_CELL, "40 m³")
+
+    def test_the_heat_bemessungen_carry_no_rd_marker(self) -> None:
+        """**F2's rule, applied to the new column.** 600 · 146,25 · 103,75 · 150
+        are all exact at two decimals, so none of them is marked: `rd.` marks the
+        *value*, not the line, and a marker on a figure that was not rounded
+        states a rounding that did not happen."""
+        table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
+        heat_cells = [row[2] for row in table if len(row) == 4 and row[0].startswith("Wohnung")]
+
+        assert heat_cells == [
+            f"600 {HKV_UNIT}",
+            f"146,25 {HKV_UNIT}",
+            f"103,75 {HKV_UNIT}",
+            f"150 {HKV_UNIT}",
+        ]
+        assert not any(cell.startswith(ROUNDED) for cell in heat_cells)
 
     def test_the_rounding_is_disclosed_once_and_under_the_table_it_qualifies(self) -> None:
         """**F2**, `docs/08` → "The rounding is disclosed".
@@ -727,6 +840,17 @@ class TestBlockBBemessungsgrundlagen:
         assert "543.000" not in text  # Bernd's
         assert "552.000" not in text  # the landlord party's
         assert "730.000" not in text  # unit C's
+        # A meter register is ×1000 in the DB (`value_x1000`, `packages/db` →
+        # `MeterReading`), so the leak forms of the two consumption columns are
+        # the same figure with three zeros: `1.000 HKV-Einheiten` → `1.000.000`,
+        # `40 m³` → `40.000`, `rd. 5,95 m³` → `5950`. Block-scoped, because no
+        # legitimate Bemessung in this block is in that range — page-wide the
+        # same canary would fire on a 40.000,00 € invoice.
+        assert HEAT_TOTAL_CELL in text and "40 m³" in text
+        assert "1.000.000" not in text  # Σ heat Bemessung, ×1000, leaked
+        assert "600.000" not in text  # unit A's heat Bemessung, likewise
+        assert "40.000" not in text  # Σ warm-water Bemessung, ×1000, leaked
+        assert "5950" not in text  # Bernd's 5,95 m³, ×1000, leaked
 
     def test_the_printed_bemessungen_sum_to_the_printed_gesamtbemessung(self) -> None:
         """The invariant of every allocation test, over rendered text: a document
@@ -740,7 +864,9 @@ class TestBlockBBemessungsgrundlagen:
         assert len(party_rows) == len(_heating(data).lines), "one row per party"
         total_row = next(row for row in table if row and row[0] == "Gesamtbemessung")
 
-        for column in (1, 2):
+        # Three Bemessung columns since slice 5: Fläche·Tage, Verbrauch Heizung,
+        # Verbrauch Warmwasser — in the money table's column order.
+        for column in (1, 2, 3):
             printed = [_de(row[column]) for row in party_rows]
             assert sum(printed) == _de(total_row[column]), (
                 f"column {column}: printed Bemessungen {printed} do not sum to the "
@@ -763,7 +889,7 @@ class TestBlockBBemessungsgrundlagen:
         }
         party_rows = [row for row in table if row and row[0] in labels]
 
-        printed = [_de(row[2]) for row in party_rows]
+        printed = [_de(row[3]) for row in party_rows]
         assert printed == [
             Decimal(20),
             Decimal("5.95"),
@@ -772,9 +898,9 @@ class TestBlockBBemessungsgrundlagen:
             Decimal(8),
         ]
         assert sum(printed) == Decimal(40)
-        assert has_row(table, "Gesamtbemessung", "36.500", "40 m³")
+        assert has_row(table, "Gesamtbemessung", "36.500", HEAT_TOTAL_CELL, "40 m³")
         # F2: the three rounded ones are marked, the two exact ones are not.
-        assert [row[2].startswith(ROUNDED) for row in party_rows] == [
+        assert [row[3].startswith(ROUNDED) for row in party_rows] == [
             False,
             True,
             True,
@@ -782,18 +908,58 @@ class TestBlockBBemessungsgrundlagen:
             False,
         ]
 
+    def test_the_heating_column_states_its_unit_where_the_building_records_one(self) -> None:
+        """**Slice 5**, `docs/08` → "`MeasurementUnit` travels with the value".
+
+        `HeatingUnit.heat_consumption` is kWh at a Wärmemengenzähler and
+        dimensionless HKV-Einheiten at a Heizkostenverteiler, and nothing in the
+        input distinguished them — so the largest denominator on the page was
+        withheld. The unit now rides on the row that carries the value, and the
+        demo building's allocators are `HKV_UNITS` (`packages/adapters` `_SPEC`:
+        1200→1800, 3400→3650, 880→1030 ⇒ 600 / 250 / 150, Σ 1.000).
+
+        The long form is in the Umlageschlüssel cell, where naming the device is
+        the *Erläuterung* half of BGH minimum #2; the compact form is in the
+        figure cell beside it."""
+        text = block_text(statement_html(build_demo_statement()), BLOCK_B)
+
+        assert HEAT_COLUMN in text
+        assert HEAT_KEY_HKV_WITH_CHANGE in text
+        assert HEAT_TOTAL_CELL in text
+        # The two spellings do not leak into each other's cell: a numeric cell
+        # naming a device wraps, and a key cell without one is the old defect.
+        assert f"1.000 {HEAT_KEY_HKV}" not in text
+        assert "Einheiten (Heizkostenverteiler)" not in text  # the un-composed long form
+        # And nothing is withheld any more on this building.
+        assert WITHHELD_CELL not in text
+        assert WITHHELD_NOTE not in text
+
+    def test_a_kwh_building_names_its_heat_meter_instead(self) -> None:
+        """The other lawful configuration, and why the device belongs in the copy
+        at all: `MeterKind.HEAT` does not say which device it is, and the two
+        differ by three orders of magnitude in what their figures mean."""
+        data = build_statement(units=heating_units(heat_unit=MeasurementUnit.KWH))
+        table = rows(block(statement_html(data), BLOCK_B))
+
+        assert has_row(
+            table, HEAT_COLUMN, f"{HEAT_KEY_KWH} (Nutzerwechsel: Gradtagszahlen)", "1.000 kWh"
+        )
+        assert not has_row(table, HEAT_COLUMN, HEAT_KEY_HKV_WITH_CHANGE, HEAT_TOTAL_CELL)
+
     def test_only_the_heating_gesamtbemessung_is_withheld_never_the_row(self) -> None:
-        """**F1.** `docs/08` gap: `HeatingUnit.heat_consumption` is kWh at a
-        Wärmemengenzähler and dimensionless HKV-Einheiten at a Heizkostenverteiler,
-        and nothing distinguishes them. That is **slice 5** and blocks the
-        *figure* — a guessed unit on a Verbrauchsabrechnung is a defect that
-        reaches a tenant, and a unit-free `1.000` invites the assumption.
+        """**F1**, and the branch **slice 5 deliberately kept** (`docs/08` rule 3):
+        a building that records no Maßeinheit still withholds the *figure* — a
+        guessed unit on a Verbrauchsabrechnung is a defect that reaches a tenant,
+        and a unit-free `1.000` invites the assumption (the sub-question the lead
+        answered on 06.08.2026: withhold).
 
         It does **not** block the Umlageschlüssel, which is a name and is BGH
         formal minimum #2 in its own right. Dropping the row left 5.325,03 € —
         52 % of the umlagefähige Kosten — with no key named anywhere on a page
         headed *Bemessungsgrundlagen*."""
-        text = block_text(statement_html(build_demo_statement()), BLOCK_B)
+        data = unitless_statement()
+        assert _heating(data).heat_consumption_unit is None
+        text = block_text(statement_html(data), BLOCK_B)
 
         assert HEAT_COLUMN in text  # the row is on the page
         assert HEAT_KEY_WITH_CHANGE in text  # with the key that was applied
@@ -801,6 +967,10 @@ class TestBlockBBemessungsgrundlagen:
         assert "1.000" not in text  # Σ of the heat Bemessungen, withheld
         assert "146,25" not in text  # Bernd's heat Bemessung, withheld
         assert "103,75" not in text  # the landlord party's, withheld
+        # No device is named either — the key cell may not name a
+        # Heizkostenverteiler while the cell beside it says the unit is unknown.
+        assert HEAT_KEY_HKV not in text
+        assert HEAT_KEY_KWH not in text
 
     def test_the_withheld_cell_can_be_read_as_neither_zero_nor_an_oversight(self) -> None:
         """**F1**, `docs/08` → "The withheld cell is a sentence, not a blank".
@@ -810,7 +980,7 @@ class TestBlockBBemessungsgrundlagen:
         share is undefined. `nicht ausgewiesen` is an act of the landlord's in
         the register § 7 Abs. 3 CO2KostAufG uses; `ohne Maßeinheit` is the only
         reason that makes a figure unprintable rather than merely absent."""
-        table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
+        table = rows(block(statement_html(unitless_statement()), BLOCK_B))
         heat_row = next(row for row in table if row and row[0] == HEAT_COLUMN)
 
         assert heat_row == [HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL]
@@ -818,6 +988,16 @@ class TestBlockBBemessungsgrundlagen:
             f"the withheld cell {heat_row[2]!r} contains a digit and will be read as a figure"
         )
         assert heat_row[2] not in {"", "—", "–", "-", "0", "n/a", "k. A."}
+
+    def test_the_withheld_column_is_absent_from_the_party_table(self) -> None:
+        """The Gesamtbemessung and the per-party Bemessung are withheld together:
+        a column of unit-less figures under a withheld total is the assumption
+        the cell above it exists to prevent."""
+        table = rows(block(statement_html(unitless_statement()), BLOCK_B))
+
+        assert has_row(table, "Partei", "Fläche·Tage", "Verbrauch Warmwasser")
+        assert has_row(table, "Wohnung A — Anna Beispiel", "18.250", "20 m³")
+        assert has_row(table, "Gesamtbemessung", "36.500", "40 m³")
 
     def test_the_withholding_is_explained_directly_beneath_the_column_table(self) -> None:
         """The note carries two facts, and the second is not optional: without
@@ -827,8 +1007,9 @@ class TestBlockBBemessungsgrundlagen:
         Abs. 1 HeizkostenV defect rather than a display gap.
 
         Adjacency is part of the rule (`docs/08`): the note sits between the two
-        tables, not at the end of the block."""
-        rendered = block(statement_html(build_demo_statement()), BLOCK_B)
+        tables, not at the end of the block. Byte-identical to the copy that
+        shipped in slice 4 — slice 5 removed the cause, not the branch."""
+        rendered = block(statement_html(unitless_statement()), BLOCK_B)
         text = _text(rendered)
 
         assert WITHHELD_NOTE in text
@@ -857,6 +1038,13 @@ class TestBlockBBemessungsgrundlagen:
         assert WITHHELD_CELL not in text
         assert HEAT_KEY not in text  # the key that was *not* applied
         assert "Gradtagszahlen" not in text
+        # Slice 5, `docs/08` rule 4: the devices still declare `HKV_UNITS`, but
+        # no consumption Bemessung was applied, so no unit is stated for one —
+        # `None` means *not applied*, and a unit here would label a Bemessung
+        # that determined no euro on the page.
+        assert _heating(data).heat_consumption_unit is None
+        assert HKV_UNIT not in text
+        assert HEAT_KEY_HKV not in text
 
     def test_the_nutzerwechsel_parenthetical_renders_only_at_a_nutzerwechsel(self) -> None:
         """`(Nutzerwechsel: Gradtagszahlen)` names the method that split one
@@ -865,8 +1053,20 @@ class TestBlockBBemessungsgrundlagen:
         built on (`docs/08` → "states no fact the data does not carry")."""
         table = rows(block(statement_html(single_party_statement()), BLOCK_B))
 
-        assert has_row(table, HEAT_COLUMN, HEAT_KEY, WITHHELD_CELL)
-        assert not has_row(table, HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL)
+        assert has_row(table, HEAT_COLUMN, HEAT_KEY_HKV, HEAT_TOTAL_CELL)
+        assert not has_row(table, HEAT_COLUMN, HEAT_KEY_HKV_WITH_CHANGE, HEAT_TOTAL_CELL)
+
+    def test_the_key_cell_carries_exactly_one_parenthetical(self) -> None:
+        """`docs/08` → "Which spelling goes where": the long form is
+        parenthesis-free *so that* the Nutzerwechsel parenthetical stays the only
+        bracket in the cell. `Erfasster Wärmeverbrauch (Einheiten
+        (Heizkostenverteiler)) (Nutzerwechsel: …)` is the failure this rule
+        exists to prevent, and it is one word choice away."""
+        table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
+        key_cell = next(row for row in table if row and row[0] == HEAT_COLUMN)[1]
+
+        assert key_cell == HEAT_KEY_HKV_WITH_CHANGE
+        assert key_cell.count("(") == 1 and key_cell.count(")") == 1
 
     def test_a_warm_water_key_fallback_withholds_the_consumption_bemessung(self) -> None:
         """§ 9a Abs. 2: the area key was applied to that column, so Block B states
@@ -882,9 +1082,10 @@ class TestBlockBBemessungsgrundlagen:
         assert has_row(table, "Verbrauch Warmwasser", AREA_KEY_FALLBACK, "36.500 m²·Tage")
         assert "Erfasster Warmwasserverbrauch" not in _text(rendered)
         assert "m³" not in _text(rendered)
-        # The heating column did *not* fall back, so its row keeps the withheld
-        # cell — the two absences have different causes and different copy.
-        assert has_row(table, HEAT_COLUMN, HEAT_KEY_WITH_CHANGE, WITHHELD_CELL)
+        # The heating column did *not* fall back, so it states its own key and
+        # its own denominator. The two columns' absences and presences have
+        # different causes and different copy, and must stay distinguishable.
+        assert has_row(table, HEAT_COLUMN, HEAT_KEY_HKV_WITH_CHANGE, HEAT_TOTAL_CELL)
 
     def test_without_central_warm_water_no_warm_water_column_appears(self) -> None:
         """No warm-water column exists at all — that is not § 9a Abs. 2 and the
@@ -896,9 +1097,10 @@ class TestBlockBBemessungsgrundlagen:
         assert "Verbrauch Warmwasser" not in text
         assert "Grundkosten Warmwasser" not in text
         assert "m³" not in text
-        # The two columns that do exist, both stated (F1).
+        # The two columns that do exist, both stated (F1) — and the heating one
+        # with its own denominator, which no warm-water branch may take away.
         assert "Grundkosten Heizung" in text
-        assert HEAT_COLUMN in text and WITHHELD_CELL in text
+        assert HEAT_COLUMN in text and HEAT_TOTAL_CELL in text
 
 
 # --- Block C -----------------------------------------------------------------

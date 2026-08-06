@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from lokara_domain import AllocationKey, Occupancy, cents, period
+from lokara_domain import AllocationKey, MeasurementUnit, Occupancy, cents, period
 from lokara_heating_engine import (
     Co2Input,
     HeatingInput,
@@ -91,15 +91,34 @@ def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
             billing_period=BILLING_PERIOD,
             total_cost=cents(1_030_000),
             total_energy_kwh=Decimal(20000),
+            # The Maßeinheit travels with the value (`docs/08` → slice 5): the
+            # three flats carry Heizkostenverteiler, so their 600 / 250 / 150
+            # are dimensionless Einheiten and Σ 1.000 can be printed as such.
+            # `packages/adapters` `_SPEC` is the register source of the same
+            # figures (1200→1800, 3400→3650, 880→1030). Without this the demo
+            # lands on the withholding branch and the largest denominator on
+            # the page stays unprintable.
             units=(
                 HeatingUnit(
-                    "unit-a", 5000, heat_consumption=Decimal(600), ww_consumption_m3=Decimal(20)
+                    "unit-a",
+                    5000,
+                    heat_consumption=Decimal(600),
+                    ww_consumption_m3=Decimal(20),
+                    heat_consumption_unit=MeasurementUnit.HKV_UNITS,
                 ),
                 HeatingUnit(
-                    "unit-b", 3000, heat_consumption=Decimal(250), ww_consumption_m3=Decimal(12)
+                    "unit-b",
+                    3000,
+                    heat_consumption=Decimal(250),
+                    ww_consumption_m3=Decimal(12),
+                    heat_consumption_unit=MeasurementUnit.HKV_UNITS,
                 ),
                 HeatingUnit(
-                    "unit-c", 2000, heat_consumption=Decimal(150), ww_consumption_m3=Decimal(8)
+                    "unit-c",
+                    2000,
+                    heat_consumption=Decimal(150),
+                    ww_consumption_m3=Decimal(8),
+                    heat_consumption_unit=MeasurementUnit.HKV_UNITS,
                 ),
             ),
             # Same occupancy timeline as the NK section: one coherent statement.
