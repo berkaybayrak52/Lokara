@@ -17,6 +17,7 @@ from decimal import Decimal
 
 from lokara_domain import (
     Cents,
+    MeasurementUnit,
     Segment,
     build_unit_segments,
     cents,
@@ -87,6 +88,9 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     else:
         heat_weights = _consumption_weights(parties, heat_values, by_degree_days=True)
         heat_cons = distribute_cents(heat_cons_pot, heat_weights)
+    # The unit follows the weights it labels: `None` under § 9a Abs. 2 means the
+    # consumption key was *replaced*, so there is no Bemessung to put a unit on.
+    heat_unit = None if heat_fallback else _resolve_heat_unit(heating_input.units)
 
     ww_estimated: tuple[str, ...] = ()
     ww_fallback = False
@@ -159,7 +163,24 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
         applied_consumption_share=share,
         split_bounds=heating_input.rules.split_bounds,
         warm_water_separation=separation,
+        heat_consumption_unit=heat_unit,
     )
+
+
+def _resolve_heat_unit(units: tuple[HeatingUnit, ...]) -> MeasurementUnit | None:
+    """The Maßeinheit of the heating-consumption Bemessungen (docs/08 rule 3).
+
+    A unit with `heat_consumption=None` supplies **no measured value**: § 9a
+    estimates it from the measured units, so its estimate is by construction in
+    *their* unit and that row need not declare one. A unit that did supply a
+    value and declares no Maßeinheit makes the key unit-less — the statement
+    then withholds it rather than guessing. `_validate` has already rejected
+    conflicting declarations, so at most one distinct unit reaches here.
+    """
+    if any(u.heat_consumption is not None and u.heat_consumption_unit is None for u in units):
+        return None
+    declared = {u.heat_consumption_unit for u in units if u.heat_consumption_unit is not None}
+    return declared.pop() if declared else None
 
 
 def _unit_totals(parties: list[_Party]) -> tuple[dict[str, int], dict[str, Decimal]]:
@@ -194,6 +215,21 @@ def _validate(heating_input: HeatingInput) -> None:
     ):
         raise HeatingInputError(
             "CO₂ input given but rules carry no CO₂ table/Rechtsstand (CO2KostAufG)"
+        )
+    # One key, one unit (docs/08 rule 2). Checked over the **declarations**, so a
+    # unit that declares a device without supplying a reading conflicts too: its
+    # § 9a estimate would otherwise be labelled with another device's unit.
+    # Checked here, before any branch runs — validation that depends on which
+    # branch ran can be skipped by an unrelated data problem, and mixed units
+    # stay an input error even when § 9a Abs. 2 replaces the key entirely.
+    declared_units = {
+        u.heat_consumption_unit for u in heating_input.units if u.heat_consumption_unit is not None
+    }
+    if len(declared_units) > 1:
+        raise HeatingInputError(
+            "Heating consumption key mixes measurement units "
+            f"({', '.join(sorted(u.value for u in declared_units))}); a Gesamtbemessung is a sum "
+            "and units that cannot be summed cannot be a checkable denominator"
         )
 
 

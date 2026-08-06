@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from lokara_domain import (
     AllocationKey,
+    MeasurementUnit,
     Occupancy,
     Segment,
     build_unit_segments,
@@ -23,7 +24,15 @@ from lokara_domain import (
     overlap_days,
 )
 
-from .inputs import CostItem, NkInput, NkInputError, NkResult, ShareLine, UnitBasis
+from .inputs import (
+    ConsumptionValue,
+    CostItem,
+    NkInput,
+    NkInputError,
+    NkResult,
+    ShareLine,
+    UnitBasis,
+)
 
 
 @dataclass(frozen=True)
@@ -35,6 +44,7 @@ class _Party:
 
 def calculate_nk_statement(nk_input: NkInput) -> NkResult:
     window_from, window_to = _billing_window(nk_input)
+    consumption_unit = _resolve_consumption_unit(nk_input.consumptions)
 
     lines: list[ShareLine] = []
     for cost in nk_input.costs:
@@ -56,7 +66,31 @@ def calculate_nk_statement(nk_input: NkInput) -> NkResult:
         assert sum(a for a in amounts) == cost.amount  # reconciliation, per cost
 
     total = cents(sum(int(line.amount) for line in lines))
-    return NkResult(lines=tuple(lines), total=total)
+    return NkResult(lines=tuple(lines), total=total, consumption_unit=consumption_unit)
+
+
+def _resolve_consumption_unit(
+    consumptions: tuple[ConsumptionValue, ...],
+) -> MeasurementUnit | None:
+    """The Maßeinheit every CONSUMPTION Bemessung is counted in (docs/08 rule 2).
+
+    All parties supplying a value for the key must agree: the reference total is
+    a **sum**, and `600 kWh + 250 m³` is not a quantity, so two distinct units
+    are an input error rather than a display problem — never a silent pick,
+    never a majority vote. Any row without a unit makes the key unit-less and
+    the reference total is withheld (rule 3); NK has no estimation branch, so
+    every row is a supplied value and every one of them must declare its unit.
+    """
+    declared = {row.measurement_unit for row in consumptions if row.measurement_unit is not None}
+    if len(declared) > 1:
+        raise NkInputError(
+            "CONSUMPTION key mixes measurement units "
+            f"({', '.join(sorted(u.value for u in declared))}); a Gesamtbemessung is a sum "
+            "and units that cannot be summed cannot be a checkable denominator"
+        )
+    if not consumptions or any(row.measurement_unit is None for row in consumptions):
+        return None
+    return declared.pop()
 
 
 def _billing_window(nk_input: NkInput) -> tuple[date, date]:
