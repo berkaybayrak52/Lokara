@@ -298,6 +298,14 @@ def statement_html(data: StatementData) -> str:
 <html lang="de">
 <head>
 <meta charset="utf-8" />
+<!-- Becomes the PDF's /Title. Chromium takes it from <title>; it is NOT produced
+     by page.pdf(tagged=True), which only supplies /StructTreeRoot, /MarkInfo and
+     /Lang. An untitled PDF is announced by its filename in a screen reader and in
+     every document list, so the three parts a reader needs to tell two statements
+     apart — what it is, which building, which period — belong here. Same three
+     facts as the <h1> and the meta line below it. -->
+<title>Betriebs- und Heizkostenabrechnung — {escape(data.building_label)} \
+· Abrechnungszeitraum {escape(data.period_label)}</title>
 <style>
   /* docs/05 design tokens — no ad-hoc colors */
   :root {{
