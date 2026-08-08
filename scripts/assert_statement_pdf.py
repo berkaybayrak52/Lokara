@@ -115,7 +115,7 @@ MUST_NOT_APPEAR: dict[str, str] = {
 # BFSG has been in force since 28.06.2025 and an untagged PDF fails WCAG 1.3.1 and 3.1.1
 # at document level, so this is the accessibility DoD on the primary deliverable.
 STRUCTURE_REQUIRED: dict[str, str] = {
-    "/StructTreeRoot": "WCAG 1.3.1 — without the tag tree a screen reader cannot navigate the columns",
+    "/StructTreeRoot": "WCAG 1.3.1 — no tag tree, no way to navigate the columns",
     "/MarkInfo": "the marked-content flag that says the tag tree is real",
 }
 
@@ -161,7 +161,7 @@ def check_structure(pdf: Path) -> list[str]:
     if not root.get("/Lang"):
         problems.append(
             "MISSING  /Lang — WCAG 3.1.1. A screen reader reads German with an English "
-            "voice. Set <html lang=\"de\">; Chromium only carries it through when tagged."
+            'voice. Set <html lang="de">; Chromium only carries it through when tagged.'
         )
     if not (reader.metadata or {}).get("/Title"):
         problems.append(
