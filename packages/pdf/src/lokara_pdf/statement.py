@@ -49,8 +49,16 @@ _REFERENCE_TOTAL_UNITS: dict[AllocationKey, str] = {
     AllocationKey.MEA: "MEA·Tage",
 }
 
+# "Tool, not advice" (CLAUDE.md) is a *positioning* claim about the product. The
+# earlier wording — "Dieses Dokument wurde … erstellt" — warranted that THIS
+# Abrechnung was produced in conformity with the law, which it cannot: BGH formal
+# minimum #4 (Abzug der geleisteten Vorauszahlungen) is not rendered at all until
+# the M6 payment ledger. The subject is Lokara; nothing in the sentence points at
+# this artifact. docs/08 → "The disclaimer states what Lokara is, never that this
+# Abrechnung is complete". Tier 2, footer, one line, no internal break.
 DISCLAIMER = (
-    "Dieses Dokument wurde rechtskonform erstellt; es stellt keine Rechts- oder Steuerberatung dar."
+    "Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, "
+    "keine Rechts- oder Steuerberatung."
 )
 
 

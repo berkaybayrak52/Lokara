@@ -24,8 +24,16 @@ export default function Home() {
       <BrandSection />
       <SummarySection />
 
+      {/*
+        The disclaimer states what Lokara is, never that an artifact it produced
+        is legally complete (docs/08). "Rechtskonform erstellt" was an
+        attestation about the page carrying it; the sentence below is the one
+        transcribed form, identical to the statement PDF's DISCLAIMER, so the
+        product does not carry two spellings of one claim.
+      */}
       <footer className="mt-16 border-t border-mint pt-6 text-sm text-slate">
-        Rechtskonform erstellt — keine Rechts- oder Steuerberatung.
+        Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, keine
+        Rechts- oder Steuerberatung.
       </footer>
     </main>
   );
