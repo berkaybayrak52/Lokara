@@ -39,6 +39,11 @@
   trap — a large share of statements are formally challengeable in court).
 - Consistent disclaimer on every legal/tax output: _"Lokara ist ein Werkzeug, keine Rechts- oder
   Steuerberatung."_ Keep the StBerG/legal-advice line out of the product.
+- **The claim is about the tool, never about the artifact.** A per-document form — *"Dieses Dokument
+  wurde rechtskonform erstellt"* — attests that *this* statement is legally complete, which no
+  document may say while a BGH formal minimum is unrendered. The statement's exact rendered wording,
+  the constraint and the rejected alternatives: `docs/08` → *"The disclaimer states what Lokara is,
+  never that this Abrechnung is complete"*.
 
 ## Accessibility (BFSG / WCAG 2.1 AA)
 

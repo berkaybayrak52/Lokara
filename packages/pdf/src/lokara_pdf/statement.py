@@ -49,8 +49,16 @@ _REFERENCE_TOTAL_UNITS: dict[AllocationKey, str] = {
     AllocationKey.MEA: "MEA·Tage",
 }
 
+# "Tool, not advice" (CLAUDE.md) is a *positioning* claim about the product. The
+# earlier wording — "Dieses Dokument wurde … erstellt" — warranted that THIS
+# Abrechnung was produced in conformity with the law, which it cannot: BGH formal
+# minimum #4 (Abzug der geleisteten Vorauszahlungen) is not rendered at all until
+# the M6 payment ledger. The subject is Lokara; nothing in the sentence points at
+# this artifact. docs/08 → "The disclaimer states what Lokara is, never that this
+# Abrechnung is complete". Tier 2, footer, one line, no internal break.
 DISCLAIMER = (
-    "Dieses Dokument wurde rechtskonform erstellt; es stellt keine Rechts- oder Steuerberatung dar."
+    "Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, "
+    "keine Rechts- oder Steuerberatung."
 )
 
 
@@ -292,12 +300,110 @@ def _heating_section(data: StatementData) -> str:
   {"".join(notes)}"""
 
 
+def _party_total_section(data: StatementData) -> str:
+    """`Anteile je Partei` — the one figure about themselves each party is owed.
+
+    docs/08 → "`Ihr Anteil gesamt` — the per-party total, and why it is never a
+    Saldo". Nothing is calculated here: ``Anteil gesamt = Betriebskosten-Anteil +
+    Heizungs-Anteil``, both addends already computed, already rounded by the
+    engines and already printed above. Integer cents are summed and formatted
+    once; formatted strings are never added.
+
+    **Not a Saldo, and no word that implies one.** BGH minimum #4 is
+    *Vorauszahlungen minus Anteil = Nachzahlung oder Guthaben*; this document renders
+    only the middle term until the M6 payment ledger, so the label is `Anteil` —
+    what the figure is — and the note below the table names the quantity that is
+    missing, in § 556 Abs. 3 BGB's own word.
+
+    **No second person.** `Ihr Anteil gesamt` is the Mieter-Einzelabrechnung's
+    form, where the document has one addressee. This render is the
+    Vermieter-Gesamtübersicht: several parties, no addressee block, and one of
+    the parties is the landlord reading it.
+
+    **One code path, no branch on the heating section.** Without heating that
+    column is simply absent from ``columns`` and `Anteil gesamt` equals the
+    Betriebskosten column by construction — printed, rather than asserted in
+    words. A party's total across cost types is not on the page even then.
+    """
+    heating = data.heating_result
+    # (column header, {party: cents}) in the order the reader met the columns.
+    # The headers name the sections the figures come from — a summary column that
+    # renames its source section makes the reader hunt for it. Summed *across*
+    # cost items, so a second Betriebskostenart lands in the same row.
+    nk_shares: dict[PartyKey, int] = {}
+    for nk_line in data.nk_result.lines:
+        nk_key = (nk_line.unit_id, nk_line.tenancy_id)
+        nk_shares[nk_key] = nk_shares.get(nk_key, 0) + int(nk_line.amount)
+    columns: list[tuple[str, dict[PartyKey, int]]] = [("Betriebskosten", nk_shares)]
+    if heating is not None:
+        heat_shares: dict[PartyKey, int] = {}
+        for heat_line in heating.lines:
+            heat_key = (heat_line.unit_id, heat_line.tenancy_id)
+            heat_shares[heat_key] = heat_shares.get(heat_key, 0) + int(heat_line.total)
+        columns.append((data.heating_cost_label, heat_shares))
+
+    # Row order: first appearance over the money tables, in their own order. A
+    # reader reads down two tables and down this one.
+    parties: list[PartyKey] = []
+    for _, amounts in columns:
+        for party_key in amounts:
+            if party_key not in parties:
+                parties.append(party_key)
+
+    def _cells(figures: list[int]) -> str:
+        return "".join(
+            f'<td class="num">{escape(format_eur(cents(figure)))}</td>'
+            for figure in [*figures, sum(figures)]
+        )
+
+    rows: list[str] = []
+    for party_key in parties:
+        # Every party gets a row under the same header, the landlord's vacancy
+        # line included: the rows are the addends of the Σ row, and a blank or a
+        # dash in a money column reads as zero.
+        party = _party(data.party_labels, party_key[0], party_key[1])
+        figures = [amounts.get(party_key, 0) for _, amounts in columns]
+        rows.append(f"<tr><td>{escape(party)}</td>{_cells(figures)}</tr>")
+
+    headers = "".join(f'<th class="num">{escape(header)}</th>' for header, _ in columns)
+    sums = [sum(amounts.values()) for _, amounts in columns]
+    # `Summe` is licensed here, unlike in the heating tfoot: the rows above this
+    # one really are its addends. The heating column therefore sums to the party
+    # shares, not to heating.total — the difference is the CO₂-Vermieteranteil,
+    # deducted before the renter-facing split and carried by no party.
+    return f"""
+  <div class="party-total">
+    <h3 class="disclosure-title">Anteile je Partei</h3>
+    <table>
+      <thead>
+        <tr><th>Partei</th>{headers}<th class="num">Anteil gesamt</th></tr>
+      </thead>
+      <tbody>
+        {"".join(rows)}
+      </tbody>
+      <tfoot>
+        <tr><td>Summe der Anteile</td>{_cells(sums)}</tr>
+      </tfoot>
+    </table>
+    <p class="advance-note">Der Anteil gesamt ist die Summe der in derselben Zeile
+    ausgewiesenen Anteile; geleistete Vorauszahlungen sind darin nicht berücksichtigt.</p>
+  </div>"""
+
+
 def statement_html(data: StatementData) -> str:
     rechtsstaende = " · ".join(escape(r) for r in data.rechtsstaende)
     return f"""<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8" />
+<!-- Becomes the PDF's /Title. Chromium takes it from <title>; it is NOT produced
+     by page.pdf(tagged=True), which only supplies /StructTreeRoot, /MarkInfo and
+     /Lang. An untitled PDF is announced by its filename in a screen reader and in
+     every document list, so the three parts a reader needs to tell two statements
+     apart — what it is, which building, which period — belong here. Same three
+     facts as the <h1> and the meta line below it. -->
+<title>Betriebs- und Heizkostenabrechnung — {escape(data.building_label)} \
+· Abrechnungszeitraum {escape(data.period_label)}</title>
 <style>
   /* docs/05 design tokens — no ad-hoc colors */
   :root {{
@@ -466,6 +572,26 @@ def statement_html(data: StatementData) -> str:
   /* One derivation line is one statement and is never legible in halves. */
   .apportionment li {{ margin-bottom: 0.8mm; break-inside: avoid; }}
   .party-change .caveat {{ margin-top: 2.5mm; }}
+  /* The document's bottom line: one row per party, and the one figure a reader
+     is otherwise never given about themselves. Tier 1, but the *result* of the
+     BGH minimum rather than a basis for it, so it keeps the money tables' full
+     ink body copy (no `color`, no `font-size`: both inherit, which is the
+     highest pair available) instead of the quieter forest of the three blocks
+     above it. Its surface is Paper like theirs — a fourth tinted slab under
+     three of them is ornament, not clarity — and it is set apart by space and a
+     hairline rule instead. It GROWS with the number of parties, so it must not
+     refuse to break; orphans/widows keep a lone line off a sheet of its own. */
+  .party-total {{
+    line-height: 1.5; margin-top: 6mm; padding-top: 4mm;
+    border-top: 0.5pt solid var(--color-mint);
+    orphans: 2; widows: 2;
+  }}
+  /* The sentence naming what the total does not contain. Same idiom as the
+     heating footer's reconciliation line: quieter by weight, never by size and
+     never by ink below the tier-1 pair (Forest Deep on Paper, 11,32:1). */
+  .party-total .advance-note {{
+    color: var(--color-forest); font-weight: 400; line-height: 1.5; margin: 3mm 0 0;
+  }}
   .co2-grounds {{ display: block; margin-top: 2mm; }}
   footer {{
     color: var(--color-slate); font-size: 8pt; border-top: 0.5pt solid var(--color-slate);
@@ -482,6 +608,7 @@ def statement_html(data: StatementData) -> str:
   </p>
   {_nk_section(data)}
   {_heating_section(data)}
+  {_party_total_section(data)}
   <footer>
     Rechtsstand: {rechtsstaende} · Erstellt mit Lokara.<br />
     {escape(DISCLAIMER)}

@@ -93,6 +93,7 @@ LEGAL_SURFACES = {
     ".cost-split": "--color-paper",  # Block A — §§ 7/8/9 split of the Gesamtkosten
     ".basis-table": "--color-paper",  # Block B — Umlageschlüssel/Bemessung per column
     ".party-change": "--color-paper",  # Block C — § 9b Nutzerwechsel apportionment
+    ".party-total": "--color-paper",  # `Anteil gesamt` per Partei — BGH #3
     "footer": "--color-paper",  # Rechtsstand + disclaimer
 }
 
@@ -111,6 +112,13 @@ LEGAL_SURFACES = {
 # Block B is the horizontal half (Umlageschlüssel, Bemessung, Gesamtbemessung),
 # Block C derives the Bemessung the money table prints. Their surfaces are
 # Paper — docs/08 → 4a, "Carriers, and their tier".
+#
+# `.party-total` passes the same test the other way round: it is the *result* of
+# BGH minimum #3 rather than a basis for it, and a reader recomputes it from two
+# amounts already on the page — verification content by definition (docs/08,
+# "Carrier, tier and page breaks"). Its surface is Paper on purpose: a fourth
+# tinted slab next to the three disclosure blocks is ornament (docs/05,
+# "Restraint over reduction").
 TIER_1_VERIFICATION = frozenset(
     {
         ".key-label",
@@ -120,6 +128,7 @@ TIER_1_VERIFICATION = frozenset(
         ".cost-split",
         ".basis-table",
         ".party-change",
+        ".party-total",
     }
 )
 

@@ -29,6 +29,17 @@ def render_html_to_pdf(html: str, options: PdfOptions | None = None) -> bytes:
                 format=options.format,
                 print_background=True,
                 margin={"top": "20mm", "bottom": "20mm", "left": "18mm", "right": "18mm"},
+                # BFSG / WCAG 2.1 AA. Without this Chromium's print path emits an
+                # untagged PDF: no /StructTreeRoot, no /MarkInfo, and `<html lang="de">`
+                # is dropped so the file carries no /Lang either. A screen reader then
+                # gets an undifferentiated stream of text where the statement has four
+                # money columns, and the four BGH minimums are unreachable by structure.
+                # Measured on Playwright 1.61.0 / Chromium against the demo statement:
+                # tagged=False → root keys /Pages /Type /ViewerPreferences, /Lang None
+                # tagged=True  → + /StructTreeRoot /MarkInfo, /Lang "de", 17423 → 19104 B.
+                # /Title is NOT supplied by this flag — it comes from <title>, which
+                # `statement.py` now sets.
+                tagged=True,
             )
         finally:
             browser.close()
