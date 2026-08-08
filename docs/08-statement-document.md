@@ -193,6 +193,208 @@ Gate: `packages/pdf/tests/test_statement_template.py` — the new string is pinn
 `keine Rechts- oder Steuerberatung` assertion is untouched, and the attestation form is asserted
 **absent from the rendered page**, so it cannot come back through a later edit.
 
+## `Ihr Anteil gesamt` — the per-party total, and why it is never a Saldo
+
+> **Rechtsstand 08/2026** (transcribed 06.08.2026, lead's ruling of the same day). A
+> **document-copy rule**: it introduces nothing into `packages/rules-store`, resolves no dated rule
+> and **computes nothing new** — the figure is the sum of two integer-cent amounts the engines
+> already produced and the page already prints. The legal purpose is BGH formal minimum **#3**
+> (*Berechnung des Anteils des Mieters*); the reason it is **not** #4 is the whole of the labelling
+> ruling below. Standard caveat of this file applies (`docs/07`).
+
+**The defect** (`statement-reviewer`, verified 06.08.2026 against the rendered HTML of the demo
+composition). **No per-party grand total exists anywhere on the document.** The strings `6.203,97`,
+`1.674,05`, `1.462,58`, `2.002,32` and `11.342,92` each occur **0** times. Wohnung A's renter reads
+`600,00 €` in one table and `5.603,97 €` in another — in practice on a different sheet — and is
+never told one number about themselves. Two disconnected tables, no bottom line.
+
+**The figure.** `Anteil gesamt = Betriebskosten-Anteil + Heizungs-Anteil`, per party. Both addends
+are already computed, already rounded by the engines and already printed. Nothing is re-derived, no
+new rounding rule is needed and no euro moves anywhere else on the page.
+
+### The label is `Anteil`. `Saldo` is forbidden, and so is everything that implies one
+
+> **Lead's ruling, 06.08.2026, binding:** *"`Ihr Anteil gesamt: 6.203,97 €` — the sum of two figures
+> already on the page. **Do not label it Saldo and do not imply a balance**; without
+> Vorauszahlungen there isn't one, and a mislabelled figure is the same class of error as the false
+> identity we just fixed."*
+
+The false identity referred to is `= 5,95 m³` for `12 × 181 ÷ 365` (*"The rounding is disclosed —
+`rd.`"*), and the parallel is exact: a **label that asserts more than the arithmetic supports**.
+BGH minimum #4 is *advances paid − share owed = Nachzahlung oder Guthaben*. This document renders
+**only the middle term**. Every word below asserts the first and third as well:
+
+| Forbidden here | What it asserts that this page cannot |
+| --- | --- |
+| `Saldo` | that two sides were netted. Only one side exists. |
+| `Nachzahlung` / `Guthaben` | the *sign* of a balance — i.e. that the deduction happened and came out one way |
+| `zu zahlen` / `offener Betrag` / `fällig` | that the printed figure is what the renter still owes. It is what their share *is*; what they owe is that minus what they have already paid, which is not derivable here (*"#4 is blocked on the M6 ledger, by decision"*). |
+
+`Anteil` is what the figure actually is, it is the word the two money tables already use for exactly
+this quantity (`Anteil` is the NK table's own column header), and it makes no claim about payment.
+
+**The one sentence that has to accompany it** — the fact would otherwise be inferred wrongly by
+every reader who has ever received a utility statement:
+
+```
+Der Anteil gesamt ist die Summe der in derselben Zeile ausgewiesenen Anteile; geleistete
+Vorauszahlungen sind darin nicht berücksichtigt.
+```
+
+- **`geleistete`** is § 556 Abs. 3 BGB's own word and the one this file already insists on for the
+  *Ist* figure. It says which quantity is missing, not merely that something is.
+- The sentence states **no** right, **no** deadline and **no** payment instruction. All three would
+  be claims this document has not transcribed (payment details are still on the *"Also missing"*
+  list).
+- The word `Saldo` does not appear in it. Naming the absent thing by the forbidden name would put
+  the term on the page in the one place a reader scans for it.
+
+### Where it renders, and why there
+
+**Last block of the statement body, after the heating section's disclosure blocks and the `.co2`
+block and the § 9a `.note`s, immediately before the `footer`.** In `statement_html`, between
+`{_heating_section(data)}` and `<footer>`.
+
+1. **It is the only position where both addends are already on the page.** A total placed after the
+   Betriebskosten table would sum a figure the reader has not met yet.
+2. **4b forbids the obvious alternative.** *"Nothing may be inserted between the heating money table
+   and Block A"* — the money table and the disclosure that justifies it stay adjacent, so the
+   summary cannot slot in directly under the heating table.
+3. **It is where the Saldo goes at M6.** German statements put the bottom line last, and the
+   succession below replaces this block in place. A figure that later moves to a different part of
+   the page teaches the reader's eye the wrong place twice.
+
+The document has **no addressee block** today (*"Also missing from the tenant document"*), which is
+also why the second-person form is not what renders — see the next section.
+
+### Which parties get a row, and which label
+
+**Every party gets a row, including the landlord's vacancy line, under the same column header.**
+`Wohnung B — Leerstand ab 01.07.2025 → Vermieter` reads `1.462,58 €` like the other three.
+
+- **Omitting it would make the Σ row false.** The four rows are the addends of `11.342,92 €`; drop
+  one and the column no longer sums to the printed figure — the precise defect the heating footer
+  section exists to fix, re-created one table later.
+- **The vacancy share is a real figure with a real bearer.** The landlord carries the Leerstand
+  share; it is neither zero nor nothing, and a blank or a `—` in a money column reads as zero.
+- **It gets no second, softer label.** Two labels for one arithmetic is the drift the heating-footer
+  section warns about, and the thing that would have been wrong about the landlord's row is the word
+  **`Ihr`** — which is not used on this document at all.
+
+**And that is the ruling on the second person.** The lead's `Ihr Anteil gesamt` is the correct form
+where the document has **one** addressee — the *Mieter-Einzelabrechnung* of *"Two documents from one
+calculation"*, which shows that renter's row and no other. Today's render is the
+**Vermieter-Gesamtübersicht**: four parties, no addressee block, and one of the parties is the
+landlord reading it. `Ihr` there addresses a reader the page does not have, and addresses the
+landlord as though they were the tenant. So:
+
+| Document | Rendered form |
+| --- | --- |
+| Vermieter-Gesamtübersicht (today) | column header `Anteil gesamt`, one row per party |
+| Mieter-Einzelabrechnung (later) | `Ihr Anteil gesamt: 6.203,97 €` — one party, one addressee |
+
+Same word, same figure, same token — only the person changes with the audience. Recorded so the
+Einzelabrechnung does not invent a third spelling.
+
+### The arithmetic, verified against the current figures
+
+Both engines on the demo composition, 06.08.2026 (`build_demo_statement()`), integer cents:
+
+| Partei | Betriebskosten | Heiz- und Warmwasserkosten | Anteil gesamt |
+| --- | --- | --- | --- |
+| Wohnung A — Anna Beispiel | 600,00 € | 5.603,97 € | **6.203,97 €** |
+| Wohnung B — Bernd Muster (Auszug 30.06.2025) | 178,52 € | 1.495,53 € | **1.674,05 €** |
+| Wohnung B — Leerstand ab 01.07.2025 → Vermieter | 181,48 € | 1.281,10 € | **1.462,58 €** |
+| Wohnung C — Clara Vorlage | 240,00 € | 1.762,32 € | **2.002,32 €** |
+| **Summe der Anteile** | **1.200,00 €** | **10.142,92 €** | **11.342,92 €** |
+
+`620_397 + 167_405 + 146_258 + 200_232 = 1_134_292` cents = `120_000 + 1_014_292` — the NK total plus
+the heating shares, which are the Gesamtkosten **less the CO₂-Vermieteranteil**:
+`1.030.000 − 15.708 = 1.014.292`.
+
+- **`11.342,92 €` is deliberately not `11.500,00 €`.** The 157,08 € the landlord bears under § 7
+  Abs. 1 CO2KostAufG is in no party's Anteil, because it is deducted before the renter-facing split.
+  The heating footer already prints that difference, named and cited; this block does not repeat it.
+- **`Summe` is licensed here**, unlike in the heating `tfoot`: the rows printed above the Σ row
+  really are its addends. That is the same test the footer section applies, coming out the other way
+  — the wordings differ because the facts differ.
+- **Invariant, asserted over rendered text:** each column's printed party figures sum exactly to that
+  column's printed Σ, and the `Anteil gesamt` column's Σ equals the sum of the other two columns' Σ.
+  The same invariant every allocation test in this repo carries.
+- Money stays integer cents end to end; the display is `format_eur` (German grouping, NBSP before €).
+
+### Required rendered text
+
+German UI copy (`CLAUDE.md`). Heading, headers and the Σ label are fixed copy; the money-column
+headers name the sections the figures come from — `Betriebskosten` is the NK section's own `<h2>`
+and the heating header is `StatementData.heating_cost_label`, the heating section's `<h2>`. A
+summary column that renames its source section makes the reader hunt for it.
+
+```
+Anteile je Partei
+
+Partei                                            Betriebskosten   Heiz- und Warmwasserkosten   Anteil gesamt
+Wohnung A — Anna Beispiel                               600,00 €                   5.603,97 €      6.203,97 €
+Wohnung B — Bernd Muster (Auszug 30.06.2025)            178,52 €                   1.495,53 €      1.674,05 €
+Wohnung B — Leerstand ab 01.07.2025 → Vermieter         181,48 €                   1.281,10 €      1.462,58 €
+Wohnung C — Clara Vorlage                               240,00 €                   1.762,32 €      2.002,32 €
+Summe der Anteile                                     1.200,00 €                  10.142,92 €     11.342,92 €
+
+Der Anteil gesamt ist die Summe der in derselben Zeile ausgewiesenen Anteile; geleistete
+Vorauszahlungen sind darin nicht berücksichtigt.
+```
+
+- **Row order is the order the parties appear in the money tables** (first appearance over the NK
+  lines, then the heating lines). A reader reads down two tables and down this one; a different
+  order makes them search.
+- **The block always renders — one code path, no branch.** Without a heating section that column is
+  absent and `Anteil gesamt` equals the Betriebskosten column by construction, printed rather than
+  asserted in words — the heating footer's rule, applied one table later. A party's total across
+  *cost types* is not on the page even when heating is absent, so the block still earns its place.
+- **The heading uses the existing `.disclosure-title` class**, so it inherits the *"a heading never
+  ends a page alone"* rule rather than introducing a second heading idiom.
+- **Party labels are the ones the money tables print** (`_party`), so one party is one string across
+  three tables.
+
+### At M6 this becomes an input to the Saldo — it is not a placeholder to delete
+
+`Ihr Anteil gesamt` is **the correct bottom line for a document that does not deduct prepayments**,
+not a stand-in for one. When the M6 Payment Ledger supplies the *geleistete* Vorauszahlungen
+(*"#4 is blocked on the M6 ledger, by decision"* — the `advance × months` shortcut stays rejected),
+the block gains two rows in the same place and the same table:
+
+```
+Anteil gesamt                     6.203,97 €
+− geleistete Vorauszahlungen      2.640,00 €
+= Nachzahlung                     3.563,97 €
+```
+
+- **`Anteil gesamt` survives as the first line of that arithmetic.** It is the *share owed* term of
+  BGH #4 and it does not change when the other two terms arrive. The accompanying sentence
+  (*"geleistete Vorauszahlungen sind darin nicht berücksichtigt"*) is what is dropped then — it
+  becomes false the moment the row above it exists.
+- **`Saldo`, `Nachzahlung` and `Guthaben` become available exactly then**, and not one milestone
+  earlier: what licenses the word is the deduction being on the page, not the figure being
+  convenient.
+- The figures in that sketch are illustrative — `2.640,00 €` is the *Soll* figure of the demo
+  tenancy, which is precisely the number M6 must **not** use. The wording and arithmetic of that
+  block are still an open question at the foot of this file.
+
+### Carrier, tier and page breaks
+
+- Carrier: **`.party-total`**, one element, one class — added to *"Which text on the statement is
+  legally required"* below as **tier 1**. A reader recomputes it from two figures on the page, which
+  is the whole test in `docs/05` → *"Assigning a carrier to a tier"*. Surface **Paper**, like the
+  three disclosure blocks; a fourth tinted slab is ornament (`docs/05` → *Restraint over reduction*).
+- Page breaks: **4b applies unchanged.** The block grows with the number of parties, so it must
+  **not** declare `break-inside: avoid`, and it carries `orphans: 2; widows: 2`; its `tr`s and its
+  `thead` are covered by the existing element-level rules.
+
+Gate: `packages/pdf/tests/test_statement_party_totals.py` — the copy, the per-party arithmetic read
+back off the page, the two reconciliations, the forbidden vocabulary (page-wide, so it cannot be
+introduced elsewhere either), and the landlord row. Plus the two carrier-list rows in
+`test_statement_legal_typography.py` and `test_statement_pagination.py`.
+
 ## Two documents from one calculation ⚠️
 
 The first render shows **every party's name and share to everyone**. That is right for the landlord and
@@ -1321,7 +1523,7 @@ a real building has eight parties.
 
 | Element | Declaration | Why |
 | --- | --- | --- |
-| `.cost-split`, `.basis-table`, `.party-change` | **must not declare `break-inside: avoid`** | These blocks grow with the number of parties. A block that may not split cannot be laid out at all beyond one page, and long before that it strands the page above it. Breaking a disclosure block across pages is *normal*; stranding it is the defect. |
+| `.cost-split`, `.basis-table`, `.party-change`, `.party-total` | **must not declare `break-inside: avoid`** | These blocks grow with the number of parties. A block that may not split cannot be laid out at all beyond one page, and long before that it strands the page above it. Breaking a disclosure block across pages is *normal*; stranding it is the defect. |
 | every `tr` | `break-inside: avoid` | A party's label and their Bemessung are one statement. Split across a page boundary, a renter reads a figure with no name or a name with no figure. |
 | every `thead` | `break-after: avoid` | A column header separated from its first row leaves a page of unlabelled numbers — and in `.basis-table` the *first* table is what gives the second's `Fläche·Tage` / `Verbrauch Warmwasser` columns their meaning. |
 | `.disclosure-title` (Blocks A, B, C) | `break-after: avoid` | A heading alone at the foot of a page is the "justification separated from its figures" defect at its smallest scale, and the cheapest one to prevent. |
@@ -1594,6 +1796,7 @@ fails on it.
 | The heating footer's reconciliation sentence | `tfoot .foot-note` | **1** | HeizkostenV disclosure; it reconciles the Gesamtkosten a reader adds up |
 | § 9a estimation / fallback disclosure | `.note` | **1** | § 9a HeizkostenV — see *Why `.note` is tier 1* below |
 | The CO₂ split and its Berechnungsgrundlagen | `.co2` | **1** | § 7 Abs. 3 CO2KostAufG — the reconciliation `104,72 + 157,08 = 261,80` |
+| `Anteil gesamt` per Partei + the Σ row + the "Vorauszahlungen sind darin nicht berücksichtigt" sentence | `.party-total` | **1** | BGH-Mindestangaben #3 — *Berechnung des Anteils des Mieters*; a reader recomputes each figure from two amounts already on the page |
 | `Rechtsstand` stamps + the "keine Rechts- oder Steuerberatung" disclaimer | `footer` | **2** | `CLAUDE.md` cross-cutting rules — **not** a BGH minimum, our own rule |
 
 Everything else on the page — the Vermieter/period meta line, column headings, decorative framing — is

@@ -45,11 +45,11 @@ import re
 from lokara_pdf import statement_html
 from lokara_pdf.demo import build_demo_statement
 
-# The three heating-disclosure carriers (`docs/08` → 4a). Each grows with the
-# number of parties, so each must be *breakable*: a block that may not split
-# cannot be laid out beyond one page, and long before that it strands the page
-# above it.
-GROWING_CARRIERS = (".cost-split", ".basis-table", ".party-change")
+# The three heating-disclosure carriers (`docs/08` → 4a) plus the per-party
+# total (`docs/08` → "`Ihr Anteil gesamt`"). Each grows with the number of
+# parties, so each must be *breakable*: a block that may not split cannot be
+# laid out beyond one page, and long before that it strands the page above it.
+GROWING_CARRIERS = (".cost-split", ".basis-table", ".party-change", ".party-total")
 
 # The smallest elements that are one indivisible claim. A party's label and their
 # Bemessung are one statement; split across a page boundary a renter reads a
@@ -112,9 +112,9 @@ def declarations(selector: str) -> dict[str, str]:
 
 
 class TestBlocksThatGrowMayBreak:
-    """`docs/08` → 4b: the three disclosure carriers must **not** declare
-    `break-inside: avoid`. Breaking a disclosure block across pages is normal;
-    stranding the page above it is the defect."""
+    """`docs/08` → 4b: the carriers that grow with the party count must **not**
+    declare `break-inside: avoid`. Breaking a disclosure block across pages is
+    normal; stranding the page above it is the defect."""
 
     def test_no_growing_carrier_refuses_to_break(self) -> None:
         rules = stylesheet()
@@ -130,14 +130,17 @@ class TestBlocksThatGrowMayBreak:
             "minimum #3 on a different sheet from the figures it justifies (docs/08 → 4b)"
         )
 
-    def test_the_three_carriers_are_still_the_three_carriers(self) -> None:
-        """Guard on the list above: a fourth disclosure block added without a
-        page-break decision falls through this file otherwise."""
+    def test_every_growing_carrier_is_still_declared(self) -> None:
+        """Guard on the list above: a growing block added without a page-break
+        decision falls through this file otherwise. `.party-total` joined the
+        list on 06.08.2026 — it is one row per party, so it grows exactly like
+        the three disclosure blocks do."""
         rules = stylesheet()
 
         for selector in GROWING_CARRIERS:
             assert selector in rules, (
-                f"{selector} is a `docs/08` → 4a carrier and the stylesheet no longer declares it"
+                f"{selector} is a `docs/08` carrier that grows with the party count and the "
+                "stylesheet no longer declares it"
             )
 
 
