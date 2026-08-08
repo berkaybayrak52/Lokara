@@ -73,6 +73,14 @@ MUST_APPEAR: dict[str, str] = {
     # extend this leftward to include "Wohnflaeche" — PDF extraction renders the ligature
     # as U+FB02 and the golden then fails both paths.
     "Gesamtbemessung: 36.500 m²·Tage": "docs/08: the denominator BGH minimum #3 needs",
+    # --- Anteile je Partei. The whole block could stop rendering and every other golden
+    # above would still pass, because none of them live in it. These cannot appear by
+    # accident: the sum exists nowhere else on the page, the label is unique to the block.
+    "11.342,92": "docs/08: Summe der Anteile — the figure that proves the block rendered",
+    "Summe der Anteile": "docs/08: the block's total row",
+    "geleistete Vorauszahlungen": "docs/08: BGH #4 named as absent, in §556 Abs.3 BGB's own word",
+    # docs/07's positioning claim, in the form CLAUDE.md mandates.
+    "keine Rechts- oder Steuerberatung": "CLAUDE.md: the disclaimer every legal output carries",
 }
 
 MUST_NOT_APPEAR: dict[str, str] = {
@@ -92,6 +100,23 @@ MUST_NOT_APPEAR: dict[str, str] = {
     # there would fire falsely one day. `600 HKV-Einheiten` in MUST_APPEAR catches the same
     # regression from the other side. Worth noting LONG_DIGIT_RUN misses it twice over --
     # six digits is under the 7+ threshold, and the grouped form is not a digit run at all.
+    #
+    # --- claim-strength canaries. docs/07 fixes the positioning word as `rechtskonform`
+    # and forbids `rechtssicher`; and the disclaimer must describe the TOOL, never attest
+    # to this artifact. "Dieses Dokument wurde rechtskonform erstellt" was a per-document
+    # warranty on a statement that does not render BGH minimum #4 at all.
+    "rechtssicher": "docs/07: forbidden claim — the word is `rechtskonform`, never this",
+    "Dokument wurde rechtskonform": "docs/07: per-artifact warranty; the claim is about the tool",
+}
+
+# Structural properties of the PDF itself, read from the document catalog rather than the
+# text layer. Tagging was raised in three consecutive reviews and caught by nothing,
+# because every check in this tree reads extracted text and none of this appears there.
+# BFSG has been in force since 28.06.2025 and an untagged PDF fails WCAG 1.3.1 and 3.1.1
+# at document level, so this is the accessibility DoD on the primary deliverable.
+STRUCTURE_REQUIRED: dict[str, str] = {
+    "/StructTreeRoot": "WCAG 1.3.1 — without the tag tree a screen reader cannot navigate the columns",
+    "/MarkInfo": "the marked-content flag that says the tag tree is real",
 }
 
 # No legitimate figure on this statement has seven or more consecutive digits.
@@ -113,6 +138,37 @@ def extract_text(pdf: Path) -> str:
 
     reader = PdfReader(str(pdf))
     return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+def check_structure(pdf: Path) -> list[str]:
+    """Read the document catalog, not the text layer.
+
+    `/Lang` and `/Title` are independent of tagging: `/Lang` comes from `<html lang>` and
+    `/Title` from `<title>`, and Chromium's print path drops the first and ignores the
+    second unless it is set. A file with no `/Title` is announced by its filename in a
+    screen reader and in a document list.
+    """
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(pdf))
+    root = reader.trailer["/Root"]
+    problems: list[str] = []
+
+    for key, why in STRUCTURE_REQUIRED.items():
+        if key not in root:
+            problems.append(f"MISSING  {key} in the document catalog — {why}")
+
+    if not root.get("/Lang"):
+        problems.append(
+            "MISSING  /Lang — WCAG 3.1.1. A screen reader reads German with an English "
+            "voice. Set <html lang=\"de\">; Chromium only carries it through when tagged."
+        )
+    if not (reader.metadata or {}).get("/Title"):
+        problems.append(
+            "MISSING  /Title — the document announces itself by filename. Comes from "
+            "<title>, independently of tagging."
+        )
+    return problems
 
 
 def main(argv: list[str]) -> int:
@@ -143,6 +199,8 @@ def main(argv: list[str]) -> int:
             f"SUSPECT  {match.group()!r} — 7+ digit run; no figure on this statement is "
             f"that long. Likely an un-de-scaled cents value or x100 weight (docs/03)."
         )
+
+    failures.extend(check_structure(pdf))
 
     if failures:
         print(
