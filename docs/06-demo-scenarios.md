@@ -28,6 +28,14 @@
 > *"Scenario 2 … the fuel, the emissions and the CO₂ price"* below — and the CO₂-Vermieteranteil is
 > deducted **before** the renter-facing split, so correcting it moves every heating euro downstream.
 > The **585/415 ‰ ratio itself is unchanged**: 778,79 / 552,47 is still exactly 585 : 415.
+>
+> ⚠️ **And they move once more with K3 (Berkay Seite 01b), to `776,52 € / 554,74 €`.** The degree-day
+> table becomes VDI 2067 Bl. 1, 12/1983, Tab. 22, so Jan–Jun is **583,3 ‰** and Jul–Dez **416,7 ‰**
+> instead of 585/415 (`docs/03` → *"Seite 01b … (2) K3"*). The split itself is unchanged; only the
+> table under it is. **Recomputed under both rounding methods — the demo chain is bit-identical under
+> largest-remainder and under R5/K9 — so this pair moves for exactly one reason, K3.** The figures in
+> `DEMO-RUNBOOK.md`, `scripts/assert_statement_pdf.py` and the PDF goldens are re-based in the same
+> pass as the engine change, not before it.
 
 ## Scenario 1 — Solo landlord, clean NK + vacancy (⭐ the crown jewel)
 
@@ -105,6 +113,35 @@ rounding (`docs/03` → *"Known gap"*, `PLAN.md` row 4.5).
 **Story value, unexpectedly better.** A building at 40 kg CO₂/m²/a is a Sanierungsfall, the statute
 puts **60 %** of the CO₂ cost on the landlord, and that is exactly the incentive the CO2KostAufG was
 written to create. The demo now shows the law biting instead of a token 20 %.
+
+### The demo's energy reference (Ho/Hu) — DECIDED 12.08.2026, it does not re-base
+
+> **DECISION (lead, delegated and taken).** **The demo does NOT re-base its CO₂ mass. It declares its
+> 20.000 kWh as Heizwert (Hu) and keeps 4.000 kg.** Closed decision; it does not get re-argued.
+
+`docs/03` → *"Seite 01b … (4) Ho/Hu"* introduces the rule that an energy quantity carries its
+reference (Brennwert Ho / Heizwert Hu), that the emission factor carries the same one, that there is
+**no conversion step anywhere**, and that a mismatch is a hard error. Two facts make the demo immune
+to it:
+
+- **The demo's CO₂ mass is supplier-stated** (§ 3 Abs. 1 Nr. 1 CO2KostAufG) — it is an input the
+  landlord copies off the invoice, exactly as `docs/03` requires.
+- **The K4 emission factors are `nur Fallback`.** The register says so in the value itself: they apply
+  **only** where the supplier has failed to state the mass. A fallback that never fires cannot change
+  a figure.
+
+So the Ho/Hu rule changes **nothing** in the demo, and it gets exercised by its own fixtures instead —
+which is where a rule about a fallback belongs. This also keeps exactly **one** re-base in this slice
+(the heating pair, from K3). If a figure looks wrong afterwards there is one cause to look at, not two.
+
+**The consequence if this is ever revisited — written down so the trade-off is visible instead of
+rediscovered.** Restating the demo as a real Erdgas invoice would make the 20.000 kWh **Ho**. The
+consistent supplier mass at the register's Ho factor (0,181 kg CO₂/kWh) is then ≈ **3.620 kg**, the
+intensity ≈ **36,2 kg CO₂/m²/a**, and the building crosses from *37 bis unter 42* into
+**_32 bis unter 37_ — landlord share 60 % → 50 %**. That is a smaller CO₂-Vermieteranteil, a different
+Einstufung on the page, and a re-base of every heating euro downstream (the CO₂ share is deducted
+first). It would also weaken the story recorded below — the building would no longer be the
+Sanierungsfall the 60 % step makes it. Not a reason on its own; recorded so the cost is priced.
 
 ### The two implausible totals — SETTLED, they stay
 

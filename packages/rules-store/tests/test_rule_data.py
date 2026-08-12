@@ -48,10 +48,51 @@ class TestCo2Table:
 
 
 class TestDegreeDays:
-    def test_promille_table_sums_to_1000(self) -> None:
+    def test_carries_the_vdi_2067_table_in_tenths_of_a_promille(self) -> None:
+        """K3 - VDI 2067 Blatt 1, Ausgabe 12/1983, Tabelle 22, stored as
+        Zehntelpromille with sum 10 000 (`docs/03` -> "Seite 01b … (2) K3").
+
+        Replaces the unsourced `170 150 130 80 40 15 10 10 30 80 120 165`, which
+        carried `TODO(verify)` and no citation. Four months move (Jun, Jul, Aug,
+        Dez); the money consequence is the demo's 585/415 pair.
+        """
         table = get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).value
-        assert sum(table.promille_by_month) == 1000
-        assert len(table.promille_by_month) == 12
+        assert table.tenth_promille_by_month == (
+            1700,
+            1500,
+            1300,
+            800,
+            400,
+            133,
+            133,
+            134,
+            300,
+            800,
+            1200,
+            1600,
+        )
+        assert sum(table.tenth_promille_by_month) == 10_000
+        assert len(table.tenth_promille_by_month) == 12
+
+    def test_the_source_names_the_vdi_edition_and_table(self) -> None:
+        """A convention with a citation beats one without: the old rule pointed
+        at "anerkannte Promilletabelle" and nothing else, so nobody could check
+        it. § 9b Abs. 2 stays named, because the *method* is the statute."""
+        source = get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).source
+        assert "§ 9b" in source
+        assert "VDI 2067" in source
+        assert "12/1983" in source
+        assert "Tabelle 22" in source
+        assert "keine Rechtsnorm" in source
+        assert source.count("—") == 1
+        assert source.endswith("— verify before production")
+
+    def test_the_rechtsstand_dates_the_vdi_edition(self) -> None:
+        """12/1983 is the edition of the table. The superseded stamp 01/1981 was
+        attached to a table with no source at all. § 9b's own in-force date is
+        still not asserted anywhere, so no output may pair the paragraph with
+        this date as its Rechtsstand."""
+        assert get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).rechtsstand == "Rechtsstand 12/1983"
 
     def test_source_names_the_statute_the_method_rests_on(self) -> None:
         """§ 9b Abs. 2 HeizkostenV is what permits apportioning an unread period
@@ -59,15 +100,11 @@ class TestDegreeDays:
         Zeitanteile — exactly what the engine does. The store carried only the
         VDI table, so the statement could not cite the paragraph it applies:
         the page must never cite a paragraph the store does not carry.
-        Spec + exact string: `docs/08-statement-document.md` → "The method's
-        statutory basis (§ 9b HeizkostenV) is a prerequisite, not an assumption".
+        Spec: `docs/08-statement-document.md` → "The method's statutory basis
+        (§ 9b HeizkostenV) is a prerequisite, not an assumption".
         """
         source = get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).source
-        assert source == (
-            "§ 9b Abs. 2 und Abs. 3 HeizkostenV; Gradtagszahlen nach anerkannter "
-            "Promilletabelle (VDI-Konvention, keine Rechtsnorm) "
-            "— verify before production"
-        )
+        assert source.startswith("§ 9b Abs. 2 und Abs. 3 HeizkostenV;")
 
     def test_the_statute_and_the_convention_stay_distinguishable(self) -> None:
         """§ 9b is law; the promille numbers are not. A source that named only
@@ -81,11 +118,71 @@ class TestDegreeDays:
         assert resolved.source.count("—") == 1
         assert resolved.source.endswith("— verify before production")
 
-    def test_the_rechtsstand_still_dates_the_table_and_not_the_paragraph(self) -> None:
-        """01/1981 is the promille table's stamp. § 9b's own in-force date is not
-        verified anywhere (it would need the BGBl. history of the HeizkostenV),
-        so no output may pair the paragraph with this date as its Rechtsstand."""
-        assert get_rule(DEGREE_DAY_TABLE, date(2025, 1, 1)).rechtsstand == "Rechtsstand 01/1981"
+
+class TestCo2FallbackEmissionFactors:
+    """K4 - the fallback emission factors, and the energy reference they carry.
+
+    Spec: `docs/03` -> "Seite 01b … (4) Ho/Hu". Source: the Rechtsstand-Register
+    rows "Emissionsfaktor Erdgas / Heizöl / Flüssiggas (K4)", imported as-is
+    (`CLAUDE.md` precedence rule 3), all `verify-before-production`, Rechtsnatur
+    `Konvention`, values from EBeV 2030 Anlage 2 Teil 4.
+
+    ⚠️ **These are `nur Fallback`.** They apply only where the supplier has
+    failed to state the mass under § 3 CO2KostAufG. The demo never reaches them
+    (`docs/06` -> "The demo's energy reference").
+
+    ⚠️ **Open, not resolved here:** the lead's brief gives Erdgas Hu 0,2016 /
+    Ho 0,1820; the register gives 0,201 / 0,181. The register wins by precedence
+    rule 3 and the difference is recorded in `docs/03` § 7 no. 1.
+
+    Neither `EnergyReference` nor the rule set exists yet, so both are imported
+    inside the tests: a module-level import would take the whole file down with
+    a collection error and hide the coverage that is already green.
+    """
+
+    @staticmethod
+    def _factors() -> object:
+        from lokara_rules_store import CO2_FALLBACK_EMISSION_FACTORS
+
+        return get_rule(CO2_FALLBACK_EMISSION_FACTORS, date(2025, 1, 1))
+
+    def test_erdgas_carries_both_references_as_separate_values(self) -> None:
+        from lokara_domain import EnergyReference
+
+        factors = self._factors().value  # type: ignore[attr-defined]
+        assert factors["erdgas"][EnergyReference.HU].kg_co2_per_kwh == Decimal("0.201")
+        assert factors["erdgas"][EnergyReference.HO].kg_co2_per_kwh == Decimal("0.181")
+
+    def test_heizoel_and_fluessiggas_exist_only_as_heizwert_values(self) -> None:
+        """The register states no Brennwert counterpart for either. None is
+        invented: an Ho quantity of oil or LPG has no factor and is refused
+        rather than converted."""
+        from lokara_domain import EnergyReference
+
+        factors = self._factors().value  # type: ignore[attr-defined]
+        assert factors["heizoel"][EnergyReference.HU].kg_co2_per_kwh == Decimal("0.266")
+        assert factors["fluessiggas"][EnergyReference.HU].kg_co2_per_kwh == Decimal("0.236")
+        assert EnergyReference.HO not in factors["heizoel"]
+        assert EnergyReference.HO not in factors["fluessiggas"]
+
+    def test_every_factor_declares_its_own_reference(self) -> None:
+        """The reference travels **on the value**, not in a comment. That is
+        what makes the mismatch checkable at all."""
+        factors = self._factors().value  # type: ignore[attr-defined]
+        for by_reference in factors.values():
+            for reference, factor in by_reference.items():
+                assert factor.reference is reference
+
+    def test_the_source_keeps_the_fallback_scope_and_the_flag(self) -> None:
+        """A statement must never present these as the invoiced factor: they are
+        a substitute for a supplier's breach of § 3 CO2KostAufG."""
+        resolved = self._factors()
+        source = resolved.source  # type: ignore[attr-defined]
+        assert "EBeV 2030" in source
+        assert "§ 3 CO2KostAufG" in source
+        assert "Fallback" in source
+        assert source.count("—") == 1
+        assert source.endswith("— verify before production")
 
 
 class TestWarmWater:
