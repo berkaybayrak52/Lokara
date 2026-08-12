@@ -42,6 +42,45 @@ later milestone). No desktop apps.
 
 ---
 
+## The calculation spec lives in `berkay-work/` and is the source of truth
+
+For **calculation rules**, the precedence is `berkay-work/` → `docs/` → the engines.
+Berkay's spec supersedes `docs/` and the code where they disagree. (`lokara-arch.md` stays
+canonical for *architecture*; this rule is about numbers, formulas and legal values.)
+
+1. **`berkay-work/` is committed and immutable.** Nobody edits anything under it — not a typo, not
+   a broken table, not a value that looks wrong. It stays exactly as exported so a transcription can
+   always be diffed against what he actually wrote. The moment someone "fixes" a value in there, the
+   transcriptions lose their oracle. Findings about its content go in a report, never in the file.
+
+2. **Do not copy his `.md` files into `docs/` — transcribe them.** They are Notion exports with hash
+   suffixes and URL-encoded links to `.csv` files that will not exist; they address "Seite 01b", not
+   `docs/03`; their section 6 is 183 worked examples that belong in `tests/`, not in a doc; and the
+   Non-Goals page has broken HTML tables he flagged himself. A verbatim copy also creates two
+   unsynced copies of every rule — exactly the drift `docs-reconciler` exists to find.
+   **Every transcribed `docs/` file carries a header line naming its source file in `berkay-work/`.**
+
+3. **One exception: the Rechtsstand register.** `berkay-work/Calculations/Rechtsstand-Register …csv`
+   is already structured data — a CSV (Comma-Separated Values) file of 179 rows: Wert, Betrag/Satz,
+   Flag, Quelle, Rechtsgrundlage, Rechtsnatur, Rechtsstand. Import it into `rules-store` nearly
+   as-is — no prose transformation.
+
+4. **Every value lands with its flag intact.** Rechtsnatur (Gesetz / Verordnung / Konvention /
+   Heuristik), Rechtsstand, source URL, and `verify-before-production` vs `geprüft`. **137 of 180 are
+   `verify-before-production`.** His `README-for-Emir.md` lists what must **not** be treated as
+   verified: Anlage-V line numbers, SKR03/SKR04 (Standardkontenrahmen) accounts, DATEV EXTF
+   (the DATEV export text format) parameters, and three BFH (Bundesfinanzhof, the Federal Fiscal
+   Court) case numbers marked `ZITAT UNSICHER`. **Transcribing a flagged value as fact is the error
+   to avoid** —
+   the computation paths are right, the numbers are placeholders of realistic magnitude.
+
+5. **Do not be conservative about editing existing `.md` files.** `docs/03`, `docs/06`, this file,
+   `DEMO-RUNBOOK.md` and `.claude/agents/statement-reviewer.md` all carry rules his spec overrides.
+   Change them. Record the reason for each change in the transcribed `docs/` file, so that a later
+   reader does not "restore" a rule that was deliberately superseded.
+
+---
+
 ## Locked tech decisions (MVP defaults — see `docs/01-tech-stack-and-decisions.md`)
 
 | Area                                                    | Decision                                                                                                                                                                                                                                                                        |
@@ -108,7 +147,13 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 1. Pure Python package, no web-framework/DB/vendor imports.
 2. Golden fixtures committed (pytest); output is byte-/cent-exact and deterministic.
 3. The canonical **€1,200 garbage-cost allocation example** (`docs/03-nk-heating-engines.md`) passes.
-4. Rounding uses **largest-remainder**; totals reconcile to the input to the cent.
+4. Rounding is **`round_half_up` per share at assignment**; the **Verteilungsrest**
+   (`Blockbetrag − Σ Anteile`) goes to the **owner bucket**, together with the vacancy share.
+   ±1 ct per block is expected and correct. Totals reconcile to the input to the cent **once the
+   residual is counted** — the owner absorbs the difference.
+   *Changed from largest-remainder (Berkay R1/R5/K9, `docs/03`; see the precedence rule above). The
+   canonical €1,200 fixture is identical under both methods — 600,00 / 178,52 / 181,48 / 240,00,
+   residual exactly 0 — so this change did not move it, and nobody may claim it did.*
 5. `mypy --strict` clean; money is `decimal.Decimal` + integer cents, never `float`.
 
 ## Definition of done for any UI work
