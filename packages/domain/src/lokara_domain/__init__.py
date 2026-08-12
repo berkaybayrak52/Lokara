@@ -2,6 +2,12 @@
 legal rule-value shapes. Pure stdlib — engines and adapters build on this."""
 
 from .allocation_key import AllocationKey
+from .energy import (
+    EmissionFactor,
+    EnergyReference,
+    EnergyReferenceMismatchError,
+    co2_grams_from_energy,
+)
 from .legal_values import (
     Co2Step,
     Co2Table,
@@ -23,6 +29,7 @@ from .money import (
     add_cents,
     cents,
     distribute_cents,
+    distribute_cents_half_up,
     format_eur,
 )
 from .occupancy import Occupancy, OccupancyOverlapError, Segment, build_unit_segments
@@ -38,6 +45,9 @@ __all__ = [
     "Co2Step",
     "Co2Table",
     "DegreeDayTable",
+    "EmissionFactor",
+    "EnergyReference",
+    "EnergyReferenceMismatchError",
     "HeatingSplitBounds",
     "MeasurementUnit",
     "MeterKind",
@@ -52,8 +62,10 @@ __all__ = [
     "add_cents",
     "build_unit_segments",
     "cents",
+    "co2_grams_from_energy",
     "days_between",
     "distribute_cents",
+    "distribute_cents_half_up",
     "format_eur",
     "overlap_days",
     "period",

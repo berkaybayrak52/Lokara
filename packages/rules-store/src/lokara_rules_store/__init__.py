@@ -6,6 +6,7 @@ weights, warm-water formula) is data with a law date — resolved via
 """
 
 from .rules import (
+    CO2_FALLBACK_EMISSION_FACTORS,
     CO2_SPLIT_TABLE,
     DEFAULT_CONSUMPTION_SHARE,
     DEGREE_DAY_TABLE,
@@ -24,6 +25,7 @@ from .store import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "CO2_FALLBACK_EMISSION_FACTORS",
     "CO2_SPLIT_TABLE",
     "DEFAULT_CONSUMPTION_SHARE",
     "DEGREE_DAY_TABLE",

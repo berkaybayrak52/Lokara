@@ -5,7 +5,7 @@ math uses decimal.Decimal exclusively.
 """
 
 from collections.abc import Sequence
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import NewType
 
 Cents = NewType("Cents", int)
@@ -71,3 +71,55 @@ def distribute_cents(total: Cents, weights: Sequence[Decimal | int]) -> list[Cen
     result = [Cents(f) for f in floors]
     assert sum(result) == total  # reconciliation is the whole game — never ship without it
     return result
+
+
+def distribute_cents_half_up(
+    total: Cents, weights: Sequence[Decimal | int], *, residual_index: int
+) -> list[Cents]:
+    """R1/R5/K9 allocation: every share is `round_half_up` of its own exact
+    quota, computed once at assignment; the party at ``residual_index`` receives
+    the ``Verteilungsrest`` — ``total - Σ(other shares)`` — instead of its own
+    rounded quota.
+
+    That party is the **owner bucket** (K9): a leftover cent may not be handed
+    to whichever renter happens to have the largest fraction, because nothing on
+    a statement can explain that transfer between tenants; the owner row can be
+    explained in one line. Its share may therefore be ±1 ct off its own quota
+    and **may be negative** (`01b-F01` verbrauchHz: -1 ct) — that is R5 working,
+    not a defect.
+
+    ``sum(shares) == total`` holds by construction, exactly as for the
+    largest-remainder :func:`distribute_cents`, which stays for its own callers.
+
+    K9 is a house convention (`Konvention`, verify before production), not a
+    norm — no output may present it as one. Spec:
+    `docs/03-nk-heating-engines.md` → "Seite 01b … (1) Rounding".
+    """
+    if len(weights) == 0:
+        raise ValueError("distribute_cents_half_up requires at least one weight")
+    if not 0 <= residual_index < len(weights):
+        raise ValueError(
+            f"distribute_cents_half_up residual_index {residual_index} is out of range "
+            f"for {len(weights)} weights"
+        )
+    decimal_weights = [w if isinstance(w, Decimal) else Decimal(w) for w in weights]
+    if any(not w.is_finite() or w < 0 for w in decimal_weights):
+        raise ValueError("distribute_cents_half_up weights must be finite and >= 0")
+    weight_sum = sum(decimal_weights, Decimal(0))
+    if weight_sum == 0:
+        raise ValueError("distribute_cents_half_up requires a positive weight sum")
+
+    shares = [
+        Cents(0)
+        if index == residual_index
+        # R1: rounded once, at the moment the share is assigned — and R2: from
+        # the recomputed exact quotient, never from a rounded factor.
+        else Cents(
+            int((Decimal(total) * w / weight_sum).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        )
+        for index, w in enumerate(decimal_weights)
+    ]
+    shares[residual_index] = Cents(int(total) - sum(shares))
+
+    assert sum(shares) == total  # the residual is inside the sum, never an exception to it
+    return shares
