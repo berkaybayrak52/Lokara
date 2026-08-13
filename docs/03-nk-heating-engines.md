@@ -753,11 +753,12 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 
 ## 9. Wiring R1/R5/K9 and Ho/Hu into the engine — the site-by-site decision
 
-> **Written 13.08.2026, before the code.** Two of the four rules of § 1 were transcribed but never
-> reached the engine: `distribute_cents_half_up` has **zero production callers** and
-> `EnergyReference` is imported by nothing outside `domain`/`rules-store`, so **no boundary refuses
-> an Ho/Hu mismatch**. `CLAUDE.md` DoD 4 carries the dated *NOT YET WIRED* warning; whoever lands the
-> engine change deletes it, and not before. K3 and H2 did land and are not touched here.
+> **Written 13.08.2026 before the code; wired the same day and now describes the engine.** It was
+> written because two of the four rules of § 1 had been transcribed but never reached the engine:
+> `distribute_cents_half_up` had **zero production callers** and `EnergyReference` was imported by
+> nothing outside `domain`/`rules-store`, so **no boundary refused an Ho/Hu mismatch**. Both are
+> wired now — the table below is the map of what the code does, not a plan. K3 and H2 had already
+> landed and were not touched.
 >
 > Rechtsstand: the *methods* below are §§ 7/8/9/9b HeizkostenV and §§ 3/7 CO2KostAufG; the
 > **residual convention K9** and the **K4 emission factors** are `Konvention` /
