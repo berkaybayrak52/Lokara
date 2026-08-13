@@ -41,7 +41,12 @@ case "$LEVEL" in
       packages/heating-engine/tests packages/rules-store/tests
     ;;
   full|demo)
-    run "pytest (all)"      uv run pytest -q
+    # LOKARA_REQUIRE_DB / LOKARA_REQUIRE_PDF turn an unreachable Postgres or a missing
+    # Chromium from a pytest.skip into a hard failure. Only ci.yml set them, so with
+    # Docker down this gate went GREEN with 93 tests skipped -- including the entire RLS
+    # isolation suite, i.e. CLAUDE.md rule 3. Eight sessions of "local green" rested on
+    # that. A gate that cannot tell a skipped suite from a passing one is not a gate.
+    run "pytest (all)"      env LOKARA_REQUIRE_DB=1 LOKARA_REQUIRE_PDF=1 uv run pytest -q
     run "eslint"            bun run lint
     run "tsc"               bun run typecheck
     run "vitest"            bun run test

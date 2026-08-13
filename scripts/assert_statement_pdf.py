@@ -162,10 +162,17 @@ def check_structure(pdf: Path) -> list[str]:
         if key not in root:
             problems.append(f"MISSING  {key} in the document catalog — {why}")
 
-    if not root.get("/Lang"):
+    # A VALUE assertion, not a truthiness one. Chromium substitutes /Lang = 'en-US' when
+    # <html> declares no language, so `if not root.get("/Lang")` was satisfied by exactly
+    # the state this message describes — and with tagged=True the key is always present,
+    # which made the branch dead as well as wrong. Caught by rendering a deliberately
+    # broken PDF: a check verified only in the passing direction is half-verified.
+    lang = str(root.get("/Lang") or "")
+    if not lang.lower().startswith("de"):
         problems.append(
-            "MISSING  /Lang — WCAG 3.1.1. A screen reader reads German with an English "
-            'voice. Set <html lang="de">; Chromium only carries it through when tagged.'
+            f"WRONG    /Lang is {lang or 'absent'!r}, not a German tag — WCAG 3.1.1. "
+            f'A screen reader reads German with an English voice. Set <html lang="de">; '
+            f"Chromium substitutes en-US when the element declares nothing."
         )
     if not (reader.metadata or {}).get("/Title"):
         problems.append(
