@@ -2,7 +2,7 @@
 
 > Build **iteratively**. Each milestone has a Definition of Done (DoD). Do not start a milestone
 > before the previous one's DoD is met. **Engines + golden fixtures always come before UI.**
-> Canonical dates from `lokara-arch.md`: pitch **06.08**, public launch **~08.09** (web + native
+> Canonical dates from `lokara-arch.md`: pitch **27.08**, public launch **~08.09** (web + native
 > iOS/Android together). (Earlier freeze/web-only dates of 23.07/25.07 are now historical.)
 >
 > **Status: M0–M4 are built and green** on the v4 Python stack (FastAPI + SQLAlchemy/RLS + Bun/shadcn).
@@ -28,46 +28,65 @@
 > it, and the six code docstrings that cited the file now cite its replacement. Phase G was the only
 > unstarted phase and is an M10 bullet below.
 
-## Pitch plan (target: 06.08) — push for maximum breadth
+## Execution order — what closes the legally-required surface first
 
-**Decision:** attempt **M4 → M10** before the pitch, ordered by investor value ÷ risk, with
-**Berkay's calculation specs written in parallel** so the spec-dependent milestones aren't guesswork.
-Stubs stay stubbed where APIs cost money (finAPI, Vision/OCR, email, billing).
+**The ranking optimises for one thing: closing the surface a Mieter can legally cut the bill over.**
+Three exposures are live in the product today — a missing **UVI** (unterjährige
+Verbrauchsinformation) costs **3 %** of the heating cost, a missing **CO₂ disclosure** costs another
+**3 %**, and a statement that is not **verbrauchsabhängig** costs **15 %** (§ 12 Abs. 1 HeizkostenV).
+The differentiator is legal correctness, so legal correctness is what gets built first.
 
-> ⚠️ **Read this before starting anything below.** This is a deliberately ambitious run. Most of
-> M6–M10 is normally months of work. The plan is therefore written to **degrade gracefully**: value
-> lands first, everything spec-dependent is gated, and there is an explicit cut list. **A working demo
-> beats a broader broken one — every time.**
+> **This replaces "investor value ÷ risk" (the pitch plan).** ⚠️ *Note the date carefully, because
+> the old plan's framing is easy to half-remember:* **06.08 passed, but the pitch itself moved to
+> 27.08** and is still ahead. The ordering principle changed **by decision** — legal surface before
+> investor surface — **not** because the deadline evaporated. There is still a pitch to rehearse for,
+> and the stop-building checkpoint below still fires. What survives from the old plan is the hard
+> rules; they were never about the date.
 
-### Execution order (not milestone order)
-
-Build in this sequence, because it front-loads what an investor reacts to:
+Berkay's spec is the other reason the order moved. **Pages 06, 07 and 08 now exist, so M6, M8 and
+M10 have specs where they had none**, and page 01b's transcription is in flight. M7's 🔒 comes off
+with a caveat that must be carried into the milestone itself, not just noted here (see row 7).
 
 | # | Work | Why here | Risk |
 | --- | --- | --- | --- |
-| 1 | **M4** canned doc-extraction | Vision stub already exists (Phase D); mostly review UI. The "AI-assisted UX" pillar. | low |
-| 1.5 | **FK-Isolation slice**: composite FKs on `(id, account_id)` | One migration across most tables. Inside M5 (identity + roles + portals + RLS at once) a failure would be impossible to attribute — and this work needs nothing from M5. | medium |
-| 2 | **M5a** identity schema + isolation (`person` RLS, `landlord`/`self_use_period` coverage, roles/shape) | Pure schema + policy. Split out for the same reason as 1.5: mixing a migration with routers and screens makes a failure impossible to attribute. Closes the last 2 `check_rls_coverage.py` problems. | low |
-| 2.5 | **M5 remainder** roles in the API, portals, URL-carried context, switcher | Unlocks **persona 4** — one login: Vermieter + Mieter + Investor — your strongest differentiator (`docs/06`). | medium |
-| 3 | **M10-slice**: read-only Mieter + StB portals | Completes the persona demo; no tickets/activation yet. | medium |
-| 4 | **M9-slice**: §556 deadline Wächter + reminders | Visible, date-driven, needs no new legal math. | medium |
-| 4.5 | **CO₂ rounding slice**: § 5 Abs. 1 S. 3 CO2KostAufG — round the specific emission value to one decimal **before** classifying | Same class as the period-factor bug already fixed: a wrong Stufe on a legal document, § 7 Abs. 4 exposure. The engine classifies the raw `Decimal`, so 11,96 lands in a different Stufe than the 12,0 the statute says to classify. Cheap, isolated, and it should not drift — `docs/03` → "Known gap, deliberately not implemented here". | low |
-| 5 | **M6** bank + Payment Ledger (finAPI stubbed) | Unlocks the two-time-axes story; adds Redis/workers. | high |
-| 6 | **M7** tax export + AfA | 🔒 **gated on specs** — see below. | high |
-| 7 | **M8** document/clause engine | 🔒 **gated on specs**. | high |
-| 8 | **M10 remainder**: tickets, activation codes, investment cockpit | Broad surface, lower per-hour demo value. | high |
-| 9 | **Phase G** native/Expo | Largest surface, least pitch payoff — "at launch" is a fine answer. | highest |
+| 1 | **Berkay 01b** — heating rules R1/R5/K9, K3, H2, Ho/Hu | In flight. Everything downstream reads the numbers it re-based. | low |
+| 2 | **Page 02 → `docs/09`** + BetrKV catalogue in `rules-store` | Catalogue import, cheap — structured data, not prose. **Two existing screens are waiting on it:** `kosten/costs-page.tsx` and `beleg/review-step.tsx` both take a free-text `Kostenart` today, so nothing validates that a cost is even umlagefähig. | low |
+| 3 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | `slice/m5-pre-context-read` already exists with **25 red fixtures**. Everything tenant-facing is behind it. | medium |
+| 4 | **M6** bank + Payment Ledger (finAPI stubbed) — **and BGH formal minimum #4** | The ledger closes the **Abzug der Vorauszahlungen** — the last of the four settled BGH minimums (`docs/08`). Until it exists the statement is formally incomplete, not merely thin. Page 08 (Bank-Matching) is specced. | high |
+| 5 | **Page 05 → `docs/12`** — the Wächter set | § 556 Frist, Eichfrist, UVI-Turnus. One guard mechanism, three uses (`CLAUDE.md`: Guard/Wächter is one reusable pattern, not bespoke code each time). Absorbs the old "M9-slice §556 Wächter" row. | medium |
+| 6 | **UVI** — unterjährige Verbrauchsinformation | **Legally mandatory monthly** (§ 6a HeizkostenV). Needs row 3 and monthly readings. This is one of the three Kürzungsrecht exposures named above. | medium |
+| 7 | **M7** tax export + AfA (pages 03 + 04) | Specced but **NOT production-ready** — see the caveat below and in the M7 milestone. | high |
+| 8 | **M8** clause engine · **M10 remainder** (tickets, activation codes, investment cockpit) · **mobile skeleton** | Broadest surface, furthest from the legal core. | high |
 
-*The FK slice is numbered **1.5**, and M5's split reuses row 2 + a new **2.5**, deliberately: the cut
-list below refers to these indices, so renumbering 3–9 would silently repoint it. Milestone
-identifiers (M4, M5, …) never move — M5a is a slice of M5, not a new milestone.*
+**Row 7's caveat, stated here and repeated in M7 because it is the expensive one to forget:**
+Berkay's `README-for-Emir.md` marks **Weg B**, **all Anlage-V line numbers**, the **SKR03/SKR04
+accounts** and the **DATEV EXTF parameters** as placeholders of realistic magnitude — the computation
+paths are right, the numbers are not verified. M7 may be built against them; **nothing derived from
+them ships to a real Steuerberater** without the values being confirmed first.
 
-### Hard rules for this run
+### Carried over from the pitch-era order, not yet ranked
 
-1. **🔒 No calculation without its spec.** M7/M8 (AfA rates, Anlage-V lines, DATEV encoding, clause
-   versions) must not start until Berkay's page exists, is transcribed into `docs/`, and its worked
-   example is a golden fixture. Guessing German tax law is the one failure this product cannot absorb.
-   If a spec isn't ready, **build the adapter/stub and move on** — never invent the numbers.
+Two rows from the old table are not in the new one. Recorded rather than dropped, so neither is lost:
+
+- **CO₂ rounding slice** — § 5 Abs. 1 S. 3 CO2KostAufG: round the specific emission value to one
+  decimal **before** classifying. The engine classifies the raw `Decimal`, so 11,96 lands in a
+  different Stufe than the 12,0 the statute says to classify — a wrong Stufe on a legal document,
+  § 7 Abs. 4 exposure, same class as the period-factor bug already fixed. Cheap and isolated.
+  `docs/03` → *"Known gap, deliberately not implemented here"*.
+- **M10-slice: read-only Mieter + StB portals** — completes the persona demo; no tickets or
+  activation codes. Sat directly after M5 in the old order.
+
+*(Rows 1, 1.5, 2 and 4.5 of the pitch-era table — M4 doc-extraction, the FK-Isolation slice, M5a —
+are **done** and now live in their milestone sections rather than in an execution table.)*
+
+### Hard rules
+
+1. **🔒 No calculation without its spec.** A calculation must not start until Berkay's page exists, is
+   transcribed into `docs/`, and its worked example is a golden fixture. Guessing German tax law is
+   the one failure this product cannot absorb. If a spec isn't ready, **build the adapter/stub and
+   move on** — never invent the numbers. Since page 01b landed, the lock is off M6/M7/M8/M10 in the
+   sense that specs now exist; it is **not** off any value his register still flags
+   `verify-before-production` (137 of 180 — `CLAUDE.md` → the `berkay-work/` precedence rule).
 2. **The demo path is sacred.** Every milestone ends with the full path re-verified end to end
    (clean DB → seed → statement → PDF). If a change breaks it, fix or revert before moving on.
 3. **Tag every green state** (`git tag demo-green-<n>`). At any moment you must be able to check out a
@@ -77,14 +96,23 @@ identifiers (M4, M5, …) never move — M5a is a slice of M5, not a new milesto
 
 ### Cut list (drop in this order if time runs short)
 
-**9 → 8 → 7 → 6 → 4.** Cut early and deliberately rather than shipping something half-built: an
-honest roadmap slide beats a broken screen. M5 and the persona story are the last things to give up —
-they carry the differentiator.
+**Mobile skeleton → M10 remainder → M8 → M7 → M6.** Cut early and deliberately rather than shipping
+something half-built. **M5 and the Wächter set are the last things to give up** — M5 carries the
+persona story, and the Wächter set is what keeps the three Kürzungsrecht exposures closed.
+
+> *This list names milestones, not row numbers.* It used to read `9 → 8 → 7 → 6 → 4`, which meant the
+> execution table could not be reordered without silently repointing it — the table said so itself,
+> in a footnote asking future readers not to renumber. That coupling is now gone: names survive a
+> reorder, indices do not. Milestone identifiers (M4, M5, …) never move; M5a is a slice of M5, not a
+> new milestone.
 
 ### Stop-building checkpoint
 
-**Two days before the pitch, stop feature work.** Merge to `main`, rehearse from `DEMO-RUNBOOK.md` on
-a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in after that line.
+**Two days before any scheduled demo, stop feature work.** Merge to `main`, rehearse from
+`DEMO-RUNBOOK.md` on a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in
+after that line. *(Was written for the 06.08 pitch. That date passed, the pitch moved to **27.08**,
+and the discipline outlives both — so it is tied to whatever demo is next rather than to a fixed
+date. At 27.08 the line falls on ~25.08.)*
 
 ---
 
@@ -338,6 +366,16 @@ the **paid** advances, not the agreed ones.
 ---
 
 ## M7 — Tax export + AfA
+
+> ⚠️ **Specced, but not production-ready — the 🔒 came off the spec, not off the numbers.**
+> Berkay's pages 03 + 04 give the computation paths, and those are right. His
+> `README-for-Emir.md` marks the *values* as placeholders of realistic magnitude:
+> **Weg B**, **every Anlage-V line number**, the **SKR03/SKR04 accounts** and the
+> **DATEV EXTF parameters** — plus three BFH case numbers flagged `ZITAT UNSICHER`.
+> Build against them; **nothing derived from them goes to a real Steuerberater or a
+> Finanzamt** until each value is confirmed and its register flag flips from
+> `verify-before-production` to `geprüft`. Transcribing a flagged value as fact is the
+> specific error this milestone is exposed to (`CLAUDE.md` → the `berkay-work/` precedence rule).
 
 - `packages/export-engine` (pure): **Anlage V** (PDF+CSV) + **DATEV EXTF** (Windows-1252, `;`, CRLF)
   from the ledger; Readiness-Check; immutable export archive with hash+timestamp.

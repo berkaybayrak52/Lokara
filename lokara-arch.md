@@ -422,7 +422,7 @@ The Wiki's Datenschutz page is explicit: this is the operating licence. Bake in 
 
 ## 7. Revised build order (aligned to the real roadmap)
 
-Roadmap from the Wiki: **pitch 06.08 (Tolga Önal)**, **launch ~08.09** (web **+ native iOS/Android
+Roadmap from the Wiki: **pitch 27.08 (Tolga Önal)**, **launch ~08.09** (web **+ native iOS/Android
 together**) before NK season. (Earlier freeze/web-only dates 23.07/25.07 are historical.) Small team → broad scope,
 hard Tier-1 priority, iterative.
 
@@ -437,7 +437,7 @@ hard Tier-1 priority, iterative.
 
 Rule from v1 still governs: **engines + fixtures before UI.** A wrong framework call later costs an app rewrite; it never touches the engines or the data.
 
-> ⚠️ **Reality flag for a two-person team:** the Wiki has pulled a _lot_ into V1 (native apps + OCR + doc-extraction + contract engine + investment module, all by ~Sept). That's ambitious. The pitch (06.08) only needs step 1. Guard the sequence — engines and correctness first; the launch surface can stage in behind them.
+> ⚠️ **Reality flag for a two-person team:** the Wiki has pulled a _lot_ into V1 (native apps + OCR + doc-extraction + contract engine + investment module, all by ~Sept). That's ambitious. The pitch (27.08) only needs step 1. Guard the sequence — engines and correctness first; the launch surface can stage in behind them.
 
 ---
 

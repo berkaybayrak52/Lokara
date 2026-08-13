@@ -234,10 +234,10 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
   `scripts/verify_demo_path.sh`, the purity/RLS/PDF checks) and the six agents with disjoint write
   scopes. No agent may both write a test and satisfy it.
 - Follow `PLAN.md`. Milestone DoDs (Definitions of Done) are binding; **engines + fixtures before
-  UI**. Before the 27.08 pitch the build order is the **execution order** in `PLAN.md` (value ÷ risk),
-  not the milestone numbering — and its **hard rules** apply: no calculation without its transcribed
-  spec + golden fixture, the demo path is re-verified every milestone, tag each green state, stubs
-  stay stubs.
+  UI**. The build order is the **execution order** in `PLAN.md` — ranked by what closes the
+  legally-required surface first, not by investor value ÷ risk and not by the milestone numbering —
+  and its **hard rules** apply: no calculation without its transcribed spec + golden fixture, the
+  demo path is re-verified every milestone, tag each green state, stubs stay stubs.
 - **Never leave the demo path broken.** If a change breaks clean-DB → seed → statement → PDF, fix or
   revert before moving on. A working demo beats a broader broken one.
 - When a decision isn't covered here or in `docs/`, prefer the choice that (a) keeps engines pure,

@@ -1960,7 +1960,7 @@ suggestion would be invented law, not a convenience.
 - [ ] BetrKV cost-type catalogue + default keys + non-umlagefähig flags
 - [ ] A **worked example** with real numbers → becomes the golden fixture for the document layer
 
-## Interim framing for the 06.08 pitch
+## Interim framing for the 27.08 pitch
 
 The current PDF is the **landlord's calculation view**, and it's honest to present it as such:
 

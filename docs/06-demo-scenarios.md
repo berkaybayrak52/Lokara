@@ -279,7 +279,7 @@ roles, three scopes, no duplicate accounts. Two accounts (A and B) are enough to
 | 3 | **M10** — Mieterportal (activation codes, tickets, UVI) |
 | 5 | **M10** — StB guest access |
 
-⚠️ **None of these are buildable before the 06.08 pitch** (M3 is still finishing). Until then the
+⚠️ **None of these are buildable before the 27.08 pitch** (M3 is still finishing). Until then the
 honest framing is: *show the model, not fake screens* — the schema, the role table above, and the
 persona-4 story, backed by the isolation test. Empty or fabricated dashboards would undercut the
 correctness argument that is the pitch's strongest asset.

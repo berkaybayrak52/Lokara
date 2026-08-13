@@ -1,4 +1,4 @@
-# DEMO-RUNBOOK.md — the 06.08 pitch walkthrough
+# DEMO-RUNBOOK.md — the 27.08 pitch walkthrough
 
 > One page, in order: get it running → click path → what to say → what to do if it breaks.
 > **Rehearse this on a clean checkout at least once.** Most demo failures are environment, not code.
