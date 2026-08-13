@@ -43,8 +43,12 @@ MUST_APPEAR: dict[str, str] = {
     # 150 EUR/t against the 2025 statutory 55 EUR/t). The 585:415 ratio did NOT move --
     # 778,79 / 1.331,26 = 0,5850 exactly. Only the pot moved, because the
     # CO2-Vermieteranteil is deducted before the renter-facing split.
-    "778,79": "docs/06: unit B heating, Mieter share (585 permille)",
-    "552,47": "docs/06: unit B heating, Vermieter share (415 permille)",
+    # Re-based again when K3 adopted Berkay's sourced degree-day table (VDI 2067 Bl. 1,
+    # 12/1983, Tab. 22). Jan-Jun 585,0 -> 583,3 permille. The POT is unchanged
+    # (77.652 + 55.474 = 133.126) -- this is a re-split, not a re-price, which is the
+    # check to run if these two ever look wrong again.
+    "776,52": "docs/06: unit B heating, Mieter share (583,3 permille)",
+    "554,74": "docs/06: unit B heating, Vermieter share (416,7 permille)",
     # --- de-scaled forms of the fields slice 4 newly put on the page (I7).
     # Asserted POSITIVELY rather than as absence-of-the-leak-form, on purpose. The leak
     # forms of two of these are `10.000` and `40.000`, which are entirely plausible euro
