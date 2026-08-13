@@ -192,3 +192,57 @@ class TestTheResidualPrimitiveItself:
     def test_rejects_a_zero_weight_sum(self) -> None:
         with pytest.raises(ValueError):
             distribute_cents_half_up(cents(100), _d(0, 0), residual_index=0)
+
+
+class TestATwoElementSplitIsTheSameAllocationUnderBothMethods:
+    """`docs/03` § 9.4 — the load-bearing fact behind four of the ten wiring
+    decisions, pinned rather than asserted in prose.
+
+    Four of the heating engine's split sites are two-element **complement**
+    splits, not allocations across parties: §§ 7/8 Grund/Verbrauch (H4), the § 9
+    Warmwasser separation (H3) and the CO₂ Vermieter/Mieter deduction (H2/R6).
+    For those, largest-remainder and `round_half_up`-on-index-0-plus-complement
+    are the *same* allocation: the two exact quotas sum to the total, so their
+    fractional parts sum to 1, so the single leftover cent goes to the element
+    whose fraction exceeds a half — which is what rounding that element half up
+    does — and at exactly a half the tie-break picks index 0, i.e. half **up**
+    again.
+
+    Consequence, and the reason this class exists: those four sites can move no
+    money, so **no fixture may claim they do**, and the absence of a RED test for
+    them is not an oversight. What the switch buys there is that the rounded side
+    is named by the formula instead of decided by argument order.
+    """
+
+    # The shapes those four sites actually pass: a statutory percentage pair, the
+    # § 7 Abs. 1 Grundkostenanteil, and a § 9 energy split with a fractional quota.
+    WEIGHT_PAIRS: ClassVar[list[list[Decimal]]] = [
+        _d(30, 70),
+        _d(50, 50),
+        _d(60, 40),
+        _d(95, 5),
+        _d(0, 100),
+        [Decimal("0.3"), Decimal("0.7")],
+        [Decimal(5000), Decimal(15000)],
+        [Decimal("4877.5"), Decimal("15122.5")],
+        [Decimal(1), Decimal(3)],
+    ]
+
+    def test_the_two_methods_agree_on_every_total(self) -> None:
+        for weights in self.WEIGHT_PAIRS:
+            for total in range(0, 2001):
+                largest_remainder = [int(s) for s in distribute_cents(cents(total), weights)]
+                half_up = [
+                    int(s)
+                    for s in distribute_cents_half_up(cents(total), weights, residual_index=1)
+                ]
+                assert largest_remainder == half_up, (weights, total)
+                assert sum(half_up) == total
+
+    def test_at_exactly_half_a_cent_the_first_element_rounds_up(self) -> None:
+        """The direction R6 fixes for the CO₂ deduction (`co2.py`): 50 % of
+        261,81 € is 130,905 €, and the half cent belongs to the **landlord's**
+        deduction — the tenant-favourable side. Reordering the two elements
+        would silently invert this."""
+        assert _shares(26_181, _d(50, 50), owner=1) == [13091, 13090]
+        assert [int(s) for s in distribute_cents(cents(26_181), _d(50, 50))] == [13091, 13090]
