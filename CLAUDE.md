@@ -1,22 +1,22 @@
 # CLAUDE.md — Lokara Web App
 
-> This is the operating contract for anyone (human or AI) building Lokara.
+> This is the operating contract for anyone (human or AI — Artificial Intelligence) building Lokara.
 > Read this first, then `PLAN.md`, then the relevant file under `docs/`.
 > The single deepest source of truth is `lokara-arch.md` (canonical architecture, v3).
 
 > **The stack is v4.** A **Python FastAPI** backend (`apps/api`) + **Python** engine packages
-> (`packages/*-engine`), **Supabase Postgres**, a **Bun** TS/JS workspace for web + mobile
-> (`apps/web`, `packages/ui`), and **shadcn/ui**. There is one backend and it is Python.
+> (`packages/*-engine`), **Supabase Postgres**, a **Bun** TS/JS (TypeScript/JavaScript) workspace for
+> web + mobile (`apps/web`, `packages/ui`), and **shadcn/ui**. There is one backend and it is Python.
 > `MIGRATION-PLAN.md` records how the tree got here. When code and docs disagree, the docs win.
 
 ---
 
 ## What Lokara is (one line)
 
-A modern, trustworthy SaaS for **legally-compliant German Nebenkosten- / Betriebskostenabrechnung**
-(operating-cost & heating-cost statements) for private landlords **and** property managers
-(Hausverwaltungen) — from 1 unit upward, no cap — competing on **domain depth, fair pricing, and
-AI-assisted UX** against objego, immocloud, vermietet.de.
+A modern, trustworthy SaaS (Software as a Service) for **legally-compliant German Nebenkosten- /
+Betriebskostenabrechnung** (operating-cost & heating-cost statements) for private landlords **and**
+property managers (Hausverwaltungen) — from 1 unit upward, no cap — competing on **domain depth,
+fair pricing, and AI-assisted UX** (User Experience) against objego, immocloud, vermietet.de.
 
 We are building the **responsive Web App first**. Native iOS/Android come at public launch (separate,
 later milestone). No desktop apps.
@@ -27,18 +27,44 @@ later milestone). No desktop apps.
 
 1. **The money/legal math is the product — keep it in pure, framework-free Python engine packages
    with golden tests (pytest).** Engines (`packages/*-engine`, Python) import no web framework, no
-   vendor SDK, no database. They take normalized inputs (plain dataclasses / Pydantic models) and
-   return deterministic outputs. A wrong framework choice later costs an app rewrite; it must never
-   touch an engine or the data.
+   vendor SDK (Software Development Kit), no database. They take normalized inputs (plain dataclasses
+   / Pydantic models) and return deterministic outputs. A wrong framework choice later costs an app
+   rewrite; it must never touch an engine or the data.
 
 2. **Correctness and auditability beat features.** Every legally-relevant record (statements, ledger
-   entries, exports, IBAN history, email delivery, contracts) is **immutable + versioned** — new
-   version, never overwrite. Store hashes where legally relevant (GoBD / §147 AO).
+   entries, exports, IBAN (International Bank Account Number) history, email delivery, contracts) is
+   **immutable + versioned** — new version, never overwrite. Store hashes where legally relevant
+   (GoBD — Grundsätze zur ordnungsmäßigen Führung und Aufbewahrung von Büchern, Aufzeichnungen und
+   Unterlagen in elektronischer Form sowie zum Datenzugriff; § 147 AO — Abgabenordnung, the German
+   Fiscal Code).
 
 3. **Multi-tenant isolation is not optional.** Every domain row carries `accountId`. Scope every
    query by it. Enforce isolation **twice**: in app logic **and** in Postgres Row-Level Security
-   (RLS). Hiding a UI link protects nothing — the endpoint must independently verify the caller holds
-   the relationship in the URL.
+   (RLS). Hiding a UI (User Interface) link protects nothing — the endpoint must independently verify
+   the caller holds the relationship in the URL (Uniform Resource Locator).
+
+   > **What it means.** *Multi-tenant* = one deployment and one database serving every paying
+   > customer at once; here a "tenant" is an **Account** (a private landlord, or a Hausverwaltung).
+   > Two competing Hausverwaltungen's buildings, renters and statements live in the **same tables, in
+   > adjacent rows**, separated by nothing but `account_id`. *Isolation* is the guarantee that one can
+   > never read the other's rows.
+   >
+   > *Not optional* is about cost of failure. A wrong figure in a statement is a bug you fix; showing
+   > Account A the renters of Account B is a personal-data breach under the DSGVO
+   > (Datenschutz-Grundverordnung) — reportable within 72 hours, and fatal to a product sold on
+   > trustworthiness. So it is never traded against a deadline the way a feature is.
+   >
+   > *Twice*, because the first enforcement is human: one forgotten `WHERE account_id = …`, on one
+   > tired evening, leaks rows. RLS does not get tired. That is what `scripts/check_rls_coverage.py`
+   > guards, and why nothing in it may be relaxed.
+   >
+   > *Hiding a UI link protects nothing*, because a hidden button is only a button that is not drawn
+   > — anyone can still type `GET /buildings/123`. The endpoint must verify ownership of `123` on
+   > every request rather than trust that the client only asks for what it was offered.
+   >
+   > The M5 pre-context read (`docs/02` → "The pre-context read") is the one sanctioned hole in this
+   > fence: `GET /me` must read *before* any account context exists. The whole design effort there
+   > went into keeping it exactly one hole, and `scripts/check_pre_context_reads.py` counts them.
 
 ---
 
@@ -81,24 +107,24 @@ canonical for *architecture*; this rule is about numbers, formulas and legal val
 
 ---
 
-## Locked tech decisions (MVP defaults — see `docs/01-tech-stack-and-decisions.md`)
+## Locked tech decisions (MVP — Minimum Viable Product — defaults; see `docs/01-tech-stack-and-decisions.md`)
 
 | Area                                                    | Decision                                                                                                                                                                                                                                                                        |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Language                                                | **Python** (backend + engines, `mypy` strict) + **TypeScript** (frontend + mobile, `strict: true`)                                                                                                                                                                             |
 | Repo                                                    | Polyglot monorepo: **Bun + Turborepo** for the TS side (web, mobile, ui); **uv** for the Python side (api, engines)                                                                                                                                                            |
-| Web                                                     | Next.js (App Router) + React + Tailwind + Framer Motion + **shadcn/ui** — **frontend only** (no direct DB access)                                                                                                                                                              |
-| Mobile                                                  | **Expo / React Native** — same API + shared patterns as web. `react-native-ease` (animation), **secure storage + Bearer JWT**, i18n, theme, responsive from the start                                                                                                          |
+| Web                                                     | Next.js (App Router) + React + Tailwind + Framer Motion + **shadcn/ui** — **frontend only** (no direct DB (database) access)                                                                                                                                                   |
+| Mobile                                                  | **Expo / React Native** — same API (Application Programming Interface) + shared patterns as web. `react-native-ease` (animation), **secure storage + Bearer JWT** (JSON Web Token; JSON = JavaScript Object Notation), i18n (internationalization), theme, responsive from the start |
 | Client state / data / forms                             | **Jotai** (client state) + **TanStack Query** (server state) + **React Hook Form + Zod** (forms) — on **both** web and mobile                                                                                                                                                   |
 | Money math                                              | Pure Python packages: integer **cents** + `decimal.Decimal`; never floats                                                                                                                                                                                                     |
-| DB / Auth / Storage                                     | **Supabase Cloud, EU region (Frankfurt)** + signed DPA (revisit self-hosted before real tenant data)                                                                                                                                                                           |
-| ORM                                                     | **SQLAlchemy 2.0 + Alembic** (migrations) against Supabase Postgres; RLS underneath. **The DB layer lives in `apps/api`, never in a client app.**                                                                                                                              |
-| Backend / API                                           | **FastAPI (`apps/api`, Python) from day 1** — one standalone HTTP/JSON API that both the web app **and** the launch-day native iOS/Android apps consume. Routers per domain (modular monolith); **FastAPI dependencies** for Supabase-JWT auth + RLS context. Async workers (Celery/Arq on Redis) added when M6 needs them. |
+| DB / Auth / Storage                                     | **Supabase Cloud, EU (European Union) region (Frankfurt)** + signed DPA (Data Processing Agreement) (revisit self-hosted before real tenant data)                                                                                                                              |
+| ORM (Object-Relational Mapper)                          | **SQLAlchemy 2.0 + Alembic** (migrations) against Supabase Postgres; RLS underneath. **The DB layer lives in `apps/api`, never in a client app.**                                                                                                                              |
+| Backend / API                                           | **FastAPI (`apps/api`, Python) from day 1** — one standalone HTTP (HyperText Transfer Protocol) / JSON API that both the web app **and** the launch-day native iOS/Android apps consume. Routers per domain (modular monolith); **FastAPI dependencies** for Supabase-JWT auth + RLS context. Async workers (Celery/Arq on Redis) added when M6 needs them. |
 | Runtime validation                                      | **Pydantic** (backend) + **Zod** (frontend/mobile) — validate at every boundary                                                                                                                                                                                               |
 | Infra                                                   | **Redis** — rate-limiting + caching. **Locust** — load testing (simulate ~100 concurrent users)                                                                                                                                                                               |
-| PDF                                                     | HTML→PDF via headless Chrome (**Playwright for Python**)                                                                                                                                                                                                                       |
-| Paid/expensive APIs (finAPI, Vision/OCR, email, payments) | **Stubbed behind adapters** for the pitch. Payments: **Stripe (web) + RevenueCat (mobile IAP)**. Real providers are flagged, EU + AVV required. Never hardcode a vendor SDK into an engine or domain module.                                                                  |
-| Hosting (prod)                                          | EU/DE (target Hetzner). Local/dev is fine anywhere.                                                                                                                                                                                                                            |
+| PDF (Portable Document Format)                          | HTML (HyperText Markup Language) → PDF via headless Chrome (**Playwright for Python**)                                                                                                                                                                                        |
+| Paid/expensive APIs (finAPI, Vision/OCR (Optical Character Recognition), email, payments) | **Stubbed behind adapters** for the pitch. Payments: **Stripe (web) + RevenueCat (mobile IAP — In-App Purchase)**. Real providers are flagged, EU + AVV (Auftragsverarbeitungsvertrag, the data-processing agreement) required. Never hardcode a vendor SDK into an engine or domain module. |
+| Hosting (prod)                                          | EU/DE — European Union / Germany (target Hetzner). Local/dev is fine anywhere.                                                                                                                                                                                                                                  |
 | UI copy language                                        | **German**. Code, comments, docs, identifiers: **English**.                                                                                                                                                                                                                   |
 
 Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked in
@@ -108,24 +134,48 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 
 ## Cross-cutting rules (apply everywhere)
 
-- **Never hardcode a legal rule.** AfA rates, HKVO ratios, CO₂ 10-step table, Anlage-V line numbers
-  per year, Grunderwerbsteuer per Bundesland, clause versions → a **versioned rules/config store**
-  with an "as-of law date". Show `Rechtsstand MM/JJJJ` in every legal output.
-- **Adapters at every external edge.** Bank (finAPI), meter platforms/MDL, DATEV, Destatis, AI/Vision
+- **Never hardcode a legal rule.** AfA (Absetzung für Abnutzung — tax depreciation) rates, HKVO
+  (Heizkostenverordnung) ratios, CO₂ 10-step table, Anlage-V line numbers per year,
+  Grunderwerbsteuer per Bundesland, clause versions → a **versioned rules/config store**
+  with an "as-of law date". Show `Rechtsstand MM/JJJJ` (Monat/Jahr) in every legal output.
+- **Adapters at every external edge.** Bank (finAPI), meter platforms/MDL (Messdienstleister —
+  metering services such as Techem, ista), DATEV, Destatis (Statistisches Bundesamt), AI/Vision
   each normalize to an internal model _before_ any engine sees it.
+
+  > **What an adapter is.** The module that sits where we touch something we do not control, whose
+  > one job is translation: the outside format becomes *our* shape before anything else sees it, and
+  > the adapter is the only file in the tree that knows the foreign format exists. Two halves — the
+  > **port**, a `Protocol` stating the shape we demand (`MeterGateway.list_readings(...) ->
+  > tuple[MeterReading, ...]` in `packages/adapters/src/lokara_adapters/meter.py`), and the
+  > **implementation** satisfying it: `StubMeterGateway` on fixtures today, the real provider later.
+  > Six ports exist: bank, vision, meter, datev, destatis, email.
+  >
+  > **Why it is a rule.** (1) It is what keeps rule 1 true — if the heating engine parsed HeiWaKo
+  > (the ARGE/bved metering-exchange format) itself, swapping ista for Techem would mean editing the
+  > file that computes money. (2) A vendor swap stays in one file; `meter.py` says it outright:
+  > *"only this module ever parses that format"*. (3) Downstream stops branching — a hand-typed
+  > reading, an MDL delivery and a radio self-read all arrive as one `MeterReading`, so persistence,
+  > statement and tests have one case, not three. (4) The demo and CI run with no network, no
+  > credentials and no invoice, because the stub **is** the pitch implementation and the real one
+  > merely replaces it. (5) It localizes the legal question: every external provider is a
+  > sub-processor needing an AVV, and when adapters are the only outbound edges, the list of what
+  > leaves the system is a directory listing.
 - **"Tool, not advice."** Every legal/tax output carries a consistent
-  _"rechtskonform, keine Rechts- oder Steuerberatung"_ disclaimer. Keep the StBerG line out of the product.
-- **Guard/Wächter is one reusable pattern.** §556 deadline, Eichfrist, 15%-AfA, UVI, arrears → all
-  "compute a warning from existing data" → one guard+reminder mechanism, not bespoke code each time.
+  _"rechtskonform, keine Rechts- oder Steuerberatung"_ disclaimer. Keep the StBerG
+  (Steuerberatungsgesetz) line out of the product.
+- **Guard/Wächter is one reusable pattern.** § 556 deadline, Eichfrist, 15 %-AfA, UVI (unterjährige
+  Verbrauchsinformation), arrears → all "compute a warning from existing data" → one guard+reminder
+  mechanism, not bespoke code each time.
 - **Temporal by default.** Anything that changes _during_ a period is a row with `validFrom/validTo`,
   never a scalar (tenancies, allocation keys, meters, self-use, IBANs…). See `docs/02-data-model.md`.
-- **Two financial time-axes never merge.** NK billing = accrual/period-based. Tax = cash basis
-  (§11 EStG, payment date). Distinct subsystems, one clean handoff. See `docs/02-data-model.md` §"Two time-axes".
+- **Two financial time-axes never merge.** NK (Nebenkosten) billing = accrual/period-based. Tax =
+  cash basis (§ 11 EStG — Einkommensteuergesetz, payment date). Distinct subsystems, one clean
+  handoff. See `docs/02-data-model.md` §"Two time-axes".
 - **Auth tokens differ per client, one flow.** Web stores the JWT in an **HttpOnly cookie**; mobile
   stores it in **secure storage** and sends it as a **Bearer** token. Access/refresh handled in one
-  shared **`api.ts` interceptor**: on a 401, refresh once, replay the failed requests, and never
-  double-fire. The auth hook layer is separate per platform (cookie vs secure storage); the API
-  verifies the Supabase JWT the same way for both.
+  shared **`api.ts` interceptor**: on a 401 (HTTP Unauthorized), refresh once, replay the failed
+  requests, and never double-fire. The auth hook layer is separate per platform (cookie vs secure
+  storage); the API verifies the Supabase JWT the same way for both.
 - **Never trust the client.** Validate every request body with **Pydantic** on the backend; mirror the
   shape with **Zod** on the client. The backend is the authority.
 
@@ -160,7 +210,8 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 
 1. Uses the design tokens in `docs/05-design-system.md` (no ad-hoc colors/fonts); shadcn components are
    themed to those tokens, never left on their defaults.
-2. Meets **WCAG 2.1 AA / BFSG**: contrast, visible focus states, scalable type, keyboard nav.
+2. Meets **WCAG (Web Content Accessibility Guidelines) 2.1 level AA / BFSG
+   (Barrierefreiheitsstärkungsgesetz)**: contrast, visible focus states, scalable type, keyboard nav.
 3. German UI copy; labels are explicit (Apple-style reduction is aesthetic only, never at the cost of
    a clear label or contrast).
 4. Meets the **Look & feel / motion principles** in `docs/05` — one primary action per screen, 8px
@@ -174,10 +225,11 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 - **`AGENTS.md` is how work is executed here** — the deterministic gates (`scripts/gate.sh`,
   `scripts/verify_demo_path.sh`, the purity/RLS/PDF checks) and the six agents with disjoint write
   scopes. No agent may both write a test and satisfy it.
-- Follow `PLAN.md`. Milestone DoDs are binding; **engines + fixtures before UI**. Before the 06.08
-  pitch the build order is the **execution order** in `PLAN.md` (value ÷ risk), not the milestone
-  numbering — and its **hard rules** apply: no calculation without its transcribed spec + golden
-  fixture, the demo path is re-verified every milestone, tag each green state, stubs stay stubs.
+- Follow `PLAN.md`. Milestone DoDs (Definitions of Done) are binding; **engines + fixtures before
+  UI**. Before the 27.08 pitch the build order is the **execution order** in `PLAN.md` (value ÷ risk),
+  not the milestone numbering — and its **hard rules** apply: no calculation without its transcribed
+  spec + golden fixture, the demo path is re-verified every milestone, tag each green state, stubs
+  stay stubs.
 - **Never leave the demo path broken.** If a change breaks clean-DB → seed → statement → PDF, fix or
   revert before moving on. A working demo beats a broader broken one.
 - When a decision isn't covered here or in `docs/`, prefer the choice that (a) keeps engines pure,
