@@ -26,6 +26,8 @@ from lokara_domain import (
     Cents,
     Co2Table,
     DegreeDayTable,
+    EmissionFactor,
+    EnergyReference,
     HeatingSplitBounds,
     MeasurementUnit,
     Occupancy,
@@ -65,8 +67,23 @@ class WarmWaterInput:
 
 @dataclass(frozen=True)
 class Co2Input:
-    total_co2_kg: Decimal
+    """§ 3 CO2KostAufG: what the supplier stated, and the K4 fallback if it did not.
+
+    `total_co2_kg` is the Brennstoffemissionen the supplier is obliged to state
+    (§ 3 Abs. 1 Nr. 1) — the normal path, and the one the demo runs. `None` means
+    the obligation was breached (E1); then and **only** then is
+    `emission_factor` read, and it must carry the same Bezugsgröße as
+    `HeatingInput.energy_reference`. Supplying both is refused rather than
+    ignored: a silently ignored factor is how a wrong one survives in the data
+    until the day a supplier stops stating the mass (`docs/03` § 9.5).
+    """
+
+    total_co2_kg: Decimal | None
     co2_cost: Cents
+    # K4 fallback (`nur Fallback`, `Konvention` / verify-before-production,
+    # Rechtsstand 07/2026). Carries its own Ho/Hu reference — that is what makes
+    # a mismatch checkable at all instead of a comment next to a number.
+    emission_factor: EmissionFactor | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +110,13 @@ class HeatingInput:
     rules: HeatingRules
     warm_water: WarmWaterInput | None = None
     co2: Co2Input | None = None
+    # The Bezugsgröße of `total_energy_kwh` — Brennwert (Ho), as a German gas
+    # invoice bills, or Heizwert (Hu), which § 3 Abs. 1 Nr. 3 CO2KostAufG's
+    # factor refers to. Read **only** on the K4 mass fallback; where the supplier
+    # stated the mass the question does not arise and this may stay `None`.
+    # It is never defaulted: defaulting to Hu on an Ho invoice is the silent 11 %
+    # error the whole no-conversion design exists to stop (`docs/03` § 9.5).
+    energy_reference: EnergyReference | None = None
 
 
 @dataclass(frozen=True)

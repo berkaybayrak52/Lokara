@@ -29,11 +29,23 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from lokara_domain import Cents, Co2Step, Co2Table, Period, days_between, distribute_cents
+from lokara_domain import (
+    Cents,
+    Co2Step,
+    Co2Table,
+    Period,
+    days_between,
+    distribute_cents_half_up,
+)
 
 from .inputs import Co2Result, HeatingInputError
 
 _ONE = Decimal(1)
+# The renters' side of the two-way § 7 split is the complement of the landlord's
+# rounded deduction, so it holds the leftover cent. Index 1, and the order of the
+# pair is load-bearing: reordering it would silently invert the direction at an
+# exact half cent (`docs/03` § 9.3).
+_RENTER_SIDE = 1
 # H2's divisor is a flat 365, and it triggers on `nTage ∉ {365, 366}` — Berkay's
 # rule as written, *not* the anchored reference year the superseded convention
 # used. A 366-day non-calendar period is therefore left un-annualised; recorded
@@ -163,8 +175,16 @@ def split_co2_cost(
     index, step = _select_step(intensity, table)
     landlord_percent = step.landlord_share_percent
     previous_bound = table[index - 1].max_intensity_exclusive if index > 0 else None
-    landlord_amount, renter_amount = distribute_cents(
-        co2_cost, [landlord_percent, 100 - landlord_percent]
+    # R6 + H2: the *statutory percentage* is what gets `round_half_up`, and H2
+    # makes the landlord's **deduction** the rounded quantity
+    # (`co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil/100)`,
+    # then `umlagefaehigCent = gesamtCent - co2Abzug`). This is a two-way split
+    # by a statutory percentage, **not** an allocation across parties: there is
+    # no owner bucket here, only the complement the formula names (`docs/03`
+    # § 9.3). At an exact half cent the deduction therefore rounds **up**, i.e.
+    # the landlord bears the cent — worth knowing before anyone "corrects" it.
+    landlord_amount, renter_amount = distribute_cents_half_up(
+        co2_cost, [landlord_percent, 100 - landlord_percent], residual_index=_RENTER_SIDE
     )
     return Co2Result(
         intensity_kg_per_sqm=intensity,

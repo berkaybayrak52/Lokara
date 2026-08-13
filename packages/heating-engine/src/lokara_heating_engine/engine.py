@@ -1,6 +1,6 @@
 """Heating + CO₂ statement calculation (M2).
 
-Pipeline (every split via largest-remainder, so each stage reconciles):
+Pipeline (every split reconciles to its input by construction):
 1. CO₂ landlord share (CO2KostAufG 10-step) is deducted from the total first.
 2. § 9 HeizkostenV: warm-water energy is separated from the billable cost.
 3. §§ 7/8: each pot splits into base (fixed) and consumption portions.
@@ -9,6 +9,20 @@ Pipeline (every split via largest-remainder, so each stage reconciles):
    single reading across occupant changes (warm water/base by days instead).
 5. § 9a: missing readings are estimated per m²; > 25 % missing area → the
    consumption portion falls back to the area key.
+
+**Rounding (R1/R5/K9, `docs/03` § 9.1).** A pot split into two complementary
+parts names its rounded side by the formula and gives the rest to the
+complement: `grund = round_half_up(pot × p)`, `verbrauch = pot - grund`. A
+Blockbetrag allocated across parties gives every renter its own
+`round_half_up` and puts the `Verteilungsrest` on the **owner bucket** — the
+first landlord party (§ 9.2 convention 1), the same row in all four blocks, so
+one Eigentümer line explains every ±ct of the statement. Where the building is
+fully let there is **no owner bucket**, and the engine may not make a block
+reconcile by handing the residual to a renter: such a block keeps
+largest-remainder (§ 9.2 convention 2), which minimises each party's deviation
+from its own quota. Both conventions are ours, not Berkay's, and both are
+flagged for him. K9 is `Konvention` / verify-before-production, Rechtsstand
+07/2026 — no output may present it as a norm.
 """
 
 from dataclasses import dataclass
@@ -21,7 +35,9 @@ from lokara_domain import (
     Segment,
     build_unit_segments,
     cents,
+    co2_grams_from_energy,
     distribute_cents,
+    distribute_cents_half_up,
 )
 
 from .co2 import split_co2_cost
@@ -37,6 +53,11 @@ from .inputs import (
 )
 
 _ZERO = cents(0)
+# A two-element pot split is written `a = round_half_up(pot × q)`, `b = pot - a`:
+# the formula names its rounded side, and the residual sits on the *complement*,
+# which is index 1 in every such call here (`docs/03` § 9.1 sites #1, #5, #9).
+# Not a party index and never an owner bucket — see § 9.2.
+_COMPLEMENT = 1
 
 
 def _heated_area_sqm(units: tuple[HeatingUnit, ...]) -> Decimal:
@@ -55,6 +76,33 @@ class _Party:
     degree_day_promille: Decimal
 
 
+def _owner_index(parties: list[_Party]) -> int | None:
+    """The owner bucket of every block: the **first** landlord party, or `None`.
+
+    *First*, not last, so appending a unit to the input cannot move the residual
+    onto another row (`docs/03` § 9.2 convention 1); the same index is used in
+    all four blocks, which is the whole justification for K9 — one Eigentümer
+    line explains every ±ct of the statement.
+
+    `None` when the building is fully let: there is no Eigentümer row to hold a
+    Verteilungsrest, and handing it to a renter is exactly what K9 forbids, so
+    those blocks stay on largest-remainder (§ 9.2 convention 2). That is a
+    recorded convention awaiting the unconditional Eigentümer line, not an
+    omission.
+    """
+    return next((i for i, p in enumerate(parties) if p.tenancy_id is None), None)
+
+
+def _allocate_to_parties(
+    pot: Cents, weights: list[Decimal], owner_index: int | None
+) -> list[Cents]:
+    """R1/R5/K9 when there is an owner bucket, largest-remainder when there is
+    not. Either way `sum(shares) == pot` holds by construction."""
+    if owner_index is None:
+        return distribute_cents(pot, weights)
+    return distribute_cents_half_up(pot, weights, residual_index=owner_index)
+
+
 def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     _validate(heating_input)
     window_from, window_to = (
@@ -66,6 +114,7 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     parties = _build_parties(heating_input, window_from, window_to)
     party_count = len(parties)
     base_weights = [p.base_weight for p in parties]
+    owner_index = _owner_index(parties)
 
     co2_result, billable = _apply_co2(heating_input)
 
@@ -74,8 +123,13 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     )
 
     share = heating_input.rules.consumption_share
-    heat_base_pot, heat_cons_pot = distribute_cents(heating_pot, [1 - share, share])
-    heat_base = distribute_cents(heat_base_pot, base_weights)
+    # Site #1 — H4: `grundHz = round_half_up(kostenHz × p)`, the consumption pot
+    # is the complement, so the sum is exact. No owner bucket here: the residual
+    # holder is the other *pot*, not a party.
+    heat_base_pot, heat_cons_pot = distribute_cents_half_up(
+        heating_pot, [1 - share, share], residual_index=_COMPLEMENT
+    )
+    heat_base = _allocate_to_parties(heat_base_pot, base_weights, owner_index)
 
     heat_values, heat_estimated, heat_fallback = _resolve_readings(
         heating_input.units, [u.heat_consumption for u in heating_input.units]
@@ -84,10 +138,12 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     # be disclosed; otherwise these are the exact weights that were allocated by.
     heat_weights: list[Decimal] | None = None
     if heat_fallback:
-        heat_cons = distribute_cents(heat_cons_pot, base_weights)
+        # Site #3 — § 9a Abs. 2 replaces the *key*, never the rounding rule.
+        heat_cons = _allocate_to_parties(heat_cons_pot, base_weights, owner_index)
     else:
+        # Site #4.
         heat_weights = _consumption_weights(parties, heat_values, by_degree_days=True)
-        heat_cons = distribute_cents(heat_cons_pot, heat_weights)
+        heat_cons = _allocate_to_parties(heat_cons_pot, heat_weights, owner_index)
     # The unit follows the weights it labels: `None` under § 9a Abs. 2 means the
     # consumption key was *replaced*, so there is no Bemessung to put a unit on.
     heat_unit = None if heat_fallback else _resolve_heat_unit(heating_input.units)
@@ -96,16 +152,22 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     ww_fallback = False
     ww_weights: list[Decimal] | None = None
     if heating_input.warm_water is not None:
-        ww_base_pot, ww_cons_pot = distribute_cents(ww_pot, [1 - share, share])
-        ww_base = distribute_cents(ww_base_pot, base_weights)
+        # Site #5 — H4's second line pair; residual on the complement pot.
+        ww_base_pot, ww_cons_pot = distribute_cents_half_up(
+            ww_pot, [1 - share, share], residual_index=_COMPLEMENT
+        )
+        # Site #6.
+        ww_base = _allocate_to_parties(ww_base_pot, base_weights, owner_index)
         ww_values, ww_estimated, ww_fallback = _resolve_readings(
             heating_input.units, [u.ww_consumption_m3 for u in heating_input.units]
         )
         if ww_fallback:
-            ww_cons = distribute_cents(ww_cons_pot, base_weights)
+            # Site #7 — as #3.
+            ww_cons = _allocate_to_parties(ww_cons_pot, base_weights, owner_index)
         else:
+            # Site #8.
             ww_weights = _consumption_weights(parties, ww_values, by_degree_days=False)
-            ww_cons = distribute_cents(ww_cons_pot, ww_weights)
+            ww_cons = _allocate_to_parties(ww_cons_pot, ww_weights, owner_index)
     else:
         # No warm-water column exists at all — that is not a § 9a Abs. 2
         # fallback, and the statement must not claim one happened.
@@ -288,6 +350,55 @@ def _build_parties(heating_input: HeatingInput, window_from: date, window_to: da
     return parties
 
 
+def _resolve_co2_mass_kg(heating_input: HeatingInput) -> Decimal:
+    """The Brennstoffemissionen the split runs on — stated, or K4-derived.
+
+    The five cases of `docs/03` § 9.5, in the order they can be decided. There is
+    **no conversion step** and none may be added: the factor declares its
+    Bezugsgröße, `total_energy_kwh` declares the same one, and any other pairing
+    is refused. A `× 0,903` correction is a step somebody forgets, or applies
+    twice, and its absence is what makes the mismatch unrepresentable rather
+    than merely checked for.
+    """
+    co2 = heating_input.co2
+    assert co2 is not None  # only called on the CO₂ path
+    factor = co2.emission_factor
+    if co2.total_co2_kg is not None:
+        if factor is not None:
+            raise HeatingInputError(
+                "CO₂-Berechnung nicht möglich: Es sind gleichzeitig die vom Lieferanten "
+                "ausgewiesenen Brennstoffemissionen (§ 3 Abs. 1 Nr. 1 CO2KostAufG) und ein "
+                "Emissionsfaktor hinterlegt. Der Faktor ist nur ein Ersatzwert für den Fall, "
+                "dass die Emissionen nicht ausgewiesen sind; er wird nicht stillschweigend "
+                "ignoriert. Bitte eine der beiden Angaben entfernen."
+            )
+        return co2.total_co2_kg
+    if factor is None:
+        raise HeatingInputError(
+            "CO₂-Berechnung nicht möglich: Die Abrechnung des Lieferanten weist die "
+            "Brennstoffemissionen nicht aus (Verstoß gegen § 3 Abs. 1 Nr. 1 CO2KostAufG) und "
+            "es ist kein Emissionsfaktor als Ersatzwert hinterlegt. Die Emissionen werden "
+            "nicht geschätzt. Bitte die Angabe beim Lieferanten anfordern oder einen "
+            "Emissionsfaktor mit passender Bezugsgröße hinterlegen."
+        )
+    reference = heating_input.energy_reference
+    if reference is None:
+        raise HeatingInputError(
+            "CO₂-Berechnung nicht möglich: Für die Energiemenge "
+            f"({heating_input.total_energy_kwh} kWh) ist keine Bezugsgröße angegeben. Ohne "
+            "die Angabe, ob es sich um Brennwert- (Ho) oder Heizwert-Kilowattstunden (Hu) "
+            "handelt, kann der Emissionsfaktor nicht angewendet werden; eine Annahme wird "
+            "bewusst nicht getroffen (§ 3 Abs. 1 Nr. 3 CO2KostAufG). Bitte die Bezugsgröße "
+            "der Energiemenge erfassen."
+        )
+    # Raises `EnergyReferenceMismatchError` on a mismatch — deliberately **not**
+    # caught and re-raised as a `HeatingInputError`: an API layer branches on the
+    # type and a landlord reads the German text, and wrapping loses both.
+    return Decimal(
+        co2_grams_from_energy(heating_input.total_energy_kwh, reference, factor)
+    ) / Decimal(1000)
+
+
 def _apply_co2(heating_input: HeatingInput) -> tuple[Co2Result | None, Cents]:
     if heating_input.co2 is None:
         return None, heating_input.total_cost
@@ -296,7 +407,7 @@ def _apply_co2(heating_input: HeatingInput) -> tuple[Co2Result | None, Cents]:
     assert table is not None and rechtsstand is not None  # _validate guarantees
     heated_area_sqm = _heated_area_sqm(heating_input.units)
     co2_result = split_co2_cost(
-        total_co2_kg=heating_input.co2.total_co2_kg,
+        total_co2_kg=_resolve_co2_mass_kg(heating_input),
         co2_cost=heating_input.co2.co2_cost,
         heated_area_sqm=heated_area_sqm,
         table=table,
@@ -360,7 +471,12 @@ def _separate_warm_water(
             f"Warm-water energy {q_ww} kWh must lie inside (0, total energy "
             f"{heating_input.total_energy_kwh} kWh)"
         )
-    ww_pot, heating_pot = distribute_cents(billable, [q_ww, heating_input.total_energy_kwh - q_ww])
+    # Site #9 — H3: `kostenWw = round_half_up(umlagefaehig × anteilWw)`,
+    # `kostenHz = umlagefaehig - kostenWw` ("complement, so the sum is exact").
+    # The residual sits on the heating pot, which is the complement here.
+    ww_pot, heating_pot = distribute_cents_half_up(
+        billable, [q_ww, heating_input.total_energy_kwh - q_ww], residual_index=_COMPLEMENT
+    )
     return ww_pot, heating_pot, separation
 
 
