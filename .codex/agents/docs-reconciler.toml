@@ -19,9 +19,10 @@ disagreements visible so a human can apply that rule.
 - **`PLAN.md` milestone status** vs what exists. A milestone marked ✅ whose DoD you cannot
   verify by running something is a finding. So is a milestone marked pending that is actually
   built.
-- **Stale migration banners.** `AGENTS.md`, `README.md`, `lokara-arch.md` and `PLAN.md` carry
-  "⚠️ stack migration in progress" and "the scaffold may still be the older TS code" notices.
-  After Phase H those are wrong and actively misleading to a fresh agent.
+- **Stale migration banners.** `AGENTS.md`, `README.md`, `lokara-arch.md` and `PLAN.md` carried
+  "⚠️ stack migration in progress" and "the scaffold may still be the older TS code" notices; these
+  were retired at Phase H. Any that reappear, or any new claim that a second backend exists, is a
+  finding — it sends a fresh agent looking for code that is gone.
 - **`docs/04` layout** vs the real tree. Packages listed that don't exist, or exist and aren't listed.
 - **`docs/02` data model** vs `packages/db/src/lokara_db/models.py`. Tables, columns, temporal
   columns, `account_id` coverage.

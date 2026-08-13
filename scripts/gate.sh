@@ -32,6 +32,10 @@ run "ruff"                uv run ruff check .
 run "ruff format"         uv run ruff format --check .
 run "mypy --strict"       uv run mypy
 run "engine purity"       uv run python scripts/check_engine_purity.py
+# Nothing in this repo reads .codex/, so it drifts unnoticed. It once told an agent that
+# rounding is largest-remainder after CLAUDE.md had split the rule per engine -- an
+# instruction to revert correct code. Cheap check; no DB, no network.
+run "agent parity"        uv run python scripts/check_agent_parity.py
 
 case "$LEVEL" in
   fast)

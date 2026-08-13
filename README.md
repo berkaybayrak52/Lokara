@@ -133,8 +133,9 @@ top to bottom.
    FK-isolation / PDF-fingerprint checks. Gates are trusted; agents are not.
 4. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
    M0–M4 are built and green; work since then follows PLAN's **execution order** — ranked by *what
-   closes the legally-required surface first* — and its cut list, rather than the milestone numbering. Its dates come from `lokara-arch.md`:
-   pitch **27.08**, public launch **~08.09** (web + native iOS/Android together).
+   closes the legally-required surface first* — rather than the milestone numbering. **It carries no
+   deadline on purpose:** dates in `lokara-arch.md` are communication events (when something gets
+   shown), never planning inputs, and they do not reorder the work.
 5. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
 6. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
 7. **`docs/`** — modular specs:

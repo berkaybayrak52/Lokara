@@ -2,8 +2,12 @@
 
 > Build **iteratively**. Each milestone has a Definition of Done (DoD). Do not start a milestone
 > before the previous one's DoD is met. **Engines + golden fixtures always come before UI.**
-> Canonical dates from `lokara-arch.md`: pitch **27.08**, public launch **~08.09** (web + native
-> iOS/Android together). (Earlier freeze/web-only dates of 23.07/25.07 are now historical.)
+> **There is no deadline in this plan, deliberately.** Dates that exist elsewhere
+> (`lokara-arch.md`, the Wiki) are **communication events — when something gets shown — not planning
+> inputs.** Nothing here is ordered, cut, or rushed because of one. If a date needs hitting, that is
+> a decision about what to *show* on the day, taken against whatever is green then; it never
+> reorders the work below. This replaced a pitch-plan framing (target date, cut list, stop-building
+> checkpoint) that had ordered the whole file around a single demo.
 >
 > **Status: M0–M4 are built and green** on the v4 Python stack (FastAPI + SQLAlchemy/RLS + Bun/shadcn).
 > The v4 migration is **complete**: it removed the pre-migration TypeScript, so there is now one
@@ -36,49 +40,32 @@ Verbrauchsinformation) costs **3 %** of the heating cost, a missing **CO₂ disc
 **3 %**, and a statement that is not **verbrauchsabhängig** costs **15 %** (§ 12 Abs. 1 HeizkostenV).
 The differentiator is legal correctness, so legal correctness is what gets built first.
 
-> **This replaces "investor value ÷ risk" (the pitch plan).** ⚠️ *Note the date carefully, because
-> the old plan's framing is easy to half-remember:* **06.08 passed, but the pitch itself moved to
-> 27.08** and is still ahead. The ordering principle changed **by decision** — legal surface before
-> investor surface — **not** because the deadline evaporated. There is still a pitch to rehearse for,
-> and the stop-building checkpoint below still fires. What survives from the old plan is the hard
-> rules; they were never about the date.
+Berkay's spec is the other reason the order moved: **pages 06, 07 and 08 now exist, so M6, M8 and
+M10 have specs where they had none.** M7's 🔒 comes off with a caveat that has to be carried into the
+milestone itself, not just noted here (row 9).
 
-Berkay's spec is the other reason the order moved. **Pages 06, 07 and 08 now exist, so M6, M8 and
-M10 have specs where they had none**, and page 01b's transcription is in flight. M7's 🔒 comes off
-with a caveat that must be carried into the milestone itself, not just noted here (see row 7).
+*(This replaced an "investor value ÷ risk" ordering written for a pitch. See the no-deadline note at
+the top of this file: the principle below is not a deadline argument and does not become one if a
+date reappears.)*
 
 | # | Work | Why here | Risk |
 | --- | --- | --- | --- |
-| 1 | **Berkay 01b** — heating rules R1/R5/K9, K3, H2, Ho/Hu | In flight. Everything downstream reads the numbers it re-based. | low |
-| 2 | **Page 02 → `docs/09`** + BetrKV catalogue in `rules-store` | Catalogue import, cheap — structured data, not prose. **Two existing screens are waiting on it:** `kosten/costs-page.tsx` and `beleg/review-step.tsx` both take a free-text `Kostenart` today, so nothing validates that a cost is even umlagefähig. | low |
-| 3 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | `slice/m5-pre-context-read` already exists with **25 red fixtures**. Everything tenant-facing is behind it. | medium |
-| 4 | **M6** bank + Payment Ledger (finAPI stubbed) — **and BGH formal minimum #4** | The ledger closes the **Abzug der Vorauszahlungen** — the last of the four settled BGH minimums (`docs/08`). Until it exists the statement is formally incomplete, not merely thin. Page 08 (Bank-Matching) is specced. | high |
-| 5 | **Page 05 → `docs/12`** — the Wächter set | § 556 Frist, Eichfrist, UVI-Turnus. One guard mechanism, three uses (`CLAUDE.md`: Guard/Wächter is one reusable pattern, not bespoke code each time). Absorbs the old "M9-slice §556 Wächter" row. | medium |
-| 6 | **UVI** — unterjährige Verbrauchsinformation | **Legally mandatory monthly** (§ 6a HeizkostenV). Needs row 3 and monthly readings. This is one of the three Kürzungsrecht exposures named above. | medium |
-| 7 | **M7** tax export + AfA (pages 03 + 04) | Specced but **NOT production-ready** — see the caveat below and in the M7 milestone. | high |
-| 8 | **M8** clause engine · **M10 remainder** (tickets, activation codes, investment cockpit) · **mobile skeleton** | Broadest surface, furthest from the legal core. | high |
+| 1 | **Wire R1/R5/K9 + Ho/Hu into `heating-engine`** (`slice/wire-01b-rules`) | `CLAUDE.md` DoD 4 and `docs/03` currently carry a **NOT YET WIRED** warning: the contract describes a legal rounding rule the code does not follow. `distribute_cents_half_up` has **zero production callers**; `heating-engine` uses largest-remainder at all 10 sites (`engine.py` ×9, `co2.py` ×1). `EnergyReference` is imported by nothing outside `domain`/`rules-store`, so **no boundary refuses a Ho/Hu mismatch** — the one thing that design existed to make unrepresentable. A contract that is not true is worse than no contract. | medium |
+| 2 | **§ 5 Abs. 1 S. 3 CO₂ rounding** — classify *after* rounding to one decimal | **Promoted.** The engine classifies the raw `Decimal`, so 11,96 lands in a different Stufe than the 12,0 the statute says to classify — a wrong number on a legal document, § 7 Abs. 4 exposure. Small, isolated, no dependencies. `docs/03` → *"Known gap, deliberately not implemented here"*. | low |
+| 3 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | Everything tenant-facing sits behind it. `slice/m5-pre-context-read` already carries **25 red fixtures**, plus the ENVIRONMENT guard and the `gate.sh` skip-hole fix. | medium |
+| 4 | **Page 02 → `docs/09`** + BetrKV catalogue in `rules-store` | Two **built** screens take a free-text `Kostenart` today (`kosten/costs-page.tsx`, `beleg/review-step.tsx`), so nothing validates that a cost is even umlagefähig — and **M4 deliberately refuses to derive an Umlageschlüssel** because the catalogue does not exist. Catalogue import: structured data, not prose. | low |
+| 5 | **M6** bank + Payment Ledger (finAPI stubbed) — **and BGH formal minimum #4** | The ledger closes the **Abzug der Vorauszahlungen**, the last of the four settled BGH minimums (`docs/08`). Until it exists the statement is formally *incomplete*, not merely thin. Page 08 (Bank-Matching) is specced. | high |
+| 6 | **Page 05 → `docs/12`** — the Wächter set | § 556 Frist, Eichfrist, UVI-Turnus. One guard mechanism, three uses (`CLAUDE.md`: Guard/Wächter is one reusable pattern, not bespoke code each time). | medium |
+| 7 | **Copy-and-citation slice** | The accumulated `statement-reviewer` findings — ligatures, blank space, footer citations. Genuinely polish, and it is *now* polish rather than a gap, because the rows above closed the substance. | low |
+| 8 | **UVI** — unterjährige Verbrauchsinformation | **Legally mandatory monthly** (§ 6a HeizkostenV); a missing one costs **3 %**. Needs row 3 for the tenant surface, monthly readings, and **Berkay's K13 answer on where average-user comparison values come from** — that input is not in hand. | medium |
+| 9 | **M7** tax export + AfA (pages 03 + 04) | Specced, **not production-ready**. See the caveat below and in the M7 milestone. | high |
+| 10 | **M8** clause engine · **M10 remainder** (tickets, activation codes, investment cockpit) · **mobile skeleton** | Broadest surface, furthest from the legal core. | high |
 
-**Row 7's caveat, stated here and repeated in M7 because it is the expensive one to forget:**
+**Row 9's caveat, stated here and repeated in M7 because it is the expensive one to forget:**
 Berkay's `README-for-Emir.md` marks **Weg B**, **all Anlage-V line numbers**, the **SKR03/SKR04
 accounts** and the **DATEV EXTF parameters** as placeholders of realistic magnitude — the computation
 paths are right, the numbers are not verified. M7 may be built against them; **nothing derived from
 them ships to a real Steuerberater** without the values being confirmed first.
-
-### Carried over from the pitch-era order, not yet ranked
-
-Two rows from the old table are not in the new one. Recorded rather than dropped, so neither is lost:
-
-- **CO₂ rounding slice** — § 5 Abs. 1 S. 3 CO2KostAufG: round the specific emission value to one
-  decimal **before** classifying. The engine classifies the raw `Decimal`, so 11,96 lands in a
-  different Stufe than the 12,0 the statute says to classify — a wrong Stufe on a legal document,
-  § 7 Abs. 4 exposure, same class as the period-factor bug already fixed. Cheap and isolated.
-  `docs/03` → *"Known gap, deliberately not implemented here"*.
-- **M10-slice: read-only Mieter + StB portals** — completes the persona demo; no tickets or
-  activation codes. Sat directly after M5 in the old order.
-
-*(Rows 1, 1.5 and 2 of the pitch-era table — M4 doc-extraction, the FK-Isolation slice, M5a — are
-**done** and now live in their milestone sections rather than in an execution table. Row 4.5 was the
-CO₂ rounding slice and is **not** done — it is in the carried-over list above.)*
 
 ### Hard rules
 
@@ -91,29 +78,13 @@ CO₂ rounding slice and is **not** done — it is in the carried-over list abov
 2. **The demo path is sacred.** Every milestone ends with the full path re-verified end to end
    (clean DB → seed → statement → PDF). If a change breaks it, fix or revert before moving on.
 3. **Tag every green state** (`git tag demo-green-<n>`). At any moment you must be able to check out a
-   tag and demo. This is the whole safety net.
+   tag and demo. This is the whole safety net, and it is what makes a demo date cheap: you show the
+   last green tag, you do not reorder work to reach one.
 4. **One milestone per session**, each ending green (tests + CI). No half-merged subsystems.
 5. **Stubs stay stubs.** finAPI, Vision, email, billing behind adapters — no vendor SDK, no real keys.
-
-### Cut list (drop in this order if time runs short)
-
-**Mobile skeleton → M10 remainder → M8 → M7 → M6.** Cut early and deliberately rather than shipping
-something half-built. **M5 and the Wächter set are the last things to give up** — M5 carries the
-persona story, and the Wächter set is what keeps the three Kürzungsrecht exposures closed.
-
-> *This list names milestones, not row numbers.* It used to read `9 → 8 → 7 → 6 → 4`, which meant the
-> execution table could not be reordered without silently repointing it — the table said so itself,
-> in a footnote asking future readers not to renumber. That coupling is now gone: names survive a
-> reorder, indices do not. Milestone identifiers (M4, M5, …) never move; M5a is a slice of M5, not a
-> new milestone.
-
-### Stop-building checkpoint
-
-**Two days before any scheduled demo, stop feature work.** Merge to `main`, rehearse from
-`DEMO-RUNBOOK.md` on a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in
-after that line. *(Was written for the 06.08 pitch. That date passed, the pitch moved to **27.08**,
-and the discipline outlives both — so it is tied to whatever demo is next rather than to a fixed
-date. At 27.08 the line falls on ~25.08.)*
+6. **A documented rule that the code does not follow is a defect, not a to-do.** Row 1 exists because
+   `CLAUDE.md` described a rounding rule `heating-engine` did not implement. When that happens again,
+   the fix is to wire it or to mark it — never to leave the contract asserting it.
 
 ---
 
@@ -149,7 +120,7 @@ trivial PDF renders.
 
 ---
 
-## M1 — NK / operating-cost engine (⭐ pitch core) — ✅ built (Python, migration Phase C)
+## M1 — NK / operating-cost engine (⭐ the product's core) — ✅ built (Python, migration Phase C)
 
 > Built 2026-07-24 in `packages/nk-engine` (`lokara_nk_engine`): the €1,200 fixture passes
 > byte-exact; all keys incl. DIRECT/MEA; interim (<12 mo) and 18-month periods covered.
@@ -180,7 +151,7 @@ trivial PDF renders.
 
 ---
 
-## M3 — Web-app vertical slice + PDF (⭐ pitch demoable end-to-end) — ✅ done
+## M3 — Web-app vertical slice + PDF (⭐ demoable end-to-end) — ✅ done
 
 > **All six pages are built and the fixtures are gone.** Semantic tokens + `StatusNote`; the
 > URL-scoped portal (`/a/{accountId}`) with `account_session_for_path` (independent Membership check
@@ -208,10 +179,10 @@ without touching a database by hand.
 
 ---
 
-## M4 — Doc-extraction (OCR/Vision) pipeline — canned demo for pitch ✅ done
+## M4 — Doc-extraction (OCR/Vision) pipeline — canned demo ✅ done
 
 - One **upload → prefill → confirm** flow, shared by NK-receipt OCR **and** migration import.
-- **Vision adapter is stubbed** for the pitch: canned sample invoices return prefilled fields from
+- **Vision adapter is stubbed**: canned sample invoices return prefilled fields from
   fixtures; real EU+AVV provider is flagged behind the same adapter interface.
 - Review UI where the user confirms/corrects extracted fields before they hit the ledger.
 
@@ -444,14 +415,15 @@ redemption all leave it untouched.
 
 ## Reality flag (from the arch doc)
 
-A lot has been pulled into V1 (native apps + OCR + contract engine + investment module by ~Sept) for a
-small team, and the pre-pitch plan above now attempts **M4→M10** on top of that. That is a deliberate
-stretch, taken with eyes open.
+A lot has been pulled into V1 (native apps + OCR + contract engine + investment module) for a small
+team. That is a deliberate stretch, taken with eyes open — but it is a **scope** observation, not a
+schedule one, and nothing above is ordered around fitting it into a window.
 
-**The floor, if everything else slips:** M0→M3 is built, green and demoable *today* — a correct
-CO₂-compliant NK/heating statement from user-entered data, with tenant isolation proven. That alone is
-a legitimate pitch. Everything above it is upside.
+**The floor, at any moment:** M0→M4 is built, green and demoable *today* — a correct CO₂-compliant
+NK/heating statement from user-entered data, with tenant isolation proven. Everything above it is
+upside. That floor is what makes a demo date cheap to answer: you show the last `demo-green` tag.
 
-So: guard the sequence — correctness first, breadth second. Use the **cut list**, keep a
-**`demo-green` tag** at all times, and never let integration or native-app work cannibalise
-Tier-1 (engine) capacity or destabilise the working path.
+So: guard the sequence — correctness first, breadth second. Keep a **`demo-green` tag** at all times,
+and never let integration or native-app work cannibalise engine capacity or destabilise the working
+path. If work has to stop early, stop at a green tag; there is no pre-agreed drop order, because the
+rows above are ranked by legal exposure and dropping from the bottom is already the answer.
