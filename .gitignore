@@ -49,3 +49,4 @@ LAST_OUTPUT.md
 # Throwaway checkouts for `isolation: worktree` agents (AGENTS.md). Real git worktrees,
 # so they carry a full tree that would otherwise show up as untracked noise.
 .claude/worktrees/
+visualization
