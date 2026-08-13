@@ -16,10 +16,11 @@
 
 - Input: **normalized** value objects — plain dataclasses / Pydantic models (no SQLAlchemy models, no
   vendor types). Adapters map DB → these.
-- Money: integer **cents**; intermediate math with `decimal.Decimal`; **`round_half_up` per share at
-  assignment, `Verteilungsrest` to the owner bucket** (R1/R5/K9 — see *"Rounding & reconciliation"*
-  below). Every block reconciles to the input **to the cent once the residual is counted**.
-  *Superseded largest-remainder on this branch; the reason is recorded under "Rounding".*
+- Money: integer **cents**; intermediate math with `decimal.Decimal`. Rounding is **per engine**
+  (`CLAUDE.md` DoD 4): **heating** uses `round_half_up` per share at assignment with the
+  `Verteilungsrest` to the owner bucket (R1/R5/K9 — see *"Rounding & reconciliation"* below and § 9
+  for the site-by-site wiring); **NK** stays largest-remainder until Berkay's Seite 01/02 is
+  transcribed. Every block reconciles to the input **to the cent once the residual is counted**.
 - Output: a plain result object (shares per party + a reconciliation total) — the PDF layer formats it.
 - ⚠️ **De-scale at the render boundary.** Engine values are **scaled integers** (money = cents;
   areas/weights = ×100 fixed-point). The presentation layer must convert back before display, or a
@@ -750,6 +751,147 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 - **The whole MDL path (H7)** and **the UVI comparison (H8)** — nothing exists. `StubMeterGateway` is
   a fixture, not the MDL path.
 
+## 9. Wiring R1/R5/K9 and Ho/Hu into the engine — the site-by-site decision
+
+> **Written 13.08.2026, before the code.** Two of the four rules of § 1 were transcribed but never
+> reached the engine: `distribute_cents_half_up` has **zero production callers** and
+> `EnergyReference` is imported by nothing outside `domain`/`rules-store`, so **no boundary refuses
+> an Ho/Hu mismatch**. `CLAUDE.md` DoD 4 carries the dated *NOT YET WIRED* warning; whoever lands the
+> engine change deletes it, and not before. K3 and H2 did land and are not touched here.
+>
+> Rechtsstand: the *methods* below are §§ 7/8/9/9b HeizkostenV and §§ 3/7 CO2KostAufG; the
+> **residual convention K9** and the **K4 emission factors** are `Konvention` /
+> `verify-before-production`, **Rechtsstand 07/2026** in the Rechtsstand-Register. No output may
+> present either as a norm.
+
+### 9.1 Which of the ten split sites switch
+
+`heating-engine` calls the largest-remainder `distribute_cents` at ten places. They are not all the
+same operation, so they do not all get the same answer.
+
+| # | Site | What it splits | Decision | Who holds the residual | Reason |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `engine.py:77` | heating pot → (Grund, Verbrauch), §§ 7/8 + K1 | **half-up**, residual on the **consumption** pot | no owner bucket — the *complement pot* | H4 is written as `grundHz = round_half_up(kostenHz × p/100)` and `verbrauchHz = kostenHz − grundHz`. The rounded side is named by the formula. |
+| 2 | `engine.py:78` | `grundHz` → parties by m²·Tage (K2) | **half-up** | the **landlord party** (§ 9.2) | H6 + R1/R5/K9 — the archetypal Blockbetrag→Parteien allocation. |
+| 3 | `engine.py:87` | heat consumption pot → parties by **area** (§ 9a Abs. 2 fallback) | **half-up** | the landlord party | § 9a Abs. 2 replaces the *key*, not the rounding rule. Same operation as #2 with different weights. |
+| 4 | `engine.py:90` | `verbrauchHz` → parties by HKV-Einheiten / kWh | **half-up** | the landlord party | H6. `01b-F01`'s verbrauchHz block is the case where the residual is **−1 ct**. |
+| 5 | `engine.py:99` | warm-water pot → (Grund, Verbrauch) | **half-up**, residual on the consumption pot | complement pot | H4, second line pair. |
+| 6 | `engine.py:100` | `grundWw` → parties by m²·Tage | **half-up** | the landlord party | H6. |
+| 7 | `engine.py:105` | ww consumption → parties by **area** (§ 9a Abs. 2) | **half-up** | the landlord party | as #3. |
+| 8 | `engine.py:108` | `verbrauchWw` → parties by m³ | **half-up** | the landlord party | H6. `01b-F26`: the 4 m³ no unit meter saw stay with the owner as **4.227 ct**. |
+| 9 | `engine.py:363` | umlagefähig → (Warmwasser, Heizung), § 9 | **half-up**, residual on the **heating** pot | complement pot | H3: `kostenWwCent = round_half_up(umlagefaehigCent × anteilWw)`, `kostenHzCent = umlagefaehigCent − kostenWwCent` — his own comment reads *"complement, so the sum is exact"*. |
+| 10 | `co2.py:166` | CO₂ cost → (Vermieteranteil, Mieteranteil) | **half-up**, residual on the **renter** side | **no owner bucket at all** — see 9.3 | R6 + H2: `co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil/100)`, then `umlagefaehigCent = gesamtCent − co2Abzug`. The rounded quantity is the *deduction*; the renter side is what is left of it. |
+| — | `nk-engine/engine.py:55` | an NK cost block → parties | **stays largest-remainder** | — | Out of scope by decision, not oversight: `CLAUDE.md` DoD 4 splits the rule per engine, and NK switches when Berkay's Seite 01/02 is transcribed. The canonical €1.200 fixture is identical under both methods, so nothing is at risk in the meantime. |
+
+**Six sites move money (#2, 3, 4, 6, 7, 8). Four provably do not (#1, 5, 9, 10)** — see 9.4. Both
+halves are stated so that a reviewer who sees four sites change with no fixture behind them knows
+that is intended.
+
+### 9.2 What "the owner bucket" is at a party allocation — and when there is none
+
+Berkay's model has exactly **one** owner bucket per Liegenschaft. Our engine derives a **landlord
+party per unit** from the vacancy segments, so the mapping needs two conventions. Both are **ours**,
+neither is in his page, and both are flagged for him (§ 7 open discrepancy list):
+
+1. **Several landlord parties** (more than one unit vacant): the residual goes to the **first**
+   landlord party in the engine's deterministic party ordering, and to the **same** party in all
+   four blocks — one Eigentümer row then explains every ±ct of the whole statement in one line,
+   which is the entire justification for K9. *First*, not last, because appending a unit to the
+   input must not move the residual to another row.
+2. **No landlord party at all** (nothing vacant, nothing self-used — the majority of buildings, and
+   most of the existing fixtures): there **is** no owner bucket in the result, and the engine must
+   **not** hand the residual to a renter to make the block reconcile. Until an unconditional
+   Eigentümer line exists, such a block **keeps largest-remainder**, which is the allocation that
+   minimises each party's deviation from its own exact quota. Flagged as a convention, not settled:
+   the resolution named in § 5 (*"the owner line always exists, even at 0,00 €"* — Seite 01 D12) is
+   a `docs/02` + `docs/08` + PDF change and is its own slice.
+
+Reconciliation is unaffected either way: `sum(shares) == Blockbetrag` holds by construction under
+both primitives, and the assertion in `calculate_heating_statement` stays.
+
+### 9.3 Why `co2.py:166` gets its own answer
+
+It looks like the others and is not the same operation. It splits **one amount between two roles by
+a statutory percentage**; it does not allocate a pot across parties by weight. Consequences:
+
+- **There is no owner bucket here.** Nothing in the pair is an Eigentümer row absorbing a
+  distribution rest; the "residual holder" is only the complement the formula defines. The owner
+  bucket appears one level further down — in the **per-tenant** pro-rata of the renters' CO₂ share
+  (Rechtsstand-Register, *"CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6)"*: *"Zeilenweise
+  round_half_up; der Verteilungsrest landet beim Eigentümer und wird NIE still verteilt"*), which is
+  a Seite-01 step this engine does not implement at all. Do not conflate the two.
+- **The switch is therefore about direction, not about a bucket.** R6 says the *statutory
+  percentage* is what gets `round_half_up`, and H2 makes the landlord's **deduction** the rounded
+  quantity. Under largest-remainder that holds only by an accident of the two-element case and of
+  the tie-break preferring index 0; swap the two list entries and the deduction silently rounds the
+  other way at an exact half cent. Naming the complement removes that.
+- At an exact half cent the deduction rounds **up**, i.e. the tenant-favourable direction — the
+  landlord bears more of the CO₂ cost, not less. Worth knowing before anyone "corrects" it.
+
+### 9.4 Sites #1, #5, #9, #10 move no money, and no fixture may claim they do
+
+For a **two-element** split whose weights are complements, largest-remainder and
+`round_half_up`-on-index-0-plus-complement are the **same allocation**: the two exact quotas sum to
+the total, so their fractional parts sum to 1, so the single leftover cent goes to the element whose
+fraction exceeds ½ — which is exactly what rounding that element half up does — and at exactly ½ the
+tie-break picks index 0, which is again half **up**. Verified by brute force over 300.000 random
+weight pairs (integer and fractional) and by running the entire existing suite against a simulated
+post-change engine: **278 tests, no value moved, including the demo chain and the PDF goldens.**
+
+So these four sites cannot have a RED fixture, and their absence is not an omission. What is pinned
+instead: the equivalence itself (`packages/domain/tests/test_residual_rounding.py`) and the exact
+half-cent direction at #10 (`packages/heating-engine/tests/test_berkay_01b_residual_wiring.py`),
+which is what would break if the two elements were ever reordered.
+
+### 9.5 The Ho/Hu boundary — what the engine must accept and what it must refuse
+
+§ 1 (4) adopted the design; nothing consumes it. The boundary that has to refuse a mismatch is the
+**CO₂ mass fallback (K4/E1)** — the only place in the engine where a kWh quantity meets an emission
+factor. Where the supplier states the Brennstoffemissionen (§ 3 Abs. 1 Nr. 1 — the normal case and
+the demo case) **no factor is read and the Ho/Hu question does not arise**; that path must keep
+working untouched, and no default reference may be invented for it.
+
+**Input contract** (the minimal shape; it adds no legal value and no conversion):
+
+```python
+Co2Input.total_co2_kg: Decimal | None        # § 3 Abs. 1 Nr. 1, supplier-stated — the normal path
+Co2Input.emission_factor: EmissionFactor | None = None   # K4 fallback; carries its own Bezugsgröße
+HeatingInput.energy_reference: EnergyReference | None = None   # the Bezug of total_energy_kwh
+```
+
+| Situation | Behaviour |
+| --- | --- |
+| mass stated, no factor | unchanged — the reference is never read, `energy_reference` may stay `None` |
+| mass stated **and** a factor supplied | `HeatingInputError` (German). K4 is *nur Fallback*; a factor that sits next to a stated mass is **refused, not ignored** — a silently ignored factor is how the wrong one survives in the data |
+| mass absent, no factor | `HeatingInputError` (German) — the § 3 breach is reported, never guessed around |
+| mass absent, factor present, `energy_reference is None` | `HeatingInputError` (German) — an undeclared Bezugsgröße is refused, **never** defaulted. Defaulting to Hu on an Ho invoice is precisely the silent 11 % error this rule exists to stop |
+| references **differ** | `EnergyReferenceMismatchError`, propagated **unwrapped** so its German text and its type both reach the API boundary. No coercion, no warning-and-continue, no `× 0,903` |
+| references match | `total_co2_kg = co2_grams_from_energy(total_energy_kwh, reference, factor) / 1000` — R4 integer grams, then the unrounded value into the step lookup |
+
+**Why the mismatch is worth a hard error, as one fixture pair.** Same building, same invoice of
+20.000 kWh, Erdgas, 100 m² beheizte Fläche:
+
+| Bezug | Factor (K4, register, `verify-before-production`) | Emissions | kg CO₂/m²/a | Stufe | Vermieteranteil |
+| --- | --- | --- | --- | --- | --- |
+| Hu | **0,201** kg CO₂/kWh | 4.020 kg | 40,2 | 37 – < 42 | **60 %** |
+| Ho | **0,181** kg CO₂/kWh | 3.620 kg | 36,2 | 32 – < 37 | **50 %** |
+
+Both rows are lawful; which one is right depends only on what the invoice's kWh means. Multiplying
+the Ho quantity by the Hu factor reads 40,2 where the truth is 36,2 — **a whole Stufe, against the
+landlord**, on a document the tenant may rely on (§ 7 Abs. 3/Abs. 4 CO2KostAufG). Nothing in the
+intermediates looks wrong, which is why it must be refused rather than checked for.
+
+**Deliberately not in this slice**, so the absence is known rather than silent:
+
+- the **CO₂ cost fallback** (`co2Cent` from a price) — two rules disagree and neither was decided;
+  § 7 open discrepancy 5 stands. Only the *mass* fallback is wired;
+- E1's **warning + § 7 Abs. 4 risk flag** when the fallback ran, and any provenance field saying the
+  printed Brennstoffemissionen were derived rather than stated. `HeatingResult` has no warning
+  channel at all; that is a `docs/08` slice. **Until it exists, the fallback path prints a § 3
+  Abs. 1 Nr. 1 figure the supplier never stated** — a real gap, recorded here;
+- an **Ho factor for Heizöl or Flüssiggas**: the register states none, none is invented, and an Ho
+  quantity of either is refused by the same mismatch error.
+
 ---
 
 ## Rounding & reconciliation (applies to both engines)
@@ -758,8 +900,9 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 > visible rather than silently overwritten. The old rule was **largest-remainder**:
 > *floor each exact `Decimal` share to cents, then give the leftover cents to the largest fractional
 > remainders (ties: stable order)*, with `sum(shares) == input_total` true by construction.
-> `distribute_cents` still implements it and stays for any caller that wants it; the **allocation of a
-> Blockbetrag to parties no longer uses it.**
+> `distribute_cents` still implements it and stays for its own callers: **`nk-engine` keeps it**
+> (`CLAUDE.md` DoD 4), and so does a heating block that has **no landlord party to hold the residual**
+> (§ 9.2). In `heating-engine`, the allocation of a Blockbetrag to parties otherwise no longer uses it.
 
 1. Compute exact fractional shares with `decimal.Decimal` (**unchanged** — R2).
 2. `round_half_up` each share to whole cents, once, at assignment (R1).
