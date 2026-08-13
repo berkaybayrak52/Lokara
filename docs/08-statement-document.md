@@ -63,7 +63,7 @@ heating section the page prints six euro columns and **nothing else**.
 - No Gesamtbemessung, therefore no denominator.
 - No §§ 7/8 base/consumption ratio — the demo runs 30/70 and the page never says so.
 - No § 9 warm-water separation.
-- No Gradtagszahlen: the 585/415 ‰ split exists on the page **only** as the ratio between two printed
+- No Gradtagszahlen: the 583,3/416,7 ‰ split exists on the page **only** as the ratio between two printed
   euro amounts (786,24 / 557,76). Text search over the rendered PDF: `HeizkostenV` **0**, `585` **0**,
   `415` **0**, `‰` **0**.
 
@@ -879,7 +879,7 @@ intermediate this spec needs is computed in `engine.py` as a local and then drop
 | `rules.consumption_share` (the ratio actually applied) + the bounds | input, never echoed | §§ 7/8 disclosure |
 | `_Party.base_weight` | `_build_parties` | per-party Bemessung (Fläche·Tage) |
 | the consumption weights from `_consumption_weights` | local list | per-party Bemessung (Verbrauch) |
-| `_Party.degree_day_promille` and its per-unit total | `_build_parties` | the 585/415 ‰ |
+| `_Party.degree_day_promille` and its per-unit total | `_build_parties` | the 583,3/416,7 ‰ |
 | `_Party.days` | `_build_parties` | day-apportionment of WW/base at a Nutzerwechsel |
 | `total_co2_kg`, `co2_cost`, `heated_area_sqm`, the selected step's band | `_apply_co2` / `co2.py` | § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen |
 
@@ -923,14 +923,15 @@ Warmwasserverbrauch A/B/C **20 / 12 / 8 m³**; CO₂ **4.000 kg**, CO₂-Kosten 
 | Grundkosten-Bemessung | A 18.250 · B-Mieter 5.430 · B-Vermieter 5.520 · C 7.300 · **Σ 36.500 m²·Tage** |
 | Wärmeverbrauchs-Bemessung | A 600 · B-Mieter 146,25 · B-Vermieter 103,75 · C 150 · **Σ 1.000 HKV-Einheiten** (die Maßeinheit wird seit Slice 5 mitgeführt) |
 | Warmwasser-Bemessung | A 20 · B-Mieter 5,950684… · B-Vermieter 6,049315… · C 8 · **Σ 40 m³** |
-| Gradtagszahlen B | 01.01.–30.06. **585 ‰ von 1.000 ‰** · 01.07.–31.12. **415 ‰ von 1.000 ‰** |
+| Gradtagszahlen B | 01.01.–30.06. **583,3 ‰ von 1.000 ‰** · 01.07.–31.12. **416,7 ‰ von 1.000 ‰** |
 | Tage B (Grund + WW) | **181 von 365** bzw. **184 von 365** |
 
-Party totals: 5.603,97 / 1.495,53 / 1.281,10 / 1.762,32 € — Σ 10.142,92 €, plus the 157,08 €
+Party totals: 5.603,97 / 1.493,26 / 1.283,37 / 1.762,32 € — Σ 10.142,92 €, plus the 157,08 €
 CO₂-Vermieteranteil = 10.300,00 €.
 
 Unit B's heating-consumption cells — the figures `DEMO-RUNBOOK.md` and `docs/06` point at — are
-**778,79 € / 552,47 €**, still exactly 585 : 415.
+**776,52 € / 554,74 €**, exactly 583,3 : 416,7 — re-based by K3 (VDI 2067, `docs/03`) on
+13.08.2026. The pot did not move: 77.652 + 55.474 = 133.126, as before.
 
 ### 1 — Umlageschlüssel and Gesamtbemessung per money column
 
@@ -1240,7 +1241,7 @@ Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
 
 **Ruling 3 — `× (N von M Tagen)`, parenthesised.**
 
-The document's single share idiom is `A von B` — `585 ‰ von 1.000 ‰`, `5.000 kWh von 20.000 kWh`,
+The document's single share idiom is `A von B` — `583,3 ‰ von 1.000 ‰`, `5.000 kWh von 20.000 kWh`,
 `365 von 365 Tagen`. The defect is not the idiom, it is **operator binding**: `×` binds to `181`
 instead of to the share. Parentheses fix precisely that and teach the renter nothing new:
 
@@ -1255,7 +1256,7 @@ instead of to the share. Parentheses fix precisely that and teach the renter not
   `32 kWh je m² Wohnfläche und Jahr × 100 m² × (365 von 365 Tagen) = 3.200 kWh von 20.000 kWh`. That
   result is exact, so it carries **no `rd.`** — which is the marker doing its job in the one branch
   where a reader could otherwise not tell.
-- `585 ‰ von 1.000 ‰` and `5.000 kWh von 20.000 kWh Gesamtenergie` are **not** parenthesised and must
+- `583,3 ‰ von 1.000 ‰` and `5.000 kWh von 20.000 kWh Gesamtenergie` are **not** parenthesised and must
   not be: no `×` precedes them, so nothing binds wrongly, and bracketing them would imply an operator
   that is not there.
 
@@ -1315,7 +1316,7 @@ Nutzerwechsel Wohnung B — Aufteilung des erfassten Verbrauchs
 
 Wohnung B wurde im Abrechnungszeitraum von mehreren Parteien genutzt. Der für die Einheit
 erfasste Wärmeverbrauch wurde nach monatlichen Gradtagszahlen auf die Nutzungszeiträume
-aufgeteilt: 01.01.–30.06.2025 585 ‰ von 1.000 ‰ · 01.07.–31.12.2025 415 ‰ von 1.000 ‰.
+aufgeteilt: 01.01.–30.06.2025 583,3 ‰ von 1.000 ‰ · 01.07.–31.12.2025 416,7 ‰ von 1.000 ‰.
 Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:
 12 m³ × 181 von 365 Tagen = 5,95 m³ · 12 m³ × 184 von 365 Tagen = 6,05 m³.
 
@@ -1323,7 +1324,7 @@ Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gese
 Vorgabe (Rechtsstand 01/1981).
 ```
 
-- **`585 ‰ von 1.000 ‰` — never a bare `585 ‰`.** The promille of a segment is a fraction of the
+- **`583,3 ‰ von 1.000 ‰` — never a bare `583,3 ‰`.** The promille of a segment is a fraction of the
   *heating year*; over a partial billing period the parties' promille sum to **less than 1.000**, and a
   bare figure would then read as wrong. Printing own/total is the same Bemessung/Gesamtbemessung shape
   the rest of the document uses, and it degrades correctly (`120 ‰ von 300 ‰`).
@@ -1399,10 +1400,10 @@ Each names what renders **instead** and what would restore the drafted form. Non
 of substance: no figure moves and no citation changes.
 
 1. **Block C identifies each segment by party label, not by date range.** Item 4 prints
-   `01.01.–30.06.2025 585 ‰ von 1.000 ‰`; the date range needs a per-party `Period` and `HeatingLine`
+   `01.01.–30.06.2025 583,3 ‰ von 1.000 ‰`; the date range needs a per-party `Period` and `HeatingLine`
    carries `days` / `unit_total_days` and no dates at all. Taking the dates from the engine *input*
    alongside the result is exactly the drift this section forbids at its head. What renders is the
-   **party label the money table already prints**, beside that party's own `585 ‰ von 1.000 ‰` — and
+   **party label the money table already prints**, beside that party's own `583,3 ‰ von 1.000 ‰` — and
    the day derivation keeps item 4's operands exactly (`12 m³ × 181 von 365 Tagen = 5,95 m³`), one
    line per party instead of one `·`-joined sentence. **Restores the dates:** `HeatingLine` carrying
    its segment `Period` (an engine slice). Not invented here.
@@ -1442,8 +1443,8 @@ Nutzerwechsel — Aufteilung des erfassten Verbrauchs
 
 Diese Einheit wurde im Abrechnungszeitraum von mehreren Parteien genutzt. Der für die Einheit
 erfasste Wärmeverbrauch wurde nach monatlichen Gradtagszahlen auf die Nutzungszeiträume aufgeteilt:
-Wohnung B — Bernd Muster (Auszug 30.06.2025): 585 ‰ von 1.000 ‰
-Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 415 ‰ von 1.000 ‰
+Wohnung B — Bernd Muster (Auszug 30.06.2025): 583,3 ‰ von 1.000 ‰
+Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 416,7 ‰ von 1.000 ‰
 Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:
 Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
 Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 12 m³ × (184 von 365 Tagen) = rd. 6,05 m³
@@ -1733,8 +1734,8 @@ One row per party, so every field is per party.
 | `base_weight_sqm_days_x100` | `Decimal` | `1_825_000 · 543_000 · 552_000 · 730_000` | Block B's `Fläche·Tage` Bemessung — §§ 7 Abs. 1 / 8 Abs. 1 HeizkostenV. **×100 fixed point**: ÷ 100 gives the printed `18.250 · 5.430 · 5.520 · 7.300`, Σ `36.500` |
 | `heat_consumption_weight` | `Decimal \| None` | `600 · 146.25 · 103.75 · 150` | the consumption Bemessung actually applied to the heating pot. `None` **iff** `heat_fallback_to_area` — then the applied Bemessung was Fläche·Tage and no consumption figure may be shown |
 | `ww_consumption_weight_m3` | `Decimal \| None` | `20 · 5.950684… · 6.049315… · 8` | Block B's `Verbrauch Warmwasser` Bemessung (m³, unscaled). `None` **iff** there is no central warm water or `ww_fallback_to_area` |
-| `degree_day_promille` | `Decimal` | `1000 · 585 · 415 · 1000` | Block C's `585 ‰` — § 9b Abs. 2 |
-| `unit_degree_day_promille_total` | `Decimal` | `1000 · 1000 · 1000 · 1000` | Block C's `von 1.000 ‰`. Never omit it: over a partial billing period a unit's parties sum to **less** than 1.000 and a bare `585 ‰` would then read as wrong |
+| `degree_day_promille` | `Decimal` | `10000 · 5833 · 4167 · 10000` | Block C's `583,3 ‰` — § 9b Abs. 2. **Zehntelpromille since K3** (VDI 2067, `docs/03`); the render boundary divides by ten |
+| `unit_degree_day_promille_total` | `Decimal` | `10000 · 10000 · 10000 · 10000` | Block C's `von 1.000 ‰` (10.000 Zehntelpromille). Never omit it: over a partial billing period a unit's parties sum to **less** than the full year and a bare `583,3 ‰` would then read as wrong |
 
 - `degree_day_promille` is carried for **every** party, including single-party units, exactly as
   `_build_parties` already computes it; the template decides whether Block C renders (unit with > 1

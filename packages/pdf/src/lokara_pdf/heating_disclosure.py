@@ -25,12 +25,14 @@ Two rules run through the whole module:
 2. **De-scale once, at the boundary.** ``base_weight_sqm_days_x100`` is ×100
    fixed point: the *sum* is divided by 100 once, never per line, and the
    printed values are rounded by largest remainder so they add up to the
-   printed Gesamtbemessung.
+   printed Gesamtbemessung. ``degree_day_promille`` is ×10 fixed point
+   (Zehntelpromille, Σ 10.000) and is divided by ten here for the same reason —
+   see ``TENTH_PROMILLE_PER_PROMILLE``.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_FLOOR, Decimal
 from html import escape
 
 from lokara_domain import Cents, MeasurementUnit, format_eur
@@ -528,13 +530,55 @@ DEGREE_DAY_CAVEAT = (
 )
 
 
-def _promille_line(label: str, line: HeatingLine) -> str:
+# `HeatingLine.degree_day_promille` is **Zehntelpromille**, not promille: the
+# VDI 2067 table sums to 10.000 because its monthly values are fractional
+# (13,3 ‰ in June). The engine keeps the scaled integer end to end and states so
+# (`lokara_heating_engine.degree_days`); dividing by ten is this boundary's job.
+# Print the raw value and `583,3 ‰` renders as `5.833 ‰` while every test that
+# compares against the engine integer stays green — the failure mode docs/03
+# names under "De-scale at the render boundary".
+TENTH_PROMILLE_PER_PROMILLE = Decimal(10)
+# The printed grid is the table's own resolution, one tenth of a promille. The
+# hundredths of `DISPLAY_STEP` are the Bemessung columns' grid and would claim a
+# precision the convention does not have. `format_number_de` drops a trailing
+# `,0`, so a whole promille prints as `585 ‰` — the form every other figure on
+# the statement takes, and the form the unit total `1.000 ‰` has to take.
+PROMILLE_STEP = Decimal("0.1")
+
+
+def _promille_shares(lines: Sequence[HeatingLine]) -> tuple[list[Decimal], Decimal]:
+    """One unit's ‰ shares and the total they are printed under, de-scaled.
+
+    Rounded by largest remainder on the tenth — the same idiom as
+    `largest_remainder_display`, spelled out here because that helper's grid is
+    the hundredth: floor every share, then hand the missing tenths to the largest
+    remainders in the order the parties are printed, so the column is
+    reproducible from the page. Whole-month segments are exact tenths and nothing
+    is redistributed; a mid-month Nutzerwechsel is the case where independently
+    rounded shares would print `1.000,1 ‰` under a total of `1.000 ‰`.
+    """
+    exact = [line.degree_day_promille / TENTH_PROMILLE_PER_PROMILLE for line in lines]
+    # Every line of a unit carries the same denominator (the engine sums it per
+    # unit), so it is read once rather than re-derived from the shares.
+    total = (lines[0].unit_degree_day_promille_total / TENTH_PROMILLE_PER_PROMILLE).quantize(
+        PROMILLE_STEP
+    )
+    floors = [share.quantize(PROMILLE_STEP, rounding=ROUND_FLOOR) for share in exact]
+    shortfall = int((total - sum(floors, Decimal(0))) / PROMILLE_STEP)
+    if shortfall <= 0:
+        return floors, total
+    remainders = [share - floor for share, floor in zip(exact, floors, strict=True)]
+    order = sorted(range(len(exact)), key=lambda index: (-remainders[index], index))
+    shares = list(floors)
+    for index in order[:shortfall]:
+        shares[index] += PROMILLE_STEP
+    return shares, total
+
+
+def _promille_line(label: str, share: Decimal, total: Decimal) -> str:
     """Never a bare promille: over a partial billing period a unit's parties sum
     to less than 1.000 ‰ and the bare figure would read as an error."""
-    return (
-        f"<li>{escape(label)}: {_num(line.degree_day_promille)} ‰"
-        f" von {_num(line.unit_degree_day_promille_total)} ‰</li>"
-    )
+    return f"<li>{escape(label)}: {_num(share)} ‰ von {_num(total)} ‰</li>"
 
 
 def _day_share_line(
@@ -593,10 +637,12 @@ def party_change_blocks(
                 '<p class="apportionment-lead">Der für die Einheit erfasste Wärmeverbrauch wurde'
                 " nach monatlichen Gradtagszahlen auf die Nutzungszeiträume aufgeteilt:</p>"
             )
+            shares, promille_total = _promille_shares([heating.lines[index] for index in indexes])
             parts.append(
                 '<ul class="apportionment">'
                 + "".join(
-                    _promille_line(party_labels[index], heating.lines[index]) for index in indexes
+                    _promille_line(party_labels[index], share, promille_total)
+                    for index, share in zip(indexes, shares, strict=True)
                 )
                 + "</ul>"
             )

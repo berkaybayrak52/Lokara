@@ -133,7 +133,7 @@ This is the pitch. Slow down here.
   €178.52 — only her 181 days. €181.48 lands on the landlord for the vacancy. Renter 3 pays €240.
   It reconciles to the cent — largest-remainder rounding, no lost cent, no rounding fudge."*
 - Then the differentiator: *"Heating splits by degree-days, so unit B's mid-year change comes out
-  **585/415 ‰** — €786,24 to the tenant, €557,76 to the landlord. And the CO₂ split follows the
+  **583,3/416,7 ‰** — €776,52 to the tenant, €554,74 to the landlord. And the CO₂ split follows the
   10-step model with the **Rechtsstand** printed on the statement. That's the legal depth."*
 - Open the downloaded PDF: *"This is what the tenant receives."*
 
@@ -150,7 +150,7 @@ This is the pitch. Slow down here.
 | Unit C — Renter 3 (20 m², 365 d) | **€240,00** |
 | Reconciliation | sums to **exactly €1.200,00** |
 | Heating/CO₂ total | **€10.300,00** |
-| Unit B heating split (degree-days) | **585/415 ‰** = €786,24 / €557,76 |
+| Unit B heating split (degree-days) | **583,3/416,7 ‰** = €776,52 / €554,74 |
 | CO₂ table | 10-step, **Rechtsstand 01/2023** on the statement |
 
 ---

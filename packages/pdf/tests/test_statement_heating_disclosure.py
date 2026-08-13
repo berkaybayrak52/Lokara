@@ -115,6 +115,7 @@ from lokara_heating_engine import (
 from lokara_nk_engine import CostItem, NkInput, UnitBasis, calculate_nk_statement
 from lokara_pdf import PartyKey, StatementData, format_number_de, rechtsstand_entry, statement_html
 from lokara_pdf.demo import AS_OF, BILLING_PERIOD, PARTY_LABELS, build_demo_statement
+from lokara_pdf.heating_disclosure import TENTH_PROMILLE_PER_PROMILLE
 from lokara_rules_store import (
     CO2_SPLIT_TABLE,
     DEFAULT_CONSUMPTION_SHARE,
@@ -774,34 +775,43 @@ class TestBlockBBemessungsgrundlagen:
             table,
             "Wohnung B — Bernd Muster (Auszug 30.06.2025)",
             "5.430",
-            f"146,25 {HKV_UNIT}",
+            f"rd. 145,83 {HKV_UNIT}",
             "rd. 5,95 m³",
         )
         assert has_row(
             table,
             "Wohnung B — Leerstand ab 01.07.2025 → Vermieter",
             "5.520",
-            f"103,75 {HKV_UNIT}",
+            f"rd. 104,17 {HKV_UNIT}",
             "rd. 6,05 m³",
         )
         assert has_row(table, "Wohnung C — Clara Vorlage", "7.300", f"150 {HKV_UNIT}", "8 m³")
         assert has_row(table, "Gesamtbemessung", "36.500", HEAT_TOTAL_CELL, "40 m³")
 
-    def test_the_heat_bemessungen_carry_no_rd_marker(self) -> None:
-        """**F2's rule, applied to the new column.** 600 · 146,25 · 103,75 · 150
-        are all exact at two decimals, so none of them is marked: `rd.` marks the
-        *value*, not the line, and a marker on a figure that was not rounded
-        states a rounding that did not happen."""
+    def test_the_rounded_heat_bemessungen_carry_the_rd_marker(self) -> None:
+        """**F2's rule, applied to the new column.** `rd.` marks the *value*, not
+        the line: a marker on a figure that was not rounded states a rounding that
+        did not happen, and a missing marker on one that was hides it.
+
+        Under the VDI 2067 table (K3, `docs/03`) the Nutzerwechsel figures are no
+        longer exact: 250 × 5.833/10.000 = 145,825 and 250 × 4.167/10.000 = 104,175.
+        Both are marked. 600 and 150 are whole readings and stay bare. This test
+        previously asserted that *no* heat Bemessung carried the marker, which was
+        true only of the old 585/415 table where 146,25 and 103,75 came out exact —
+        the premise moved with the table, not the rule.
+
+        The two rounded halves still sum to the exact 250 the meter recorded."""
         table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
         heat_cells = [row[2] for row in table if len(row) == 4 and row[0].startswith("Wohnung")]
 
         assert heat_cells == [
             f"600 {HKV_UNIT}",
-            f"146,25 {HKV_UNIT}",
-            f"103,75 {HKV_UNIT}",
+            f"rd. 145,83 {HKV_UNIT}",
+            f"rd. 104,17 {HKV_UNIT}",
             f"150 {HKV_UNIT}",
         ]
-        assert not any(cell.startswith(ROUNDED) for cell in heat_cells)
+        assert [cell.startswith(ROUNDED) for cell in heat_cells] == [False, True, True, False]
+        assert Decimal("145.83") + Decimal("104.17") == Decimal("250.00")
 
     def test_the_rounding_is_disclosed_once_and_under_the_table_it_qualifies(self) -> None:
         """**F2**, `docs/08` → "The rounding is disclosed".
@@ -965,7 +975,7 @@ class TestBlockBBemessungsgrundlagen:
         assert HEAT_KEY_WITH_CHANGE in text  # with the key that was applied
         assert WITHHELD_CELL in text  # and only the figure withheld
         assert "1.000" not in text  # Σ of the heat Bemessungen, withheld
-        assert "146,25" not in text  # Bernd's heat Bemessung, withheld
+        assert "145,83" not in text  # Bernd's heat Bemessung, withheld
         assert "103,75" not in text  # the landlord party's, withheld
         # No device is named either — the key cell may not name a
         # Heizkostenverteiler while the cell beside it says the unit is unknown.
@@ -1139,7 +1149,7 @@ class TestBlockCNutzerwechsel:
         rendered = block_text(statement_html(data), BLOCK_C)
         pairs = _PROMILLE_PAIR.findall(rendered)
 
-        assert pairs == [("585", "1.000"), ("415", "1.000")]
+        assert pairs == [("583,3", "1.000"), ("416,7", "1.000")]
         assert rendered.count("‰") == 2 * len(pairs), (
             "a ‰ figure is printed without its per-unit total — docs/08 item 4"
         )
@@ -1156,10 +1166,13 @@ class TestBlockCNutzerwechsel:
             if line.unit_id != "unit-b":
                 continue
             label = PARTY_LABELS[(line.unit_id, line.tenancy_id)]
-            assert (
-                f"{label}: {_n(line.degree_day_promille)} ‰ von "
-                f"{_n(line.unit_degree_day_promille_total)} ‰"
-            ) in text
+            # De-scaled with the renderer's own constant, not a literal 10: the
+            # field is Zehntelpromille since K3 (`docs/03`), and a test that
+            # formatted the raw integer would assert `5.833 ‰` — the very
+            # de-scaling bug this suite exists to catch, frozen into a golden.
+            own = line.degree_day_promille / TENTH_PROMILLE_PER_PROMILLE
+            total = line.unit_degree_day_promille_total / TENTH_PROMILLE_PER_PROMILLE
+            assert f"{label}: {_n(own)} ‰ von {_n(total)} ‰" in text
 
     def test_the_day_apportionment_is_printed_with_its_operands(self) -> None:
         """**F2**, `docs/08` → "The rounding is disclosed": the line is
@@ -1246,7 +1259,7 @@ class TestBlockCNutzerwechsel:
         text = block_text(statement_html(data), BLOCK_C)
         pairs = _PROMILLE_PAIR.findall(text)
 
-        assert pairs == [("585", "1.000"), ("365", "1.000"), ("50", "1.000")]
+        assert pairs == [("583,3", "1.000"), ("360", "1.000"), ("56,7", "1.000")]
         assert sum(_de(own) for own, _total in pairs) == _de(pairs[0][1])
 
 
@@ -1428,10 +1441,14 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
     def test_the_worked_examples_party_totals_follow_the_new_billable_cost(self) -> None:
         heating = _heating(build_demo_statement())
 
+        # Re-based by K3 (VDI 2067, `docs/03`): the degree-day split moves the two
+        # unit-B parties against each other. 149.553 + 128.110 = 277.663 =
+        # 149.326 + 128.337 — the pair re-splits, the pot does not move, and the
+        # two unaffected units do not move at all.
         assert [int(line.total) for line in heating.lines] == [
             560_397,
-            149_553,
-            128_110,
+            149_326,
+            128_337,
             176_232,
         ]
         assert int(heating.total) == 1_030_000  # the invoice did not move
@@ -1454,15 +1471,21 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
             assert golden in html, f"the canonical €1.200 allocation moved: {golden} is gone"
         assert "Summe Betriebskosten (stimmt centgenau mit den Gesamtkosten überein)" in html
 
-    def test_the_degree_day_ratio_did_not_move(self) -> None:
-        """585 : 415 is a property of the Gradtagszahl table, not of the CO₂
-        split. `docs/06` promises the demo beat survives the re-base; 778,79 /
-        552,47 is still exactly 585 : 415."""
+    def test_the_degree_day_ratio_is_the_table_and_nothing_else(self) -> None:
+        """The ratio is a property of the Gradtagszahl table, not of the CO₂
+        split — which is why it moves when, and only when, the table moves.
+
+        It has now moved once: K3 (`docs/03`) adopts VDI 2067 Bl. 1, 12/1983,
+        Tab. 22, and Jan–Jun goes 585,0 ‰ → 583,3 ‰, so 778,79 / 552,47 re-bases
+        to 776,52 / 554,74. **The pot does not move** — 77.652 + 55.474 = 133.126,
+        the same total as before — which is the check that this was a re-split and
+        not a re-price."""
         heating = _heating(build_demo_statement())
         unit_b = [line for line in heating.lines if line.unit_id == "unit-b"]
 
         mieter, vermieter = (int(line.heating_consumption) for line in unit_b)
-        assert (mieter, vermieter) == (77_879, 55_247)
-        # Within the cent the pot-level largest remainder can move it — the
-        # ratio is the invariant, the last cent belongs to `distribute_cents`.
-        assert abs(Decimal(mieter) - Decimal("0.585") * (mieter + vermieter)) <= 1
+        assert (mieter, vermieter) == (77_652, 55_474)
+        assert mieter + vermieter == 133_126
+        # Within the cent the pot-level rounding can move it — the ratio is the
+        # invariant, the last cent belongs to the distribution primitive.
+        assert abs(Decimal(mieter) - Decimal("0.5833") * (mieter + vermieter)) <= 1

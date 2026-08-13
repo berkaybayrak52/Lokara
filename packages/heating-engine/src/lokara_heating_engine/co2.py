@@ -1,15 +1,28 @@
 """CO2KostAufG 10-step split of the CO₂ cost portion of heating cost.
 
-The Anlage's bounds are per **year** (`kg CO2/m2/a`), so a billing period shorter
-than a year is classified against a *shortened* table — § 5 Abs. 1 S. 4
-CO2KostAufG: *"Ist ein Abrechnungszeitraum von unter einem Jahr vereinbart, so
-sind die Werte der Einstufungstabelle in der Anlage anteilig zu kürzen."*
+The Anlage's bounds are per **year** (`kg CO2/m2/a`), so a billing period that is
+not a year is classified against an **annualised** intensity (H2):
 
-The statute shortens the table; it does not extrapolate the emissions. So the
-disclosed `intensity_kg_per_sqm` stays the **period** figure (§ 7 Abs. 3) and only
-the finite bounds are scaled. Spec + the day-based `period_factor` convention:
-`docs/03-nk-heating-engines.md` § "The Stufenmodell is a per-year table".
-Rechtsstand 01/2023.
+    spezifisch = (co2Gramm / 1e6) / gesamtflaecheM2
+    if nTage not in (365, 366): spezifisch ×= 365 / nTage
+    step = lookup10(spezifisch)          # against the UNSHORTENED Anlage table
+
+⚠️ **Do not "fix" this back to shortening the table.** The § 5 Abs. 1 S. 4
+reading (scale every finite bound by days/reference-year, leave the intensity as
+the period figure) was implemented here before, is quoted verbatim and argued at
+length in `docs/03-nk-heating-engines.md`, and is marked **SUPERSEDED** there
+rather than deleted so that nobody re-derives it. Both readings select the *same
+step* — `i × 365/d < b` ⇔ `i < b × d/365` — so no Einstufung and no euro move on
+selection. They differ in the figure that is **printed**, and the printed figure
+is what § 7 Abs. 3 CO2KostAufG is about: the old reading printed a 275-day
+figure under a `kg CO₂/m²/a` header, against a band (20,34–24,11) that appears
+in no statute annex. H2 prints an annualised figure against the statute's own
+bounds (27–32), which is the pair a tenant can check against the published
+Anlage. Spec: `docs/03` → "Seite 01b … (3) CO₂ short billing period".
+
+Periods longer than twelve months are refused, not annualised downward — a
+validation error inherited from Seite 01 (E6/E24), so annualisation never sees
+one. Rechtsstand 01/2023.
 """
 
 from dataclasses import dataclass
@@ -21,23 +34,31 @@ from lokara_domain import Cents, Co2Step, Co2Table, Period, days_between, distri
 from .inputs import Co2Result, HeatingInputError
 
 _ONE = Decimal(1)
+# H2's divisor is a flat 365, and it triggers on `nTage ∉ {365, 366}` — Berkay's
+# rule as written, *not* the anchored reference year the superseded convention
+# used. A 366-day non-calendar period is therefore left un-annualised; recorded
+# as an open convention in `docs/03` § 7 no. 8, not decided here.
+_ANNUALISATION_DIVISOR_DAYS = 365
+_FULL_YEAR_DAY_COUNTS = frozenset({365, 366})
 
 
 @dataclass(frozen=True)
 class _PeriodBasis:
-    """The three figures § 5 Abs. 1 S. 4 needs, derived once. `Co2Result` carries
-    all three because the factor alone cannot be un-divided back into the days."""
+    """The period's length, the divisor H2 annualises by, and the resulting
+    factor. `Co2Result` carries all three because the factor alone cannot be
+    un-divided back into the days the disclosure copy needs."""
 
     period_days: int
     reference_year_days: int
-    factor: Decimal
+    annualisation_factor: Decimal
 
 
 def _reference_year_days(start: date) -> int:
     """Days in [start, same calendar date one year later).
 
-    Anchoring the reference year on the period's own `valid_from` is what makes a
-    full leap year 366/366 = 1 rather than 366/365 — a leap year is not *more*
+    Used **only** to decide whether the period exceeds a year, not to annualise:
+    anchoring on the period's own `valid_from` is what keeps a full leap year at
+    366 of 366 rather than 366 of 365, so a leap year is not treated as longer
     than a year. A 29 Feb start rolls to 1 Mar (docs/03).
     """
     try:
@@ -47,53 +68,62 @@ def _reference_year_days(start: date) -> int:
     return days_between(start, end)
 
 
-def period_factor_for(billing_period: Period) -> Decimal:
-    """`min(1, days(billing_period) / days(reference year))` — exact, never float."""
-    return _period_basis_for(billing_period).factor
+def annualisation_factor_for(billing_period: Period) -> Decimal:
+    """`365 / days(billing_period)`, or exactly 1 for a full year — exact, never float."""
+    return _period_basis_for(billing_period).annualisation_factor
 
 
 def _period_basis_for(billing_period: Period) -> _PeriodBasis:
-    """The factor and the two day counts it came from, computed together.
+    """The annualisation factor and the day counts behind it, computed together.
 
-    Raises for a period longer than its reference year: § 5 Abs. 1 S. 4 shortens
-    the table only for periods *under* a year, and stretching the bounds upward
-    would push the building into a lower Stufe at the renter's expense (docs/03
-    § "Why a period > 12 months is refused rather than scaled").
+    Raises for a period longer than a year (E24): S. 4 addresses periods *under*
+    a year and for Wohnraum a longer Abrechnungszeitraum is not lawful at all
+    (§ 556 Abs. 3 S. 1 BGB). Annualising downward would enlarge nothing but
+    would shrink the intensity, push the building into a **lower** Stufe and
+    shift cost onto the renter — inventing a legal number in the one direction
+    the 3 % Kürzungsrecht punishes (docs/03 → "Why a period > 12 months is
+    refused rather than scaled").
     """
     if billing_period.valid_to is None:
         raise HeatingInputError(
             "CO₂ split requires a bounded billing period (valid_to is required)"
         )
     period_days = days_between(billing_period.valid_from, billing_period.valid_to)
-    reference_days = _reference_year_days(billing_period.valid_from)
-    if period_days > reference_days:
+    if period_days > _reference_year_days(billing_period.valid_from):
         raise HeatingInputError(
             "CO₂-Aufteilung nicht möglich: Der Abrechnungszeitraum "
             f"({billing_period.valid_from.isoformat()} bis "
-            f"{billing_period.valid_to.isoformat()}, {period_days} Tage) ist länger als ein Jahr "
-            f"({reference_days} Tage). § 5 Abs. 1 Satz 4 CO2KostAufG kürzt die "
-            "Einstufungstabelle nur bei einem Abrechnungszeitraum von unter einem Jahr; für "
-            "längere Zeiträume gibt es keine gesetzliche Grundlage für eine Streckung der "
-            "Tabelle. Bitte den Abrechnungszeitraum auf höchstens zwölf Monate begrenzen "
-            "(§ 556 Abs. 3 Satz 1 BGB)."
+            f"{billing_period.valid_to.isoformat()}, {period_days} Tage) ist länger als ein Jahr. "
+            "Die Einstufungstabelle der Anlage zum CO2KostAufG gilt je Jahr "
+            "(kg CO₂/m²/Jahr); für einen längeren Zeitraum gibt es keine gesetzliche Grundlage, "
+            "den spezifischen Wert umzurechnen. Bitte den Abrechnungszeitraum auf höchstens "
+            "zwölf Monate begrenzen (§ 556 Abs. 3 Satz 1 BGB)."
         )
-    factor = Decimal(period_days) / Decimal(reference_days)
+    factor = (
+        _ONE
+        if period_days in _FULL_YEAR_DAY_COUNTS
+        else Decimal(_ANNUALISATION_DIVISOR_DAYS) / Decimal(period_days)
+    )
     return _PeriodBasis(
         period_days=period_days,
-        reference_year_days=reference_days,
-        factor=min(_ONE, factor),
+        # What was divided by, echoed rather than re-derived — the disclosure
+        # prints "(275 von 365 Tagen)" and 1,327… cannot be un-divided into it.
+        reference_year_days=_ANNUALISATION_DIVISOR_DAYS,
+        annualisation_factor=factor,
     )
 
 
-def _select_step(
-    intensity_kg_per_sqm: Decimal, table: Co2Table, period_factor: Decimal
-) -> tuple[int, Co2Step]:
+def _select_step(intensity_kg_per_sqm: Decimal, table: Co2Table) -> tuple[int, Co2Step]:
     """The one place the Einstufung is decided — the percent and the band both
-    read off this single walk, so they can never disagree."""
+    read off this single walk, so they can never disagree.
+
+    The bounds are the Anlage's own, unscaled: under H2 it is the intensity that
+    is brought onto a per-year basis, never the table.
+    """
     for index, step in enumerate(table):
         if (
             step.max_intensity_exclusive is None
-            or intensity_kg_per_sqm < step.max_intensity_exclusive * period_factor
+            or intensity_kg_per_sqm < step.max_intensity_exclusive
         ):
             return index, step
     raise HeatingInputError(
@@ -101,16 +131,16 @@ def _select_step(
     )
 
 
-def landlord_share_percent_for_intensity(
-    intensity_kg_per_sqm: Decimal, table: Co2Table, period_factor: Decimal = _ONE
-) -> int:
-    """Selects the step whose (exclusive) upper bound the intensity falls under.
+def landlord_share_percent_for_intensity(intensity_kg_per_sqm: Decimal, table: Co2Table) -> int:
+    """Selects the step whose (exclusive) upper bound the annualised intensity
+    falls under. Intervals are left-closed, right-open: exactly 12,00 is step 2,
+    exactly 52,00 is the open-ended top step.
 
-    Every finite bound is shortened by `period_factor` (§ 5 Abs. 1 S. 4). The
-    open-ended top step has no bound and is therefore never scaled — a building
-    already in it stays in it.
+    The value passed in must be **unrounded** (R4). Rounding to two decimals
+    first would put 11,99948… into the 10 % step and print a band the renter's
+    own figure contradicts (E3, `01b-F05`).
     """
-    return _select_step(intensity_kg_per_sqm, table, period_factor)[1].landlord_share_percent
+    return _select_step(intensity_kg_per_sqm, table)[1].landlord_share_percent
 
 
 def split_co2_cost(
@@ -124,22 +154,21 @@ def split_co2_cost(
     if heated_area_sqm <= 0:
         raise HeatingInputError("CO₂ split requires a positive heated area")
     basis = _period_basis_for(billing_period)
-    factor = basis.factor
-    # The period figure, deliberately not annualised: the statute shortens the
-    # table, and this is the value § 7 Abs. 3 requires to be disclosed.
+    # Annualised (H2), because the Anlage's column header reads
+    # "… pro Quadratmeter Wohnfläche **und Jahr**". The quotient is recomputed
+    # rather than multiplied by the stored factor (R2).
     intensity = total_co2_kg / heated_area_sqm
-    index, step = _select_step(intensity, table, factor)
+    if basis.period_days not in _FULL_YEAR_DAY_COUNTS:
+        intensity = intensity * Decimal(_ANNUALISATION_DIVISOR_DAYS) / Decimal(basis.period_days)
+    index, step = _select_step(intensity, table)
     landlord_percent = step.landlord_share_percent
-    # The bounds the intensity was *actually* compared against, i.e. already
-    # shortened. A renderer that scaled them itself would be a second
-    # implementation of § 5 Abs. 1 S. 4, and the two would drift.
     previous_bound = table[index - 1].max_intensity_exclusive if index > 0 else None
     landlord_amount, renter_amount = distribute_cents(
         co2_cost, [landlord_percent, 100 - landlord_percent]
     )
     return Co2Result(
         intensity_kg_per_sqm=intensity,
-        period_factor=factor,
+        annualisation_factor=basis.annualisation_factor,
         landlord_share_percent=landlord_percent,
         landlord_amount=landlord_amount,
         renter_amount=renter_amount,
@@ -147,10 +176,8 @@ def split_co2_cost(
         total_co2_kg=total_co2_kg,
         heated_area_sqm=heated_area_sqm,
         co2_cost=co2_cost,
-        band_min_inclusive=None if previous_bound is None else previous_bound * factor,
-        band_max_exclusive=(
-            None if step.max_intensity_exclusive is None else step.max_intensity_exclusive * factor
-        ),
+        band_min_inclusive=previous_bound,
+        band_max_exclusive=step.max_intensity_exclusive,
         period_days=basis.period_days,
         reference_year_days=basis.reference_year_days,
     )

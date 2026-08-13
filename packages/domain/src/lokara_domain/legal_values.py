@@ -35,13 +35,24 @@ Co2Table = tuple[Co2Step, ...]
 
 @dataclass(frozen=True)
 class DegreeDayTable:
-    """Monthly degree-day (Gradtagszahlen) weights in promille, Jan..Dec; sums to 1000."""
+    """Monthly degree-day (Gradtagszahlen) weights, Jan..Dec, in **Zehntelpromille**;
+    sums to 10 000.
 
-    promille_by_month: tuple[int, int, int, int, int, int, int, int, int, int, int, int]
+    The unit is in the field name because the table itself forces it: VDI 2067
+    Blatt 1, Ausgabe 12/1983, Tabelle 22 puts Jun/Jul/Aug at 13,3 / 13,3 / 13,4 ‰
+    — 400/3 split three ways, which no integer promille can represent (K3,
+    `docs/03-nk-heating-engines.md` → "Seite 01b … (2) K3").
+
+    Display value = stored / 10. Never store the ‰ integer: the superseded
+    promille table summed to 1000 and would otherwise be constructible here in
+    silence, at a tenth of its intended weight.
+    """
+
+    tenth_promille_by_month: tuple[int, int, int, int, int, int, int, int, int, int, int, int]
 
     def __post_init__(self) -> None:
-        if sum(self.promille_by_month) != 1000:
-            raise ValueError("DegreeDayTable promille values must sum to 1000")
+        if sum(self.tenth_promille_by_month) != 10_000:
+            raise ValueError("DegreeDayTable tenth-promille values must sum to 10 000")
 
 
 @dataclass(frozen=True)

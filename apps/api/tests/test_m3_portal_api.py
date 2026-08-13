@@ -149,9 +149,10 @@ class TestDemoStatement:
         assert len(lines) == 4  # A, B-renter, B-landlord (vacancy), C
         bernd = next(line for line in lines if "Bernd Muster" in line["partyLabel"])
         vacancy = next(line for line in lines if line["isLandlord"])
-        # 585/415 ‰ degree-day apportionment of unit B's annual consumption.
-        assert bernd["heatingConsumptionEur"] == f"778,79{NBSP}€"
-        assert vacancy["heatingConsumptionEur"] == f"552,47{NBSP}€"
+        # 583,3/416,7 ‰ degree-day apportionment of unit B's annual consumption
+        # (VDI 2067, K3 — docs/03).
+        assert bernd["heatingConsumptionEur"] == f"776,52{NBSP}€"
+        assert vacancy["heatingConsumptionEur"] == f"554,74{NBSP}€"
         assert "Auszug 30.06.2025" in bernd["partyLabel"]
 
         assert body["heatingTotalCents"] == 1_030_000

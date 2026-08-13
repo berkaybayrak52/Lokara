@@ -50,9 +50,16 @@ any new one appeared.
 - **WCAG 2.1 AA / BFSG** on any screen you were asked about: contrast ratios computed against
   the tokens in `docs/05` (Slate is secondary text only; green-on-mint is decorative and never
   carries text), visible focus states, keyboard reachability, type that scales.
-- The degree-day split is visible and derived (585/415 ‰ → 786,24 / 557,76), because that is
-  the domain depth competitors don't show — and because a ratio that is printed rather than
-  derived from the amounts is a fixture in disguise.
+- The degree-day split is visible and derived, because that is the domain depth competitors
+  don't show — and because a ratio that is printed rather than derived from the amounts is a
+  fixture in disguise.
+  **Do not carry the demo's figures in your head or in this file.** This line named
+  `585/415 ‰ → 786,24 / 557,76` through two re-bases after they stopped being true, and a
+  reviewer holding a stale number reports a correct render as wrong — the most expensive kind
+  of finding, because it costs trust in the reviewer. Read the current pair from
+  `docs/06-demo-scenarios.md` at review time and check that the amounts derive from the printed
+  ratio. As of the VDI 2067 table (K3, `docs/03`) the split is 583,3/416,7 ‰, and that is the
+  third re-base — which is the point: look it up, do not memorise it.
 
 ## Output
 

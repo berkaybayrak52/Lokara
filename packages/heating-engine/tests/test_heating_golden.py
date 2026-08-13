@@ -40,8 +40,13 @@ WW_FORMULA = WarmWaterFormula(
     cold_temp_c=Decimal(10),
     area_fallback_kwh_per_sqm_year=Decimal(32),
 )
+# Synthetic, **not** the rules-store table: the superseded 01/1981 shape ×10, so
+# Jan–Jun stays a legible 5850 of 10 000 (585,0 ‰) and the hand-computed rows
+# below can be checked by eye. The unit is Zehntelpromille, Σ 10 000 (K3,
+# `docs/03` → "Seite 01b … (2) K3"); the live VDI 2067 table is pinned in
+# `packages/rules-store/tests/test_rule_data.py` and is what the demo path uses.
 DEGREE_DAYS = DegreeDayTable(
-    promille_by_month=(170, 150, 130, 80, 40, 15, 10, 10, 30, 80, 120, 165)
+    tenth_promille_by_month=(1700, 1500, 1300, 800, 400, 150, 100, 100, 300, 800, 1200, 1650)
 )
 CO2_TABLE: Co2Table = (
     Co2Step(max_intensity_exclusive=Decimal(12), landlord_share_percent=0),
@@ -227,7 +232,9 @@ class TestCo2TenStepSplit:
 
 class TestDegreeDayApportionment:
     """Renter change in unit B at Jul 1, single annual reading of 250 heat units:
-    Jan–Jun promille 585 / Jul–Dec 415 → 146.25 vs 103.75 units. WW (not
+    Jan–Jun 5850 / Jul–Dec 4150 Zehntelpromille of this file's synthetic table
+    (585,0 ‰ / 415,0 ‰) → 146.25 vs 103.75 units. The ×10 rescale of K3 is a
+    change of unit, not of ratio, so no cent below moves. WW (not
     weather-dependent) and base costs split by days instead."""
 
     def test_mid_period_renter_change_without_interim_reading(self) -> None:

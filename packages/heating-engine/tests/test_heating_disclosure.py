@@ -64,8 +64,13 @@ WW_FORMULA = WarmWaterFormula(
     cold_temp_c=Decimal(10),
     area_fallback_kwh_per_sqm_year=Decimal(32),
 )
+# Synthetic, **not** the rules-store table: the superseded 01/1981 shape ×10, so
+# unit B's Jan–Jun stays exactly 5850 of 10 000 (585,0 ‰) and the Bemessungen
+# below stay hand-checkable. Zehntelpromille, Σ 10 000 (K3, `docs/03` → "Seite
+# 01b … (2) K3"). The demo path reads the live VDI 2067 table from rules-store
+# and therefore splits unit B 583,3/416,7 ‰ — the two are not interchangeable.
 DEGREE_DAYS = DegreeDayTable(
-    promille_by_month=(170, 150, 130, 80, 40, 15, 10, 10, 30, 80, 120, 165)
+    tenth_promille_by_month=(1700, 1500, 1300, 800, 400, 150, 100, 100, 300, 800, 1200, 1650)
 )
 CO2_TABLE: Co2Table = (
     Co2Step(max_intensity_exclusive=Decimal(12), landlord_share_percent=0),
@@ -371,8 +376,8 @@ class TestBlockBBemessungen:
         assert None not in weights
         assert weights == [
             Decimal(600),
-            Decimal("146.25"),  # 250 × 585 ‰
-            Decimal("103.75"),  # 250 × 415 ‰
+            Decimal("146.25"),  # 250 × 5850/10 000 (585,0 ‰)
+            Decimal("103.75"),  # 250 × 4150/10 000 (415,0 ‰)
             Decimal(150),
         ]
         # Σ 1.000 — the Gesamtbemessung the page may not print until the
@@ -394,19 +399,23 @@ class TestBlockCNutzerwechsel:
 
     `docs/08` → Block C: `01.01.–30.06.2025 585 ‰ von 1.000 ‰`, and
     `12 m³ × 181 von 365 Tagen = 5,95 m³`.
+
+    The carried figures are **Zehntelpromille** since K3 (`docs/03` → "Seite 01b
+    … (2) K3"): the pair below is 5850/10 000, which the page prints as
+    `585,0 ‰ von 1.000 ‰`. De-scaling by 10 happens once, at the renderer.
     """
 
-    def test_promille_is_carried_with_its_per_unit_total(self) -> None:
-        """Never a bare `585 ‰`: over a partial billing period a unit's parties
-        sum to less than 1.000 and the bare figure would read as wrong."""
+    def test_tenth_promille_is_carried_with_its_per_unit_total(self) -> None:
+        """Never a bare `585,0 ‰`: over a partial billing period a unit's parties
+        sum to less than 1.000 ‰ and the bare figure would read as wrong."""
         result = statement()
         assert [
             (line.degree_day_promille, line.unit_degree_day_promille_total) for line in result.lines
         ] == [
-            (Decimal(1000), Decimal(1000)),
-            (Decimal(585), Decimal(1000)),
-            (Decimal(415), Decimal(1000)),
-            (Decimal(1000), Decimal(1000)),
+            (Decimal(10_000), Decimal(10_000)),
+            (Decimal(5850), Decimal(10_000)),
+            (Decimal(4150), Decimal(10_000)),
+            (Decimal(10_000), Decimal(10_000)),
         ]
 
     def test_the_unit_total_is_the_denominator_that_was_applied(self) -> None:
@@ -418,8 +427,8 @@ class TestBlockCNutzerwechsel:
         )
         weights = [line.heat_consumption_weight for line in unit_b]
         assert weights == [
-            Decimal(250) * Decimal(585) / Decimal(1000),
-            Decimal(250) * Decimal(415) / Decimal(1000),
+            Decimal(250) * Decimal(5850) / Decimal(10_000),
+            Decimal(250) * Decimal(4150) / Decimal(10_000),
         ]
 
     def test_the_printed_derivation_is_reproducible_from_the_carried_fields(self) -> None:
@@ -529,34 +538,50 @@ class TestCo2Berechnungsgrundlagen:
         assert co2.band_max_exclusive is None
 
     def test_the_full_year_days_are_carried_alongside_the_factor(self) -> None:
-        """`period_factor` alone cannot be un-divided back into `181 von 365`."""
+        """`annualisation_factor` alone cannot be un-divided back into
+        `181 von 365`, so both day counts stay on the result."""
         result = statement()
         co2 = result.co2
         assert co2 is not None
         assert co2.period_days == 365
         assert co2.reference_year_days == 365
-        assert co2.period_factor == Decimal(1)
+        assert co2.annualisation_factor == Decimal(1)
 
-    def test_a_leap_year_is_366_of_366_and_not_shortened(self) -> None:
+    def test_a_leap_year_is_366_days_and_is_not_annualised(self) -> None:
+        """H2 triggers on `nTage ∉ {365, 366}`, so a leap year is left alone and
+        the band stays the Anlage's own. `reference_year_days` is the flat 365
+        H2 divides by (`docs/03` §(3) "Divisor", open item § 7 no. 8) — the
+        field echoes what was divided by, not the length of this year; the
+        anchored reference year now only decides whether a period exceeds twelve
+        months. Before H2 this assertion read 366 of 366."""
         result = statement(billing_period=LEAP_YEAR_2024)
         co2 = result.co2
         assert co2 is not None
         assert co2.period_days == 366
-        assert co2.reference_year_days == 366
-        assert co2.period_factor == Decimal(1)
+        assert co2.reference_year_days == 365
+        assert co2.annualisation_factor == Decimal(1)
+        assert co2.intensity_kg_per_sqm == Decimal(40)
         assert co2.band_min_inclusive == Decimal(37)
         assert co2.band_max_exclusive == Decimal(42)
 
 
 class TestCo2BandOverAShortPeriod:
-    """§ 5 Abs. 1 S. 4 CO2KostAufG — the band that is disclosed is the *shortened* one.
+    """H2 — the intensity is annualised and the band disclosed is the **unshortened** one.
 
-    01.01.–01.07.2025 = 181 of 365 days; 1.950 kg over 100 m² = 19,5 kg/m² for
-    the period. Against the shortened table that is Stufe 37 – < 42 (Vermieter
-    60 %), and `docs/08` item 5 requires the page to print
-    `Einstufung: 18,3 bis unter 20,8 … anteilig gekürzt`. The renderer must not
-    multiply the bounds itself — a second implementation of a legal rule in the
-    template layer is how the two drift apart.
+    Replaces the § 5 Abs. 1 S. 4 reading this class used to pin (every finite
+    bound × 181/365, intensity left as the period figure, page printing
+    `Einstufung: 18,3 bis unter 20,8 … anteilig gekürzt`). Superseded
+    12.08.2026 — `docs/03-nk-heating-engines.md` → "Seite 01b … (3) CO₂ short
+    billing period"; the old section is kept and marked there so nobody
+    re-derives it.
+
+    01.01.–01.07.2025 = 181 days; 1.950 kg over 100 m² = 19,5 kg/m² **over the
+    period**, annualised 19,5 × 365/181 = 39,32… kg/m²/a → Stufe 37 – < 42,
+    Vermieter 60 %. Same step as the shortened-table reading, same cents; what
+    moved is the pair the page prints, and § 7 Abs. 3 CO2KostAufG is about
+    exactly that pair. The renderer must still not derive either figure itself —
+    a second implementation of a legal rule in the template layer is how the two
+    drift apart.
     """
 
     def _result(self) -> HeatingResult:
@@ -568,25 +593,44 @@ class TestCo2BandOverAShortPeriod:
             co2=Co2Input(total_co2_kg=Decimal(1950), co2_cost=cents(30_000)),
         )
 
-    def test_the_carried_band_is_the_shortened_one(self) -> None:
+    def test_the_carried_band_is_the_anlages_own(self) -> None:
         co2 = self._result().co2
         assert co2 is not None
         assert co2.landlord_share_percent == 60
-        assert co2.intensity_kg_per_sqm == Decimal("19.5")  # the period figure, not annualised
+        # The disclosed intensity is the annualised one — the header over it
+        # reads kg CO₂/m²/**Jahr**, and now the figure under it does too.
+        assert co2.intensity_kg_per_sqm == Decimal("19.5") * Decimal(365) / Decimal(181)
+        assert co2.intensity_kg_per_sqm.quantize(Decimal("0.01")) == Decimal("39.32")
         lower, upper = co2.band_min_inclusive, co2.band_max_exclusive
         assert lower is not None and upper is not None
-        # Shortened by the *carried* factor — not by one the template recomputes.
-        assert lower == Decimal(37) * co2.period_factor
-        assert upper == Decimal(42) * co2.period_factor
-        assert lower.quantize(Decimal("0.001")) == Decimal("18.348")
-        assert upper.quantize(Decimal("0.001")) == Decimal("20.827")
+        # Unscaled: the pair a tenant can look up in the published Anlage.
+        assert lower == Decimal(37)
+        assert upper == Decimal(42)
         assert lower <= co2.intensity_kg_per_sqm < upper
+
+    def test_both_readings_select_the_same_step(self) -> None:
+        """The equivalence that makes the change safe, asserted rather than
+        believed: `i × 365/d < b` ⇔ `i < b × d/365`. The superseded reading
+        compared the **period** figure 19,5 against bounds shortened to
+        18,348…/20,827…; H2 compares 39,32… against 37/42. Same Stufe, same
+        60 %, same cents — only the printed pair moves (`docs/03` §(3))."""
+        co2 = self._result().co2
+        assert co2 is not None
+        period_figure = Decimal("19.5")
+        shortened_lower = Decimal(37) * Decimal(181) / Decimal(365)
+        shortened_upper = Decimal(42) * Decimal(181) / Decimal(365)
+        assert shortened_lower.quantize(Decimal("0.001")) == Decimal("18.348")
+        assert shortened_upper.quantize(Decimal("0.001")) == Decimal("20.827")
+        assert shortened_lower <= period_figure < shortened_upper
+        assert co2.landlord_share_percent == 60
+        assert int(co2.landlord_amount) == 18_000  # 60 % of 300,00 €
+        assert int(co2.renter_amount) == 12_000
 
     def test_the_days_behind_the_factor_are_carried(self) -> None:
         """`(181 von 365 Tagen)` is required copy; it is not recoverable from
-        0,4958904109589041095890410959."""
+        2,0165745856353591160220994475."""
         co2 = self._result().co2
         assert co2 is not None
         assert co2.period_days == 181
         assert co2.reference_year_days == 365
-        assert co2.period_factor == Decimal(181) / Decimal(365)
+        assert co2.annualisation_factor == Decimal(365) / Decimal(181)

@@ -68,8 +68,11 @@ WW_FORMULA = WarmWaterFormula(
     cold_temp_c=Decimal(10),
     area_fallback_kwh_per_sqm_year=Decimal(32),
 )
+# Synthetic, **not** the rules-store table (the superseded 01/1981 shape ×10).
+# Zehntelpromille, Σ 10 000 — K3, `docs/03` → "Seite 01b … (2) K3". Nothing in
+# this file depends on the weights; it exists so the engine has a table at all.
 DEGREE_DAYS = DegreeDayTable(
-    promille_by_month=(170, 150, 130, 80, 40, 15, 10, 10, 30, 80, 120, 165)
+    tenth_promille_by_month=(1700, 1500, 1300, 800, 400, 150, 100, 100, 300, 800, 1200, 1650)
 )
 CO2_TABLE: Co2Table = (
     Co2Step(max_intensity_exclusive=Decimal(12), landlord_share_percent=0),

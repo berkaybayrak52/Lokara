@@ -20,7 +20,7 @@
 > they appear — NK allocation, heating, and the statement. (A seed once had Bernd Muster occupying all
 > year in the heating section but moving out in June in the NK section.) Deriving both engines from the
 > same tenancy rows isn't just consistency: it makes the **degree-day split visible on the statement**
-> — unit B's heating row splits Mieter/Vermieter **585/415 ‰** (778,79 € / 552,47 €), which is exactly
+> — unit B's heating row splits Mieter/Vermieter **583,3/416,7 ‰** (776,52 € / 554,74 €), which is exactly
 > the domain depth the competitors don't show. Keep it in the demo.
 >
 > ⚠️ **Those two euro figures moved on 05.08.2026** (they were 786,24 € / 557,76 €) and nothing about
@@ -29,7 +29,7 @@
 > deducted **before** the renter-facing split, so correcting it moves every heating euro downstream.
 > The **585/415 ‰ ratio itself is unchanged**: 778,79 / 552,47 is still exactly 585 : 415.
 >
-> ⚠️ **And they move once more with K3 (Berkay Seite 01b), to `776,52 € / 554,74 €`.** The degree-day
+> ⚠️ **And they moved once more with K3 (Berkay Seite 01b), to `776,52 € / 554,74 €` — landed 13.08.2026.** The degree-day
 > table becomes VDI 2067 Bl. 1, 12/1983, Tab. 22, so Jan–Jun is **583,3 ‰** and Jul–Dez **416,7 ‰**
 > instead of 585/415 (`docs/03` → *"Seite 01b … (2) K3"*). The split itself is unchanged; only the
 > table under it is. **Recomputed under both rounding methods — the demo chain is bit-identical under

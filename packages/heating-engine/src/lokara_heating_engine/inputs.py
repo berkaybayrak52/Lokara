@@ -160,11 +160,15 @@ class HeatingLine:
 
 @dataclass(frozen=True)
 class Co2Result:
-    # kg CO₂/m² **over the Abrechnungszeitraum** — not annualised (§ 7 Abs. 3).
+    # kg CO₂/m²/**Jahr** — annualised (H2), which is what the Anlage's column
+    # header asks for and what § 7 Abs. 3 has the tenant check.
     intensity_kg_per_sqm: Decimal
-    # § 5 Abs. 1 S. 4 CO2KostAufG: the factor the Anlage's finite bounds were
-    # shortened by. Exactly 1 for a full year. Rendering the gekürzt band needs it.
-    period_factor: Decimal
+    # H2: `365 / nTage`, which is **>= 1** for a short period and exactly 1 when
+    # nTage is 365 or 366. Deliberately not called `period_factor`: that name
+    # belonged to the superseded bound-shortening factor, which was <= 1, and an
+    # inverted meaning behind an old name is how a renderer silently prints the
+    # wrong band.
+    annualisation_factor: Decimal
     landlord_share_percent: int
     landlord_amount: Cents
     renter_amount: Cents
@@ -176,17 +180,20 @@ class Co2Result:
     total_co2_kg: Decimal
     heated_area_sqm: Decimal
     co2_cost: Cents
-    # The Einstufung as the band actually compared against — already shortened
-    # by `period_factor`, so no renderer multiplies a legal rule a second time.
+    # The Einstufung as the band actually compared against — the Anlage's own,
+    # unscaled bounds, i.e. the pair a tenant can look up in the published annex.
     # `Co2Step` carries no ordinal, so a step *number* would be invented.
     # `None` lower = the first step ("unter 12"); `None` upper = the open-ended
-    # top step, which is never scaled.
+    # top step.
     band_min_inclusive: Decimal | None
     band_max_exclusive: Decimal | None
-    # The two day counts behind `period_factor` — "(181 von 365 Tagen)" is
-    # required copy and 0,4958904109589041… cannot be un-divided back into it.
+    # The two day counts behind `annualisation_factor` — "(275 von 365 Tagen)"
+    # is required copy and 1,327272… cannot be un-divided back into it.
     period_days: int
-    # Anchored on `valid_from`, so a full leap year is 366 of 366 (docs/03).
+    # The divisor H2 actually applied: a flat 365, never the anchored reference
+    # year (which is used only to refuse a period longer than a year). The
+    # result echoes what was divided by; the flat divisor is a convention
+    # recorded in `docs/03` § 7 no. 8.
     reference_year_days: int
 
 
