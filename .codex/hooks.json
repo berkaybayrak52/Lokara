@@ -1,4 +1,18 @@
 {
+  "_comment": [
+    "Mirror of the `hooks` object in .claude/settings.json — same events, same matchers,",
+    "same timeouts, pointing at .codex/hooks/ instead of .claude/hooks/.",
+    "scripts/check_agent_parity.py fails the gate when the two diverge.",
+    "",
+    "Paths are NOT absolute. They used to be, four times over, which pinned this file to",
+    "one machine and one checkout location — it broke on a move or a fresh clone. `codex",
+    "--help` documents no project-dir variable, so each command resolves the repo root",
+    "itself via git and runs the hook relative to it. That also picks the *worktree* root",
+    "when an agent runs in one, which is the same correctness fix post-edit.sh and",
+    "stop-gate.sh carry internally: grade the tree being worked in, not the one the",
+    "session started in. $CODEX_PROJECT_DIR stays as a fallback for a non-git checkout.",
+    "`exec` keeps stdin intact — the hook payload arrives that way."
+  ],
   "hooks": {
     "PreToolUse": [
       {
@@ -6,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/write-scope.sh'",
+            "command": "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || echo \"${CODEX_PROJECT_DIR:-$PWD}\")\" && exec .codex/hooks/write-scope.sh'",
             "timeout": 10
           }
         ]
@@ -18,19 +32,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/post-edit.sh'",
+            "command": "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || echo \"${CODEX_PROJECT_DIR:-$PWD}\")\" && exec .codex/hooks/post-edit.sh'",
             "timeout": 60
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/stop-gate.sh'",
-            "timeout": 900
           }
         ]
       }
@@ -40,7 +43,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/kyotun/Desktop/Lokara/.codex/hooks/stop-gate.sh'",
+            "command": "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || echo \"${CODEX_PROJECT_DIR:-$PWD}\")\" && exec .codex/hooks/stop-gate.sh'",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || echo \"${CODEX_PROJECT_DIR:-$PWD}\")\" && exec .codex/hooks/stop-gate.sh'",
             "timeout": 900
           }
         ]

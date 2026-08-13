@@ -163,3 +163,54 @@ solange der Katalog fehlt — eine geratene Zuordnung wäre erfundenes Recht.
    die **Jahresabrechnung** zulässig, **nicht** für die UVI. Damit braucht die UVI echte
    Vergleichswerte — das ist eher eine Datenbeschaffungs- als eine Rechenfrage. Hast du eine
    Vorstellung, woher die kommen, bevor wir die vierstellige Objektzahl für eigene Werte haben?
+
+---
+
+## 9. Eine Rückfrage, die aus der Implementierung entstanden ist: der Eigentümer-Topf, wenn es keinen gibt
+
+Beim Verdrahten von R1/R5/K9 ist eine Lücke aufgefallen, die weder in Seite 01b noch in der
+Collision Map steht — sie entsteht erst aus dem Zusammentreffen deines Modells mit unserer
+Datenstruktur. Wir haben sie **vorläufig** entschieden und die Entscheidung als *unsere*
+Konvention markiert, nicht als deine (`docs/03` § 9.2).
+
+**Der Unterschied.** Dein Modell hat **einen** Eigentümer-Topf pro Liegenschaft. Unsere Engine
+leitet die Parteien aus Belegungszeiträumen ab, also entsteht eine **Vermieterpartei je Einheit**
+— und zwar nur dann, wenn diese Einheit im Abrechnungszeitraum leer stand oder eigengenutzt war.
+
+**Fall A — mehrere Vermieterparteien** (mehr als eine Einheit leer). Wir geben den
+Verteilungsrest an die **erste** Vermieterpartei in unserer deterministischen Reihenfolge, und in
+**allen vier Blöcken an dieselbe**. Damit erklärt eine Eigentümerzeile jeden ±ct der gesamten
+Abrechnung, was ja der eigentliche Sinn von K9 ist. *Erste*, nicht letzte, damit das Anhängen
+einer weiteren Einheit den Rest nicht auf eine andere Zeile verschiebt.
+
+**Fall B — gar keine Vermieterpartei.** Voll vermietet, nichts eigengenutzt. Dann gibt es im
+Ergebnis **keinen Eigentümer-Topf**, an den R5 den Rest geben könnte. Wir haben uns entschieden,
+den Rest **nicht** an einen Mieter zu geben, nur damit der Block aufgeht — genau die stille
+Verschiebung zwischen Mietern, die K9 verhindern soll. Solche Blöcke rechnen bei uns deshalb
+vorerst weiter mit Largest-Remainder.
+
+**Warum das mehr ist als ein Randfall:** Fall B ist der **Normalfall**. Ein voll vermietetes Haus
+ohne Leerstand ist die Mehrheit unserer Zielobjekte. In der jetzigen Fassung greift deine
+Rundungsregel also genau dort **nicht**, wo die meisten Abrechnungen entstehen.
+
+**Unsere Lesart deiner Antwort — bitte bestätigen oder korrigieren.** Seite 01 D12 beschreibt die
+Eigentümerzeile als feste Zeile der Darstellung. Wir lesen das so, dass sie **immer** existiert,
+auch bei 0,00 € und auch ohne Leerstand, und dann Träger des Verteilungsrests ist. Wenn das
+stimmt, ist Fall B kein Sonderfall, sondern verschwindet — und wir ziehen die Zeile unbedingt
+ein (bei uns ein eigener Arbeitsschritt, weil Datenmodell, Statement-Layout und PDF betroffen
+sind; er steht jetzt an zweiter Stelle unserer Reihenfolge).
+
+Drei Fragen, damit wir nicht raten:
+
+1. **Existiert die Eigentümerzeile immer?** Auch bei 0,00 €, auch ohne Leerstand und ohne
+   Eigennutzung — also als reiner Träger des Verteilungsrests?
+2. **Wenn ja: was steht als Bemessung darin?** 0 m²·Tage / 0 HKV-Einheiten, oder bleibt die
+   Bemessungsspalte leer und nur der Betrag erscheint? Das entscheidet, ob eine gedruckte Quote
+   auf der Seite plausibel bleibt.
+3. **Wenn nein** — wenn es ohne Leerstand wirklich keinen Eigentümer-Topf gibt: wohin dann mit
+   dem Rest? Unsere Annahme ist „dann eben Largest-Remainder für diesen Block", weil das die
+   Abweichung jeder Partei von ihrer eigenen Quote minimiert. Ist das in deinem Sinne, oder
+   siehst du einen anderen Weg?
+
+Bis zu deiner Antwort bleibt die Konvention oben als **unsere** gekennzeichnet — in `docs/03`
+§ 9.2 und in der Liste der offenen Punkte in § 7. Sie steht nirgends als Norm.

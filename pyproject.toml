@@ -76,6 +76,7 @@ files = [
   "packages/db/tests",
   "packages/pdf/src",
   "packages/pdf/tests",
+  "scripts/tests",
 ]
 
 [tool.pytest.ini_options]
@@ -88,4 +89,5 @@ testpaths = [
   "packages/adapters/tests",
   "packages/db/tests",
   "packages/pdf/tests",
+  "scripts/tests",
 ]

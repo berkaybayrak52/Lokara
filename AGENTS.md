@@ -112,14 +112,23 @@ uv run python scripts/check_fk_isolation.py     # docs/02 isolation rule (needs 
 
 **What each one turns from discipline into a command:**
 
-- `check_agent_parity.py` — the agent definitions themselves. `.codex/agents/*.toml` are
-  read by the external `codex` CLI and by **nothing in this repository**, so they drift
-  unnoticed; on 13.08.2026 `.codex`'s `statement-reviewer` still carried a heating pair two
-  re-bases old, and both `engine-implementer` definitions still stated the retired blanket
-  *"rounding is largest-remainder"* — an instruction to revert correct code. The check
-  compares prose, not syntax, and treats `CLAUDE.md`↔`AGENTS.md` as equivalent because each
-  tool auto-reads a different file. **Deleting `.codex/agents/` also satisfies it** — that is
-  the honest option if nobody is running `codex` against this repo any more.
+- `check_agent_parity.py` — the whole `.codex` mirror: agent **definitions**, hook
+  **scripts**, and hook **wiring** (`.claude/settings.json` ↔ `.codex/hooks.json`).
+  `.codex/` is read by the external `codex` CLI and by **nothing in this repository**, and it
+  is the fallback used when tokens run out — i.e. exactly when nobody is watching it. It
+  drifts unnoticed: on 13.08.2026 `.codex`'s `statement-reviewer` carried a heating pair two
+  re-bases old and both `engine-implementer` definitions stated the retired blanket
+  *"rounding is largest-remainder"* — an instruction to revert correct code — while all three
+  `.codex` hooks were the **pre-fix** versions, so `>>` was unguarded there and worktree
+  agents were graded against the wrong tree.
+  **The first version of this check missed all of that**, because it compared definitions and
+  not the mechanism. Definitions are what an agent is told; hooks are what actually stops it.
+  It now compares executable lines (comments excluded — the two trees may explain themselves
+  differently), the event/matcher/script/timeout wiring, and refuses an absolute path in
+  `.codex/hooks.json`. Only the tokens each tool spells its own way are exempt:
+  `CLAUDE.md`↔`AGENTS.md`, `.claude`↔`.codex`, `CLAUDE_PROJECT_DIR`↔`CODEX_PROJECT_DIR`.
+  `scripts/tests/test_agent_parity.py` pins nine cases, including the `>>` one, so the check
+  is known to go red rather than merely never having done so.
 - `check_engine_purity.py` — rule 1. AST-level: forbidden imports, no I/O, no clock, and
   engines never importing `rules-store`. Runs on every Python edit via `PostToolUse`.
 - `check_rls_coverage.py` — rule 3. Queries the **live migrated database**, because the

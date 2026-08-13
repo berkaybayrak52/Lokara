@@ -42,18 +42,26 @@ deny() {
     echo
     echo "$2"
     echo
-    echo "If this file genuinely belongs to this agent, change .claude/hooks/write-scope.sh"
+    echo "If this file genuinely belongs to this agent, change .codex/hooks/write-scope.sh"
     echo "and say why in the commit. Do not work around it by shelling out."
   } >&2
   exit 2
 }
 
 # --- Bash: catch the obvious escapes, then get out of the way ----------------------
+#
+# The redirect branch reads: a `>` or `>>` not preceded by an fd digit, `<`, `>` or `&`
+# (so `2>&1` and `>&2` stay legal), pointing at something that is not `&`.
+#
+# It used to be `[^\>\<]\>[^\>]`, which deliberately skipped anything with a `>` on
+# either side -- and therefore skipped `>>` entirely. A read-only agent could append to
+# any file in the repo and the hook said nothing; H3 caught it doing exactly that.
+# Truncate and append are the same escape, so both are matched now.
 if [[ "$tool" == "Bash" ]]; then
   case "$agent" in
     main) exit 0 ;;
     boundary-auditor|statement-reviewer|docs-reconciler)
-      if [[ "$cmd" =~ [^\>\<]\>[^\>]|[[:space:]]tee[[:space:]]|sed[[:space:]]+-i|(^|[[:space:]])rm[[:space:]] ]]; then
+      if [[ "$cmd" =~ (^|[^0-9\<\>\&])\>\>?[[:space:]]*[^\&\>[:space:]]|[[:space:]]tee[[:space:]]|sed[[:space:]]+-i|(^|[[:space:]])rm[[:space:]] ]]; then
         deny "via Bash redirection" "This agent is read-only: it reports, it does not fix."
       fi
       ;;
@@ -108,5 +116,5 @@ domain packages belong to engine-implementer; docs belong to spec-scribe." ;;
 that can edit is an auditor you cannot trust." ;;
 
   *)
-    deny "$rel" "Unknown agent type '$agent' -- add its lane to .claude/hooks/write-scope.sh." ;;
+    deny "$rel" "Unknown agent type '$agent' -- add its lane to .codex/hooks/write-scope.sh." ;;
 esac
