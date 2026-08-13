@@ -118,6 +118,10 @@ uv run python scripts/check_fk_isolation.py     # docs/02 isolation rule (needs 
   policies are created inside `for table in (...)` loops and any grep-based checker gives
   false answers in both directions. Checks ENABLE, **FORCE**, a policy, and that the table is
   named in the isolation test.
+  **The rule it enforces, stated once so the gate has a home to cite:** *every new tenant table
+  needs an RLS policy **and** a line in the isolation test — a table without a policy is a silent
+  leak.* This lived in `MIGRATION-PLAN.md` §8 until that file was retired; it is an operating rule,
+  not migration history, which is why it moved here rather than going away with the file.
 - `check_fk_isolation.py` — the other half of rule 3, which RLS structurally cannot cover.
   Postgres checks foreign keys with **RLS bypassed**, so a correctly stamped row can still
   point at another account's parent. Fails on any FK whose child and parent are both
@@ -137,7 +141,7 @@ on each one's **exit code**. Their status differs, so read them separately:
 | Gate | Status | Why |
 | --- | --- | --- |
 | `check_fk_isolation.py` | **green** since the FK-Isolation slice (`0004`) | all 17 tenant-to-tenant edges are composite |
-| `check_rls_coverage.py` | **red**, 2 problems | `landlord` + `self_use_period` have policies no test exercises — M5 populates those tables |
+| `check_rls_coverage.py` | **green** since M3's meter slice | 15 tenant tables ENABLEd + FORCEd + policied + named in the isolation test; 3 exempt. (Was red on `landlord` + `self_use_period`; those tables are now exercised.) |
 
 Note the ordering trap: RLS runs **first**, so `verify_demo_path.sh` aborts there and never
 reaches the FK step. Run `uv run python scripts/check_fk_isolation.py` directly to see it

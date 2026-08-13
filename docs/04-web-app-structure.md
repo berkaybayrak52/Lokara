@@ -40,8 +40,9 @@ lokara/
 > contract — never by importing each other's code.
 >
 > The Python packages were built **in place** alongside the TS scaffold they replaced (same
-> directories, per `MIGRATION-PLAN.md`); that scaffold was removed at Phase H, so each directory above
-> now holds exactly one implementation in the language its label names.
+> directories, per the v4 migration — `git log --oneline pre-migration..phase-h-done`); that scaffold
+> was removed at the end of it, so each directory above now holds exactly one implementation in the
+> language its label names.
 
 **Dependency rule:** `engine` packages depend only on `domain`. Nothing in `packages/*-engine`
 imports `db`, `adapters`, `ui`, or any vendor SDK. **`apps/api` (FastAPI)** wires engines + db +

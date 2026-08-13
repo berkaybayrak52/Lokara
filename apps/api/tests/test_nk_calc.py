@@ -1,5 +1,5 @@
-"""The Phase E DoD gate: a JWT-auth'd NK request returns the €1,200 fixture's
-numbers byte-exact over HTTP (MIGRATION-PLAN Phase E). No database required."""
+"""The FastAPI layer's gate: a JWT-auth'd NK request returns the €1,200 fixture's
+numbers byte-exact over HTTP (docs/03). No database required."""
 
 import pytest
 from fastapi.testclient import TestClient

@@ -43,7 +43,7 @@ from the spec, without seeing an implementation.
 
 ## Boundaries
 
-- Writes: `docs/**`, `PLAN.md`, `MIGRATION-PLAN.md`, `lokara-arch.md`, `DEMO-RUNBOOK.md`,
+- Writes: `docs/**`, `PLAN.md`, `lokara-arch.md`, `DEMO-RUNBOOK.md`,
   and any `tests/` path. The write-scope hook enforces this — if it blocks you, you are
   about to do someone else's job.
 - **Never** invent a legal number. If the spec is silent, the docs entry says so and the

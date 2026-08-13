@@ -1,4 +1,4 @@
-"""Temporal core + identity three-layer + RLS backstop (docs/02, MIGRATION-PLAN Appendix B).
+"""Temporal core + identity three-layer + RLS backstop (docs/02).
 
 Revision ID: 0001
 Revises:

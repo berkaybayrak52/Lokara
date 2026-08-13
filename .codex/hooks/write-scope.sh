@@ -75,7 +75,7 @@ case "$agent" in
   # by whoever is about to satisfy it proves nothing (PLAN.md hard rule 1).
   spec-scribe)
     case "$rel" in
-      docs/*|PLAN.md|MIGRATION-PLAN.md|lokara-arch.md|DEMO-RUNBOOK.md|AGENTS.md) exit 0 ;;
+      docs/*|PLAN.md|lokara-arch.md|DEMO-RUNBOOK.md|AGENTS.md) exit 0 ;;
       */tests/*|*_test.py|test_*.py|*.test.ts|*.test.tsx) exit 0 ;;
       *) deny "$rel" "spec-scribe owns docs/ and tests/ only. It writes the spec and the golden
 fixture; an implementer then makes the fixture pass." ;;

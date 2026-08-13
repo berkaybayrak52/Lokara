@@ -7,7 +7,8 @@
 > **The stack is v4.** A **Python FastAPI** backend (`apps/api`) + **Python** engine packages
 > (`packages/*-engine`), **Supabase Postgres**, a **Bun** TS/JS (TypeScript/JavaScript) workspace for
 > web + mobile (`apps/web`, `packages/ui`), and **shadcn/ui**. There is one backend and it is Python.
-> `MIGRATION-PLAN.md` records how the tree got here. When code and docs disagree, the docs win.
+> `git log --oneline pre-migration..phase-h-done` records how the tree got here — the migration
+> plan itself was retired once it was complete. When code and docs disagree, the docs win.
 
 ---
 
@@ -197,13 +198,20 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 1. Pure Python package, no web-framework/DB/vendor imports.
 2. Golden fixtures committed (pytest); output is byte-/cent-exact and deterministic.
 3. The canonical **€1,200 garbage-cost allocation example** (`docs/03-nk-heating-engines.md`) passes.
-4. Rounding is **`round_half_up` per share at assignment**; the **Verteilungsrest**
-   (`Blockbetrag − Σ Anteile`) goes to the **owner bucket**, together with the vacancy share.
-   ±1 ct per block is expected and correct. Totals reconcile to the input to the cent **once the
-   residual is counted** — the owner absorbs the difference.
-   *Changed from largest-remainder (Berkay R1/R5/K9, `docs/03`; see the precedence rule above). The
-   canonical €1,200 fixture is identical under both methods — 600,00 / 178,52 / 181,48 / 240,00,
-   residual exactly 0 — so this change did not move it, and nobody may claim it did.*
+4. **Rounding depends on the engine, and the split is deliberate.**
+   - **Heating (`heating-engine`):** `round_half_up` per share at assignment; the
+     **Verteilungsrest** (`Blockbetrag − Σ Anteile`) goes to the **owner bucket**, together with
+     the vacancy share. ±1 ct per block is expected and correct, and the owner bucket may go
+     slightly negative. Totals reconcile to the input to the cent **once the residual is counted**
+     — the owner absorbs the difference. (Berkay R1/R5/K9, `docs/03`; `distribute_cents_half_up`.)
+   - **NK (`nk-engine`):** **largest-remainder**, unchanged. (`distribute_cents`.)
+
+   *Why the two differ, so nobody reads it as an oversight:* Berkay's page 01b is the heating page,
+   and switching NK before its own page (01/02) is transcribed means doing the work twice — once
+   from a spec that does not cover NK, then again when it does. There is no correctness pressure to
+   rush it: the canonical €1,200 fixture is **identical under both methods** — 600,00 / 178,52 /
+   181,48 / 240,00, residual exactly 0 — so the change did not move it, and nobody may claim it did.
+   NK switches when page 01/02 lands, not before.
 5. `mypy --strict` clean; money is `decimal.Decimal` + integer cents, never `float`.
 
 ## Definition of done for any UI work

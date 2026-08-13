@@ -6,8 +6,27 @@
 > iOS/Android together). (Earlier freeze/web-only dates of 23.07/25.07 are now historical.)
 >
 > **Status: M0–M4 are built and green** on the v4 Python stack (FastAPI + SQLAlchemy/RLS + Bun/shadcn).
-> The migration is complete except **Phase G** (Expo skeleton): Phase H removed the pre-migration
-> TypeScript, so there is now one backend and it is Python — see `MIGRATION-PLAN.md`.
+> The v4 migration is **complete**: it removed the pre-migration TypeScript, so there is now one
+> backend and it is Python. Its only unstarted phase, the Expo skeleton, moved into **M10** below.
+> `MIGRATION-PLAN.md` and `PHASE-H-PLAN.md` were **deleted** with the migration. The record is
+> `git log --oneline pre-migration..phase-h-done` — one range, because Phase H merged `--no-ff` and
+> is tagged.
+>
+> *Why they were deleted rather than kept as history:* they had started to mislead. `MIGRATION-PLAN`
+> §0a still announced `main` untouched at `c5fadab` with "remaining: **G** (mobile) · **H**
+> (cutover)", contradicting its own Phase H section forty lines later, which marks H done and merged.
+> Its §4 body still called the NestJS/Prisma backend a coexisting reference, and its run instructions
+> still warned that `turbo run dev` starts that backend on `:3001` — a port collision that stopped
+> existing when Phase H deleted it. A doc that misleads is worse than no doc, and a reader cannot tell
+> which half of a self-contradicting file to believe. `PHASE-H-PLAN.md` went with it: every prompt in
+> its section 6 is spent, including H4, which `slice/m5-pre-context-read` superseded.
+>
+> Nothing live was lost. Its Appendix A (largest-remainder with its tie-break, the day-weighting rule,
+> the €1,200 expected values) is in `docs/03` and in the `distribute_cents` docstring; Appendix B's
+> RLS recipe is in `docs/02`, in more depth; §8's one **live** rule — *every new tenant table needs an
+> RLS policy and a line in the isolation test* — moved to `AGENTS.md`, next to the gate that enforces
+> it, and the six code docstrings that cited the file now cite its replacement. Phase G was the only
+> unstarted phase and is an M10 bullet below.
 
 ## Pitch plan (target: 06.08) — push for maximum breadth
 
@@ -72,10 +91,11 @@ a clean checkout, and fix only what the rehearsal breaks. Nothing new goes in af
 ## M0 — Foundations & scaffolding — ✅ done (Python stack)
 
 > **What exists today:** M0 stands on the v4 Python stack — FastAPI + SQLAlchemy/Alembic + Bun/shadcn
-> — re-established by `MIGRATION-PLAN.md` Phases A–F. The interim TypeScript build (NestJS + Prisma)
-> that originally satisfied M0 was removed in Phase H, which is now merged to `main`. It survives only
+> — re-established by the v4 migration. The interim TypeScript build (NestJS + Prisma) that
+> originally satisfied M0 was removed at the end of it, which is now merged to `main`. It survives only
 > at the **`pre-migration`** tag (`c5fadab`) — that tag, not a branch, is the historical fallback.
-> `apps/mobile` (Expo) is the one part of the spec below that is still outstanding — Phase G.
+> `apps/mobile` (Expo) is the one part of the spec below that is still outstanding; it is now an
+> **M10** bullet.
 
 **Goal:** an empty but correct skeleton everything else hangs off.
 
@@ -367,6 +387,12 @@ the **paid** advances, not the agreed ones.
 - Native **iOS/Android** at public launch (Expo/RN; Capacitor/PWA fallback if native slips) — shared
   stack with web (Jotai, TanStack Query, RHF+Zod, i18n, theme), `react-native-ease` motion, secure
   storage + Bearer JWT.
+  - **Mobile skeleton first** (was Phase G of the v4 migration, moved here verbatim when
+    `MIGRATION-PLAN.md` was retired — it was the only phase never started):
+    `apps/mobile` (Expo): same Jotai/TanStack/RHF/Zod, `react-native-ease`, secure storage +
+    Bearer JWT, i18n + theme; consume the same FastAPI.
+    **DoD:** Expo app logs in and reads one screen.
+    Expo profiling belongs here too, not to the retired Phase H.
 - **Billing wired:** Stripe (web subscription) + **RevenueCat** (mobile in-app purchases).
 - **Load test with Locust** (~100 concurrent users) before launch to confirm the API holds.
 

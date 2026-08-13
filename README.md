@@ -135,11 +135,9 @@ top to bottom.
    M0–M4 are built and green; work since then follows PLAN's **execution order** (investor value ÷
    risk) and its cut list rather than the milestone numbering. Its dates come from `lokara-arch.md`:
    pitch **06.08**, public launch **~08.09** (web + native iOS/Android together).
-5. **`MIGRATION-PLAN.md`** — the record of the v4 rebuild that produced the current tree (Phases A–H;
-   only **G**, the Expo skeleton, is outstanding).
-6. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
-7. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
-8. **`docs/`** — modular specs:
+5. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
+6. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
+7. **`docs/`** — modular specs:
    - `00-product-overview.md` — what/why/who, competitive thesis, pitch framing
    - `01-tech-stack-and-decisions.md` — locked defaults for every flagged decision (ADR-style)
    - `02-data-model.md` — identity three-layer model, temporal core, allocation keys, two time-axes

@@ -1,4 +1,4 @@
-"""Golden fixtures for the NK engine (MIGRATION-PLAN Appendix A order).
+"""Golden fixtures for the NK engine (docs/03).
 
 These tests are the spec — committed before the engine that satisfies them.
 Every allocation asserts sum(shares) == input_total.

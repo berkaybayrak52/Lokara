@@ -1,6 +1,6 @@
-"""RLS isolation tests against a live Postgres — the Phase B gate.
+"""RLS isolation tests against a live Postgres.
 
-The whole ballgame (MIGRATION-PLAN B.3): a session carrying account B's RLS
+The whole ballgame (docs/02, CLAUDE.md rule 3): a session carrying account B's RLS
 context must NOT see account A's rows, as the non-owner `lokara_app` role.
 
 The suite is self-sufficient: it applies scripts/init-app-role.sql and
@@ -708,8 +708,8 @@ class TestLandlordAndSelfUseIsolation:
 
     Both are ENABLEd, FORCEd and policied since migration 0001 — the reported
     problem is check 4, "not named in the isolation test", i.e. the policy exists
-    but nothing proves it behaves. MIGRATION-PLAN §8: *a table without a policy is
-    a silent leak* — a policy without a test is a silent regression.
+    but nothing proves it behaves. AGENTS.md: *a table without a policy is a silent
+    leak* — a policy without a test is a silent regression.
     """
 
     def test_cross_account_read_is_blocked(

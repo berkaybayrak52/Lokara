@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Mechanize CLAUDE.md rule 3: multi-tenant isolation is enforced twice.
 
-MIGRATION-PLAN.md §8 says it plainly: *"Every new tenant table needs an RLS policy +
-a line in the isolation test. A table without a policy is a silent leak."* That rule
-was enforced by review. This enforces it against the **live migrated database**, which
+AGENTS.md says it plainly (moved there from MIGRATION-PLAN.md §8 when that file was
+retired): *"Every new tenant table needs an RLS policy and a line in the isolation
+test — a table without a policy is a silent leak."* That rule was enforced by
+review. This enforces it against the **live migrated database**, which
 is the only ground truth — the policies in `packages/db/alembic/versions/` are created
 inside `for table in (...)` loops, so any grep-based checker gives false answers in
 both directions.
