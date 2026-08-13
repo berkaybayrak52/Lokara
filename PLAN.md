@@ -76,8 +76,9 @@ Two rows from the old table are not in the new one. Recorded rather than dropped
 - **M10-slice: read-only Mieter + StB portals** — completes the persona demo; no tickets or
   activation codes. Sat directly after M5 in the old order.
 
-*(Rows 1, 1.5, 2 and 4.5 of the pitch-era table — M4 doc-extraction, the FK-Isolation slice, M5a —
-are **done** and now live in their milestone sections rather than in an execution table.)*
+*(Rows 1, 1.5 and 2 of the pitch-era table — M4 doc-extraction, the FK-Isolation slice, M5a — are
+**done** and now live in their milestone sections rather than in an execution table. Row 4.5 was the
+CO₂ rounding slice and is **not** done — it is in the carried-over list above.)*
 
 ### Hard rules
 
@@ -269,7 +270,7 @@ re-verified.
 
 ---
 
-## M5a — Identity schema + isolation (schema and policies only) — execution row 2
+## M5a — Identity schema + isolation (schema and policies only) — ✅ done
 
 > **Split out of M5** (decision, 03.08), for the same reason the FK slice became row 1.5: M5 was
 > identity **and** roles **and** RLS **and** routers **and** portal screens. A migration that changes
@@ -319,7 +320,7 @@ demo path (clean DB → seed → statement → PDF) is re-verified.
 
 ---
 
-## M5 remainder — roles in the API, portals, context switching — execution row 2.5
+## M5 remainder — roles in the API, portals, context switching
 
 - Portals + **URL-carried context** (`/a/{accountId}/…`, `/renter/{tenancyId}/…`); switcher only when
   a Person holds >1 context. Menu is navigation, not authorization — every request independently

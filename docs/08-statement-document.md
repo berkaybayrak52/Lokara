@@ -64,8 +64,8 @@ heating section the page prints six euro columns and **nothing else**.
 - No §§ 7/8 base/consumption ratio — the demo runs 30/70 and the page never says so.
 - No § 9 warm-water separation.
 - No Gradtagszahlen: the 583,3/416,7 ‰ split exists on the page **only** as the ratio between two printed
-  euro amounts (786,24 / 557,76). Text search over the rendered PDF: `HeizkostenV` **0**, `585` **0**,
-  `415` **0**, `‰` **0**.
+  euro amounts (776,52 / 554,74). Text search over the rendered PDF: `HeizkostenV` **0**, `583,3` **0**,
+  `416,7` **0**, `‰` **0**.
 
 So for heating the defect is not "the operator is missing" (that is the Betriebskosten state). There is
 no equation on the page to be missing an operator from. The spec that closes it is
@@ -1558,6 +1558,18 @@ the first time a real building has eight units.
 
 ### 5 — § 7 Abs. 3 CO2KostAufG: what already works, and the remainder only
 
+> ⚠️ **SUPERSEDED by H2 (Berkay 01b, 13.08.2026) — read `docs/03` §(3) before implementing any of
+> the short-period CO₂ wording below.** Everything in this section that shortens the Anlage table by
+> a period factor (`band_max_exclusive = step.max_intensity_exclusive × period_factor`, "bounds …
+> already shortened", and the copy `Werte der Anlage anteilig gekürzt (§ 5 Abs. 1 Satz 4
+> CO2KostAufG)`) states the **old** rule. H2 replaces it: **annualise the intensity**
+> (`spezifisch × 365 / nTage`) and look it up against the **unshortened** table with **unscaled**
+> Anlage bounds. Both methods select the same Stufe; only the disclosed figure differs, and H2's is
+> the one that prints. The field is `Co2Result.annualisation_factor` — `period_factor` no longer
+> exists, and it was renamed rather than kept because an inverted meaning behind an old name is how
+> a renderer silently prints the wrong band. The § 5 Abs. 1 S. 4 reading below was carefully argued
+> and is left in place as the record of what it replaced; **do not "restore" it.**
+
 § 7 Abs. 3 CO2KostAufG requires the landlord to show, **in the Heizkostenabrechnung**, the tenant's CO₂
 share, the building's **Einstufung**, and the **Berechnungsgrundlagen** of that Einstufung.
 
@@ -1747,6 +1759,18 @@ One row per party, so every field is per party.
 
 #### `Co2Result` — § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen, item 5
 
+> ⚠️ **SUPERSEDED by H2 (Berkay 01b, 13.08.2026) — read `docs/03` §(3) before implementing any of
+> the short-period CO₂ wording below.** Everything in this section that shortens the Anlage table by
+> a period factor (`band_max_exclusive = step.max_intensity_exclusive × period_factor`, "bounds …
+> already shortened", and the copy `Werte der Anlage anteilig gekürzt (§ 5 Abs. 1 Satz 4
+> CO2KostAufG)`) states the **old** rule. H2 replaces it: **annualise the intensity**
+> (`spezifisch × 365 / nTage`) and look it up against the **unshortened** table with **unscaled**
+> Anlage bounds. Both methods select the same Stufe; only the disclosed figure differs, and H2's is
+> the one that prints. The field is `Co2Result.annualisation_factor` — `period_factor` no longer
+> exists, and it was renamed rather than kept because an inverted meaning behind an old name is how
+> a renderer silently prints the wrong band. The § 5 Abs. 1 S. 4 reading below was carefully argued
+> and is left in place as the record of what it replaced; **do not "restore" it.**
+
 | Field | Type | Demo value | Required by |
 | --- | --- | --- | --- |
 | `total_co2_kg` | `Decimal` | `4000` | § 7 Abs. 3 — the emissions the Einstufung was computed from |
@@ -1866,13 +1890,13 @@ a pixel one — rendering and measuring glyphs would test Chromium.
   `period_factor = min(1, days(period) / days(reference year))`, the emissions are *not* extrapolated,
   and the disclosed intensity stays the period figure. Rule + conventions + edge cases:
   `docs/03` → *"The Stufenmodell is a **per-year** table"*; fixtures
-  `packages/heating-engine/tests/test_co2_period_factor.py`; `Co2Result.period_factor` carries the
+  `packages/heating-engine/tests/test_co2_short_period_annualisation.py`; `Co2Result.annualisation_factor` carries the
   applied factor and the contract above adds the two day counts, so item 5's short-period copy renders
   without the template recomputing law. What genuinely remains open:
   - **§ 5 Abs. 1 S. 3 rounding before classification** — the statute requires the specific emission
     value to be rounded to one decimal place (*"auf die erste Nachkommastelle zu runden"*); the engine
     classifies the unrounded `Decimal`, and at a bound (11,96 → 12,0) that changes the Stufe.
-    Scheduled: `PLAN.md` execution order **row 4.5**; recorded in `docs/03` → *"Known gap, deliberately
+    Scheduled: `PLAN.md` → *Carried over from the pitch-era order, not yet ranked*; recorded in `docs/03` → *"Known gap, deliberately
     not implemented here"*. Not folded into any slice of this section.
   - **Two conventions that are conventions, not statute**: *anteilig* read day-exact rather than
     month-exact, and S. 4 applied to a Rumpfperiode that was never *vereinbart*. A BMWSB Arbeitshilfe
@@ -1951,7 +1975,7 @@ suggestion would be invented law, not a convenience.
       ~~the unit of the heating-consumption Bemessung~~ (**closed 06.08.2026**: the unit is carried,
       and withhold-vs-unit-free is answered *withhold*),
       **Zählerstände** (no data path into the engine),
-      **§ 5 Abs. 1 S. 3 rounding before the CO₂ classification** (`PLAN.md` row 4.5 — the period
+      **§ 5 Abs. 1 S. 3 rounding before the CO₂ classification** (`PLAN.md` → *Carried over from the pitch-era order, not yet ranked* — the period
       factor itself shipped on 04.08.2026), **§ 9's flat-365 fallback divisor**,
       **§§ 7/8 with different shares for heating and warm water** (not expressible in the input)
 - [ ] What closes BGH minimum #3: a rendered per-party calculation (the operator, and the Bemessung

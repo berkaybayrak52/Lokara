@@ -123,7 +123,7 @@ def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
             ),
             # Same occupancy timeline as the NK section: one coherent statement.
             # Unit B's annual consumption is apportioned Bernd/landlord by
-            # degree-days (585/415 ‰ at the Jul 1 change), base costs by days.
+            # degree-days (583,3/416,7 ‰ at the Jul 1 change), base costs by days.
             occupancies=_OCCUPANCIES,
             rules=HeatingRules(
                 consumption_share=DEFAULT_CONSUMPTION_SHARE,

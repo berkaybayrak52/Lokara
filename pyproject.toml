@@ -45,7 +45,7 @@ lokara-pdf = { workspace = true }
 line-length = 100
 target-version = "py313"
 # ruff 0.16 formats fenced ```python blocks inside Markdown. The snippets in
-# `lokara-arch.md`, `MIGRATION-PLAN.md` and `docs/02` are illustrative prose — some
+# `lokara-arch.md`, `docs/03` and `docs/02` are illustrative prose — some
 # are hand-aligned to make a point, and `docs/` is the source of truth CLAUDE.md
 # says wins over code. A formatter must not rewrite it as a side effect of a lint
 # sweep. Reverse this line if we ever decide doc snippets should be formatted.

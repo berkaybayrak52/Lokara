@@ -146,7 +146,7 @@ top to bottom.
    - `05-design-system.md` — brand tokens (colors, Montserrat/Manrope) + WCAG/BFSG
    - `06-demo-scenarios.md` — seeded example cases for the investor demo
    - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
-   - `08-statement-document.md` — **the largest spec here (~1,700 lines):** what a legally complete
+   - `08-statement-document.md` — **the largest spec here (~2,000 lines):** what a legally complete
      Abrechnung must *contain*, as opposed to what the engines compute. The four BGH formal minimums
      and exactly which are rendered today; the Gesamtbemessung reference totals per allocation key;
      the whole **Heizkostenabrechnung disclosure** — Blocks A/B/C, the Umlageschlüssel and

@@ -206,6 +206,15 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
      — the owner absorbs the difference. (Berkay R1/R5/K9, `docs/03`; `distribute_cents_half_up`.)
    - **NK (`nk-engine`):** **largest-remainder**, unchanged. (`distribute_cents`.)
 
+   > ⚠️ **NOT YET WIRED (13.08.2026).** This states the target, not the code. `heating-engine`
+   > still calls `distribute_cents` at **all 10** of its split sites; `distribute_cents_half_up`
+   > exists in `domain` with its own tests and **zero production callers**. Same for the Ho/Hu
+   > energy reference: `EnergyReference` and `EnergyReferenceMismatchError` exist and `rules-store`
+   > carries the factor pairs, but no engine, adapter, API or PDF module imports them, so **no
+   > boundary refuses a mismatch today**. Both are `PLAN.md` execution row 1 ("Berkay 01b — in
+   > flight"). K3 (the VDI degree-day table) and H2 (CO₂ annualisation) *did* land in the engine.
+   > **Delete this warning when the wiring lands — not before.**
+
    *Why the two differ, so nobody reads it as an oversight:* Berkay's page 01b is the heating page,
    and switching NK before its own page (01/02) is transcribed means doing the work twice — once
    from a spec that does not cover NK, then again when it does. There is no correctness pressure to

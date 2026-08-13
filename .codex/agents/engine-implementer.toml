@@ -24,8 +24,16 @@ From `AGENTS.md`, in priority order when a decision isn't covered:
 
 ## Money
 
-Integer cents plus `decimal.Decimal`. Never `float`. Rounding is **largest-remainder** and
-`sum(shares) == input_total` is asserted, not hoped for. `mypy --strict` clean.
+Integer cents plus `decimal.Decimal`. Never `float`. `sum(shares) == input_total` is asserted,
+not hoped for. `mypy --strict` clean.
+
+Rounding is **per engine** — do not "correct" one to the other (`CLAUDE.md` DoD 4):
+- **NK** — largest-remainder, `distribute_cents`.
+- **Heating** — `round_half_up` per share, `Verteilungsrest` to the owner bucket,
+  `distribute_cents_half_up` (Berkay R1/R5/K9, `docs/03`). The owner share may be ±1 ct off its
+  own quota and may go negative; that is the rule working, not a defect.
+  **As of 13.08.2026 heating is still on `distribute_cents` — the switch is unbuilt work, not a
+  bug to leave alone.**
 
 ## When a test refuses rather than computes
 

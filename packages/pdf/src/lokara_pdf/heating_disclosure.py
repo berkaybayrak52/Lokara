@@ -690,7 +690,8 @@ def _einstufung(co2: Co2Result) -> str:
     """The Einstufung as the intensity band actually compared against.
 
     `Co2Step` carries no ordinal, so a step *number* would be invented; the
-    bounds are already shortened by `period_factor` on the result, so nothing is
+    bounds are the unscaled Anlage bounds — H2 annualises the intensity instead of
+    shortening the table (`docs/03` §(3)) — so nothing is
     multiplied a second time here (§ 5 Abs. 1 S. 4 CO2KostAufG).
     """
     low, high = co2.band_min_inclusive, co2.band_max_exclusive

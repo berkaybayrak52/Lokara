@@ -250,7 +250,7 @@ account B would be granted account A's building.
 The 15 + 2 edges are **not** covered by 17 tests, and never should be — a test-per-edge list rots the
 moment someone adds edge 18, and its absence is invisible.
 
-- **`scripts/check_fk_isolation.py`** (lead-owned, not yet written) is the completeness mechanism: it
+- **`scripts/check_fk_isolation.py`** (lead-owned) is the completeness mechanism: it
   fails on any foreign key between two account-scoped tables that is not composite on
   `(id, account_id)`. **This is what any NEW foreign key has to satisfy** — the rule is enforced at
   the schema level, once, for edges that do not exist yet.

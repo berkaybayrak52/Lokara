@@ -263,8 +263,11 @@ abbreviation is written out the first time it appears.
       The reason it fails at startup rather than per request: an `if` inside a request handler is
       one forgotten branch away from being wrong, and it fails silently. Refusing to boot fails once,
       loudly, at the only moment where somebody is watching.
-      Status: specified, not yet implemented — the failing test `apps/api/tests/test_environment_guard.py`
-      exists and is red on purpose, waiting for M5.
+      Status: specified, **not implemented on `main`**. The failing test
+      `apps/api/tests/test_environment_guard.py` exists and is red on purpose only on branch
+      `slice/m5-pre-context-read`, which is unmerged — so on `main` today nothing guards the
+      dev-token minter, the seeder or the published JWT secret. `ApiSettings` has no `environment`
+      field yet. Do not read this entry as saying the gate is in place.
 
 ---
 

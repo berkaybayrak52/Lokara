@@ -108,7 +108,7 @@ lands near 40 kg CO₂/m²/a; the old 20 kg/m²/a was only reachable by an emiss
 Per the lead's constraint — *"do not bend the physics to protect a fixture"* — the band moves. Both
 bounds are comfortably clear of 40,0, so the step selection stays an unambiguous golden, and 40,0 is
 already at one decimal place, so the demo does **not** depend on the unimplemented § 5 Abs. 1 S. 3
-rounding (`docs/03` → *"Known gap"*, `PLAN.md` row 4.5).
+rounding (`docs/03` → *"Known gap"*, `PLAN.md` → *Carried over from the pitch-era order, not yet ranked*).
 
 **Story value, unexpectedly better.** A building at 40 kg CO₂/m²/a is a Sanierungsfall, the statute
 puts **60 %** of the CO₂ cost on the landlord, and that is exactly the incentive the CO2KostAufG was
@@ -183,7 +183,7 @@ Two consequences worth stating out loud, because both are argued from every few 
   (`docs/08` → "Interim framing"), and the invoice total is an input a landlord types in — not a figure
   Lokara computes. Nothing on the page claims 10.300,00 € is typical.
 - **Nothing downstream is wrong because of it.** Every ratio the demo exists to show — 30/70, the § 9
-  separation, 585 : 415, the CO₂ Einstufung — is scale-free, so an implausible input scales the euro
+  separation, 583,3 : 416,7, the CO₂ Einstufung — is scale-free, so an implausible input scales the euro
   amounts and falsifies no rule.
 
 ## Scenario 3 — Flexible allocation keys without data loss

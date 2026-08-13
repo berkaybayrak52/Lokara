@@ -1,8 +1,8 @@
 """SQLAlchemy 2.0 models — identity three-layer + temporal core (docs/02).
 
 Conventions:
-- snake_case tables/columns. The Prisma-era quoted-PascalCase tables ("Building" …)
-  coexist in the same database until Phase H removes them — no name collisions.
+- snake_case tables/columns. The Prisma-era quoted-PascalCase tables ("Building" …) were
+  removed with the pre-migration TypeScript; nothing in the database uses them today.
 - Every domain row carries account_id (the isolation boundary; the RLS backstop
   lives in the Alembic migration). Person is global — Supabase Auth maps onto it.
 - Every foreign key between two account-scoped tables is composite on

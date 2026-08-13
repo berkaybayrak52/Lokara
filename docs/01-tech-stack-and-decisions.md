@@ -19,7 +19,7 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 | Async / jobs                | **Celery or Arq** on **Redis** (from M6)                               | finAPI sync, reconsent cleanup, deadline watchers, email retries.                            |
 | Cache / rate-limit          | **Redis**                                                              | Response/computation caching + per-user/IP rate limiting.                                    |
 | PDF                         | HTML→PDF via headless Chrome (**Playwright for Python**)               | One shared document service: NK, UVI, AfA, Anlage V, contracts.                              |
-| Money                       | integer **cents** + `decimal.Decimal`                                  | Never floats. Largest-remainder rounding.                                                    |
+| Money                       | integer **cents** + `decimal.Decimal`                                  | Never floats. Largest-remainder (NK); `round_half_up` + Verteilungsrest (heating) — CLAUDE.md DoD 4. |
 | Testing                     | **pytest** (engines, golden fixtures) + **Vitest** (TS) + **Locust** (load) | Engines: deterministic, byte-/cent-exact. Locust simulates ~100 concurrent users.       |
 | Code quality                | Python: **Ruff + mypy strict**. TS: **ESLint + Prettier + Husky + strict TS**. **React Compiler** on; **React Scan** for web perf | Enforced automatically, not by discipline.                             |
 | Hosting (prod)              | EU/DE (target Hetzner)                                                 | DSGVO: EU/DE hosting is the operating licence. Dev anywhere.                                 |

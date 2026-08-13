@@ -17,7 +17,7 @@ _SQLALCHEMY_SCHEME = "postgresql+psycopg://"
 
 
 def sqlalchemy_url(url: str) -> str:
-    """Normalizes a libpq-style URL (shared with psql/Prisma) to the psycopg3 driver."""
+    """Normalizes a libpq-style URL (shared with psql) to the psycopg3 driver."""
     if url.startswith(_LIBPQ_SCHEME):
         return _SQLALCHEMY_SCHEME + url.removeprefix(_LIBPQ_SCHEME)
     return url
