@@ -88,7 +88,7 @@ canonical for *architecture*; this rule is about numbers, formulas and legal val
    **Every transcribed `docs/` file carries a header line naming its source file in `berkay-work/`.**
 
 3. **One exception: the Rechtsstand register.** It is already structured data — a CSV
-   (Comma-Separated Values) file of 179 rows: Wert, Betrag/Satz, Flag, Quelle, Rechtsgrundlage,
+   (Comma-Separated Values) file of 180 rows: Wert, Betrag/Satz, Flag, Quelle, Rechtsgrundlage,
    Rechtsnatur, Rechtsstand. Import it into `rules-store` nearly as-is — no prose transformation.
 
    > **Two copies carry the same filename; only one is authoritative.** Take
@@ -98,13 +98,13 @@ canonical for *architecture*; this rule is about numbers, formulas and legal val
    > from `verify-before-production` to `geprüft`; a Notion export has no date in the name, which is
    > how two versions came to look identical. He date-stamps exports from the next one on
    > (`…_2026-08-14`), so this is a one-time collision — but until then, check the path, not the
-   > filename. (Each directory also holds a `_all.csv` twin of the same 179 rows.)
+   > filename. (Each directory also holds a `_all.csv` twin of the same 180 rows.)
 
 4. **Every value lands with its flag intact.** Rechtsnatur (Gesetz / Verordnung / Konvention /
    Heuristik), Rechtsstand, source URL, and `verify-before-production` vs `geprüft`. **130 of the
-   179 rows are `verify-before-production`** in the authoritative copy named in rule 3; the figure
-   was 137 in the earlier one, and quoting that number is the first symptom of reading the wrong
-   file. His `README-for-Emir.md` lists what must **not** be treated as
+   180 rows are `verify-before-production`**, the other 50 `geprüft`, in the authoritative copy
+   named in rule 3; the figure was 137 in the earlier one, and quoting that number is the first
+   symptom of reading the wrong file. His `README-for-Emir.md` lists what must **not** be treated as
    verified: Anlage-V line numbers, SKR03/SKR04 (Standardkontenrahmen) accounts, DATEV EXTF
    (the DATEV export text format) parameters, and three BFH (Bundesfinanzhof, the Federal Fiscal
    Court) case numbers marked `ZITAT UNSICHER`. **Transcribing a flagged value as fact is the error
