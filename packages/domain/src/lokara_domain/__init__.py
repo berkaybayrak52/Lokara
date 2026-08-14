@@ -30,6 +30,7 @@ from .money import (
     cents,
     distribute_cents,
     distribute_cents_half_up,
+    distribute_cents_owner_residual,
     format_eur,
 )
 from .occupancy import Occupancy, OccupancyOverlapError, Segment, build_unit_segments
@@ -66,6 +67,7 @@ __all__ = [
     "days_between",
     "distribute_cents",
     "distribute_cents_half_up",
+    "distribute_cents_owner_residual",
     "format_eur",
     "overlap_days",
     "period",

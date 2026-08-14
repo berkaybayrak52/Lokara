@@ -123,3 +123,68 @@ def distribute_cents_half_up(
 
     assert sum(shares) == total  # the residual is inside the sum, never an exception to it
     return shares
+
+
+def distribute_cents_owner_residual(
+    total: Cents, weights: Sequence[Decimal | int], *, owner_weight: Decimal | int
+) -> tuple[list[Cents], Cents]:
+    """The Eigentümer-Residuum: renter shares by R1 `round_half_up`, and the rest.
+
+        eigentuemeranteilCent = gesamtbetragCent - Σ mieteranteilCent
+
+    ``weights`` are the **renters'** Bemessungen and nothing else.
+    ``owner_weight`` is the Fiktivbelegung (D0) of what stood empty or was
+    self-used; it enters the **denominator** and never becomes a share of its
+    own. Returns ``(renter_shares, owner_cents)`` — the owner is not an element
+    of the list, so *"the Eigentümer is not a party"* is a property of the
+    shape rather than a rule someone has to remember.
+
+    Deliberately **not** :func:`distribute_cents_half_up` with a
+    ``residual_index``: that signature says *the owner is the party at index i*,
+    which is the model `berkay-work/Antwort-an-Emir_02.md` § 1 replaced, and it
+    lets a caller pass the owner as a party by accident. This one cannot express
+    that.
+
+    Three consequences the callers rely on, all of them documented business
+    cases rather than defects:
+
+    * **The residual may be negative.** `round_half_up` biases every renter
+      share upward, so a fully-let block routinely overshoots its pot by a cent
+      and the owner absorbs it with a minus sign. Never clamp it — the clamp
+      would break ``sum(shares) + owner == total``, which is the one thing this
+      line exists to keep true.
+    * **A zero denominator is not an error** (Seite 01 **E3**): every renter
+      share is 0 and the whole amount stays with the owner, with the cost never
+      silently re-keyed. A `ZeroDivisionError` here would leave the caller to
+      invent an allocation at the call site.
+    * **An empty renter list is a real case** (Seite 01 **E19**): a building
+      vacant for the whole period allocates nothing and the residual is the pot.
+
+    Spec: `docs/02-data-model.md` -> "The Eigentümeranteil is a residual line,
+    not a party"; `docs/03-nk-heating-engines.md` § 9.2.
+    """
+    decimal_weights = [w if isinstance(w, Decimal) else Decimal(w) for w in weights]
+    owner = owner_weight if isinstance(owner_weight, Decimal) else Decimal(owner_weight)
+    if any(not w.is_finite() or w < 0 for w in [*decimal_weights, owner]):
+        raise ValueError("distribute_cents_owner_residual weights must be finite and >= 0")
+    weight_sum = sum(decimal_weights, owner)
+
+    if weight_sum == 0:
+        # E3 — nothing was captured, so nothing may be allocated. Zero shares
+        # rather than an exception; the whole amount is the residual.
+        shares = [ZERO_CENTS for _ in decimal_weights]
+    else:
+        # R1: rounded once, at the moment the share is assigned — and R2: from
+        # the recomputed exact quotient, never from a rounded factor. The
+        # denominator carries the owner's Bemessung (D0), which is what makes
+        # the residual come out at the vacancy share rather than at zero.
+        shares = [
+            Cents(
+                int((Decimal(total) * w / weight_sum).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+            )
+            for w in decimal_weights
+        ]
+    owner_cents = Cents(int(total) - sum(shares))
+
+    assert sum(shares) + owner_cents == total  # the residual is inside the sum
+    return shares, owner_cents
