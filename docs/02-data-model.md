@@ -594,6 +594,157 @@ class SelfUsePeriod(Base):
   StB, don't model as self-use.
 - **To specify before AfA:** mid-year Nutzungswechsel needs month-accurate AfA apportionment.
 
+## The Eigentümeranteil is a **residual line**, not a party
+
+> **Source:** `berkay-work/Antwort-an-Emir_02.md` § 1 (1.1–1.4), 14.08.2026, answering
+> `FRAGEN-an-Berkay-02.md`. Primary rule text:
+> `berkay-work/…/Spec-Seiten/01 · Die Abrechnung ….md` → **D0** (Fiktivbelegung), **D12**
+> (Leerstandsaufstellung) and edge cases **E3**, **E17**, **E19**. Seite 01 is not otherwise
+> transcribed yet; only the blocks named here are.
+>
+> **Rechtsnatur: fixed model rule, not a convention.** § 1.4 closes with *"Das ist meine feste
+> Modellregel, keine offene Konvention. Ihr müsst hier nichts ‚vorläufig als eure Konvention'
+> markieren — setzt es fest um."* So this section carries **no** `verify-before-production` flag.
+> The `Fiktivbelegung bei Leerstand` register row it leans on **does** keep its flag
+> (`Konvention`, Rechtsstand 07/2026) — the *residual* is settled, the *fictional occupancy count*
+> that feeds a person-keyed denominator is not.
+
+This replaces a model, it does not clarify one. Until 14.08.2026 the engines derived **one landlord
+party per unit** from the vacancy/self-use segments and let that party carry the vacancy share. That
+is wrong in his spec, and the two failure modes it produced (several landlord parties → *which one
+holds the rounding rest?*; no landlord party at all → *no owner row exists*) are artefacts of the
+derivation, not real cases.
+
+### The rule
+
+For one Liegenschaft and one Kostenart:
+
+```
+eigentuemeranteilCent[kostenart] = gesamtbetragCent[kostenart] − Σ mieteranteilCent[kostenart]
+```
+
+- **It is not a party.** It is a **structural reconciliation line**, one per
+  `(Liegenschaft, Kostenart)`. It is never derived from occupancy, never allocated by a weight, and
+  never `Bemessung × Quote`. D12: *"ALWAYS as a residual, NEVER computed separately"*.
+- **It always exists**, including at `0,00 €`, including in a fully-let building with no vacancy and
+  no self-use. There is no state in which a rest is "left over and has no bucket" — the bucket **is**
+  the rest.
+- **It may be negative.** `round_half_up` on the renter side biases the renter shares upward, so
+  Σ Mieter routinely exceeds the pot by a cent or two and the residual absorbs it with a minus sign.
+  −0,01 € is the ordinary output of a fully-let building, not a defect (`CLAUDE.md` DoD 4 already
+  allows it).
+- **Σ Mieteranteile + Eigentümeranteil = Gesamtkosten holds by construction**, per Kostenart and in
+  total. That is the whole point: **one** line explains every ±ct of the statement.
+
+### What the renters' denominator still contains
+
+The residual is not a way of *skipping* the vacancy — the vacancy is in the **denominator**, which is
+what makes the residual come out at the vacancy share rather than at zero. Per **D0**:
+
+- **Area and unit denominators are already period-based** (`gesM2 × nTage`), so a vacant unit's
+  m²-Tage / Wohneinheits-Tage stay in the denominator automatically and its share falls to the owner
+  (BGH VIII ZR 159/05). **E19:** a unit vacant for the whole period stays in the Gesamtverteiler and
+  is never removed from it.
+- **Person-keyed denominators get the Fiktivbelegung** added before any denominator is formed
+  (`nPersTage += fiktivPersonen × L.tage`). His `09-F07`: `nPersTage = 2.006 + 2 × 31 = 2.068` — the
+  62 Personen-Tage of the empty unit are *in* the denominator, and 62000 − Σ Mieter = **1858** is
+  therefore the vacancy share, arrived at as a rest.
+- **Consumption denominators are untouched** — a vacant unit consumed nothing, so its residual on a
+  consumption-keyed Kostenart is genuinely `0,00 €`. That is why his `09-F19` prints the Eigentümer
+  column at `0` for Wasserversorgung, Entwässerung and Heizkosten while carrying `3174` for
+  Grundsteuer. Zero there means *zero*, not *absent*.
+- **Zero denominator (E3):** where a consumption key captured nothing at all, every renter share is
+  `0,00 €` and the residual is the **whole** amount, with the note *"Für diese Kostenart wurden keine
+  Verbrauchswerte erfasst; die Kosten verbleiben beim Eigentümer."* The cost is never silently
+  re-keyed. This is the one case where the allocation primitive may not divide, and it is a rule,
+  not an exception to invent at the call site.
+
+### Display aggregates; the data keeps its origin
+
+His § 1.4, and the constraint that makes the shape non-obvious: the Gesamtübersicht shows **one**
+Eigentümer line per Liegenschaft, but the landlord needs the vacancy share **per object** for Anlage
+V, so the origin may not be thrown away. D12 splits the residual into three blocks:
+
+| Block | Meaning | Granularity |
+| --- | --- | --- |
+| **(a)** Leerstandsanteil | Werbungskosten § 9 EStG, Anlage V | **per empty unit and per Kostenart** — retained in the data |
+| **(b)** nicht umlagefähige Kosten | Werbungskosten, a different Anlage-V line (his Seite 04) | per cost position; **not modelled yet** — Seite 02 dependency, see below |
+| **(c)** Rundungsdifferenz | no economic item | belongs to **no** unit; disclosed separately |
+
+`(a)` is each empty unit's share **computed for the annex** (its own `round_half_up`); `(c)` is what
+is left: `residual − Σ (a)`. They differ, and the difference is the point — his `09-F19`: separately
+computed `17.536`, as a residual `17.531`, and the **5 ct is block (c)**. The printed Eigentümer
+amount is always the residual; the annex explains it. *"Aggregation im Display, Herkunft in den
+Daten."*
+
+### Shape
+
+Not a table. The residual is **computed, never stored** — storing it would create a second place
+where the statement's reconciliation can be wrong. It is a field of the engine result and a section
+of the immutable `Statement` snapshot, alongside the party lines:
+
+```python
+# packages/heating-engine — the same shape the NK engine grows when Seite 02 lands.
+@dataclass(frozen=True)
+class OwnerResidualOrigin:
+    """Block (a): one empty/self-used unit's own share of each block, for the
+    Leerstandsaufstellung. Never printed on the Gesamtübersicht."""
+    unit_id: str
+    ...                      # one field per money column, plus the Bemessungen (Block C needs them)
+
+@dataclass(frozen=True)
+class OwnerResidual:
+    """The one line per (Liegenschaft, Kostenart). Carries no quota — by shape,
+    not by discipline: there is no percentage field to print."""
+    ...                                          # one amount per money column, and their total
+    origins: tuple[OwnerResidualOrigin, ...]     # (a) — empty tuple in a fully-let building
+    rounding_difference: Cents                   # (c) = total − Σ origins.total
+```
+
+- **The renter lines carry only Mietverhältnisse.** `tenancy_id is None` disappears from the party
+  list; a landlord "party" is no longer a party. That is what makes *"never computed separately"*
+  structural rather than a rule someone has to remember.
+- **The Bemessungen of the empty units survive on `origins`**, because § 9b Abs. 3 disclosure
+  (`docs/08` Block C — Nutzerwechsel) still has to print the vacancy segment's Zeitanteil even though
+  its money row is gone from the table.
+- **The primitive is `distribute_cents_owner_residual(pot, renter_weights, *, owner_weight)`**
+  (`packages/domain`), returning `(renter_shares, owner_cents)`. Deliberately **not**
+  `distribute_cents_half_up(..., residual_index=i)`: that signature says *the owner is the party at
+  index i*, which is the model this section replaces, and it lets a caller pass the owner as a party
+  by accident. The new signature cannot express that.
+
+### This is cross-engine and binding — but only `heating-engine` switches in this slice
+
+The rule is Berkay's, for the whole Abrechnung, and it is settled. Its **application to `nk-engine`
+belongs to the Seite 02 → `docs/09` transcription** and to nothing before it. Recorded here so that
+the asymmetry is a dated decision and not read as an oversight:
+
+- **The residual model requires `round_half_up` on the renter side. The two are not independent.**
+  Largest-remainder distributes the *whole* pot across whatever weight list it is handed, so
+  Σ over that list == pot **by construction**. Either the owner is in the list — then its amount is
+  *computed separately* from a weight (D12 forbids exactly that) and a leftover cent can land on a
+  renter (K9 forbids exactly that) — or it is not, and then Σ Mieter == pot and the Eigentümer line
+  is structurally `0,00 €` even where a unit stood empty all year. Both readings are wrong. Half-up
+  per renter share is a **prerequisite** of the residual, not a separate choice.
+- His own `09-F07` variant A is the proof at one line: half-up per renter gives
+  `32829 / 12712 / 3658 / 10943`, Σ `60142`, residual **1858**. Largest-remainder over the same five
+  weights gives `32829 / 12712 / 3657 / 10943 / 1859` — it moves a cent off *Weber* and prints the
+  owner at its own separately-computed quota. His comment: *"Gerechnet wird 1858. Residuum gewinnt."*
+- Switching NK's renter rounding therefore **moves every NK figure**, and doing it here would be
+  implementing a calculation from a spec that has not been transcribed — the one thing `CLAUDE.md`
+  forbids. `nk-engine` keeps largest-remainder until `docs/09` exists (`CLAUDE.md` DoD 4,
+  `docs/03` § 9.1 last row).
+
+### One register row may need re-wording — reported, not rewritten
+
+The Rechtsstand-Register row **`Verteilungsrest (K9)`** is worded as a house convention
+(*"keine — reine Hauskonvention"*, `Konvention` / `verify-before-production`). Under this model the
+*destination* of the Verteilungsrest is no longer ours to choose: it is D12's residual, and Berkay
+has set it fest. K9's remaining content is the **rounding direction** (`round_half_up` per line,
+R1/R5), which is his too. `berkay-work/` is immutable and the register is imported as-is
+(`CLAUDE.md` precedence rule 3), so nothing is edited here — the mismatch is reported for the next
+register export.
+
 ## Allocation keys
 
 ```python
