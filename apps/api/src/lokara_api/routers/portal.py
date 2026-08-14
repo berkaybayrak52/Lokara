@@ -8,7 +8,13 @@ context to it, on every request (enforced twice, CLAUDE.md rule 3).
 from fastapi import APIRouter, HTTPException, Response
 from lokara_db import Account, Person
 from lokara_domain import cents, format_eur
-from lokara_pdf import DISCLAIMER, format_number_de, render_html_to_pdf, statement_html
+from lokara_pdf import (
+    DISCLAIMER,
+    OWNER_LABEL,
+    format_number_de,
+    render_html_to_pdf,
+    statement_html,
+)
 
 from ..auth import RequireAuth
 from ..deps import PathAccountSession
@@ -87,10 +93,18 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
     # heating is None when the meter/invoice inputs are incomplete: the NK part
     # still stands on its own, and the response carries the German reason
     # instead of a table of invented numbers.
+    # Since 14.08.2026 `heating.lines` carries **Mietverhältnisse only** — the
+    # Eigentümeranteil is a residual line per Liegenschaft, not a party derived
+    # from occupancy (`docs/02`, Berkay Seite 01 D12). So `is_landlord` is
+    # constant here rather than a test on `tenancy_id`, and the owner row is
+    # appended once from `owner_residual` instead of falling out of the loop.
+    # It is appended **unconditionally**: the row exists at `0,00 €` too
+    # (`docs/08` → "Die Eigentümerzeile"), and `owner_residual` is non-optional
+    # precisely so no renderer can write `if ...:` and drop it.
     heating_lines = [
         StatementHeatingLine(
             party_label=bundle.party_labels.get((line.unit_id, line.tenancy_id), f"{line.unit_id}"),
-            is_landlord=line.tenancy_id is None,
+            is_landlord=False,
             heating_base_eur=format_eur(line.heating_base),
             heating_consumption_eur=format_eur(line.heating_consumption),
             ww_base_eur=format_eur(line.ww_base),
@@ -100,6 +114,22 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
         )
         for line in (heating.lines if heating is not None else ())
     ]
+    if heating is not None:
+        residual = heating.owner_residual
+        heating_lines.append(
+            StatementHeatingLine(
+                # One label for one thing, matching the PDF's `OWNER_LABEL` and
+                # Berkay's own annex wording ("Eigentümeranteil gesamt").
+                party_label=OWNER_LABEL,
+                is_landlord=True,
+                heating_base_eur=format_eur(residual.heating_base),
+                heating_consumption_eur=format_eur(residual.heating_consumption),
+                ww_base_eur=format_eur(residual.ww_base),
+                ww_consumption_eur=format_eur(residual.ww_consumption),
+                total_cents=int(residual.total),
+                total_eur=format_eur(residual.total),
+            )
+        )
 
     co2 = heating.co2 if heating is not None else None
     co2_out = (

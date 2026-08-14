@@ -219,23 +219,34 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
 2. Golden fixtures committed (pytest); output is byte-/cent-exact and deterministic.
 3. The canonical **€1,200 garbage-cost allocation example** (`docs/03-nk-heating-engines.md`) passes.
 4. **Rounding depends on the engine, and the split is deliberate.**
-   - **Heating (`heating-engine`):** `round_half_up` per share at assignment; the
-     **Verteilungsrest** (`Blockbetrag − Σ Anteile`) goes to the **owner bucket**, together with
-     the vacancy share. ±1 ct per block is expected and correct, and the owner bucket may go
-     slightly negative. Totals reconcile to the input to the cent **once the residual is counted**
-     — the owner absorbs the difference. (Berkay R1/R5/K9, `docs/03`; `distribute_cents_half_up`.)
+   - **Heating (`heating-engine`):** `round_half_up` per renter share at assignment; the
+     **Eigentümeranteil** is the **residual**, `Blockbetrag − Σ Mieteranteile`
+     (`distribute_cents_owner_residual`). It is **one line per Liegenschaft** — for heating, the
+     same line across all four blocks — **never a party**, never derived from occupancy, and
+     never computed from a weight. It **always exists**, including at `0,00 €` in a fully-let
+     building, and it may be **negative**: `round_half_up` biases the renter shares upward, so a
+     block routinely overshoots its pot by a cent and the owner absorbs it with a minus sign.
+     Totals reconcile to the cent **once the residual is counted** — it is *inside* the sum, not
+     an exception to it. (Berkay R1/R5/K9 + `Antwort-an-Emir_02.md` § 1; `docs/03` § 9.2.)
    - **NK (`nk-engine`):** **largest-remainder**, unchanged. (`distribute_cents`.)
-   - **One heating case stays largest-remainder, deliberately:** a block in a building with **no
-     landlord party** (nothing vacant, nothing self-used). There is no owner bucket to hold the
-     residual, and the engine must never hand it to a renter to make a block reconcile. See
-     `docs/03` § 9.2 — a convention of ours, not Berkay's, and flagged to him.
+   - **Where a figure can be computed two ways, the residual wins.** A per-unit recomputation that
+     disagrees by a cent is the Rundungsdifferenz — Berkay's own oracle is `1858`, not the
+     separately computed `1859` (`09-F07`), and `17.531`, not `17.536` (`08-F21`). Disclose the
+     difference; never chase it, and never hand it to a renter to make a block reconcile.
 
-   *Why the two differ, so nobody reads it as an oversight:* Berkay's page 01b is the heating page,
-   and switching NK before its own page (01/02) is transcribed means doing the work twice — once
-   from a spec that does not cover NK, then again when it does. There is no correctness pressure to
-   rush it: the canonical €1,200 fixture is **identical under both methods** — 600,00 / 178,52 /
-   181,48 / 240,00, residual exactly 0 — so the change did not move it, and nobody may claim it did.
-   NK switches when page 01/02 lands, not before.
+   *Why the two engines differ, so nobody reads it as an oversight:* the residual model **requires**
+   half-up on the renter side — under largest-remainder the renters' shares sum to the whole pot,
+   leaving the owner structurally `0`, so the two are incompatible rather than merely different.
+   Switching NK is therefore what the Seite 01/02 transcription must carry, because it moves every
+   NK figure. There is no correctness pressure to rush it: the canonical €1,200 fixture is
+   **identical under both methods** — 600,00 / 178,52 / 181,48 / 240,00, residual exactly 0 — so
+   the change did not move it, and nobody may claim it did. NK switches when page 01/02 lands.
+
+   > **Superseded 14.08.2026.** This bullet used to carry a third case: *"one heating case stays
+   > largest-remainder — a block with no landlord party."* Berkay **explicitly rejected** it
+   > (§ 1.3 Frage 3: *"soll nicht verwendet werden"*), because in his model there is no such case
+   > — the Eigentümerzeile exists even when nothing is vacant. Do not restore it. `docs/03` § 9.2
+   > carries the full record of what was removed and why.
 5. `mypy --strict` clean; money is `decimal.Decimal` + integer cents, never `float`.
 
 ## Definition of done for any UI work
