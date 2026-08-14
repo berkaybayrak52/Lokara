@@ -29,6 +29,29 @@ zero units). `HeatingUnit` carries one reading per unit, not one per tenancy
 ⚠️ `08-F01` (the MDL path) and `01b-F01` (self-billing) compute the same building
 from different inputs. They are **two data paths** and must never be asserted
 against each other. Nothing in this file mixes them; do not "unify" them.
+
+⛔ **AMENDED 14.08.2026 — the owner bucket is one Liegenschafts-Residuum.**
+`berkay-work/Antwort-an-Emir_02.md` § 1 replaced the model this file was written
+against: the Eigentümeranteil is not a party derived from vacancy but one
+structural residual line per Liegenschaft, which exists even when nothing is
+vacant. R1 and R5 themselves were **confirmed and did not change** — what changed
+is where the Verteilungsrest goes and how many rows can hold it. Two consequences
+here, both dated so nobody restores what they replaced:
+
+* `HeatingResult.lines` carries **only Mietverhältnisse**; the owner is
+  `HeatingResult.owner_residual`. `OWNER_INDEX` therefore no longer indexes a
+  party — the classes below read the residual off the result instead.
+* **`TestABlockWithNoLandlordPartyKeepsLargestRemainder` is gone.** It was the
+  codified form of `docs/03` § 9.2 convention 2 (*"a fully-let block keeps
+  largest-remainder, because there is no owner bucket"*), and its
+  `test_the_fully_let_building_does_not_move` asserted exactly the table Berkay
+  says must move. § 1.3 Frage 3: *"Euer Largest-Remainder-Vorschlag für den Rest
+  ist damit **nicht** nötig und soll **nicht** verwendet werden."* Its
+  replacement is below, and the full golden for a fully-let building lives in
+  `test_berkay_02_eigentuemer_residuum.py`.
+
+Model: `docs/02` -> "The Eigentümeranteil is a residual line, not a party".
+Engine wiring and what it superseded: `docs/03` § 9.2.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -88,8 +111,9 @@ UNITS = (
     HeatingUnit("unit-b", 3000, heat_consumption=Decimal(250), ww_consumption_m3=Decimal(12)),
     HeatingUnit("unit-c", 2000, heat_consumption=Decimal(150), ww_consumption_m3=Decimal(8)),
 )
-# Unit B's renter leaves 30 Jun -> the flat is vacant Jul-Dec, which is the one
-# landlord party and therefore the owner bucket of every block (docs/03 § 9.2).
+# Unit B's renter leaves 30 Jun -> the flat is vacant Jul-Dec. That vacancy is
+# the whole of the Liegenschafts-Residuum's Bemessung here (D0), and its share is
+# what the Eigentümerzeile carries in every block (docs/03 § 9.2).
 OCCUPANCIES_WITH_VACANCY = (
     Occupancy("unit-a", "ten-a", period("2025-01-01")),
     Occupancy("unit-b", "ten-b", period("2024-08-01", "2025-07-01")),
@@ -101,7 +125,11 @@ OCCUPANCIES_FULLY_LET = (
     Occupancy("unit-c", "ten-c", period("2023-01-01")),
 )
 
-OWNER_INDEX = 2  # unit-b's landlord party, third in the deterministic party order
+# The Eigentümer is no longer a party, so there is no owner index into `lines`.
+# In the block helpers below the residual is appended as the **last** weight, the
+# way `distribute_cents_owner_residual` treats it: a denominator entry, never a
+# row (14.08.2026 — docs/03 § 9.2).
+OWNER_LAST = -1
 
 
 def _statement(total_cost: int, occupancies: tuple[Occupancy, ...]) -> HeatingResult:
@@ -138,25 +166,32 @@ def _round_half_up(value: Decimal) -> int:
 
 
 def _assert_block_follows_r1_r5(
-    label: str, pot: Cents, weights: list[Decimal], shares: list[int], owner_index: int
+    label: str,
+    pot: Cents,
+    renter_weights: list[Decimal],
+    renter_shares: list[int],
+    owner_weight: Decimal,
+    owner_share: int,
 ) -> None:
     """The rule itself, applied to the engine's own disclosed Bemessungen.
 
     Written as a property rather than as a second copy of the golden table so
     that it cannot be satisfied by copying whatever the engine currently emits:
-    R1 fixes every renter share, R5 fixes the owner's, and the two together fix
+    R1 fixes every renter share, R5 fixes the residual, and the two together fix
     the block. Largest-remainder cannot satisfy both wherever it disagrees.
+
+    Amended 14.08.2026: the denominator carries the owner's Bemessung (D0) while
+    the owner has **no share of its own** — signature changed from an
+    `owner_index` into `shares` to a separate `(owner_weight, owner_share)` pair,
+    because the Eigentümer is not a party (`docs/02`).
     """
-    weight_sum = sum(weights, Decimal(0))
-    for index, (weight, share) in enumerate(zip(weights, shares, strict=True)):
-        if index == owner_index:
-            continue
+    weight_sum = sum(renter_weights, owner_weight)
+    for index, (weight, share) in enumerate(zip(renter_weights, renter_shares, strict=True)):
         quota = Decimal(int(pot)) * weight / weight_sum
-        assert share == _round_half_up(quota), f"{label}: party {index} is not R1 round_half_up"
-    others = sum(share for index, share in enumerate(shares) if index != owner_index)
-    assert shares[owner_index] == int(pot) - others, f"{label}: owner does not hold the R5 residual"
+        assert share == _round_half_up(quota), f"{label}: renter {index} is not R1 round_half_up"
+    assert owner_share == int(pot) - sum(renter_shares), f"{label}: owner is not the R5 residual"
     # Non-negotiable, and unchanged by R5: the residual is *inside* the sum.
-    assert sum(shares) == int(pot), f"{label}: block does not reconcile"
+    assert sum(renter_shares) + owner_share == int(pot), f"{label}: block does not reconcile"
 
 
 class TestEveryBlockIsAllocatedByR1R5K9:
@@ -180,116 +215,229 @@ class TestEveryBlockIsAllocatedByR1R5K9:
     charged a cent that its own share does not produce, because another party's
     fraction ranked lower. Under K9 that cent sits on the Eigentümer row, where
     a single sentence explains it.
+
+    **Amended 14.08.2026 — none of these cents moved, the row they sit on did.**
+    The four money columns of the owner are still `9901 / 15916 / 3300 / 7701`;
+    they are now read off `result.owner_residual` instead of `result.lines[2]`,
+    because the Eigentümer is not a party (`docs/02`, `docs/03` § 9.2). RED
+    against today's engine on shape, not on arithmetic.
     """
 
     TOTAL = 291_000
+    OWNER_COLUMNS = (9901, 15916, 3300, 7701, 36818)
 
     def test_the_golden_table(self) -> None:
         result = _statement(self.TOTAL, OCCUPANCIES_WITH_VACANCY)
         assert _rows(result) == [
             ("unit-a", "ten-a", 32738, 91665, 10913, 25463, 160779),
             ("unit-b", "ten-b", 9741, 22278, 3247, 7576, 42842),
-            ("unit-b", None, 9901, 15916, 3300, 7701, 36818),
             ("unit-c", "ten-c", 13095, 22916, 4365, 10185, 50561),
         ]
-        assert sum(int(line.total) for line in result.lines) == self.TOTAL
+        owner = result.owner_residual
+        assert (
+            int(owner.heating_base),
+            int(owner.heating_consumption),
+            int(owner.ww_base),
+            int(owner.ww_consumption),
+            int(owner.total),
+        ) == self.OWNER_COLUMNS
+        assert sum(int(line.total) for line in result.lines) + int(owner.total) == self.TOTAL
         assert result.total == self.TOTAL
 
     def test_each_of_the_four_blocks_obeys_r1_and_r5(self) -> None:
         result = _statement(self.TOTAL, OCCUPANCIES_WITH_VACANCY)
+        owner = result.owner_residual
         area = [line.base_weight_sqm_days_x100 for line in result.lines]
         heat = [line.heat_consumption_weight for line in result.lines]
         water = [line.ww_consumption_weight_m3 for line in result.lines]
         assert all(w is not None for w in heat) and all(w is not None for w in water)
+        assert owner.base_weight_sqm_days_x100 is not None
+        assert owner.heat_consumption_weight is not None
+        assert owner.ww_consumption_weight_m3 is not None
 
         _assert_block_follows_r1_r5(
             "grundHz",
             result.heat_base_pot,
             area,
             [int(line.heating_base) for line in result.lines],
-            OWNER_INDEX,
+            owner.base_weight_sqm_days_x100,
+            int(owner.heating_base),
         )
         _assert_block_follows_r1_r5(
             "verbrauchHz",
             result.heat_cons_pot,
             [w for w in heat if w is not None],
             [int(line.heating_consumption) for line in result.lines],
-            OWNER_INDEX,
+            owner.heat_consumption_weight,
+            int(owner.heating_consumption),
         )
         _assert_block_follows_r1_r5(
             "grundWw",
             result.ww_base_pot,
             area,
             [int(line.ww_base) for line in result.lines],
-            OWNER_INDEX,
+            owner.base_weight_sqm_days_x100,
+            int(owner.ww_base),
         )
         _assert_block_follows_r1_r5(
             "verbrauchWw",
             result.ww_cons_pot,
             [w for w in water if w is not None],
             [int(line.ww_consumption) for line in result.lines],
-            OWNER_INDEX,
+            owner.ww_consumption_weight_m3,
+            int(owner.ww_consumption),
         )
 
-    def test_the_same_row_absorbs_the_residual_in_all_four_blocks(self) -> None:
+    def test_one_row_absorbs_the_residual_in_all_four_blocks(self) -> None:
         """K9's justification is that **one** Eigentümer line explains every
-        ±ct of the statement. It cannot, if a different row absorbs per block.
+        ±ct of the statement. Under the model that is structural rather than a
+        convention: there is exactly one `owner_residual`, and § 1.3 Frage 3
+        puts it *"in allen vier Blöcken in dieselbe Zeile"*. Its Bemessung is
+        the Fiktivbelegung of the Jul-Dec vacancy — 30,00 m² × 184 Tage.
         """
         result = _statement(self.TOTAL, OCCUPANCIES_WITH_VACANCY)
-        owner = result.lines[OWNER_INDEX]
-        assert owner.tenancy_id is None
-        assert (owner.unit_id, owner.days) == ("unit-b", 184)  # Jul-Dec vacancy
+        assert all(line.tenancy_id is not None for line in result.lines)
+        owner = result.owner_residual
+        assert owner.base_weight_sqm_days_x100 == Decimal(3000 * 184)
+        assert [origin.unit_id for origin in owner.origins] == ["unit-b"]
+        assert owner.origins[0].days == 184  # Jul-Dec vacancy
 
-    def test_the_residual_is_at_most_one_cent_per_block(self) -> None:
+    def test_the_residual_is_at_most_one_cent_off_the_vacancy_share(self) -> None:
         """±1 ct per block is expected and correct (`docs/03` § 1 (1), R5). A
-        larger deviation is not a rounding rest but a broken denominator.
+        larger deviation is not a rounding rest but a broken denominator. The
+        comparison value is the *separately computed* vacancy share — the figure
+        D12 forbids as an output but which is exactly what block (a) of the
+        Leerstandsaufstellung carries.
         """
         result = _statement(self.TOTAL, OCCUPANCIES_WITH_VACANCY)
-        owner = result.lines[OWNER_INDEX]
-        area = [line.base_weight_sqm_days_x100 for line in result.lines]
-        area_sum = sum(area, Decimal(0))
+        owner = result.owner_residual
+        assert owner.base_weight_sqm_days_x100 is not None
+        area_sum = sum(
+            (line.base_weight_sqm_days_x100 for line in result.lines),
+            owner.base_weight_sqm_days_x100,
+        )
         for label, pot, share in (
             ("grundHz", result.heat_base_pot, int(owner.heating_base)),
             ("grundWw", result.ww_base_pot, int(owner.ww_base)),
         ):
-            own_quota = _round_half_up(Decimal(int(pot)) * area[OWNER_INDEX] / area_sum)
-            assert abs(share - own_quota) <= 1, label
+            separately = _round_half_up(
+                Decimal(int(pot)) * owner.base_weight_sqm_days_x100 / area_sum
+            )
+            assert abs(share - separately) <= 1, label
 
 
-class TestABlockWithNoLandlordPartyKeepsLargestRemainder:
-    """docs/03 § 9.2 convention 2 — **our** convention, not Berkay's.
+class TestAFullyLetBlockUsesTheResidualModelToo:
+    """⛔ **Replaces `TestABlockWithNoLandlordPartyKeepsLargestRemainder`,
+    14.08.2026.**
 
-    His model has one owner bucket per Liegenschaft, always. Ours derives a
-    landlord party from vacancy, so a fully let building has **no owner bucket**
-    at all — and the engine may not make a block reconcile by handing the
-    residual to a renter, which is the one thing K9 exists to forbid. Until an
-    unconditional Eigentümer line exists (`docs/02` + `docs/08` + PDF, its own
-    slice), such a block stays on largest-remainder.
+    That class was the codified form of `docs/03` § 9.2 convention 2 — *ours*,
+    not Berkay's: *a fully let building has no owner bucket, so such a block
+    keeps largest-remainder rather than hand a cent to a renter.* Its
+    `test_the_fully_let_building_does_not_move` asserted, cent for cent, the
+    table Berkay says must move:
 
-    2.999,35 € is picked because every one of the four blocks leaves a cent
-    over, so any residual-to-a-tenant reading would visibly move this table.
+        SUPERSEDED  ("unit-a", 33743, 94480, 11248, 26244, 165715)
+        SUPERSEDED  ("unit-b", 20245, 39366,  6748, 15747,  82106)
+        SUPERSEDED  ("unit-c", 13497, 23620,  4499, 10498,  52114)   Σ = 299.935, no owner row
+
+    `Antwort-an-Emir_02.md` § 1.3 Frage 3: *"Euer Largest-Remainder-Vorschlag
+    für den Rest ist damit **nicht** nötig und soll **nicht** verwendet
+    werden."* And § 1.2: the owner bucket exists *"unabhängig von Leerstand,
+    unabhängig von Belegung"* — there is no Fall B, so there is nothing for a
+    second allocation method to cover. **Do not restore the class or its
+    table.**
+
+    Kept here rather than only in the new file so the supersession sits where
+    the dead convention lived. The full golden table for this composition,
+    with the four -1 ct blocks and the Eigentümerzeile at -0,04 €, is
+    `test_berkay_02_eigentuemer_residuum.py`
+    -> `TestAFullyLetBuildingStillHasAnEigentuemerzeile`; asserting it twice
+    would be two copies of one oracle. What is asserted here is the property
+    that kills the convention.
     """
 
     TOTAL = 299_935
 
-    def test_the_fully_let_building_does_not_move(self) -> None:
+    def test_the_fully_let_building_has_an_eigentuemerzeile(self) -> None:
         result = _statement(self.TOTAL, OCCUPANCIES_FULLY_LET)
         assert all(line.tenancy_id is not None for line in result.lines)
-        assert _rows(result) == [
-            ("unit-a", "ten-a", 33743, 94480, 11248, 26244, 165715),
-            ("unit-b", "ten-b", 20245, 39366, 6748, 15747, 82106),
-            ("unit-c", "ten-c", 13497, 23620, 4499, 10498, 52114),
-        ]
-        assert sum(int(line.total) for line in result.lines) == self.TOTAL
+        owner = result.owner_residual
+        assert owner is not None
+        # No vacancy and no self-use -> block (a) is empty and the whole line is
+        # block (c), the Rundungsdifferenz. Negative is lawful (CLAUDE.md DoD 4).
+        assert owner.origins == ()
+        assert int(owner.rounding_difference) == int(owner.total) == -4
+        assert owner.base_weight_sqm_days_x100 is None
+
+    def test_no_block_falls_back_to_largest_remainder(self) -> None:
+        """The property, not the table: every renter share is its own
+        `round_half_up`, which largest-remainder cannot produce here — it moved
+        a cent to the largest fraction in all four blocks instead."""
+        result = _statement(self.TOTAL, OCCUPANCIES_FULLY_LET)
+        owner = result.owner_residual
+        area = [line.base_weight_sqm_days_x100 for line in result.lines]
+        heat = [line.heat_consumption_weight for line in result.lines]
+        water = [line.ww_consumption_weight_m3 for line in result.lines]
+        assert all(w is not None for w in heat) and all(w is not None for w in water)
+        _assert_block_follows_r1_r5(
+            "grundHz",
+            result.heat_base_pot,
+            area,
+            [int(line.heating_base) for line in result.lines],
+            Decimal(0),
+            int(owner.heating_base),
+        )
+        _assert_block_follows_r1_r5(
+            "verbrauchHz",
+            result.heat_cons_pot,
+            [w for w in heat if w is not None],
+            [int(line.heating_consumption) for line in result.lines],
+            Decimal(0),
+            int(owner.heating_consumption),
+        )
+        _assert_block_follows_r1_r5(
+            "grundWw",
+            result.ww_base_pot,
+            area,
+            [int(line.ww_base) for line in result.lines],
+            Decimal(0),
+            int(owner.ww_base),
+        )
+        _assert_block_follows_r1_r5(
+            "verbrauchWw",
+            result.ww_cons_pot,
+            [w for w in water if w is not None],
+            [int(line.ww_consumption) for line in result.lines],
+            Decimal(0),
+            int(owner.ww_consumption),
+        )
 
     def test_each_block_still_reconciles_to_its_pot(self) -> None:
         result = _statement(self.TOTAL, OCCUPANCIES_FULLY_LET)
-        assert sum(int(line.heating_base) for line in result.lines) == int(result.heat_base_pot)
-        assert sum(int(line.heating_consumption) for line in result.lines) == int(
-            result.heat_cons_pot
-        )
-        assert sum(int(line.ww_base) for line in result.lines) == int(result.ww_base_pot)
-        assert sum(int(line.ww_consumption) for line in result.lines) == int(result.ww_cons_pot)
+        owner = result.owner_residual
+        for pot, shares, owner_share in (
+            (
+                result.heat_base_pot,
+                [int(line.heating_base) for line in result.lines],
+                int(owner.heating_base),
+            ),
+            (
+                result.heat_cons_pot,
+                [int(line.heating_consumption) for line in result.lines],
+                int(owner.heating_consumption),
+            ),
+            (
+                result.ww_base_pot,
+                [int(line.ww_base) for line in result.lines],
+                int(owner.ww_base),
+            ),
+            (
+                result.ww_cons_pot,
+                [int(line.ww_consumption) for line in result.lines],
+                int(owner.ww_consumption),
+            ),
+        ):
+            assert sum(shares) + owner_share == int(pot)
 
 
 class TestBerkay01bF26TheOwnerValueIsTheResidualAndNotARoundedQuota:

@@ -881,6 +881,22 @@ Reconciliation is unchanged and non-negotiable: `Σ Mieteranteile + Eigentümera
 by construction, and the assertion in `calculate_heating_statement` stays — it now sums the renter
 lines **and** the residual.
 
+**The fan-out, listed so it is not discovered one file at a time.** `HeatingResult.lines` losing its
+landlord rows is a *shape* change, so it reaches every consumer that walks `lines`, whether or not a
+cent moved. What the wiring slice must carry with it, as of 14.08.2026:
+
+| Where | What changes |
+| --- | --- |
+| `packages/heating-engine/tests/test_berkay_02_eigentuemer_residuum.py` | the RED spec of the slice — already written, nothing to adjust |
+| `packages/heating-engine/tests/test_berkay_01b_residual_wiring.py` | already migrated: `owner_residual` instead of `lines[2]`, and the superseded fully-let class replaced |
+| `test_heating_golden.py`, `test_heating_disclosure.py`, `test_heat_consumption_unit.py`, `test_co2_short_period_annualisation.py` | **37 assertion sites** still read `result.lines` on the old shape: 12 reconciliation sums that need `+ owner_residual.total`, and per-line disclosure tables (days, Gradtagszahlen, Bemessungen) whose arity drops from 4 rows to 3 with the fourth moving onto `OwnerResidual` / `origins` |
+| `packages/pdf/src/lokara_pdf/statement.py` | `_party` (its `tenancy_id is None` branch), `share_sum`, and the heating table's row loop — the Eigentümerzeile is rendered from `owner_residual`, per `docs/08` -> *"Die Eigentümerzeile"* |
+| `packages/pdf/tests/*` | the rendered `Eigentümeranteil` row, its required sentence, the page-wide no-percentage assertion, and the column reconciliation read back off the page |
+| `apps/api/src/lokara_api/routers/portal.py` | two `is_landlord=line.tenancy_id is None` sites — the tenant portal must not gain an Eigentümer row (Seite 01 **E17**: *"no mention on any tenant copy"*) |
+
+The demo path is **not** in that list and must not move: `scripts/assert_statement_pdf.py` stays
+green and untouched.
+
 ### 9.3 Why `co2.py:166` gets its own answer
 
 It looks like the others and is not the same operation. It splits **one amount between two roles by
