@@ -37,8 +37,17 @@ Rounding is **per engine** — do not "correct" one to the other (`CLAUDE.md` Do
 - **Heating** — `round_half_up` per share, `Verteilungsrest` to the owner bucket,
   `distribute_cents_half_up` (Berkay R1/R5/K9, `docs/03`). The owner share may be ±1 ct off its
   own quota and may go negative; that is the rule working, not a defect.
-  **As of 13.08.2026 heating is still on `distribute_cents` — the switch is unbuilt work, not a
-  bug to leave alone.**
+  **Wired 13.08.2026 — heating is on `distribute_cents_half_up` now. Do not "restore"
+  `distribute_cents` there.**
+
+The owner bucket is **one residual line per Liegenschaft and Kostenart**, never a party derived
+from occupancy, and it exists even when nothing is vacant (Berkay
+`berkay-work/Antwort-an-Emir_02.md` § 1, Seite 01 D12: *"ALWAYS as a residual, NEVER computed
+separately"*). Two consequences that look like bugs and are not: where a figure could be computed
+per unit **or** taken as the residual, **the residual is what ships**, so a per-unit recomputation
+that disagrees by a cent is the rounding difference and not an error to chase; and a fully-let
+building's Eigentümer line is typically **−0,01 €**, because half-up biases the renter shares
+upward. Both are disclosed, neither is silently distributed to a renter.
 
 ## When a test refuses rather than computes
 
