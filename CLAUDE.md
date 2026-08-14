@@ -87,19 +87,39 @@ canonical for *architecture*; this rule is about numbers, formulas and legal val
    unsynced copies of every rule — exactly the drift `docs-reconciler` exists to find.
    **Every transcribed `docs/` file carries a header line naming its source file in `berkay-work/`.**
 
-3. **One exception: the Rechtsstand register.** `berkay-work/Calculations/Rechtsstand-Register …csv`
-   is already structured data — a CSV (Comma-Separated Values) file of 179 rows: Wert, Betrag/Satz,
-   Flag, Quelle, Rechtsgrundlage, Rechtsnatur, Rechtsstand. Import it into `rules-store` nearly
-   as-is — no prose transformation.
+3. **One exception: the Rechtsstand register.** It is already structured data — a CSV
+   (Comma-Separated Values) file of 179 rows: Wert, Betrag/Satz, Flag, Quelle, Rechtsgrundlage,
+   Rechtsnatur, Rechtsstand. Import it into `rules-store` nearly as-is — no prose transformation.
+
+   > **Two copies carry the same filename; only one is authoritative.** Take
+   > **`berkay-work/FEEDBACK-to-Emir-01b/Rechtsstand-Register/`** — it is the later export and the
+   > one Berkay named as maßgeblich (`Antwort-an-Emir_02.md` § 5). The copy under
+   > `berkay-work/Calculations/` is the earlier one and differs in **7 rows** that have since moved
+   > from `verify-before-production` to `geprüft`; a Notion export has no date in the name, which is
+   > how two versions came to look identical. He date-stamps exports from the next one on
+   > (`…_2026-08-14`), so this is a one-time collision — but until then, check the path, not the
+   > filename. (Each directory also holds a `_all.csv` twin of the same 179 rows.)
 
 4. **Every value lands with its flag intact.** Rechtsnatur (Gesetz / Verordnung / Konvention /
-   Heuristik), Rechtsstand, source URL, and `verify-before-production` vs `geprüft`. **137 of 180 are
-   `verify-before-production`.** His `README-for-Emir.md` lists what must **not** be treated as
+   Heuristik), Rechtsstand, source URL, and `verify-before-production` vs `geprüft`. **130 of the
+   179 rows are `verify-before-production`** in the authoritative copy named in rule 3; the figure
+   was 137 in the earlier one, and quoting that number is the first symptom of reading the wrong
+   file. His `README-for-Emir.md` lists what must **not** be treated as
    verified: Anlage-V line numbers, SKR03/SKR04 (Standardkontenrahmen) accounts, DATEV EXTF
    (the DATEV export text format) parameters, and three BFH (Bundesfinanzhof, the Federal Fiscal
    Court) case numbers marked `ZITAT UNSICHER`. **Transcribing a flagged value as fact is the error
    to avoid** —
    the computation paths are right, the numbers are placeholders of realistic magnitude.
+
+   > **What `geprüft` means, in his words** (`berkay-work/Antwort-an-Emir_02.md`, 14.08.2026):
+   > *"Normtext an der Primärquelle gegengelesen"* — the statutory text was read at the primary
+   > source. It does **not** mean a lawyer confirmed the legal classification, and no output may
+   > imply that it does. Legal review is a **second stage**, planned once the Rechtsstand register
+   > is complete and taken to a lawyer as a whole. Two entries stay explicitly pre-legal even so:
+   > the **§ 6a Abs. 3 S. 4 Bekanntmachung**, promulgated under **GEG § 82** (BAnz AT 16.04.2021
+   > B1) — whether it is legally *the* § 6a Bekanntmachung is the lawyer's question — and the
+   > **Rechtsnatur of the emission factors**, which stays `Konvention` because using them as a
+   > fallback is a design choice, not a norm.
 
 5. **Do not be conservative about editing existing `.md` files.** `docs/03`, `docs/06`, this file,
    `DEMO-RUNBOOK.md` and `.claude/agents/statement-reviewer.md` all carry rules his spec overrides.
