@@ -1,0 +1,27 @@
+# Heizspiegel fuer Deutschland 2025 (co2online gGmbH) - Verbrauch in kWh je m2 und Jahr
+# Abrechnungsjahr 2024, Stand September 2025. Quelle: co2online gGmbH (Heizspiegel).
+# Werte beziehen sich auf die GESAMTE Wohnflaeche des Gebaeudes und enthalten Raumwaerme + Warmwasser.
+# Baender sind Obergrenzen ("bis X"); Spalte 'mittel' = "Gebaeude liegt im Durchschnitt" -> Normwert fuer den Durchschnittsnutzer.
+# WICHTIG: Heizspiegel ist eine GEBAEUDE-Referenz; laut co2online nicht zur Bewertung einer einzelnen Wohnung
+# in zentralbeheizten Gebaeuden bzw. zur Angemessenheitspruefung (SGB) geeignet. Nutzung mit Quellenangabe.
+wohnflaeche_gebaeude_m2;energietraeger;niedrig_kwh_m2a;mittel_kwh_m2a;erhoeht_kwh_m2a;zu_hoch_ab_kwh_m2a
+80-150;Erdgas;62;121;207;208
+80-150;Heizoel;100;165;263;264
+80-150;Fernwaerme;38;89;191;192
+80-150;Waermepumpe;20;36;82;83
+80-150;Holzpellets;74;148;249;250
+150-250;Erdgas;64;116;187;188
+150-250;Heizoel;92;142;220;221
+150-250;Fernwaerme;41;94;169;170
+150-250;Waermepumpe;18;33;77;78
+150-250;Holzpellets;72;126;219;220
+250-500;Erdgas;61;114;185;186
+250-500;Heizoel;78;123;197;198
+250-500;Fernwaerme;36;112;203;204
+250-500;Waermepumpe;17;30;69;70
+250-500;Holzpellets;60;113;196;197
+ueber-500;Erdgas;59;115;177;178
+ueber-500;Heizoel;68;127;198;199
+ueber-500;Fernwaerme;46;87;144;145
+# ueber-500 Waermepumpe und Holzpellets: im Flyer nicht abgedruckt -> aus der Voll-Tabelle
+# auf heizspiegel.de oder direkt bei co2online nachtragen.
