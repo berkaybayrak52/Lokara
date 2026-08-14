@@ -3,6 +3,23 @@
 §§7/8 base/consumption split, §9 warm-water separation, §9a estimation,
 degree-day apportionment on renter change, CO2KostAufG 10-step split.
 Every fixture reconciles to the input total to the cent.
+
+**Re-shaped 14.08.2026 — an Eigentümerzeile at 0,00 €, and no cent moved.**
+`berkay-work/Antwort-an-Emir_02.md` § 1: the Eigentümeranteil is one residual
+line per Liegenschaft, and § 1.3 Frage 1 makes it exist *"auch bei 0,00 €, auch
+ohne Leerstand, auch ohne Eigennutzung"*. Every building in this file is fully
+let, so each fixture gained an owner row and none of them gained an amount:
+
+* **base/WW split and CO₂ split** — 50/30/20 divides every base pot; 600/250/150
+  (= 12/5/3 over 20) and 20/12/8 (= 5/3/2 over 10) divide every consumption pot.
+* **degree-day apportionment** — four parties, and each block's `round_half_up`
+  shares already sum to the pot, incl. the exact half cent 11.157,5 → 11.158.
+* **§ 9a estimation (all three)** — 600/250/212,5 over 1.062,5 and the pure area
+  key both divide exactly.
+
+The delta across the suite was bounded in advance: **seven blocks move, one cent
+each, and none is in this file** (`docs/03` § 9.2 → the fan-out table). A value
+that moves here is a bug in the wiring, not a fixture to adjust.
 """
 
 from decimal import Decimal
@@ -120,6 +137,20 @@ class TestBaseConsumptionAndWarmWaterSplit:
             ("unit-b", "ten-b", 67500, 131250, 22500, 52500, 273750),
             ("unit-c", "ten-c", 45000, 78750, 15000, 35000, 173750),
         ]
+        # Every block divides exactly, so the Eigentümerzeile is 0,00 € — and it
+        # still renders (§ 1.3 Frage 1). No vacancy, no self-use ⇒ block (a) is
+        # empty and the Bemessung column stays blank, which is `None`, not 0.
+        owner = result.owner_residual
+        assert (
+            int(owner.heating_base),
+            int(owner.heating_consumption),
+            int(owner.ww_base),
+            int(owner.ww_consumption),
+            int(owner.total),
+        ) == (0, 0, 0, 0, 0)
+        assert owner.origins == ()
+        assert int(owner.rounding_difference) == 0
+        assert owner.base_weight_sqm_days_x100 is None
         assert result.total == 1_000_000
         assert result.co2 is None
         assert result.estimated_unit_ids == ()
@@ -196,8 +227,20 @@ class TestCo2TenStepSplit:
             ("unit-b", 69120, 134400, 23040, 53760, 280320),
             ("unit-c", 46080, 80640, 15360, 35840, 177920),
         ]
-        # Lines + landlord CO₂ reconcile to the full input cost.
-        assert sum(int(line.total) for line in result.lines) + int(co2.landlord_amount) == 1_030_000
+        # Fully let and every block divides exactly ⇒ Eigentümerzeile 0,00 €.
+        owner = result.owner_residual
+        assert int(owner.total) == 0
+        assert owner.origins == ()
+        # Renter lines + Eigentümeranteil + landlord CO₂ reconcile to the input.
+        # The CO₂-Vermieteranteil is a **statutory deduction** (§ 7 CO2KostAufG)
+        # taken before the split; the residual is what is left of a Blockbetrag
+        # after it. Two figures with one bearer, never one (`docs/03` § 9.3).
+        assert (
+            sum(int(line.total) for line in result.lines)
+            + int(owner.total)
+            + int(co2.landlord_amount)
+            == 1_030_000
+        )
         assert result.total == 1_030_000
 
     def test_step_selection_boundaries(self) -> None:
@@ -273,7 +316,15 @@ class TestDegreeDayApportionment:
             ("unit-b", "ten-b2", 34027, 54469, 11342, 26466, 126304),
             ("unit-c", "ten-c", 45000, 78750, 15000, 35000, 173750),
         ]
-        assert sum(int(line.total) for line in result.lines) == 1_000_000
+        # A Nutzerwechsel is **not** a vacancy: both segments are Mietverhält-
+        # nisse, so both keep a money row and the Eigentümerzeile is 0,00 €.
+        # `11.157,5 → 11.158` is the exact half cent — R1 half-up, and the block
+        # still sums to its pot, so nothing is left for the residual.
+        owner = result.owner_residual
+        assert int(owner.total) == 0
+        assert owner.origins == ()
+        assert len(result.lines) == 4
+        assert sum(int(line.total) for line in result.lines) + int(owner.total) == 1_000_000
 
 
 class TestParagraph9aEstimation:
@@ -312,7 +363,11 @@ class TestParagraph9aEstimation:
         ]
         assert result.estimated_unit_ids == ("unit-c",)
         assert result.consumption_fallback_to_area is False
-        assert sum(int(line.total) for line in result.lines) == 750_000
+        assert int(result.owner_residual.total) == 0
+        assert (
+            sum(int(line.total) for line in result.lines) + int(result.owner_residual.total)
+            == 750_000
+        )
 
     def test_more_than_25_percent_missing_falls_back_to_area(self) -> None:
         units = (
@@ -332,7 +387,11 @@ class TestParagraph9aEstimation:
             ("unit-c", 45000, 105000),
         ]
         assert result.consumption_fallback_to_area is True
-        assert sum(int(line.total) for line in result.lines) == 750_000
+        assert int(result.owner_residual.total) == 0
+        assert (
+            sum(int(line.total) for line in result.lines) + int(result.owner_residual.total)
+            == 750_000
+        )
 
     def test_all_readings_missing_falls_back_to_area(self) -> None:
         units = (
@@ -342,4 +401,8 @@ class TestParagraph9aEstimation:
         )
         result = calculate_heating_statement(self._input(units))
         assert result.consumption_fallback_to_area is True
-        assert sum(int(line.total) for line in result.lines) == 750_000
+        assert int(result.owner_residual.total) == 0
+        assert (
+            sum(int(line.total) for line in result.lines) + int(result.owner_residual.total)
+            == 750_000
+        )

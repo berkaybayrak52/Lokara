@@ -26,6 +26,20 @@ engine behaviour**, and every figure here is still what the engine produces from
 the fixture `docs/08` → "The worked example" states. Provenance of the new
 figures: `docs/06` → "Scenario 2 — the fuel, the emissions and the CO₂ price";
 statutory basis in `docs/03` → "Where `total_co2_kg` and `co2_cost` come from".
+
+**Re-shaped 14.08.2026 — the fourth row moved off `lines`, and no euro moved.**
+`berkay-work/Antwort-an-Emir_02.md` § 1: the Eigentümeranteil is not a party but
+one residual line per Liegenschaft, so `("unit-b", None)` is now
+`result.owner_residual` and every four-element list below is three elements plus
+the residual. **The three renter rows keep the values they have today**, because
+this building has exactly one landlord party and that party's amount already
+*was* the residual (`docs/03` § 9.2 → "What actually moves in the engine").
+
+The delta was bounded in advance: **seven blocks in the whole suite move, one
+cent each, and none of them is in this file.** Anything here that changes value
+is a bug in the wiring, not a fixture to adjust. Model: `docs/02` → "The
+Eigentümeranteil is a residual line, not a party"; document rules: `docs/08` →
+"Die Eigentümerzeile".
 """
 
 from decimal import Decimal
@@ -157,19 +171,37 @@ class TestNothingThatRendersToday_Moves:
     """
 
     def test_the_worked_examples_party_totals_are_unchanged(self) -> None:
+        """The three renter rows keep their cents exactly; the landlord row is
+        the same 128.110 read off `owner_residual` instead of out of `lines`."""
         result = statement()
         rows = [(line.unit_id, line.tenancy_id, int(line.total)) for line in result.lines]
         assert rows == [
             ("unit-a", "ten-a", 560_397),
             ("unit-b", "ten-b", 149_553),
-            ("unit-b", None, 128_110),
             ("unit-c", "ten-c", 176_232),
         ]
+        owner = result.owner_residual
+        assert int(owner.total) == 128_110
         co2 = result.co2
         assert co2 is not None
-        assert sum(int(line.total) for line in result.lines) == 1_014_292
-        assert sum(int(line.total) for line in result.lines) + int(co2.landlord_amount) == 1_030_000
+        assert sum(int(line.total) for line in result.lines) + int(owner.total) == 1_014_292
+        assert (
+            sum(int(line.total) for line in result.lines)
+            + int(owner.total)
+            + int(co2.landlord_amount)
+            == 1_030_000
+        )
         assert int(result.total) == 1_030_000
+
+    def test_the_residual_is_the_vacancy_share_and_block_c_is_two_cents(self) -> None:
+        """`docs/08` § 5 — the printed Eigentümeranteil is the residual; block
+        (a) is what the Leerstandsaufstellung itemises per empty unit, and their
+        difference is block (c). Same structure as Berkay's 17.531 vs 17.536.
+        """
+        owner = statement().owner_residual
+        assert [origin.unit_id for origin in owner.origins] == ["unit-b"]
+        origins_total = sum(int(origin.total) for origin in owner.origins)
+        assert int(owner.rounding_difference) == int(owner.total) - origins_total
 
 
 class TestBlockAVerticalSplit:
@@ -318,80 +350,104 @@ class TestBlockBBemessungen:
         integer comparison stays green through exactly that bug. This fixture
         pins **both** the carried scale and the de-scaled display value."""
         result = statement()
+        owner = result.owner_residual
         carried = [line.base_weight_sqm_days_x100 for line in result.lines]
         assert carried == [
             Decimal(5000 * 365),  # A: 50 m² × 365 d
             Decimal(3000 * 181),  # B, Bernd: 30 m² × 181 d
-            Decimal(3000 * 184),  # B, Leerstand → Vermieter: 30 m² × 184 d
             Decimal(2000 * 365),  # C: 20 m² × 365 d
         ]
         assert carried == [
             Decimal(1_825_000),
             Decimal(543_000),
-            Decimal(552_000),
             Decimal(730_000),
         ]
+        # B, Leerstand → the Fiktivbelegung (D0) on the Eigentümerzeile, same
+        # scale, same de-scaling rule: 30 m² × 184 d.
+        assert owner.base_weight_sqm_days_x100 == Decimal(3000 * 184) == Decimal(552_000)
         # De-scaled once, at the render boundary — never per line and never twice.
         assert [w / 100 for w in carried] == [
             Decimal(18_250),
             Decimal(5_430),
-            Decimal(5_520),
             Decimal(7_300),
         ]
+        assert owner.base_weight_sqm_days_x100 / 100 == Decimal(5_520)
 
     def test_the_base_bemessungen_sum_to_the_gesamtbemessung(self) -> None:
+        """The Gesamtbemessung is unchanged at 36.500 m²·Tage — the vacancy is
+        still in the denominator (D0/E19), it is just no longer a party. Summing
+        `lines` alone would print a denominator 5.520 m²·Tage short of the one
+        the renters' own shares were divided by."""
         result = statement()
-        total = sum((line.base_weight_sqm_days_x100 for line in result.lines), Decimal(0))
+        owner = result.owner_residual
+        assert owner.base_weight_sqm_days_x100 is not None
+        total = sum(
+            (line.base_weight_sqm_days_x100 for line in result.lines),
+            owner.base_weight_sqm_days_x100,
+        )
         assert total == Decimal(3_650_000)
         assert total / 100 == Decimal(36_500)  # 36.500 m²·Tage, the printed figure
 
     def test_the_warm_water_bemessungen_sum_to_the_measured_total(self) -> None:
         result = statement()
+        owner = result.owner_residual
         weights = [line.ww_consumption_weight_m3 for line in result.lines]
         assert None not in weights
         assert weights == [
             Decimal(20),
             Decimal(12) * Decimal(181) / Decimal(365),
-            Decimal(12) * Decimal(184) / Decimal(365),
             Decimal(8),
         ]
-        assert sum((w for w in weights if w is not None), Decimal(0)) == Decimal(40)
+        assert owner.ww_consumption_weight_m3 == Decimal(12) * Decimal(184) / Decimal(365)
+        assert owner.ww_consumption_weight_m3 is not None
+        assert sum(
+            (w for w in weights if w is not None), owner.ww_consumption_weight_m3
+        ) == Decimal(40)
 
     def test_a_fractional_bemessung_displays_at_two_decimals(self) -> None:
         """`docs/08`: `5,950684931506849…` prints as `5,95`. The engine carries
         the exact value; rounding is the renderer's job and needs the exact one."""
         result = statement()
+        owner = result.owner_residual
         weights = [line.ww_consumption_weight_m3 for line in result.lines]
         rounded = [None if w is None else w.quantize(Decimal("0.01")) for w in weights]
         assert rounded == [
             Decimal("20.00"),
             Decimal("5.95"),
-            Decimal("6.05"),
             Decimal("8.00"),
         ]
+        assert owner.ww_consumption_weight_m3 is not None
+        assert owner.ww_consumption_weight_m3.quantize(Decimal("0.01")) == Decimal("6.05")
 
     def test_the_heat_bemessungen_sum_to_the_units_readings(self) -> None:
         result = statement()
+        owner = result.owner_residual
         weights = [line.heat_consumption_weight for line in result.lines]
         assert None not in weights
         assert weights == [
             Decimal(600),
             Decimal("146.25"),  # 250 × 5850/10 000 (585,0 ‰)
-            Decimal("103.75"),  # 250 × 4150/10 000 (415,0 ‰)
             Decimal(150),
         ]
+        assert owner.heat_consumption_weight == Decimal("103.75")  # 250 × 4150/10 000 (415,0 ‰)
+        assert owner.heat_consumption_weight is not None
         # Σ 1.000 — the Gesamtbemessung the page may not print until the
         # measurement unit is carried (slice 5), but that the engine must carry.
-        assert sum((w for w in weights if w is not None), Decimal(0)) == Decimal(1000)
+        assert sum((w for w in weights if w is not None), owner.heat_consumption_weight) == Decimal(
+            1000
+        )
 
     def test_days_and_the_denominator_they_are_a_share_of(self) -> None:
         result = statement()
         assert [(line.days, line.unit_total_days) for line in result.lines] == [
             (365, 365),
             (181, 365),
-            (184, 365),
             (365, 365),
         ]
+        # The vacancy's Zeitanteil is still disclosed — Block C needs it (§ 9b
+        # Abs. 3 is about Bemessung, not money), so it travels on the origin.
+        origin = result.owner_residual.origins[0]
+        assert (origin.days, origin.unit_total_days) == (184, 365)
 
 
 class TestBlockCNutzerwechsel:
@@ -403,6 +459,14 @@ class TestBlockCNutzerwechsel:
     The carried figures are **Zehntelpromille** since K3 (`docs/03` → "Seite 01b
     … (2) K3"): the pair below is 5850/10 000, which the page prints as
     `585,0 ‰ von 1.000 ‰`. De-scaling by 10 happens once, at the renderer.
+
+    **The vacancy segment still gets a Block C line (14.08.2026).** § 9b Abs. 3
+    disclosure is about *Bemessung*, not about money: a unit used by a renter to
+    30.06. and standing empty afterwards owes the reader both Zeitanteile, and
+    the two must still sum to the unit's denominator. So the segment keeps its
+    line here and loses only its **money row** — which is exactly why
+    `OwnerResidualOrigin` carries the Bemessungen and not just the amounts
+    (`docs/08` → "Die Eigentümerzeile" § 3 and § 6).
     """
 
     def test_tenth_promille_is_carried_with_its_per_unit_total(self) -> None:
@@ -414,19 +478,26 @@ class TestBlockCNutzerwechsel:
         ] == [
             (Decimal(10_000), Decimal(10_000)),
             (Decimal(5850), Decimal(10_000)),
-            (Decimal(4150), Decimal(10_000)),
             (Decimal(10_000), Decimal(10_000)),
         ]
+        origin = result.owner_residual.origins[0]
+        assert (origin.degree_day_promille, origin.unit_degree_day_promille_total) == (
+            Decimal(4150),
+            Decimal(10_000),
+        )
 
     def test_the_unit_total_is_the_denominator_that_was_applied(self) -> None:
+        """Unit B's two Block-C segments are now one renter line plus one origin,
+        and they must still add up to the unit's own denominator — otherwise the
+        printed `von 1.000 ‰` is a denominator nothing on the page sums to."""
         result = statement()
-        unit_b = [line for line in result.lines if line.unit_id == "unit-b"]
-        assert len(unit_b) == 2
-        assert sum((line.degree_day_promille for line in unit_b), Decimal(0)) == (
-            unit_b[0].unit_degree_day_promille_total
+        renter = next(line for line in result.lines if line.unit_id == "unit-b")
+        origin = next(o for o in result.owner_residual.origins if o.unit_id == "unit-b")
+        assert renter.degree_day_promille + origin.degree_day_promille == (
+            renter.unit_degree_day_promille_total
         )
-        weights = [line.heat_consumption_weight for line in unit_b]
-        assert weights == [
+        assert origin.unit_degree_day_promille_total == renter.unit_degree_day_promille_total
+        assert [renter.heat_consumption_weight, origin.heat_consumption_weight] == [
             Decimal(250) * Decimal(5850) / Decimal(10_000),
             Decimal(250) * Decimal(4150) / Decimal(10_000),
         ]
@@ -434,16 +505,20 @@ class TestBlockCNutzerwechsel:
     def test_the_printed_derivation_is_reproducible_from_the_carried_fields(self) -> None:
         """`12 m³ × 181 von 365 Tagen = 5,95 m³` — every operand of that sentence
         comes off the line, and the unit's reading is the exact sum of its
-        parties' Bemessungen (which is why it is not carried a second time)."""
+        segments' Bemessungen (which is why it is not carried a second time)."""
         result = statement()
-        unit_b = [line for line in result.lines if line.unit_id == "unit-b"]
-        shares = [line.ww_consumption_weight_m3 for line in unit_b]
+        renter = next(line for line in result.lines if line.unit_id == "unit-b")
+        origin = next(o for o in result.owner_residual.origins if o.unit_id == "unit-b")
+        shares = [renter.ww_consumption_weight_m3, origin.ww_consumption_weight_m3]
         assert None not in shares
         unit_reading = sum((s for s in shares if s is not None), Decimal(0))
         assert unit_reading == Decimal(12)
-        for line, share in zip(unit_b, shares, strict=True):
+        for days, total_days, share in (
+            (renter.days, renter.unit_total_days, renter.ww_consumption_weight_m3),
+            (origin.days, origin.unit_total_days, origin.ww_consumption_weight_m3),
+        ):
             assert share is not None
-            assert share == unit_reading * Decimal(line.days) / Decimal(line.unit_total_days)
+            assert share == unit_reading * Decimal(days) / Decimal(total_days)
 
 
 class TestParagraph9aFallbackWithholdsAConsumptionBemessung:
@@ -464,16 +539,24 @@ class TestParagraph9aFallbackWithholdsAConsumptionBemessung:
         assert result.heat_fallback_to_area is True
         assert result.ww_fallback_to_area is False
         assert result.consumption_fallback_to_area is True  # unchanged meaning: heat or ww
-        assert [line.heat_consumption_weight for line in result.lines] == [None] * 4
+        owner = result.owner_residual
+        assert [line.heat_consumption_weight for line in result.lines] == [None] * 3
+        # The withholding is `None` on the Eigentümerzeile too: no consumption
+        # Bemessung was applied to that column for anybody, so none may be shown
+        # for anybody (`docs/08` rule 4 — `None` means *not applied*).
+        assert owner.heat_consumption_weight is None
         ww = [line.ww_consumption_weight_m3 for line in result.lines]
         assert None not in ww
-        assert sum((w for w in ww if w is not None), Decimal(0)) == Decimal(40)
+        assert owner.ww_consumption_weight_m3 is not None
+        assert sum((w for w in ww if w is not None), owner.ww_consumption_weight_m3) == Decimal(40)
         # The Fläche·Tage Bemessung is still carried — it is what was applied to
         # *both* heating columns in this case.
+        assert owner.base_weight_sqm_days_x100 is not None
         assert sum(
-            (line.base_weight_sqm_days_x100 for line in result.lines), Decimal(0)
+            (line.base_weight_sqm_days_x100 for line in result.lines),
+            owner.base_weight_sqm_days_x100,
         ) == Decimal(3_650_000)
-        assert sum(int(line.total) for line in result.lines) == 1_000_000
+        assert sum(int(line.total) for line in result.lines) + int(owner.total) == 1_000_000
 
     def test_no_central_warm_water_is_not_a_fallback(self) -> None:
         """No warm-water column exists at all — that is not § 9a Abs. 2, and the
@@ -481,7 +564,8 @@ class TestParagraph9aFallbackWithholdsAConsumptionBemessung:
         result = statement(total_cost=1_000_000, warm_water=None, co2=None)
         assert result.ww_fallback_to_area is False
         assert result.heat_fallback_to_area is False
-        assert [line.ww_consumption_weight_m3 for line in result.lines] == [None] * 4
+        assert [line.ww_consumption_weight_m3 for line in result.lines] == [None] * 3
+        assert result.owner_residual.ww_consumption_weight_m3 is None
 
 
 class TestCo2Berechnungsgrundlagen:

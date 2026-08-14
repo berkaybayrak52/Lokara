@@ -778,9 +778,15 @@ class TestBlockBBemessungsgrundlagen:
             f"rd. 145,83 {HKV_UNIT}",
             "rd. 5,95 m³",
         )
+        # Re-labelled 14.08.2026: Block B is a Liegenschafts-level table whose
+        # column sums to the printed Gesamtbemessung, so it carries the single
+        # `Eigentümeranteil` row one-for-one with the money table — not a party
+        # row per vacant unit (`docs/08` → "Die Eigentümerzeile" § 3). The
+        # Bemessungen are unchanged: one vacant unit, so the aggregate is that
+        # unit's own. Block C keeps the per-segment label, deliberately.
         assert has_row(
             table,
-            "Wohnung B — Leerstand ab 01.07.2025 → Vermieter",
+            "Eigentümeranteil",
             "5.520",
             f"rd. 104,17 {HKV_UNIT}",
             "rd. 6,05 m³",
@@ -1481,11 +1487,62 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
         the same total as before — which is the check that this was a re-split and
         not a re-price."""
         heating = _heating(build_demo_statement())
-        unit_b = [line for line in heating.lines if line.unit_id == "unit-b"]
-
-        mieter, vermieter = (int(line.heating_consumption) for line in unit_b)
+        # 14.08.2026: unit B's Vermieter half is no longer a party row — it is
+        # the Liegenschafts-Residuum. **Neither figure moves**: this building has
+        # exactly one landlord party, so its amount already *was* the residual,
+        # which is why `scripts/assert_statement_pdf.py`'s 776,52 / 554,74
+        # goldens hold across the model change (`docs/03` § 9.2).
+        mieter = int(
+            next(line for line in heating.lines if line.unit_id == "unit-b").heating_consumption
+        )
+        vermieter = int(heating.owner_residual.heating_consumption)
         assert (mieter, vermieter) == (77_652, 55_474)
         assert mieter + vermieter == 133_126
         # Within the cent the pot-level rounding can move it — the ratio is the
         # invariant, the last cent belongs to the distribution primitive.
         assert abs(Decimal(mieter) - Decimal("0.5833") * (mieter + vermieter)) <= 1
+
+
+class TestTheEigentuemerzeileRendersInAFullyLetBuilding:
+    """`docs/08` → "Die Eigentümerzeile" § 1, the case the row exists for.
+
+    Added 14.08.2026. Every other rendering fixture in this repo has a vacancy,
+    so the branch that had *no* landlord row at all was never rendered — and
+    that is precisely the building Berkay's § 1.3 Frage 1 is about:
+    *"Auch bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."*
+
+    `single_party_statement()` is fully let, one party per unit. Under the model
+    it still has an Eigentümerzeile; under the current renderer it has none, so
+    this class is **red on purpose**. Its sibling assertions live in
+    `test_statement_owner_residual.py`, which runs against the demo (where the
+    row carries a real amount); this one is the zero end of the same rule.
+    """
+
+    def test_the_row_renders_even_though_there_is_no_vacancy(self) -> None:
+        data = single_party_statement()
+        heating = _heating(data)
+        assert all(line.tenancy_id is not None for line in heating.lines)
+        assert heating.owner_residual.origins == ()  # nothing empty, nothing self-used
+
+        text = _plain(statement_html(data))
+        assert "Eigentümeranteil" in text, (
+            "a fully let building renders no Eigentümerzeile — a suppressed zero "
+            "row and an omitted row are indistinguishable on paper, and only one "
+            "of them is honest (docs/08 § 1)"
+        )
+
+    def test_the_bemessung_column_stays_empty_rather_than_printing_a_zero(self) -> None:
+        """§ 2: with no vacancy and no self-use there is no Fiktivbelegung, so
+        the Bemessung is `None` — and `None` must render as *nothing*, never as
+        `0`, which would imply an allocation base of zero rather than none."""
+        owner = _heating(single_party_statement()).owner_residual
+        assert owner.base_weight_sqm_days_x100 is None
+        assert owner.heat_consumption_weight is None
+        assert owner.ww_consumption_weight_m3 is None
+
+    def test_the_money_table_still_reconciles_with_the_row_in_it(self) -> None:
+        data = single_party_statement()
+        heating = _heating(data)
+        assert sum(int(line.total) for line in heating.lines) + int(
+            heating.owner_residual.total
+        ) == int(heating.billable_cost)

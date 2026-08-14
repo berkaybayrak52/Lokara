@@ -446,9 +446,13 @@ Rest, keine Quote."*
 | Vacancy and/or self-use in the period | the **Fiktivbelegung (D0)** of the empty units — m²·Tage / Personen-Tage / HKV-Einheiten, in the same Maßeinheit and the same de-scaled form as the renter rows | the residual |
 | Fully let, nothing self-used | **empty** — no `0`, no `—`, no dash that could read as a Bemessung of zero | the residual (the pure Rundungsdifferenz) |
 
-- **Never a percentage, in any column, on this row.** Not `%`, not `‰`, not `x von y`. This is a
-  page-wide prohibition asserted over rendered text, exactly like the `Saldo` vocabulary ban — so it
-  cannot be reintroduced in another block later.
+- **Never a percentage, in any column, on this row.** Not `%`, not `‰`, not `x von y`, not the word
+  `Quote`. **Scope: the row, not the page** — corrected 14.08.2026, because an earlier draft of this
+  bullet said *page-wide* and that is wrong: Block C prints `585,0 ‰ von 1.000 ‰` legitimately under
+  § 9b Abs. 2, and a page-wide ban would forbid a required disclosure. The assertion is instead
+  applied to **every** Eigentümer row wherever one renders — the heating money table, the
+  party-totals block and the Leerstandsaufstellung — so it cannot be reintroduced in another block
+  later, which is the property the `Saldo` vocabulary ban gets from being page-wide.
 - **The Bemessung is disclosure, not derivation.** Even where the Fiktivbelegung is printed, the
   amount is *not* `Bemessung × Quote` and must never be recomputed from the printed Bemessung. The
   two figures sit in one row and are related only through the denominator.
@@ -473,11 +477,52 @@ Zeile**."*
   `Wohnung B — Leerstand ab 01.07.2025 → Vermieter` is superseded by a single `Eigentümeranteil` row.
   The reasoning of that section is untouched and is in fact why this works: the four rows must remain
   the addends of the Σ row, and they do — the Eigentümer row is one of the addends.
-- **Block C (Nutzerwechsel) still prints the vacancy segment.** § 9b Abs. 3 disclosure is about
-  Bemessung, not about money: a unit used by a renter until 30.06. and standing empty afterwards
-  still owes the reader both Zeitanteile. The segment keeps its line in Block C
-  (`Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 416,7 ‰ von 1.000 ‰`) and loses only its **money
-  row**. That is what `OwnerResidual.origins` carries the Bemessungen for.
+- **Block B (Bemessungsgrundlagen) gets the same one row, under the same label.** Block B is a
+  Liegenschafts-level table whose column must sum to the printed **Gesamtbemessung** — 36.500 m²·Tage
+  includes the vacancy's 5.520, and dropping that row would leave the column short of the very
+  denominator printed at the foot of it. So Block B carries an `Eigentümeranteil` row with the
+  aggregated Fiktivbelegung, one-for-one with the money table. `statement.py` already states the
+  reason: *"the same label names a party in the money table, in Block B and in Block C, so a reader
+  can follow one row across all three."*
+- **Block C (Nutzerwechsel) keeps the per-segment landlord label instead**, and that is not an
+  inconsistency: Block C is the only **per-unit** block on the page. It decomposes one unit's
+  timeline, so its rows must identify *segments of that unit* — `Wohnung B — Leerstand ab
+  01.07.2025 → Vermieter: 416,7 ‰ von 1.000 ‰`, not the Liegenschaft's residual line. § 9b Abs. 3
+  disclosure is about Bemessung, not about money: a unit used by a renter until 30.06. and standing
+  empty afterwards still owes the reader both Zeitanteile, and they must still sum to that unit's
+  `von 1.000 ‰`. The segment loses only its **money row**. That is what `OwnerResidual.origins`
+  carries the Bemessungen for.
+
+  *Rule of thumb, so the next block does not have to re-litigate it:* a table whose column sums to a
+  **Liegenschafts**-total (the money table, Block B, the party-totals block) shows **one**
+  `Eigentümeranteil` row; a table that decomposes a **single unit** (Block C, and the
+  Leerstandsaufstellung's (a) rows) keeps the **per-unit / per-segment** label.
+
+### 3a — The party-totals block gets **one** Eigentümer row, not two
+
+`Anteile je Partei` sums each party across both engines, so the NK asymmetry below would otherwise
+surface there as **two** landlord rows for one owner: `Wohnung B — Leerstand … → Vermieter` carrying
+the NK share, and `Eigentümeranteil` carrying the heating residual. Ruling, 14.08.2026:
+
+**One row, labelled `Eigentümeranteil`, rendered last, carrying the sum of every landlord-side amount
+from both engines** — the NK landlord parties' shares (summed over units) in the Betriebskosten
+column, the Liegenschafts-Residuum in the heating column.
+
+- It is § 1.4's *"Aggregation im Display, Herkunft in den Daten"* applied to the block whose entire
+  job is aggregation.
+- **It survives more than one vacant unit.** Keeping the per-unit NK landlord rows here would print
+  two, three, four rows for one owner in a table that exists to give each party *one* number.
+- **Nothing is hidden by it.** The Betriebskosten table above still itemises the NK landlord share
+  per unit; this block never was the itemisation.
+- **It does not misdescribe its own NK part.** The block's label is `Anteil gesamt`, a sum, and its
+  accompanying sentence is the existing one. The *"Restbetrag"* sentence of § 4 belongs to the
+  heating table's row and is not repeated here — until `docs/09` lands, the NK part of this row is
+  still a sum of separately-computed quotas, and no copy on the page may call it a residual.
+- When `docs/09` lands and NK switches, the NK part becomes a residual too and **nothing about this
+  block changes** — which is the test of whether the interim shape was chosen well.
+
+Row order is unchanged (*"the order the parties appear in the money tables"*), with the Eigentümer
+row appended last regardless, because it is the reconciling line rather than a party.
 
 ### 4 — Required rendered text (Gesamtübersicht)
 

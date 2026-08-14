@@ -885,17 +885,20 @@ lines **and** the residual.
 landlord rows is a *shape* change, so it reaches every consumer that walks `lines`, whether or not a
 cent moved. What the wiring slice must carry with it, as of 14.08.2026:
 
-| Where | What changes |
-| --- | --- |
-| `packages/heating-engine/tests/test_berkay_02_eigentuemer_residuum.py` | the RED spec of the slice — already written, nothing to adjust |
-| `packages/heating-engine/tests/test_berkay_01b_residual_wiring.py` | already migrated: `owner_residual` instead of `lines[2]`, and the superseded fully-let class replaced |
-| `test_heating_golden.py`, `test_heating_disclosure.py`, `test_heat_consumption_unit.py`, `test_co2_short_period_annualisation.py` | **37 assertion sites** still read `result.lines` on the old shape: 12 reconciliation sums that need `+ owner_residual.total`, and per-line disclosure tables (days, Gradtagszahlen, Bemessungen) whose arity drops from 4 rows to 3 with the fourth moving onto `OwnerResidual` / `origins` |
-| `packages/pdf/src/lokara_pdf/statement.py` | `_party` (its `tenancy_id is None` branch), `share_sum`, and the heating table's row loop — the Eigentümerzeile is rendered from `owner_residual`, per `docs/08` -> *"Die Eigentümerzeile"* |
-| `packages/pdf/tests/*` | the rendered `Eigentümeranteil` row, its required sentence, the page-wide no-percentage assertion, and the column reconciliation read back off the page |
-| `apps/api/src/lokara_api/routers/portal.py` | two `is_landlord=line.tenancy_id is None` sites — the tenant portal must not gain an Eigentümer row (Seite 01 **E17**: *"no mention on any tenant copy"*) |
+| Where | What changes | Status |
+| --- | --- | --- |
+| `packages/heating-engine/tests/test_berkay_02_eigentuemer_residuum.py` | the RED spec of the slice | ✅ written |
+| `packages/domain/tests/test_owner_residual_model.py` + `test_berkay_residual_oracles.py` | the primitive, and Berkay's arithmetic as its oracle | ✅ written |
+| `packages/heating-engine/tests/test_berkay_01b_residual_wiring.py` | `owner_residual` instead of `lines[2]`; the superseded fully-let class replaced | ✅ migrated |
+| `test_heating_golden.py`, `test_heating_disclosure.py`, `test_heat_consumption_unit.py`, `test_co2_short_period_annualisation.py`, `test_berkay_01b_energy_reference_boundary.py` | the 37 assertion sites: reconciliation sums now `Σ lines + owner_residual.total`, and the per-line disclosure tables drop from 4 rows to 3 with the fourth moving onto `OwnerResidual` / `origins` | ✅ migrated |
+| `packages/pdf/tests/*` | the rendered `Eigentümeranteil` row, its required sentence, the no-percentage assertion **scoped to the row**, the column reconciliation read off the page, the Block B re-label, and the party-totals block's single owner row | ✅ written (new file `test_statement_owner_residual.py` + 3 existing files) |
+| `packages/pdf/src/lokara_pdf/statement.py` | `_party` (its `tenancy_id is None` branch), `share_sum`, the heating table's row loop, Block B's row list, and the new required sentence — the Eigentümerzeile is rendered from `owner_residual`, per `docs/08` -> *"Die Eigentümerzeile"* | ⬜ **engine-implementer** |
+| `packages/heating-engine/src`, `packages/domain/src` | `OwnerResidual`, `OwnerResidualOrigin`, `HeatingResult.owner_residual`, `distribute_cents_owner_residual` | ⬜ **engine-implementer** |
+| `apps/api/src/lokara_api/routers/portal.py` | two `is_landlord=line.tenancy_id is None` sites — the tenant portal must not gain an Eigentümer row (Seite 01 **E17**: *"no mention on any tenant copy"*) | ⬜ **engine-implementer** |
 
 The demo path is **not** in that list and must not move: `scripts/assert_statement_pdf.py` stays
-green and untouched.
+green and untouched, and its 776,52 / 554,74 goldens hold because the demo building has exactly one
+landlord party whose amount already *was* the residual.
 
 **The expected red state between the spec commit and the wiring commit.** `AGENTS.md` →
 *"Every slice gets its own branch"*: the spec-before-implementation split *"guarantees a **red
@@ -906,8 +909,25 @@ window** on every slice"*, which is why this work is on `slice/eigentuemer-resid
 | --- | --- | --- |
 | `ruff check` / `format` | **green** | — |
 | `scripts/verify_demo_path.sh`, engine purity, agent parity | **green** | the demo building has a vacancy, so its residual does not move |
-| `pytest` | **460 passed, 7 failed, 2 collection errors** | the 7 are `test_berkay_01b_residual_wiring.py` on `AttributeError: owner_residual`; the 2 are the new files' `ImportError` on `OwnerResidual` / `distribute_cents_owner_residual` |
-| `mypy --strict` | **28 errors, in 3 files** | every one of them is one of those same three names. Nothing else. |
+| `pytest` | **430 passed, 51 failed, 2 collection errors** | the 2 collection errors are the new files' `ImportError` on `OwnerResidual` / `distribute_cents_owner_residual`; of the 51, **36** are heating-engine assertions on the old 4-row shape, **15** are pdf assertions on the unrendered `Eigentümeranteil` row |
+| `mypy --strict` | **67 errors, in 11 files** | every one of them is `owner_residual`, `OwnerResidual` or `distribute_cents_owner_residual`. Filtering those three names out leaves **zero**. |
+
+Counts as of the second spec pass (14.08.2026), after the 37 consumer sites and the pdf gates were
+migrated. Before it the figures were 460/7/2 and 28 mypy errors — the difference is entirely stale
+assertions being brought onto the new shape, not new breakage.
+
+**How to check the red is still the designed one**, without reading 51 tracebacks:
+
+```bash
+uv run mypy 2>&1 | grep -vE "owner_residual|OwnerResidual|distribute_cents_owner_residual" \
+  | grep "error:"          # must print nothing
+uv run pytest packages/ apps/api/tests scripts/tests -q \
+  --ignore=packages/domain/tests/test_owner_residual_model.py \
+  --ignore=packages/heating-engine/tests/test_berkay_02_eigentuemer_residuum.py 2>&1 \
+  | grep -E "^E  " | sort | uniq -c    # every line must be an owner_residual
+                                       # AttributeError, a 4-vs-3 row diff, or a
+                                       # missing Eigentümeranteil row
+```
 
 **No `# type: ignore` was added to make `mypy` green**, and none may be: it would have to be stripped
 again by the wiring commit, and in the meantime it would let a *wrong* shape past the type checker —

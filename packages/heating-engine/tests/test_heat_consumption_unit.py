@@ -30,6 +30,15 @@ Four rules, all from `docs/08`:
 
 **No euro moves.** The unit is metadata about a weight the engine already
 allocated by; `TestNoEuroMoves` is the guard on that.
+
+**Re-shaped 14.08.2026 — and still no euro moves.** The Eigentümeranteil is one
+residual line per Liegenschaft rather than a party (`berkay-work/
+Antwort-an-Emir_02.md` § 1, `docs/02`), so this building's Leerstand row moved
+from `lines` to `result.owner_residual` carrying the same 128.110 — one landlord
+party, whose amount already *was* the residual. Its 103,75 HKV-Einheiten are
+still inside the denominator the unit labels; they are just no longer a party's
+Bemessung. None of the seven blocks the rule moves is in this file
+(`docs/03` § 9.2 → the fan-out table).
 """
 
 from decimal import Decimal
@@ -185,16 +194,24 @@ class TestTheUnitIsCarriedInputToResult:
         the one the engine divided by: Σ 1.000 HKV-Einheiten (`docs/08` rule 7),
         and the Nutzerwechsel split inside it."""
         result = statement()
+        owner = result.owner_residual
         weights = [line.heat_consumption_weight for line in result.lines]
         assert all(w is not None for w in weights)
 
         assert [w for w in weights if w is not None] == [
             Decimal(600),
             Decimal("146.25"),
-            Decimal("103.75"),
             Decimal(150),
         ]
-        assert sum((w for w in weights if w is not None), Decimal(0)) == DEMO_HEAT_TOTAL
+        # The Leerstand's 103,75 HKV-Einheiten are the Fiktivbelegung on the
+        # Eigentümerzeile — still inside the denominator the label belongs to,
+        # just no longer a party (`docs/02`, D0).
+        assert owner.heat_consumption_weight == Decimal("103.75")
+        assert owner.heat_consumption_weight is not None
+        assert (
+            sum((w for w in weights if w is not None), owner.heat_consumption_weight)
+            == DEMO_HEAT_TOTAL
+        )
 
 
 class TestOneKeyOneUnit:
@@ -306,6 +323,9 @@ class TestTheAreaFallbackHasNoConsumptionUnit:
 
         assert result.heat_fallback_to_area is True
         assert all(line.heat_consumption_weight is None for line in result.lines)
+        # The withholding reaches the Eigentümerzeile too: no consumption
+        # Bemessung was applied to that column for anybody (`docs/08` rule 4).
+        assert result.owner_residual.heat_consumption_weight is None
         assert result.heat_consumption_unit is None
 
 
@@ -320,19 +340,24 @@ class TestNoEuroMoves:
         assert [int(line.total) for line in result.lines] == [
             560_397,
             149_553,
-            128_110,
             176_232,
         ]
+        assert int(result.owner_residual.total) == 128_110
 
     def test_the_statement_still_reconciles_to_the_invoice(self) -> None:
-        """`sum(shares) == input_total`, the invariant of every allocation test —
-        the CO₂-Vermieteranteil is deducted before the renter-facing split, so it
-        is part of the sum."""
+        """`Σ Mieteranteile + Eigentümeranteil == input_total`, the invariant of
+        every allocation test — the CO₂-Vermieteranteil is deducted before the
+        renter-facing split, so it is part of the sum too."""
         result = statement()
         co2 = result.co2
         assert co2 is not None
 
-        assert sum(int(line.total) for line in result.lines) + int(co2.landlord_amount) == 1_030_000
+        assert (
+            sum(int(line.total) for line in result.lines)
+            + int(result.owner_residual.total)
+            + int(co2.landlord_amount)
+            == 1_030_000
+        )
         assert int(result.total) == 1_030_000
 
     def test_the_unit_does_not_change_a_single_amount(self) -> None:
@@ -344,5 +369,6 @@ class TestNoEuroMoves:
         assert [int(line.total) for line in with_unit.lines] == [
             int(line.total) for line in without_unit.lines
         ]
+        assert int(with_unit.owner_residual.total) == int(without_unit.owner_residual.total)
         assert int(with_unit.heat_cons_pot) == int(without_unit.heat_cons_pot)
         assert with_unit.heat_consumption_unit is not without_unit.heat_consumption_unit

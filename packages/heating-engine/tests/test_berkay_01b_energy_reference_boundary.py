@@ -110,8 +110,12 @@ RULES = HeatingRules(
     co2_rechtsstand="Rechtsstand 01/2023",
 )
 
-# 50 + 30 + 20 = 100 m², fully let all year: this file is about the CO₂ input
-# boundary, so nothing here depends on the residual rule (`docs/03` § 9.2).
+# 50 + 30 + 20 = 100 m², fully let all year. This file is about the CO₂ input
+# boundary, so nothing here *depends* on the residual rule — but one of its
+# blocks is nonetheless one of the seven in the suite that the rule moves, and
+# it is pinned below rather than left to be discovered (`docs/03` § 9.2).
+# Amended 14.08.2026: the previous comment claimed the file was untouched by
+# § 9.2, which stopped being true when the fully-let case gained an owner row.
 UNITS = (
     HeatingUnit("unit-a", 5000, heat_consumption=Decimal(600)),
     HeatingUnit("unit-b", 3000, heat_consumption=Decimal(250)),
@@ -174,6 +178,10 @@ class TestTheFactorIsAppliedOnlyToItsOwnReference:
         )
         co2 = result.co2
         assert co2 is not None
+        # Billable 284.292 ⇒ `heat_base_pot` 85.288 and `heat_cons_pot` 199.004,
+        # both of which divide exactly, so this reading's Eigentümerzeile is
+        # 0,00 € — unlike the Brennwert one below. It still renders.
+        assert int(result.owner_residual.total) == 0
         # R4: derived as integer grams, then the unrounded value into the lookup.
         assert co2.total_co2_kg == Decimal(4020)
         assert co2.intensity_kg_per_sqm == Decimal("40.2")
@@ -199,6 +207,25 @@ class TestTheFactorIsAppliedOnlyToItsOwnReference:
         assert int(co2.landlord_amount) == 13090  # 50 % of 261,80 €
         assert int(co2.renter_amount) == 13090
         assert result.total == TOTAL_COST
+        # ⚠️ **One of the seven blocks that move** under the Eigentümer-Residuum
+        # (`docs/03` § 9.2 → the fan-out table). Billable 300.000 - 13.090 =
+        # 286.910 ⇒ `heat_base_pot` = 86.073, split by 50/30/20: 43.036,5 →
+        # **43.037** (R1 half-up, up from 43.036 under largest-remainder),
+        # 25.821,9 → 25.822, 17.214,6 → 17.215. Σ = 86.074 ⇒ residual **-1**.
+        # The HU reading above lands on 85.288 and divides exactly, which is why
+        # only this one of the two moves.
+        owner = result.owner_residual
+        assert int(result.heat_base_pot) == 86_073
+        assert [int(line.heating_base) for line in result.lines] == [43_037, 25_822, 17_215]
+        assert int(owner.heating_base) == -1
+        assert int(owner.total) == -1
+        assert owner.origins == ()  # fully let ⇒ the whole line is block (c)
+        assert (
+            sum(int(line.total) for line in result.lines)
+            + int(owner.total)
+            + int(co2.landlord_amount)
+            == TOTAL_COST
+        )
 
     def test_the_reference_alone_moves_a_whole_stufe(self) -> None:
         """Same building, same 20.000 kWh, same invoice — 60 % vs 50 % of the

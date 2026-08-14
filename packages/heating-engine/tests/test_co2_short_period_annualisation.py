@@ -252,8 +252,18 @@ class TestInterimPeriodAnnualisesTheIntensity:
         # Billable after the CO₂ deduction: 530.000 minus 18.000 = 512.000 cents.
         # Under-classified (20 %) it would be 524.000 — 120,00 € too much on the
         # renters' side of a legal document.
-        assert sum(int(line.total) for line in result.lines) == 512_000
-        assert sum(int(line.total) for line in result.lines) + int(co2.landlord_amount) == 530_000
+        # Fully let, and all four blocks divide exactly (115.200 / 268.800 /
+        # 38.400 / 89.600 against 50/30/20, 12/5/3 and 5/3/2) ⇒ the
+        # Eigentümerzeile is 0,00 € here. It still renders (§ 1.3 Frage 1).
+        owner = result.owner_residual
+        assert int(owner.total) == 0
+        assert sum(int(line.total) for line in result.lines) + int(owner.total) == 512_000
+        assert (
+            sum(int(line.total) for line in result.lines)
+            + int(owner.total)
+            + int(co2.landlord_amount)
+            == 530_000
+        )
         assert int(result.total) == 530_000
 
 
@@ -332,7 +342,19 @@ class TestNoOverCorrection:
         assert co2.band_max_exclusive is None
         assert int(co2.landlord_amount) == 28_500
         assert int(co2.renter_amount) == 1_500
-        assert sum(int(line.total) for line in result.lines) + 28_500 == 530_000
+        # ⚠️ **One of the seven blocks that move** under the Eigentümer-Residuum
+        # (`docs/03` § 9.2 → the fan-out table), and the only one in this file.
+        # Billable 501.500 ⇒ `ww_base_pot` = 37.613, split by 50/30/20:
+        # 18.806,5 → **18.807** (R1 half-up, up from 18.806 under
+        # largest-remainder), 11.283,9 → 11.284, 7.522,6 → 7.523. Σ = 37.614,
+        # so the residual is **-1**. The other three blocks divide exactly.
+        # A value moving anywhere else in this file is a wiring bug.
+        owner = result.owner_residual
+        assert int(owner.ww_base) == -1
+        assert int(owner.total) == -1
+        assert owner.origins == ()  # fully let ⇒ the whole line is block (c)
+        assert int(owner.rounding_difference) == -1
+        assert sum(int(line.total) for line in result.lines) + int(owner.total) + 28_500 == 530_000
 
 
 class TestPeriodLongerThanAYearIsRefused:
@@ -371,4 +393,8 @@ class TestPeriodLongerThanAYearIsRefused:
             )
         )
         assert result.co2 is None
-        assert sum(int(line.total) for line in result.lines) == 1_000_000
+        assert int(result.owner_residual.total) == 0
+        assert (
+            sum(int(line.total) for line in result.lines) + int(result.owner_residual.total)
+            == 1_000_000
+        )

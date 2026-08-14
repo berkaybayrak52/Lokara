@@ -52,6 +52,14 @@ HEADING = "Anteile je Partei"
 TOTAL_COLUMN = "Anteil gesamt"
 SUM_ROW_LABEL = "Summe der Anteile"
 
+# `docs/08` → "Die Eigentümerzeile" § 3a, added 14.08.2026. The landlord side
+# collapses into **one** row here — otherwise the NK asymmetry surfaces as two
+# rows for one owner (`Wohnung B — Leerstand … → Vermieter` for the NK share and
+# `Eigentümeranteil` for the heating residual) in the one table whose whole job
+# is to give each party a single number. Same word as the heating money table,
+# Block B and the annex.
+OWNER_LABEL = "Eigentümeranteil"
+
 # The sentence that has to accompany the figure. `geleistete` is § 556 Abs. 3
 # BGB's own word: it says *which* quantity is missing, not merely that something
 # is. It states no right, no deadline and no payment instruction — all three
@@ -142,11 +150,14 @@ def _block(html: str) -> str:
 
 
 def _party_order(data: StatementData) -> list[str]:
-    """Party labels in the order the money tables introduce them.
+    """Row labels in the order the money tables introduce them, `Eigentümeranteil`
+    last.
 
-    First appearance over the Betriebskosten lines, then over the heating lines.
-    A reader reads down two tables and down this one; a different order makes
-    them search.
+    Renters first, by first appearance over the Betriebskosten lines and then the
+    heating lines — a reader reads down two tables and down this one, and a
+    different order makes them search. The Eigentümer row is appended **last
+    regardless**, because it is the reconciling line rather than a party
+    (`docs/08` → "Die Eigentümerzeile" § 3a).
     """
     keys: list[tuple[str | None, str | None]] = []
     heating = data.heating_result
@@ -155,20 +166,32 @@ def _party_order(data: StatementData) -> list[str]:
         *(() if heating is None else ((line.unit_id, line.tenancy_id) for line in heating.lines)),
     ]
     for key in seen:
-        if key not in keys:
+        if key not in keys and key[1] is not None:
             keys.append(key)
-    return [data.party_labels[key] for key in keys]
+    return [data.party_labels[key] for key in keys] + [OWNER_LABEL]
 
 
 def _expected_shares(data: StatementData) -> dict[str, tuple[int, int]]:
-    """`{party label: (Betriebskosten cents, Heizkosten cents)}` from the engines.
+    """`{row label: (Betriebskosten cents, Heizkosten cents)}` from the engines.
 
-    Summed per party across *all* cost items: the demo bills one NK cost today,
-    and a second one must land in the same row rather than a second one.
+    Summed per row across *all* cost items: the demo bills one NK cost today, and
+    a second one must land in the same row rather than a second one.
+
+    **The landlord side collapses into one `Eigentümeranteil` row** — `docs/08`
+    § 3a. Its heating figure is the Liegenschafts-Residuum; its Betriebskosten
+    figure is the sum of `nk-engine`'s per-unit landlord parties, which still
+    exist because NK keeps largest-remainder until Seite 02 lands in `docs/09`.
+    Summing them here is a **display** aggregation and asserts nothing about how
+    they were computed: the Betriebskosten table above still itemises them per
+    unit, and no copy on this block calls the NK part a residual.
     """
     shares: dict[str, tuple[int, int]] = {label: (0, 0) for label in _party_order(data)}
     for nk_line in data.nk_result.lines:
-        label = data.party_labels[(nk_line.unit_id, nk_line.tenancy_id)]
+        label = (
+            OWNER_LABEL
+            if nk_line.tenancy_id is None
+            else data.party_labels[(nk_line.unit_id, nk_line.tenancy_id)]
+        )
         nk, heat = shares[label]
         shares[label] = (nk + int(nk_line.amount), heat)
     heating = data.heating_result
@@ -177,6 +200,8 @@ def _expected_shares(data: StatementData) -> dict[str, tuple[int, int]]:
             label = data.party_labels[(heat_line.unit_id, heat_line.tenancy_id)]
             nk, heat = shares[label]
             shares[label] = (nk, heat + int(heat_line.total))
+        nk, heat = shares[OWNER_LABEL]
+        shares[OWNER_LABEL] = (nk, heat + int(heating.owner_residual.total))
     return shares
 
 
@@ -230,14 +255,19 @@ def test_the_heading_reuses_the_disclosure_title_idiom() -> None:
     assert HEADING in _plain(heading.group(1))
 
 
-def test_every_party_gets_a_row_including_the_landlord_vacancy() -> None:
-    """`docs/08` → "Which parties get a row, and which label".
+def test_every_party_gets_a_row_and_the_owner_gets_exactly_one() -> None:
+    """`docs/08` → "Which parties get a row, and which label", as amended by
+    "Die Eigentümerzeile" § 3a (14.08.2026).
 
-    The landlord's `Leerstand` line is under the *same* header and gets no
-    second, softer label. Two reasons, both in the spec: omitting it makes the Σ
-    row false (the four rows are the addends of the printed total), and the
-    vacancy share is a real figure with a real bearer — a blank or a `—` in a
+    The owner's line is under the *same* header and gets no second, softer
+    label. Two reasons, both unchanged by the model: omitting it makes the Σ row
+    false (the printed rows are the addends of the printed total), and the
+    owner's share is a real figure with a real bearer — a blank or a `—` in a
     money column reads as zero.
+
+    What *did* change: it is **one** `Eigentümeranteil` row rather than one row
+    per vacant unit, and it renders last because it is the reconciling line
+    rather than a party.
     """
     data = build_demo_statement()
     block = _block(statement_html(data))
@@ -257,10 +287,18 @@ def test_every_party_gets_a_row_including_the_landlord_vacancy() -> None:
         )
 
     # Named explicitly, because this is the row that would be dropped: the
-    # landlord's, and with it the truth of the Σ row.
+    # owner's, and with it the truth of the Σ row.
+    assert rendered_parties[-1].strip().startswith(OWNER_LABEL), (
+        "the Eigentümeranteil row must render last — it is the reconciling "
+        "line, not a party (docs/08 § 3a)"
+    )
+    assert _row_for(block, OWNER_LABEL)
+    # …and the per-unit landlord label is no longer a row of *this* block. It
+    # is still on the page, in the Betriebskosten table, which keeps its
+    # per-unit landlord party until Seite 02 lands in `docs/09`.
     vacancy = data.party_labels[("unit-b", None)]
     assert "Vermieter" in vacancy, "fixture no longer carries a landlord vacancy party"
-    assert _row_for(block, vacancy)
+    assert vacancy not in _text(block)
 
 
 def test_each_party_row_is_the_sum_of_that_party_two_shares() -> None:
