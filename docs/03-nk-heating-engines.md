@@ -897,6 +897,23 @@ cent moved. What the wiring slice must carry with it, as of 14.08.2026:
 The demo path is **not** in that list and must not move: `scripts/assert_statement_pdf.py` stays
 green and untouched.
 
+**The expected red state between the spec commit and the wiring commit.** `AGENTS.md` →
+*"Every slice gets its own branch"*: the spec-before-implementation split *"guarantees a **red
+window** on every slice"*, which is why this work is on `slice/eigentuemer-residuum` and not on
+`main`. Written down so the next reader can tell the designed red from a regression at a glance:
+
+| Gate | State after the spec commits | Why |
+| --- | --- | --- |
+| `ruff check` / `format` | **green** | — |
+| `scripts/verify_demo_path.sh`, engine purity, agent parity | **green** | the demo building has a vacancy, so its residual does not move |
+| `pytest` | **460 passed, 7 failed, 2 collection errors** | the 7 are `test_berkay_01b_residual_wiring.py` on `AttributeError: owner_residual`; the 2 are the new files' `ImportError` on `OwnerResidual` / `distribute_cents_owner_residual` |
+| `mypy --strict` | **28 errors, in 3 files** | every one of them is one of those same three names. Nothing else. |
+
+**No `# type: ignore` was added to make `mypy` green**, and none may be: it would have to be stripped
+again by the wiring commit, and in the meantime it would let a *wrong* shape past the type checker —
+the one thing the RED fixture exists to prevent. The gate goes green when the three names exist, and
+not before.
+
 ### 9.3 Why `co2.py:166` gets its own answer
 
 It looks like the others and is not the same operation. It splits **one amount between two roles by
