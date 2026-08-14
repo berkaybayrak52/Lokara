@@ -395,6 +395,277 @@ back off the page, the two reconciliations, the forbidden vocabulary (page-wide,
 introduced elsewhere either), and the landlord row. Plus the two carrier-list rows in
 `test_statement_legal_typography.py` and `test_statement_pagination.py`.
 
+## Die Eigentümerzeile — always printed, never a Quote
+
+> **Source:** `berkay-work/Antwort-an-Emir_02.md` § 1.3 (Fragen 1–3) and § 1.4, 14.08.2026; primary
+> rule text `berkay-work/…/Spec-Seiten/01 · Die Abrechnung ….md` → **D0**, **D12**, **`08-F21`**
+> (line 757) and edge cases **E3**, **E17**, **E19**. The figures behind it are his `09-F06`–`09-F09`
+> and `09-F19` on Seite 02, which his answer cites under the older IDs `08-F06` / `08-F21` /
+> `08-F22`; both numberings are named everywhere so they can be matched later.
+>
+> **Model:** `docs/02` → *"The Eigentümeranteil is a residual line, not a party"*. **Engine wiring:**
+> `docs/03` § 9.2. This section is only what the **document** does with it.
+>
+> **Scope:** the **heating** table in this slice. The Betriebskosten table keeps its per-unit
+> landlord row until Seite 02 lands in `docs/09` — see *"The one asymmetry this slice leaves"* below.
+
+### 1 — The row renders unconditionally, including at 0,00 €
+
+§ 1.3 Frage 1, verbatim: *"Existiert die Eigentümerzeile immer? → **Ja.** Auch bei 0,00 €, auch ohne
+Leerstand, auch ohne Eigennutzung."*
+
+- **One code path, no branch.** Same rule the heating footer and the party-totals block already
+  follow: a reader must see that the residual is `0,00 €`, not have to notice a missing line. A
+  suppressed zero row and an omitted row are indistinguishable on paper, and only one of them is
+  honest.
+- **`0,00 €` is a real value with a reason.** His `09-F19` prints the Eigentümer column at `0` for
+  **Wasserversorgung**, **Entwässerung** and **Heizkosten** while carrying `3174` for Grundsteuer.
+  Those three are consumption-keyed: the denominator is the sum of *actually measured* consumption
+  and the empty unit consumed nothing, so the residual is genuinely zero (D0: *"Consumption
+  denominators are untouched — a vacant unit consumes nothing."*). Zero there means **zero**, not
+  *absent* and not *not applicable*.
+- **Negative is lawful and expected.** On a fully-let building the line is the pure line-wise
+  rounding difference, and `round_half_up` biases renter shares upward, so **−0,01 €** is the
+  ordinary result. It renders as `-0,01 €` via `format_eur` like any other amount. Nobody may
+  "fix" it to zero: doing so would break the control sum, which is the one thing this row exists to
+  keep true.
+- **On which document.** The Eigentümerzeile belongs to the **Vermieter-Gesamtübersicht** and to the
+  **Leerstandsaufstellung**. It does **not** go on the Mieter-Einzelabrechnung — Seite 01 **E17**:
+  Leerstand gets *"**No** tenant document, **no** mention on any tenant copy"*. The object-level
+  Gesamtbemessung the tenant copy prints is unaffected and still contains the Fiktivbelegung; the
+  tenant recomputes only its own share from it, which still works.
+
+### 2 — No Quote, ever. What goes in the Bemessung column
+
+§ 1.3 Frage 2, blockquote: *"Druckt in der Eigentümerzeile **keine** Quote/Prozentzahl. Eine
+gedruckte Quote würde eine Verteilungsbasis suggerieren, die es nicht gibt — der Betrag ist ein
+Rest, keine Quote."*
+
+| Situation | Bemessung column | Amount |
+| --- | --- | --- |
+| Vacancy and/or self-use in the period | the **Fiktivbelegung (D0)** of the empty units — m²·Tage / Personen-Tage / HKV-Einheiten, in the same Maßeinheit and the same de-scaled form as the renter rows | the residual |
+| Fully let, nothing self-used | **empty** — no `0`, no `—`, no dash that could read as a Bemessung of zero | the residual (the pure Rundungsdifferenz) |
+
+- **Never a percentage, in any column, on this row.** Not `%`, not `‰`, not `x von y`. This is a
+  page-wide prohibition asserted over rendered text, exactly like the `Saldo` vocabulary ban — so it
+  cannot be reintroduced in another block later.
+- **The Bemessung is disclosure, not derivation.** Even where the Fiktivbelegung is printed, the
+  amount is *not* `Bemessung × Quote` and must never be recomputed from the printed Bemessung. The
+  two figures sit in one row and are related only through the denominator.
+- **`09-F07` is the proof, and it is numeric.** Müllbeseitigung 62000 ct by Personen-Tage, denominator
+  `nPersTage = 2.006 + 2 × 31 = 2.068` (the 62 being the empty unit's Fiktivbelegung). Renter shares
+  round to `32829 / 12712 / 3658 / 10943`, Σ `60142`, residual **1858**. The *separately computed*
+  vacancy share is `62000 × 62 / 2068 = 1858,80 → 1859`. His comment: *"Gerechnet wird 1858.
+  Residuum gewinnt."* Printing a Quote next to 1858 would show a base that produces 1859.
+
+### 3 — The heating table: one Eigentümer row across all four blocks
+
+§ 1.3 Frage 3: *"der Rest geht in das Liegenschafts-Residuum, in **allen vier Blöcken in dieselbe
+Zeile**."*
+
+- One row, positioned **last** in the money table, after all Mietverhältnis rows. Last, because it is
+  the reconciling line: the reader adds the rows above and the last one closes the column.
+- It carries a figure in **each** of the four money columns (Grundkosten Heizung, Verbrauch Heizung,
+  Grundkosten Warmwasser, Verbrauch Warmwasser) and in `Anteil gesamt` — any of them may be `0,00 €`
+  or negative.
+- **This replaces the per-unit landlord row in the heating table.** *"Which parties get a row, and
+  which label"* above still governs the **Betriebskosten** table; for the heating table the row
+  `Wohnung B — Leerstand ab 01.07.2025 → Vermieter` is superseded by a single `Eigentümeranteil` row.
+  The reasoning of that section is untouched and is in fact why this works: the four rows must remain
+  the addends of the Σ row, and they do — the Eigentümer row is one of the addends.
+- **Block C (Nutzerwechsel) still prints the vacancy segment.** § 9b Abs. 3 disclosure is about
+  Bemessung, not about money: a unit used by a renter until 30.06. and standing empty afterwards
+  still owes the reader both Zeitanteile. The segment keeps its line in Block C
+  (`Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 416,7 ‰ von 1.000 ‰`) and loses only its **money
+  row**. That is what `OwnerResidual.origins` carries the Bemessungen for.
+
+### 4 — Required rendered text (Gesamtübersicht)
+
+German UI copy. Label and sentence are fixed copy; the label is `Eigentümeranteil` — Berkay's own
+word in `08-F21` (*"Eigentümeranteil gesamt (= Gesamtübersicht)"*), so one word means one thing
+across statement and annex.
+
+```
+Partei                                            Grundkosten Hz   Verbrauch Hz   …   Anteil gesamt
+Wohnung A — Anna Beispiel                             …              …                    …
+Wohnung B — Bernd Muster (Auszug 30.06.2025)          …              …                    …
+Wohnung C — Clara Vorlage                             …              …                    …
+Eigentümeranteil                                      99,01 €       159,16 €              368,18 €
+Summe                                                 …              …                    …
+
+(Figures from the 2.910,00 € fixture in `test_berkay_01b_residual_wiring.py`, not from the demo
+building — the demo's own residual does not move in this slice and is unchanged at 1.281,10 €.)
+
+Der Eigentümeranteil ist der Restbetrag: Gesamtkosten abzüglich der Summe der Mieteranteile. Er
+enthält den auf Leerstand und Eigennutzung entfallenden Anteil sowie die zeilenweise
+Rundungsdifferenz. Er wird nicht aus einer Quote berechnet.
+```
+
+- **The last sentence is required copy wherever the row renders.** Without it a reader who tries to
+  reconstruct the row from a Bemessung finds no quota and concludes the page is wrong.
+- Where a Fiktivbelegung exists, the Bemessung cells of that row carry it, formatted exactly like the
+  renter rows (same de-scaling, same `rd.` marker rules as *"Display rounding of a fractional
+  Bemessung"*).
+- **Forbidden on this row, asserted:** `%`, `‰`, `Quote`, `Anteil in Prozent`, and any `x von y`
+  construction.
+
+### 5 — The Leerstandsaufstellung (D12): (a) / (b) / (c)
+
+The annex is the reason the result must keep per-unit origin at all. His `08-F21`, reference object,
+WE-02 vacant 01.08.–31.08.2025, 31 days, 74 m², fiktive Belegung 2 Personen:
+
+```
+(a) Leerstandsanteil = Werbungskosten § 9 EStG          175,31
+(b) nicht umlagefähige Kosten                             0,00   [Seite 02 pending]
+(c) Rundungsdifferenz                                     0,00
+Eigentümeranteil gesamt (= Gesamtübersicht)             175,31
+```
+
+| Block | What it is | Granularity | Status here |
+| --- | --- | --- | --- |
+| **(a)** | Leerstandsanteil → Werbungskosten § 9 EStG, Anlage V | **per empty unit and per Kostenart** | in scope — `OwnerResidual.origins` |
+| **(b)** | nicht umlagefähige Kosten → a different Anlage-V line | per cost position | **out of scope.** Not a heating concept at all; it is Seite 02 / `docs/09`, which fixes it at **1.008,00 €** for the reference object. Berkay's own rendering still shows `0,00 [Seite 02 pending]`. **That 0,00 is not a settled value** — do not pin it |
+| **(c)** | Rundungsdifferenz — no economic item | belongs to **no** unit | in scope — `OwnerResidual.rounding_difference` |
+
+**Why (a) and the printed residual differ, and why (c) is 0,00 in his example.** (a) is each empty
+unit's share *computed for the annex*; the printed Eigentümeranteil is the *residual*. They are the
+same quantity reached two ways and they drift by line-wise rounding:
+
+```
+computed separately   15.065 (m²-keyed) + 612 (WE-keyed) + 1.859 (Personen-keyed) = 17.536
+as a residual                                                                      = 17.531
+                                                                        block (c) =     −5
+```
+
+*"Computed separately the annex does not tie to the statement — exactly what an auditor notices."*
+In `08-F21` itself `(c)` prints `0,00`, and that is **not** a contradiction: with exactly **one**
+empty unit the per-Kostenart residual column already *is* that unit's (a) figure, so nothing is left
+over, and the 17.536 is a counterfactual he never prints. `(c)` becomes non-zero as soon as (a) is
+itemised across **more than one** empty unit — which is precisely the case § 1.4 says must still be
+itemised for Anlage V. Definition used here, and the one that makes both readings true:
+
+```
+(c) = Eigentümeranteil (Residuum) − Σ (a)
+```
+
+Recorded as `docs/03` § 7 item 12, because his § 1.3 prose describes the 5 ct as *"als Block (c)
+offen ausgewiesen"* while his own rendering shows `(c) 0,00`. Not silently smoothed over.
+
+**Wording constraint on the annex — `[KONVENTION]`.** Seite 01 line 103: *"The Leerstandsaufstellung
+as a document. **No statute prescribes it.** What is mandatory is the taxpayer's burden of proof
+(§ 90 AO). Never market it as ‚gesetzlich vorgeschrieben' — correct wording: ‚erfüllt Ihre
+Nachweispflicht gegenüber dem Finanzamt'."* His own footer, to be used as-is:
+
+```
+Hinweis: Der Abzug als Werbungskosten setzt eine fortbestehende Einkünfteerzielungsabsicht voraus
+(§§ 9, 21 EStG; BFH IX R 68/10). Die Feststellungslast liegt bei Ihnen (§ 90 AO). Diese Aufstellung
+dient dem Nachweis gegenüber dem Finanzamt; sie ist keine gesetzlich vorgeschriebene Form.
+```
+
+### 6 — The result-shape contract
+
+The document cannot aggregate what the engine did not carry, and it cannot itemise what the engine
+collapsed. So the collapse happens **in the display**, and the result keeps the origin — § 1.4,
+*"Aggregation im Display, Herkunft in den Daten."* Additions to `packages/heating-engine/inputs.py`,
+following that module's two existing rules (every disclosure field required; `None` means *not
+applied*, never *not carried*):
+
+```python
+@dataclass(frozen=True)
+class OwnerResidualOrigin:
+    """Block (a): one empty/self-used unit's own share of each block, computed
+    for the Leerstandsaufstellung — its own `round_half_up`, NOT a slice of the
+    residual. Never printed on the Gesamtübersicht."""
+
+    unit_id: str
+    heating_base: Cents
+    heating_consumption: Cents
+    ww_base: Cents
+    ww_consumption: Cents
+    total: Cents
+    # The Bemessungen Block C still has to disclose for the vacancy segment,
+    # in the same shapes and with the same `None` semantics as `HeatingLine`.
+    days: int
+    unit_total_days: int
+    base_weight_sqm_days_x100: Decimal
+    heat_consumption_weight: Decimal | None
+    ww_consumption_weight_m3: Decimal | None
+    degree_day_promille: Decimal
+    unit_degree_day_promille_total: Decimal
+
+
+@dataclass(frozen=True)
+class OwnerResidual:
+    """The one Eigentümerzeile per Liegenschaft (Seite 01 D12). Carries no
+    quota — by shape, not by discipline: there is no percentage field, so a
+    renderer cannot print one."""
+
+    heating_base: Cents
+    heating_consumption: Cents
+    ww_base: Cents
+    ww_consumption: Cents
+    total: Cents
+    # (a) — one entry per empty/self-used unit, in the engine's unit order.
+    # Empty tuple in a fully-let building; the row still renders.
+    origins: tuple[OwnerResidualOrigin, ...]
+    # (c) = total - Σ origins.total. Belongs to no unit.
+    rounding_difference: Cents
+    # The Fiktivbelegung (D0) printed in the Bemessung column, aggregated over
+    # `origins`. `None` — not 0 — when there is no vacancy and no self-use: the
+    # column then stays empty, and `None` is what makes "empty" unprintable as
+    # a zero.
+    base_weight_sqm_days_x100: Decimal | None
+    heat_consumption_weight: Decimal | None
+    ww_consumption_weight_m3: Decimal | None
+```
+
+And on the result itself:
+
+```python
+@dataclass(frozen=True)
+class HeatingResult:
+    lines: tuple[HeatingLine, ...]     # Mietverhältnisse ONLY — every line has a tenancy_id
+    owner_residual: OwnerResidual      # required, never None — the row always exists
+    ...
+```
+
+- **`lines` loses the landlord rows.** `tenancy_id is None` no longer occurs. That is what makes
+  *"never computed separately"* structural: there is no party slot an owner share could be written
+  into.
+- **`owner_residual` is not optional.** An `OwnerResidual | None` would re-create the branch
+  § 1.3 Frage 1 removes, and the first renderer to write `if result.owner_residual:` would silently
+  drop a `0,00 €` row.
+- **Reconciliation moves with it:** `Σ lines.total + owner_residual.total (+ CO₂-Vermieteranteil)
+  == total_cost`, asserted in the engine as it is today.
+
+### The one asymmetry this slice leaves, deliberately
+
+After this slice the **heating** table has one `Eigentümeranteil` row and the **Betriebskosten**
+table still has a per-unit `Wohnung B — Leerstand … → Vermieter` row. That is a dated decision, not
+an oversight:
+
+- The model is cross-engine and binding (`docs/02`), but it **requires** `round_half_up` on the
+  renter side, and `nk-engine` is largest-remainder. Aggregating NK's landlord rows in the display
+  while the amounts behind them are still separately-computed quotas would print a row labelled
+  *residual* that is not one — worse than the asymmetry.
+- Switching NK's renter rounding **moves every NK figure** and belongs to the Seite 02 → `docs/09`
+  transcription. Doing it here would be implementing a calculation from an untranscribed spec, which
+  `CLAUDE.md` forbids outright.
+- When `docs/09` lands, this section applies unchanged to the Betriebskosten table and the
+  party-totals block collapses to one `Eigentümeranteil` row for the whole document.
+
+### Gates
+
+- `packages/heating-engine/tests/test_berkay_02_eigentuemer_residuum.py` — the engine-level fixtures
+  (fully-let, the 0,00 € case, residual-wins, the control sum, multiple vacant units collapsing with
+  their origins retrievable, and the absence of any quota).
+- `packages/domain/tests/test_owner_residual_model.py` — the primitive and Berkay's own arithmetic
+  oracles (`09-F07` A, `09-F08`, `09-F19`, the `08-F21` 17.536/17.531 decomposition).
+- PDF: the `Eigentümeranteil` row, its copy, the forbidden-percentage assertion page-wide, and the
+  column reconciliation read back off the page — an addition to
+  `packages/pdf/tests/test_statement_party_totals.py` and the heating-table test, owned by the PDF
+  slice that renders it.
+
 ## Two documents from one calculation ⚠️
 
 The first render shows **every party's name and share to everyone**. That is right for the landlord and
