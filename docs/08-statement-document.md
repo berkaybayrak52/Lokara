@@ -269,8 +269,14 @@ also why the second-person form is not what renders — see the next section.
 
 ### Which parties get a row, and which label
 
-**Every party gets a row, including the landlord's vacancy line, under the same column header.**
-`Wohnung B — Leerstand ab 01.07.2025 → Vermieter` reads `1.462,58 €` like the other three.
+**Every party gets a row, including the landlord's, under the same column header.**
+
+> **Amended 14.08.2026 — the landlord's row is one `Eigentümeranteil` row, rendered last.** See
+> *"Die Eigentümerzeile"* § 3a below: the reasoning of this section is untouched and is in fact why
+> the collapse works (the rows must remain the addends of the Σ row, and they do), but the label is
+> no longer `Wohnung B — Leerstand ab 01.07.2025 → Vermieter` and the figure is no longer that
+> unit's party share. On the demo it reads **1.464,85 €** (181,48 € NK + 1.283,37 € heating). Read
+> the four bullets below with that substitution; do not restore the per-unit label here.
 
 - **Omitting it would make the Σ row false.** The four rows are the addends of `11.342,92 €`; drop
   one and the column no longer sums to the printed figure — the precise defect the heating footer
@@ -298,19 +304,24 @@ Einzelabrechnung does not invent a third spelling.
 
 ### The arithmetic, verified against the current figures
 
-Both engines on the demo composition, 06.08.2026 (`build_demo_statement()`), integer cents:
+Both engines on the demo composition (`build_demo_statement()`), integer cents. **Re-read off the
+rendered page 14.08.2026**, after two re-bases that this table had not caught up with: K3 (VDI 2067,
+13.08.2026) re-split the unit-B pair, and *"Die Eigentümerzeile"* (14.08.2026) turned the third row
+into the residual `Eigentümeranteil`, which renders **last**. Neither moved a Σ: the column totals
+and `11.342,92 €` are the same figures this table always carried.
 
 | Partei | Betriebskosten | Heiz- und Warmwasserkosten | Anteil gesamt |
 | --- | --- | --- | --- |
 | Wohnung A — Anna Beispiel | 600,00 € | 5.603,97 € | **6.203,97 €** |
-| Wohnung B — Bernd Muster (Auszug 30.06.2025) | 178,52 € | 1.495,53 € | **1.674,05 €** |
-| Wohnung B — Leerstand ab 01.07.2025 → Vermieter | 181,48 € | 1.281,10 € | **1.462,58 €** |
+| Wohnung B — Bernd Muster (Auszug 30.06.2025) | 178,52 € | 1.493,26 € | **1.671,78 €** |
 | Wohnung C — Clara Vorlage | 240,00 € | 1.762,32 € | **2.002,32 €** |
+| Eigentümeranteil | 181,48 € | 1.283,37 € | **1.464,85 €** |
 | **Summe der Anteile** | **1.200,00 €** | **10.142,92 €** | **11.342,92 €** |
 
-`620_397 + 167_405 + 146_258 + 200_232 = 1_134_292` cents = `120_000 + 1_014_292` — the NK total plus
+`620_397 + 167_178 + 200_232 + 146_485 = 1_134_292` cents = `120_000 + 1_014_292` — the NK total plus
 the heating shares, which are the Gesamtkosten **less the CO₂-Vermieteranteil**:
-`1.030.000 − 15.708 = 1.014.292`.
+`1.030.000 − 15.708 = 1.014.292`. The Eigentümer row's heating figure is the Liegenschafts-Residuum;
+its Betriebskosten figure is still the sum of `nk-engine`'s per-unit landlord parties (§ 3a).
 
 - **`11.342,92 €` is deliberately not `11.500,00 €`.** The 157,08 € the landlord bears under § 7
   Abs. 1 CO2KostAufG is in no party's Anteil, because it is deducted before the renter-facing split.
@@ -335,9 +346,9 @@ Anteile je Partei
 
 Partei                                            Betriebskosten   Heiz- und Warmwasserkosten   Anteil gesamt
 Wohnung A — Anna Beispiel                               600,00 €                   5.603,97 €      6.203,97 €
-Wohnung B — Bernd Muster (Auszug 30.06.2025)            178,52 €                   1.495,53 €      1.674,05 €
-Wohnung B — Leerstand ab 01.07.2025 → Vermieter         181,48 €                   1.281,10 €      1.462,58 €
+Wohnung B — Bernd Muster (Auszug 30.06.2025)            178,52 €                   1.493,26 €      1.671,78 €
 Wohnung C — Clara Vorlage                               240,00 €                   1.762,32 €      2.002,32 €
+Eigentümeranteil                                        181,48 €                   1.283,37 €      1.464,85 €
 Summe der Anteile                                     1.200,00 €                  10.142,92 €     11.342,92 €
 
 Der Anteil gesamt ist die Summe der in derselben Zeile ausgewiesenen Anteile; geleistete
@@ -539,7 +550,9 @@ Eigentümeranteil                                      99,01 €       159,16 �
 Summe                                                 …              …                    …
 
 (Figures from the 2.910,00 € fixture in `test_berkay_01b_residual_wiring.py`, not from the demo
-building — the demo's own residual does not move in this slice and is unchanged at 1.281,10 €.)
+building — the demo's own residual does not move in this slice and is unchanged at 1.283,37 €.
+The old per-unit landlord party was 345,14 / 554,74 / 115,05 / 268,44 = 1.283,37 €, byte-identical
+to today's `owner_residual`, which is why no golden in the suite moved with the re-labelling.)
 
 Der Eigentümeranteil ist der Restbetrag: Gesamtkosten abzüglich der Summe der Mieteranteile. Er
 enthält den auf Leerstand und Eigennutzung entfallenden Anteil sowie die zeilenweise
@@ -1091,8 +1104,9 @@ direction.
 
 **The defect.** The heating `tfoot` currently reads *"Summe Heiz- und Warmwasserkosten (inkl.
 CO₂-Vermieteranteil, stimmt centgenau mit den Gesamtkosten überein)" — 10.300,00 €*. The sentence is
-literally true: 10.300,00 € **is** the Gesamtkosten. But it sits under a column of four party amounts
-that sum to **10.142,92 €** (5.603,97 + 1.495,53 + 1.281,10 + 1.762,32). The 157,08 € difference is the
+literally true: 10.300,00 € **is** the Gesamtkosten. But it sits under a column of four amounts that
+sum to **10.142,92 €** (5.603,97 + 1.493,26 + 1.762,32 + 1.283,37 — three Mietverhältnisse and, since
+14.08.2026, the `Eigentümeranteil` in place of the landlord party). The 157,08 € difference is the
 CO₂-Vermieteranteil, which is deducted **before** the renter-facing split (§ 7 Abs. 1 CO2KostAufG) and
 is **not a row in the table**. So the column visibly does not add up while the footer appears to assert
 that it does. (Figures re-based 05.08.2026 with the CO₂ fixture — see *"The worked example"* below;
