@@ -17,11 +17,14 @@
 - Input: **normalized** value objects — plain dataclasses / Pydantic models (no SQLAlchemy models, no
   vendor types). Adapters map DB → these.
 - Money: integer **cents**; intermediate math with `decimal.Decimal`. Rounding is **per engine**
-  (`CLAUDE.md` DoD 4): **heating** uses `round_half_up` per share at assignment with the
-  `Verteilungsrest` to the owner bucket (R1/R5/K9 — see *"Rounding & reconciliation"* below and § 9
-  for the site-by-site wiring); **NK** stays largest-remainder until Berkay's Seite 01/02 is
-  transcribed. Every block reconciles to the input **to the cent once the residual is counted**.
-- Output: a plain result object (shares per party + a reconciliation total) — the PDF layer formats it.
+  (`CLAUDE.md` DoD 4): **heating** uses `round_half_up` per **renter** share at assignment with the
+  `Verteilungsrest` to the **Liegenschafts-Residuum** (R1/R5/K9 — see *"Rounding & reconciliation"*
+  below and § 9 for the site-by-site wiring); **NK** stays largest-remainder until Berkay's Seite 02
+  is transcribed into `docs/09`. Every block reconciles to the input **to the cent once the residual
+  is counted**.
+- Output: a plain result object (shares per Mietverhältnis, **one Eigentümer-Residuum**, and a
+  reconciliation total) — the PDF layer formats it. The Eigentümer line is not a party and exists
+  unconditionally, `0,00 €` included (`docs/02`, § 9.2).
 - ⚠️ **De-scale at the render boundary.** Engine values are **scaled integers** (money = cents;
   areas/weights = ×100 fixed-point). The presentation layer must convert back before display, or a
   Bemessung of `18.250 m²·Tage` renders as `1.825.000`. Tests comparing integers stay green through this
@@ -345,6 +348,11 @@ line, and it is the same principle the statement layout already uses for the Eig
 (Seite 01 D12). **±1 ct per block is expected and correct**, and the owner bucket may go slightly
 negative (`01b-F01` verbrauchHz: −1 ct).
 
+> **Amended 14.08.2026 — the *destination* is now defined, the *rounding* is unchanged.** "The owner
+> bucket" is **one residual line per Liegenschaft**, not a landlord party derived from vacancy; it
+> exists even when nothing is vacant. `Antwort-an-Emir_02.md` § 1, `docs/02`, § 9.2 below. R1/R5 as
+> stated in this paragraph were confirmed, not changed.
+
 > **VERIFIED BY THE LEAD — do not re-derive.** The canonical €1.200 garbage fixture is **identical
 > under both methods**: 600,00 / 178,52 / 181,48 / 240,00, residual **exactly 0**. This change did not
 > move the canonical fixture and nobody may claim it did. `CLAUDE.md` DoD item 4 already records this.
@@ -623,30 +631,44 @@ adjustment silently disappears for all of eastern Germany.
 | R2 | **Quotas** — never rounded. Exact `Decimal` (≥ 28 significant digits). Recompute the quotient; never reuse a rounded factor. |
 | R3 | **Energy** — kWh, 3 dp, `round_half_up`. |
 | R4 | **Emissions** — integer **gram** internally. Display kg with 1 dp, kg/m²/a with 2 dp. **The step lookup uses the unrounded value.** |
-| R5 | **Residual** — `Blockbetrag − Σ gerundete Anteile = Verteilungsrest` → **owner bucket**, together with the vacancy share. ±1 ct per block, sign either way (K9). |
+| R5 | **Residual** — `Blockbetrag − Σ gerundete Mieteranteile = Verteilungsrest` → the **Liegenschafts-Residuum**, together with the vacancy share. ±1 ct per block on top of that share, sign either way (K9). *Amended 14.08.2026: "owner bucket" is one line per Liegenschaft, never a derived landlord party — § 9.2, `docs/02`.* |
 | R6 | **Statutory percentages** applied to cent amounts, `round_half_up`. |
 | R7 | **Device units** — 1 dp, `round_half_up` (K11). The flat's total is the sum of the **rounded** device values. |
 
 **API consequence for `packages/domain`.** `distribute_cents` (largest-remainder) is not this rule.
-The primitive R5 needs is a second function that takes the index of the party which absorbs the
-residual:
+Two primitives implement R5, and they are not interchangeable:
 
 ```python
+# Pot complements only (§ 9.1 sites #1, #5, #9, #10) — the residual is the other *pot*.
 distribute_cents_half_up(total, weights, *, residual_index) -> list[Cents]
 #   share_i          = round_half_up(total × w_i / Σw)   for i != residual_index
-#   share_residual   = total − Σ (other shares)          # may be ±1 ct off its own quota,
+#   share_residual   = total − Σ (other shares)
+
+# Party allocations (§ 9.1 sites #2, #3, #4, #6, #7, #8) — the residual is the
+# Liegenschafts-Residuum, which is NOT a party. Added 14.08.2026.
+distribute_cents_owner_residual(pot, renter_weights, *, owner_weight) -> tuple[list[Cents], Cents]
+#   denominator      = Σ renter_weights + owner_weight   # D0/E19: the vacancy is in the DENOMINATOR
+#   renter_i         = round_half_up(pot × w_i / denominator)
+#   owner            = pot − Σ renter_i                  # may be ±1 ct off the vacancy share,
 #                                                        # and may be negative
+#   denominator == 0 → every renter 0, owner = pot       # Seite 01 E3, never a ZeroDivisionError
 ```
 
-`sum(shares) == total` still holds **by construction**, so the reconciliation assertion every
+`Σ renter shares + owner == pot` holds **by construction**, so the reconciliation assertion every
 allocation test carries does not weaken.
 
-**Open design point, not decided here.** Berkay's model has exactly **one** owner bucket per plant.
-Our engine emits a landlord *party per unit* (derived vacancy), and a block may have **no** landlord
-party at all when nothing is vacant. Which line absorbs the residual in that case is not answered by
-his page. The reading these fixtures assume — and the one the statement layout implies (Seite 01 D12
-prints an Eigentümer/Residuum row unconditionally) — is that **the owner line always exists, even at
-0,00 €**. Flagged for Berkay; not treated as settled.
+**Why two functions and not one with an optional index.** `residual_index` says *the owner is the
+party at index i*. That is the model § 9.2 replaced, and the signature lets a caller pass the owner
+as a party by accident — which is exactly the "computed separately" that Seite 01 D12 forbids. The
+second signature cannot express it: there is no slot for an owner share, only for an owner *weight*
+that lands in the denominator.
+
+**~~Open design point, not decided here.~~ Answered 14.08.2026.** This paragraph used to record that
+Berkay's page did not say which line absorbs the residual when nothing is vacant, and that the
+fixtures *assumed* an unconditional owner line. `Antwort-an-Emir_02.md` § 1.3 Frage 1 confirms the
+assumption and removes the question with it: *"Existiert die Eigentümerzeile immer? → **Ja.** Auch
+bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, not assumed — see
+§ 9.2 and `docs/02`.
 
 ## 6. Edge cases (§ 5 of the page)
 
@@ -733,6 +755,19 @@ a fixture asserting a chosen answer.
     different input.** They are **two data paths** and must **never** be asserted against each other.
     This is repeated as a comment in the fixture file, because "unifying" them is the obvious-looking
     refactor that would be wrong.
+12. **Where the 5 ct of block (c) is disclosed — his prose and his own rendering differ.**
+    `Antwort-an-Emir_02.md` § 1.3 says the 17.536-vs-17.531 difference *"wird als Block (c) offen
+    ausgewiesen"*. His rendered `08-F21` prints **`(c) Rundungsdifferenz 0,00`** and never prints
+    17.536 at all — because with **exactly one** empty unit the per-Kostenart residual column *is*
+    that unit's (a) figure, so nothing is left over. Both are consistent once (c) is *defined* as
+    `Residuum − Σ (a)`, and this repo defines it that way (`docs/02`); the 17.536 is a counterfactual
+    that proves the rule, not a printed figure. (c) becomes non-zero only when (a) is itemised across
+    **more than one** empty unit. Recorded rather than silently smoothed over — a sentence from
+    Berkay would close it.
+13. **Fixture-ID drift between his pages.** His answer cites `08-F21` / `08-F22` / `08-F06`; the
+    numbers behind them now live on Seite 02 as `09-F19` / `09-F07` / `09-F08`+`09-F19`. Same
+    arithmetic, two page numberings. Every fixture in this repo names **both**, so the two can be
+    matched later without re-deriving anything.
 
 ## 8. Known gaps — specified here, no fixture, no code
 
@@ -764,6 +799,14 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 > **residual convention K9** and the **K4 emission factors** are `Konvention` /
 > `verify-before-production`, **Rechtsstand 07/2026** in the Rechtsstand-Register. No output may
 > present either as a norm.
+>
+> ⚠️ **Amended 14.08.2026 — § 9.2 was replaced.** `berkay-work/Antwort-an-Emir_02.md` § 1 answers the
+> two conventions § 9.2 used to carry, and answers them by **replacing the model**: the
+> Eigentümeranteil is not a party derived from vacancy, it is one structural residual line per
+> `(Liegenschaft, Kostenart)`. The rounding decisions in the table below are unchanged and were
+> confirmed; what changed is *who* the residual is handed to and *how many* such rows exist. The
+> model itself lives in `docs/02` → *"The Eigentümeranteil is a residual line, not a party"*; § 9.2
+> below records what it superseded, so the old conventions are not restored by a later reader.
 
 ### 9.1 Which of the ten split sites switch
 
@@ -773,49 +816,80 @@ same operation, so they do not all get the same answer.
 | # | Site | What it splits | Decision | Who holds the residual | Reason |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `engine.py:77` | heating pot → (Grund, Verbrauch), §§ 7/8 + K1 | **half-up**, residual on the **consumption** pot | no owner bucket — the *complement pot* | H4 is written as `grundHz = round_half_up(kostenHz × p/100)` and `verbrauchHz = kostenHz − grundHz`. The rounded side is named by the formula. |
-| 2 | `engine.py:78` | `grundHz` → parties by m²·Tage (K2) | **half-up** | the **landlord party** (§ 9.2) | H6 + R1/R5/K9 — the archetypal Blockbetrag→Parteien allocation. |
-| 3 | `engine.py:87` | heat consumption pot → parties by **area** (§ 9a Abs. 2 fallback) | **half-up** | the landlord party | § 9a Abs. 2 replaces the *key*, not the rounding rule. Same operation as #2 with different weights. |
-| 4 | `engine.py:90` | `verbrauchHz` → parties by HKV-Einheiten / kWh | **half-up** | the landlord party | H6. `01b-F01`'s verbrauchHz block is the case where the residual is **−1 ct**. |
+| 2 | `engine.py:78` | `grundHz` → **renters** by m²·Tage (K2) | **half-up** | the **Liegenschafts-Residuum** (§ 9.2) | H6 + R1/R5/K9 — the archetypal Blockbetrag→Parteien allocation. |
+| 3 | `engine.py:87` | heat consumption pot → renters by **area** (§ 9a Abs. 2 fallback) | **half-up** | the Liegenschafts-Residuum | § 9a Abs. 2 replaces the *key*, not the rounding rule. Same operation as #2 with different weights. |
+| 4 | `engine.py:90` | `verbrauchHz` → renters by HKV-Einheiten / kWh | **half-up** | the Liegenschafts-Residuum | H6. `01b-F01`'s verbrauchHz block is the case where the residual is **−1 ct**. |
 | 5 | `engine.py:99` | warm-water pot → (Grund, Verbrauch) | **half-up**, residual on the consumption pot | complement pot | H4, second line pair. |
-| 6 | `engine.py:100` | `grundWw` → parties by m²·Tage | **half-up** | the landlord party | H6. |
-| 7 | `engine.py:105` | ww consumption → parties by **area** (§ 9a Abs. 2) | **half-up** | the landlord party | as #3. |
-| 8 | `engine.py:108` | `verbrauchWw` → parties by m³ | **half-up** | the landlord party | H6. `01b-F26`: the 4 m³ no unit meter saw stay with the owner as **4.227 ct**. |
+| 6 | `engine.py:100` | `grundWw` → renters by m²·Tage | **half-up** | the Liegenschafts-Residuum | H6. |
+| 7 | `engine.py:105` | ww consumption → renters by **area** (§ 9a Abs. 2) | **half-up** | the Liegenschafts-Residuum | as #3. |
+| 8 | `engine.py:108` | `verbrauchWw` → renters by m³ | **half-up** | the Liegenschafts-Residuum | H6. `01b-F26`: the 4 m³ no unit meter saw stay with the owner as **4.227 ct**. |
 | 9 | `engine.py:363` | umlagefähig → (Warmwasser, Heizung), § 9 | **half-up**, residual on the **heating** pot | complement pot | H3: `kostenWwCent = round_half_up(umlagefaehigCent × anteilWw)`, `kostenHzCent = umlagefaehigCent − kostenWwCent` — his own comment reads *"complement, so the sum is exact"*. |
 | 10 | `co2.py:166` | CO₂ cost → (Vermieteranteil, Mieteranteil) | **half-up**, residual on the **renter** side | **no owner bucket at all** — see 9.3 | R6 + H2: `co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil/100)`, then `umlagefaehigCent = gesamtCent − co2Abzug`. The rounded quantity is the *deduction*; the renter side is what is left of it. |
-| — | `nk-engine/engine.py:55` | an NK cost block → parties | **stays largest-remainder** | — | Out of scope by decision, not oversight: `CLAUDE.md` DoD 4 splits the rule per engine, and NK switches when Berkay's Seite 01/02 is transcribed. The canonical €1.200 fixture is identical under both methods, so nothing is at risk in the meantime. |
+| — | `nk-engine/engine.py:55` | an NK cost block → parties | **stays largest-remainder** | — | Out of scope by decision, not oversight: `CLAUDE.md` DoD 4 splits the rule per engine, and NK switches when Berkay's Seite 02 is transcribed into `docs/09`. The canonical €1.200 fixture is identical under both methods, so nothing is at risk in the meantime. **And the two are a package:** the residual model of § 9.2 *requires* half-up on the renter side (`docs/02`), so NK cannot take the Eigentümer line without also moving every NK figure — which is a transcription this repo does not have yet. |
 
 **Six sites move money (#2, 3, 4, 6, 7, 8). Four provably do not (#1, 5, 9, 10)** — see 9.4. Both
 halves are stated so that a reviewer who sees four sites change with no fixture behind them knows
 that is intended.
 
-### 9.2 What "the owner bucket" is at a party allocation — and when there is none
+**Amended 14.08.2026:** all six party-allocation sites additionally change **shape** — they allocate
+to *renters*, and the Verteilungsrest lands on one `OwnerResidual` per Liegenschaft rather than on a
+row inside the party list. The rounding column above is unaffected; § 9.2 has the reason.
 
-Berkay's model has exactly **one** owner bucket per Liegenschaft. Our engine derives a **landlord
-party per unit** from the vacancy segments, so the mapping needs two conventions. Both are **ours**,
-neither is in his page, and both are flagged for him (§ 7 open discrepancy list):
+### 9.2 The owner bucket is **one Liegenschafts-Residuum** — and it always exists
 
-1. **Several landlord parties** (more than one unit vacant): the residual goes to the **first**
-   landlord party in the engine's deterministic party ordering, and to the **same** party in all
-   four blocks — one Eigentümer row then explains every ±ct of the whole statement in one line,
-   which is the entire justification for K9. *First*, not last, because appending a unit to the
-   input must not move the residual to another row.
-2. **No landlord party at all** (nothing vacant, nothing self-used — the majority of buildings, and
-   most of the existing fixtures): there **is** no owner bucket in the result, and the engine must
-   **not** hand the residual to a renter to make the block reconcile. Until an unconditional
-   Eigentümer line exists, such a block **keeps largest-remainder**, which is the allocation that
-   minimises each party's deviation from its own exact quota. Flagged as a convention, not settled:
-   the resolution named in § 5 (*"the owner line always exists, even at 0,00 €"* — Seite 01 D12) is
-   a `docs/02` + `docs/08` + PDF change and is its own slice.
+> ⛔ **SUPERSEDED 14.08.2026.** The two conventions this section used to state are dead. They were
+> **ours**, written 13.08.2026 as a stopgap, and put to Berkay in `FRAGEN-an-Berkay-02.md`. He
+> answered in `berkay-work/Antwort-an-Emir_02.md` § 1 — not by picking one, but by replacing the
+> model they were both stopgaps for. **Do not restore either.** They are printed below, struck, so a
+> later reader recognises them as removed rather than missing.
+>
+> | | The dead convention | Why it is dead |
+> | --- | --- | --- |
+> | 1 | *Several landlord parties → the residual goes to the **first** in deterministic party order, the same one in all four blocks* | **Unnecessary.** There are no longer several buckets to choose between; there is exactly one line per Liegenschaft, so the question "which party" cannot be asked. § 1.2: *"Nicht ‚erste Partei in deterministischer Reihenfolge', sondern **eine** Residuumszeile, die es strukturell immer gibt."* |
+> | 2 | *No landlord party at all (fully let) → no owner bucket exists, so the block **keeps largest-remainder*** | **Explicitly rejected.** § 1.3 Frage 3: *"Euer Largest-Remainder-Vorschlag für den Rest ist damit **nicht** nötig und soll **nicht** verwendet werden."* His model has no Fall B: the line exists at `0,00 €` too, so a fully-let block has somewhere to put its rest and never needs a second allocation method. |
 
-Reconciliation is unaffected either way: `sum(shares) == Blockbetrag` holds by construction under
-both primitives, and the assertion in `calculate_heating_statement` stays.
+**The rule now.** One residual line per `(Liegenschaft, Kostenart)`; for heating that is **one line
+across all four blocks** — § 1.3 Frage 3: *"der Rest geht in das Liegenschafts-Residuum, in **allen
+vier Blöcken in dieselbe Zeile**"*. The line always exists, may be `0,00 €`, may be negative, and is
+**never computed from a weight**:
+
+```
+eigentuemerCent[block] = blockbetragCent[block] − Σ mieteranteilCent[block]
+```
+
+The engine's derived landlord parties **collapse** into it. Their per-unit figures are not thrown
+away — they survive as `OwnerResidual.origins`, block **(a)** of the Leerstandsaufstellung, because
+the landlord needs the vacancy share per object for Anlage V (§ 1.4). The difference between the
+printed residual and Σ origins is block **(c)**, the Rundungsdifferenz, which belongs to no unit.
+Full model, shape and legal basis: `docs/02` → *"The Eigentümeranteil is a residual line, not a
+party"*; document rules: `docs/08` → *"Die Eigentümerzeile"*.
+
+**Rechtsnatur.** This is Berkay's **fixed model rule**, not a convention of ours: § 1.4 —
+*"Das ist meine feste Modellregel, keine offene Konvention … setzt es fest um."* It carries no
+`verify-before-production` flag. K9 keeps its flag for what remains of it (the `round_half_up`
+direction); the **destination** of the Verteilungsrest is no longer ours to choose. See `docs/02`
+→ *"One register row may need re-wording"*.
+
+**What actually moves in the engine.** Measured across the whole suite before the change: the demo
+path does **not** move (the demo building has a vacancy on `unit-b`, one landlord party, and its
+amount already *is* the residual), so `scripts/assert_statement_pdf.py` and its 776,52 / 554,74
+goldens hold. Seven blocks move, all in **fully-let** fixtures, all by 1 ct, all with the Eigentümer
+line at **−0,01 €**. That sign is expected: half-up biases the renter shares upward, so Σ Mieter
+tends to exceed the pot by a cent and the owner absorbs it negatively.
+
+Reconciliation is unchanged and non-negotiable: `Σ Mieteranteile + Eigentümeranteil == Blockbetrag`
+by construction, and the assertion in `calculate_heating_statement` stays — it now sums the renter
+lines **and** the residual.
 
 ### 9.3 Why `co2.py:166` gets its own answer
 
 It looks like the others and is not the same operation. It splits **one amount between two roles by
 a statutory percentage**; it does not allocate a pot across parties by weight. Consequences:
 
-- **There is no owner bucket here.** Nothing in the pair is an Eigentümer row absorbing a
+- **There is no owner bucket here** — and, since 14.08.2026, no Liegenschafts-Residuum either. The
+  CO₂-Vermieteranteil is a **statutory deduction** under § 7 CO2KostAufG taken *before* the
+  renter-facing split; the Eigentümer-Residuum is what is left of a Blockbetrag *after* it. Two
+  different figures with the same bearer, never one. Nothing in the pair is an Eigentümer row absorbing a
   distribution rest; the "residual holder" is only the complement the formula defines. The owner
   bucket appears one level further down — in the **per-tenant** pro-rata of the renters' CO₂ share
   (Rechtsstand-Register, *"CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6)"*: *"Zeilenweise
@@ -843,6 +917,15 @@ So these four sites cannot have a RED fixture, and their absence is not an omiss
 instead: the equivalence itself (`packages/domain/tests/test_residual_rounding.py`) and the exact
 half-cent direction at #10 (`packages/heating-engine/tests/test_berkay_01b_residual_wiring.py`),
 which is what would break if the two elements were ever reordered.
+
+**Re-read 14.08.2026 and unaffected by the model change.** The proof above is about **pot
+complements** — two-element splits whose weights sum to the whole — and the Eigentümer-Residuum is
+not one of those: it is the rest of a *party* allocation whose weight list is the renters. Sites #1,
+#5 and #9 split a pot into two named pots, and #10 splits one amount between two statutory roles;
+none of the four allocates to parties, so none of them acquires an Eigentümer line and none of their
+figures moves. The four stay `distribute_cents_half_up(..., residual_index=_COMPLEMENT)` — that
+signature keeps naming a *complement*, which is what it does there, and it must not be swapped for
+the new owner-residual primitive, which names something else.
 
 ### 9.5 The Ho/Hu boundary — what the engine must accept and what it must refuse
 
@@ -902,15 +985,23 @@ intermediates looks wrong, which is why it must be refused rather than checked f
 > *floor each exact `Decimal` share to cents, then give the leftover cents to the largest fractional
 > remainders (ties: stable order)*, with `sum(shares) == input_total` true by construction.
 > `distribute_cents` still implements it and stays for its own callers: **`nk-engine` keeps it**
-> (`CLAUDE.md` DoD 4), and so does a heating block that has **no landlord party to hold the residual**
-> (§ 9.2). In `heating-engine`, the allocation of a Blockbetrag to parties otherwise no longer uses it.
+> (`CLAUDE.md` DoD 4). ~~and so does a heating block that has no landlord party to hold the
+> residual~~ — **struck 14.08.2026**: that was § 9.2 convention 2, which Berkay rejected in
+> `Antwort-an-Emir_02.md` § 1.3. In `heating-engine`, **no** allocation of a Blockbetrag to parties
+> uses largest-remainder any more, fully-let buildings included.
 
 1. Compute exact fractional shares with `decimal.Decimal` (**unchanged** — R2).
-2. `round_half_up` each share to whole cents, once, at assignment (R1).
-3. `Verteilungsrest = Blockbetrag − Σ Anteile` → the **owner bucket**, together with the vacancy
-   share (R5/K9). ±1 ct per block, either sign.
-4. Assert `sum(shares) == input_total` — fail loudly if not. **Unchanged and non-negotiable:** no
-   statement ships that doesn't reconcile. The residual is *inside* that sum, not an exception to it.
+2. `round_half_up` each **renter** share to whole cents, once, at assignment (R1). The Eigentümer is
+   not in the weight list — its Bemessung is in the **denominator** (D0/E19), never in the
+   numerator of a share of its own.
+3. `Verteilungsrest = Blockbetrag − Σ Mieteranteile` → the **Liegenschafts-Residuum** (R5/K9,
+   Seite 01 D12). It carries the vacancy/self-use share *and* the rounding rest in one figure,
+   because it **is** one figure. ±1 ct per block on top of the vacancy share, either sign; on a
+   fully-let building the whole line is typically −0,01 € and may be exactly 0,00 €.
+4. Assert `Σ Mieteranteile + Eigentümeranteil == input_total` — fail loudly if not. **Unchanged and
+   non-negotiable:** no statement ships that doesn't reconcile. The residual is *inside* that sum,
+   not an exception to it — and under this model it is the only term that can absorb a difference,
+   which is exactly why it may never be recomputed from a weight.
 
 ## Why this ordering (engines before UI)
 
