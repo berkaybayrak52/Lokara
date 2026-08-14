@@ -16,7 +16,12 @@ from lokara_heating_engine import HeatingResult
 from lokara_nk_engine import CostItem, NkResult, ShareLine
 
 from .formatting import format_number_de
-from .heating_disclosure import co2_grounds, heating_disclosure_html
+from .heating_disclosure import (
+    OWNER_LABEL,
+    OWNER_RESIDUAL_SENTENCE,
+    co2_grounds,
+    heating_disclosure_html,
+)
 from .measurement_units import UNIT_SYMBOLS
 
 # (unit_id, tenancy_id) as they appear on result lines; tenancy_id=None is the
@@ -154,6 +159,21 @@ def _reference_total(
 
 
 def _party(labels: Mapping[PartyKey, str], unit_id: str | None, tenancy_id: str | None) -> str:
+    """The label of one party row, or of one empty/self-used unit's segment.
+
+    ``tenancy_id is None`` no longer names a *heating* party: since 14.08.2026
+    the Eigentümeranteil is a residual line rather than a party (`docs/02`), so
+    the heating money table renders it from ``owner_residual`` under
+    ``OWNER_LABEL`` and never through this function. The branch is still live
+    for two callers:
+
+    * the **Betriebskosten** table, which keeps its per-unit landlord party
+      until Seite 02 lands in `docs/09` (`docs/08` → "The one asymmetry this
+      slice leaves");
+    * **Block C**, the one per-unit block on the page, which keeps the
+      per-segment landlord label because it decomposes a single unit's timeline
+      (`docs/08` → "Die Eigentümerzeile" § 3).
+    """
     label = labels.get((unit_id, tenancy_id))
     if label is not None:
         return label
@@ -216,6 +236,11 @@ def _heating_section(data: StatementData) -> str:
     party_labels = tuple(
         _party(data.party_labels, line.unit_id, line.tenancy_id) for line in heating.lines
     )
+    # Block C decomposes one unit's timeline, so its vacancy segment keeps the
+    # per-unit label the money table no longer prints (`docs/08` § 3).
+    origin_labels = tuple(
+        _party(data.party_labels, origin.unit_id, None) for origin in heating.owner_residual.origins
+    )
     for line, party in zip(heating.lines, party_labels, strict=True):
         rows.append(
             "<tr>"
@@ -227,6 +252,26 @@ def _heating_section(data: StatementData) -> str:
             f'<td class="num">{escape(format_eur(line.total))}</td>'
             "</tr>"
         )
+    # The Eigentümerzeile, last and unconditional — `docs/08` → "Die
+    # Eigentümerzeile" §§ 1 and 3. One row across all four blocks, rendered even
+    # at 0,00 € and even where nothing is vacant: a suppressed zero row and an
+    # omitted row are indistinguishable on paper. It is the reconciling line, so
+    # it comes after every Mietverhältnis — the reader adds the rows above and
+    # the last one closes the column. **No Bemessung cell and no quota**: this
+    # table's first column is a label, and § 2 forbids a percentage on this row
+    # in any column, by shape as well as by rule (`OwnerResidual` has no
+    # percentage field to print).
+    owner = heating.owner_residual
+    rows.append(
+        "<tr>"
+        f"<td>{escape(OWNER_LABEL)}</td>"
+        f'<td class="num">{escape(format_eur(owner.heating_base))}</td>'
+        f'<td class="num">{escape(format_eur(owner.heating_consumption))}</td>'
+        f'<td class="num">{escape(format_eur(owner.ww_base))}</td>'
+        f'<td class="num">{escape(format_eur(owner.ww_consumption))}</td>'
+        f'<td class="num">{escape(format_eur(owner.total))}</td>'
+        "</tr>"
+    )
 
     co2_block = ""
     if heating.co2 is not None:
@@ -268,7 +313,10 @@ def _heating_section(data: StatementData) -> str:
     # field spells "Heiz- und Warmwasserkosten" → "Gesamtkosten Heiz- und
     # Warmwasserkosten").
     footer_label = "Gesamtkosten Heizung und Warmwasser"
-    share_sum = cents(sum(int(line.total) for line in heating.lines))
+    # Every row printed above, the Eigentümerzeile included: the sentence names
+    # the sum of what is actually there, and leaving the residual out of it would
+    # restate the very defect this footer exists to fix.
+    share_sum = cents(sum(int(line.total) for line in heating.lines) + int(owner.total))
     reconciliation = f"Summe der oben ausgewiesenen Anteile: {escape(format_eur(share_sum))}."
     if heating.co2 is not None:
         footer_label += " (inkl. CO₂-Vermieteranteil)"
@@ -277,6 +325,11 @@ def _heating_section(data: StatementData) -> str:
             "ist der CO₂-Vermieteranteil; er wird vor der Umlage abgezogen "
             "(§ 7 Abs. 1 CO2KostAufG)."
         )
+    # Required copy wherever the row renders (`docs/08` § 4). It sits in the
+    # footer's second line — the carrier that already holds this table's
+    # reconciliation prose — so the sentence stands directly under the row it
+    # explains, and there is exactly one of it on the page.
+    reconciliation += f" {escape(OWNER_RESIDUAL_SENTENCE)}"
 
     total = format_eur(heating.total)
     return f"""
@@ -295,7 +348,7 @@ def _heating_section(data: StatementData) -> str:
       <td class="num">{escape(total)}</td></tr>
     </tfoot>
   </table>
-  {heating_disclosure_html(heating, party_labels)}
+  {heating_disclosure_html(heating, party_labels, origin_labels)}
   {co2_block}
   {"".join(notes)}"""
 
@@ -330,8 +383,22 @@ def _party_total_section(data: StatementData) -> str:
     # The headers name the sections the figures come from — a summary column that
     # renames its source section makes the reader hunt for it. Summed *across*
     # cost items, so a second Betriebskostenart lands in the same row.
+    #
+    # The landlord side is kept out of the per-party mapping and accumulated in
+    # `owner_figures` instead: `docs/08` → "Die Eigentümerzeile" § 3a gives this
+    # block **one** `Eigentümeranteil` row, not one per vacant unit and not one
+    # per engine. Its Betriebskosten figure is the sum of `nk-engine`'s per-unit
+    # landlord parties (which still exist until Seite 02 lands in `docs/09`), its
+    # heating figure is the Liegenschafts-Residuum. That is a **display**
+    # aggregation and asserts nothing about how either was computed — the
+    # Betriebskosten table above still itemises its part per unit, and no copy
+    # here calls the NK part a residual.
     nk_shares: dict[PartyKey, int] = {}
+    owner_figures: list[int] = [0]
     for nk_line in data.nk_result.lines:
+        if nk_line.tenancy_id is None:
+            owner_figures[0] += int(nk_line.amount)
+            continue
         nk_key = (nk_line.unit_id, nk_line.tenancy_id)
         nk_shares[nk_key] = nk_shares.get(nk_key, 0) + int(nk_line.amount)
     columns: list[tuple[str, dict[PartyKey, int]]] = [("Betriebskosten", nk_shares)]
@@ -341,9 +408,11 @@ def _party_total_section(data: StatementData) -> str:
             heat_key = (heat_line.unit_id, heat_line.tenancy_id)
             heat_shares[heat_key] = heat_shares.get(heat_key, 0) + int(heat_line.total)
         columns.append((data.heating_cost_label, heat_shares))
+        owner_figures.append(int(heating.owner_residual.total))
 
     # Row order: first appearance over the money tables, in their own order. A
-    # reader reads down two tables and down this one.
+    # reader reads down two tables and down this one. The Eigentümer row is
+    # appended last regardless — it is the reconciling line, not a party.
     parties: list[PartyKey] = []
     for _, amounts in columns:
         for party_key in amounts:
@@ -358,15 +427,20 @@ def _party_total_section(data: StatementData) -> str:
 
     rows: list[str] = []
     for party_key in parties:
-        # Every party gets a row under the same header, the landlord's vacancy
-        # line included: the rows are the addends of the Σ row, and a blank or a
-        # dash in a money column reads as zero.
+        # Every party gets a row under the same header: the rows are the addends
+        # of the Σ row, and a blank or a dash in a money column reads as zero.
         party = _party(data.party_labels, party_key[0], party_key[1])
         figures = [amounts.get(party_key, 0) for _, amounts in columns]
         rows.append(f"<tr><td>{escape(party)}</td>{_cells(figures)}</tr>")
+    # …and the owner's one row, last and unconditional, for the same reason the
+    # money table prints it at 0,00 €: omitting it makes the Σ row false.
+    rows.append(f"<tr><td>{escape(OWNER_LABEL)}</td>{_cells(owner_figures)}</tr>")
 
     headers = "".join(f'<th class="num">{escape(header)}</th>' for header, _ in columns)
-    sums = [sum(amounts.values()) for _, amounts in columns]
+    sums = [
+        sum(amounts.values()) + owner
+        for (_, amounts), owner in zip(columns, owner_figures, strict=True)
+    ]
     # `Summe` is licensed here, unlike in the heating tfoot: the rows above this
     # one really are its addends. The heating column therefore sums to the party
     # shares, not to heating.total — the difference is the CO₂-Vermieteranteil,

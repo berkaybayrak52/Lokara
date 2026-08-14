@@ -36,7 +36,13 @@ from decimal import ROUND_FLOOR, Decimal
 from html import escape
 
 from lokara_domain import Cents, MeasurementUnit, format_eur
-from lokara_heating_engine import Co2Result, HeatingLine, HeatingResult, WarmWaterSeparation
+from lokara_heating_engine import (
+    Co2Result,
+    HeatingLine,
+    HeatingResult,
+    OwnerResidualOrigin,
+    WarmWaterSeparation,
+)
 
 from .formatting import display_figure, format_number_de, largest_remainder_display
 from .measurement_units import HEAT_KEY_BY_UNIT, UNIT_SYMBOLS
@@ -104,6 +110,97 @@ ROUNDED_MARKER = "rd."
 # ×100 fixed point → the human figure (docs/03). The heating base Bemessung is
 # an area weight, so it carries the same divisor the NK table applies.
 _AREA_WEIGHT_DIVISOR = Decimal(100)
+
+# `docs/08` → "Die Eigentümerzeile" § 4. Berkay's own word in `08-F21`
+# (*"Eigentümeranteil gesamt (= Gesamtübersicht)"*), so one word means one thing
+# across the money table, Block B, the party-totals block and the annex. It is a
+# **label of a residual line**, never of a party — `docs/02`.
+OWNER_LABEL = "Eigentümeranteil"
+
+# Required copy wherever the row renders (`docs/08` § 4). Without it a reader who
+# tries to reconstruct the row from a Bemessung finds no quota and concludes the
+# page is wrong.
+OWNER_RESIDUAL_SENTENCE = (
+    "Der Eigentümeranteil ist der Restbetrag: Gesamtkosten abzüglich der Summe "
+    "der Mieteranteile. Er enthält den auf Leerstand und Eigennutzung "
+    "entfallenden Anteil sowie die zeilenweise Rundungsdifferenz. Er wird nicht "
+    "aus einer Quote berechnet."
+)
+
+
+# --- the rows the Bemessung blocks are built from ----------------------------
+
+
+@dataclass(frozen=True)
+class BemessungRow:
+    """One row of Blocks B and C: a Mietverhältnis, or one empty/self-used unit.
+
+    Since 14.08.2026 the Eigentümeranteil is a **residual line, not a party**
+    (`docs/02`), so `HeatingResult.lines` carries Mietverhältnisse only. The
+    Bemessungen of the empty units survive on `OwnerResidual.origins`, because
+    §§ 9b Abs. 2/3 disclosure still has to print the vacancy segment's Zeitanteil
+    and because Block B's column has to sum to the printed Gesamtbemessung —
+    36.500 m²·Tage *includes* the vacancy's 5.520.
+
+    The two carriers hold the same Bemessung fields with the same `None`
+    semantics, which is why one row type serves both. What the row adds is the
+    **label** and `is_owner_origin`, on which the two blocks then differ:
+    Block B aggregates every origin into one `Eigentümeranteil` row, Block C
+    keeps the per-segment label (`docs/08` → "Die Eigentümerzeile" § 3, and its
+    rule of thumb: Liegenschafts-total ⇒ one row, single-unit decomposition ⇒
+    per-unit label).
+    """
+
+    label: str
+    unit_id: str
+    is_owner_origin: bool
+    days: int
+    unit_total_days: int
+    base_weight_sqm_days_x100: Decimal
+    heat_consumption_weight: Decimal | None
+    ww_consumption_weight_m3: Decimal | None
+    degree_day_promille: Decimal
+    unit_degree_day_promille_total: Decimal
+
+
+def _row(source: HeatingLine | OwnerResidualOrigin, label: str, *, owner: bool) -> BemessungRow:
+    return BemessungRow(
+        label=label,
+        unit_id=source.unit_id,
+        is_owner_origin=owner,
+        days=source.days,
+        unit_total_days=source.unit_total_days,
+        base_weight_sqm_days_x100=source.base_weight_sqm_days_x100,
+        heat_consumption_weight=source.heat_consumption_weight,
+        ww_consumption_weight_m3=source.ww_consumption_weight_m3,
+        degree_day_promille=source.degree_day_promille,
+        unit_degree_day_promille_total=source.unit_degree_day_promille_total,
+    )
+
+
+def bemessung_rows(
+    heating: HeatingResult,
+    party_labels: Sequence[str],
+    origin_labels: Sequence[str],
+) -> tuple[BemessungRow, ...]:
+    """The Mietverhältnis rows, then the owner origins — the engine's own order.
+
+    The origins come **last** so that the aggregated `Eigentümeranteil` row of
+    Block B renders last, one-for-one with the money table, where it is the
+    reconciling line (`docs/08` § 3). Within one unit the relative order is
+    unchanged from the model this replaced — renters in occupancy order, the
+    landlord segment after them — so Block C's ‰ list reads in the same order it
+    always did.
+    """
+    rows = [
+        _row(line, label, owner=False)
+        for line, label in zip(heating.lines, party_labels, strict=True)
+    ]
+    rows.extend(
+        _row(origin, label, owner=True)
+        for origin, label in zip(heating.owner_residual.origins, origin_labels, strict=True)
+    )
+    return tuple(rows)
 
 
 class DisclosureDataError(ValueError):
@@ -181,6 +278,24 @@ class BemessungColumn:
 
     def cell(self, index: int, unit: str = "") -> str:
         return _marked(self.printed[index], self.exact[index], unit)
+
+    def group_cell(self, indexes: Sequence[int], unit: str = "") -> str:
+        """Several rows shown as one — the aggregated Fiktivbelegung of the
+        `Eigentümeranteil` row (`docs/08` § 3).
+
+        The **printed** values are summed, not the exact ones re-rounded: the
+        column has to add up as printed, and a cell rounded from the exact sum
+        can differ from the sum of the cells above it by a hundredth.
+
+        No origins → **empty**, never `0`. § 2: with no vacancy and no self-use
+        there is no Fiktivbelegung at all, and a printed zero would state an
+        allocation base of zero rather than none.
+        """
+        if not indexes:
+            return ""
+        printed = sum((self.printed[index] for index in indexes), Decimal(0))
+        exact = sum((self.exact[index] for index in indexes), Decimal(0))
+        return _marked(printed, exact, unit)
 
     def total_cell(self, unit: str = "") -> str:
         return _marked(self.printed_total, self.exact_total, unit)
@@ -319,14 +434,19 @@ def _cells(cells: Sequence[str], *, head: bool = False, numeric_from: int = 1) -
     return f"<tr>{''.join(rendered)}</tr>"
 
 
-def _has_party_change(heating: HeatingResult) -> bool:
+def _has_party_change(rows: Sequence[BemessungRow]) -> bool:
     """Whether any unit was used by more than one party — exactly when Block C
-    renders, and therefore exactly when the Gradtagszahlen parenthetical may."""
-    unit_ids = [line.unit_id for line in heating.lines]
+    renders, and therefore exactly when the Gradtagszahlen parenthetical may.
+
+    Counted over the **rows**, not over `HeatingResult.lines`: a unit let until
+    30.06. and empty afterwards has one Mietverhältnis and one owner origin, and
+    that is a Nutzerwechsel whether or not the vacancy keeps a money row.
+    """
+    unit_ids = [row.unit_id for row in rows]
     return len(unit_ids) != len(set(unit_ids))
 
 
-def _heat_key_label(heating: HeatingResult) -> str:
+def _heat_key_label(heating: HeatingResult, rows: Sequence[BemessungRow]) -> str:
     """The Umlageschlüssel of the `Verbrauch Heizung` column.
 
     With a Maßeinheit on the result the label names the **device** — the long
@@ -341,7 +461,7 @@ def _heat_key_label(heating: HeatingResult) -> str:
     """
     unit = heating.heat_consumption_unit
     label = HEAT_KEY_LABEL if unit is None else _heat_key_for(unit)
-    return f"{label}{NUTZERWECHSEL_SUFFIX}" if _has_party_change(heating) else label
+    return f"{label}{NUTZERWECHSEL_SUFFIX}" if _has_party_change(rows) else label
 
 
 def _heat_key_for(unit: MeasurementUnit) -> str:
@@ -359,7 +479,12 @@ def _heat_key_for(unit: MeasurementUnit) -> str:
     return label
 
 
-def _heat_column_row(heating: HeatingResult, area_total_text: str, heat_total_text: str) -> str:
+def _heat_column_row(
+    heating: HeatingResult,
+    rows: Sequence[BemessungRow],
+    area_total_text: str,
+    heat_total_text: str,
+) -> str:
     """The `Verbrauch Heizung` row — always present, and only ever *one cell* of
     it withheld (`docs/08` → "All four rows render").
 
@@ -382,7 +507,7 @@ def _heat_column_row(heating: HeatingResult, area_total_text: str, heat_total_te
     """
     if heating.heat_fallback_to_area:
         return _column_row("Verbrauch Heizung", AREA_KEY_REPLACED, area_total_text)
-    return _column_row("Verbrauch Heizung", _heat_key_label(heating), heat_total_text)
+    return _column_row("Verbrauch Heizung", _heat_key_label(heating, rows), heat_total_text)
 
 
 def _column_row(column: str, key_label: str, total: str) -> str:
@@ -407,13 +532,16 @@ class UnitColumn:
     def cell(self, index: int) -> str:
         return self.column.cell(index, self.symbol)
 
+    def group_cell(self, indexes: Sequence[int]) -> str:
+        return self.column.group_cell(indexes, self.symbol)
+
     def total_cell(self) -> str:
         return self.column.total_cell(self.symbol)
 
 
 def basis_table_block(
     heating: HeatingResult,
-    party_labels: Sequence[str],
+    rows: Sequence[BemessungRow],
     heat: UnitColumn | None,
     warm_water: BemessungColumn | None,
 ) -> str:
@@ -430,14 +558,21 @@ def basis_table_block(
     ever withheld, and only where the building records no Maßeinheit. That
     absence is unrelated to a § 9a Abs. 2 fallback and must not be read as one —
     which is why one is a citation-carrying figure and the other is a sentence.
+
+    **One `Eigentümeranteil` row, last** (`docs/08` → "Die Eigentümerzeile" § 3).
+    This is a Liegenschafts-level table whose column sums to the printed
+    Gesamtbemessung — 36.500 m²·Tage *includes* the vacancy's 5.520 — so dropping
+    the owner's rows would leave the column short of the very denominator printed
+    at the foot of it. They are shown as **one** row carrying the aggregated
+    Fiktivbelegung, and it renders even where there is none: then its cells are
+    empty rather than `0`, because there is no allocation base, not a zero one.
     """
-    lines = heating.lines
     has_warm_water = heating.warm_water_separation is not None
 
     # The sum is de-scaled once — per-line division and then summing would
     # reintroduce the rounding error the engine avoids (docs/08).
     area = BemessungColumn.of(
-        [line.base_weight_sqm_days_x100 / _AREA_WEIGHT_DIVISOR for line in lines]
+        [row.base_weight_sqm_days_x100 / _AREA_WEIGHT_DIVISOR for row in rows]
     )
     area_total_text = area.total_cell(AREA_UNIT)
     # Prose in a column of denominators, so it is set as prose: right-aligning
@@ -448,7 +583,7 @@ def basis_table_block(
 
     column_rows = [
         _column_row("Grundkosten Heizung", AREA_KEY_HEATING, area_total_text),
-        _heat_column_row(heating, area_total_text, heat_total_text),
+        _heat_column_row(heating, rows, area_total_text, heat_total_text),
     ]
     if has_warm_water:
         column_rows.append(
@@ -479,13 +614,24 @@ def basis_table_block(
     if warm_water is not None:
         party_head.append("Verbrauch Warmwasser")
     party_rows = []
-    for index, label in enumerate(party_labels):
-        cells = [escape(label), area.cell(index)]
+    for index, row in enumerate(rows):
+        if row.is_owner_origin:
+            continue
+        cells = [escape(row.label), area.cell(index)]
         if heat is not None:
             cells.append(heat.cell(index))
         if warm_water is not None:
             cells.append(warm_water.cell(index, CUBIC_METRE))
         party_rows.append(_cells(cells))
+    # …and the owner's origins as one row, last: it is the reconciling line of
+    # the money table and stands in the same place here (`docs/08` § 3).
+    owner_indexes = [index for index, row in enumerate(rows) if row.is_owner_origin]
+    owner_cells = [escape(OWNER_LABEL), area.group_cell(owner_indexes)]
+    if heat is not None:
+        owner_cells.append(heat.group_cell(owner_indexes))
+    if warm_water is not None:
+        owner_cells.append(warm_water.group_cell(owner_indexes, CUBIC_METRE))
+    party_rows.append(_cells(owner_cells))
     total_cells = ["Gesamtbemessung", area.total_cell()]
     if heat is not None:
         total_cells.append(heat.total_cell())
@@ -546,7 +692,7 @@ TENTH_PROMILLE_PER_PROMILLE = Decimal(10)
 PROMILLE_STEP = Decimal("0.1")
 
 
-def _promille_shares(lines: Sequence[HeatingLine]) -> tuple[list[Decimal], Decimal]:
+def _promille_shares(lines: Sequence[BemessungRow]) -> tuple[list[Decimal], Decimal]:
     """One unit's ‰ shares and the total they are printed under, de-scaled.
 
     Rounded by largest remainder on the tenth — the same idiom as
@@ -582,7 +728,7 @@ def _promille_line(label: str, share: Decimal, total: Decimal) -> str:
 
 
 def _day_share_line(
-    label: str, line: HeatingLine, reading: Decimal | None, share: str | None
+    label: str, line: BemessungRow, reading: Decimal | None, share: str | None
 ) -> str:
     """`12 m³ × (181 von 365 Tagen) = rd. 5,95 m³` — the operation performed.
 
@@ -604,7 +750,7 @@ def _day_share_line(
 
 def party_change_blocks(
     heating: HeatingResult,
-    party_labels: Sequence[str],
+    rows: Sequence[BemessungRow],
     warm_water: BemessungColumn | None,
 ) -> str:
     """Block C — one block per unit used by more than one party (item 4).
@@ -614,12 +760,19 @@ def party_change_blocks(
     alongside the result is the drift docs/08 forbids (4a, correction 1). For
     the same reason the heading names no unit — nothing carries a unit label
     into the statement.
+
+    **Block C keeps the per-segment landlord label** where the money table and
+    Block B carry one `Eigentümeranteil` row (`docs/08` § 3). It is the only
+    per-unit block on the page: it decomposes one unit's timeline, so its rows
+    must identify segments *of that unit*, and § 9b Abs. 3 still owes the reader
+    both Zeitanteile of a unit let until 30.06. and empty afterwards — they have
+    to sum to that unit's `von 1.000 ‰`. The segment loses only its money row.
     """
     shows_promille = not heating.heat_fallback_to_area
 
     units: dict[str, list[int]] = {}
-    for index, line in enumerate(heating.lines):
-        units.setdefault(line.unit_id, []).append(index)
+    for index, row in enumerate(rows):
+        units.setdefault(row.unit_id, []).append(index)
 
     blocks = []
     for indexes in units.values():
@@ -637,11 +790,11 @@ def party_change_blocks(
                 '<p class="apportionment-lead">Der für die Einheit erfasste Wärmeverbrauch wurde'
                 " nach monatlichen Gradtagszahlen auf die Nutzungszeiträume aufgeteilt:</p>"
             )
-            shares, promille_total = _promille_shares([heating.lines[index] for index in indexes])
+            shares, promille_total = _promille_shares([rows[index] for index in indexes])
             parts.append(
                 '<ul class="apportionment">'
                 + "".join(
-                    _promille_line(party_labels[index], share, promille_total)
+                    _promille_line(rows[index].label, share, promille_total)
                     for index, share in zip(indexes, shares, strict=True)
                 )
                 + "</ul>"
@@ -664,8 +817,8 @@ def party_change_blocks(
             '<ul class="apportionment">'
             + "".join(
                 _day_share_line(
-                    party_labels[index],
-                    heating.lines[index],
+                    rows[index].label,
+                    rows[index],
                     reading,
                     None if warm_water is None else warm_water.cell(index, CUBIC_METRE),
                 )
@@ -722,7 +875,9 @@ def co2_grounds(co2: Co2Result) -> str:
     )
 
 
-def warm_water_display_weights(heating: HeatingResult) -> BemessungColumn | None:
+def warm_water_display_weights(
+    heating: HeatingResult, rows: Sequence[BemessungRow]
+) -> BemessungColumn | None:
     """The printed m³ Bemessung per party — the single source Blocks B and C
     both read, so the derivation in C ends at the figure the table in B shows,
     and the two can never disagree about one quantity.
@@ -734,11 +889,11 @@ def warm_water_display_weights(heating: HeatingResult) -> BemessungColumn | None
     if heating.warm_water_separation is None or heating.ww_fallback_to_area:
         return None
     return BemessungColumn.of(
-        [_required(line.ww_consumption_weight_m3, "Warmwasserbemessung") for line in heating.lines]
+        [_required(row.ww_consumption_weight_m3, "Warmwasserbemessung") for row in rows]
     )
 
 
-def heat_display_weights(heating: HeatingResult) -> UnitColumn | None:
+def heat_display_weights(heating: HeatingResult, rows: Sequence[BemessungRow]) -> UnitColumn | None:
     """The printed heat Bemessung per party, with the Maßeinheit it is counted
     in — read off the result, never told to this layer by a second party.
 
@@ -759,20 +914,31 @@ def heat_display_weights(heating: HeatingResult) -> UnitColumn | None:
         return None
     return UnitColumn(
         column=BemessungColumn.of(
-            [_required(line.heat_consumption_weight, "Wärmebemessung") for line in heating.lines]
+            [_required(row.heat_consumption_weight, "Wärmebemessung") for row in rows]
         ),
         symbol=UNIT_SYMBOLS[unit],
     )
 
 
-def heating_disclosure_html(heating: HeatingResult, party_labels: Sequence[str]) -> str:
-    """Blocks A, B and C in document order, directly beneath the money table."""
-    heat = heat_display_weights(heating)
-    warm_water = warm_water_display_weights(heating)
+def heating_disclosure_html(
+    heating: HeatingResult,
+    party_labels: Sequence[str],
+    origin_labels: Sequence[str],
+) -> str:
+    """Blocks A, B and C in document order, directly beneath the money table.
+
+    ``party_labels`` is parallel to ``heating.lines`` (Mietverhältnisse only);
+    ``origin_labels`` is parallel to ``owner_residual.origins`` and carries the
+    **per-segment** landlord labels Block C discloses. Both are resolved by the
+    caller, so the same label names a row here and in the money table.
+    """
+    rows = bemessung_rows(heating, party_labels, origin_labels)
+    heat = heat_display_weights(heating, rows)
+    warm_water = warm_water_display_weights(heating, rows)
     return "".join(
         (
             cost_split_block(heating),
-            basis_table_block(heating, party_labels, heat, warm_water),
-            party_change_blocks(heating, party_labels, warm_water),
+            basis_table_block(heating, rows, heat, warm_water),
+            party_change_blocks(heating, rows, warm_water),
         )
     )
