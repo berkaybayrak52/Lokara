@@ -106,9 +106,11 @@ from lokara_domain import (
 from lokara_heating_engine import (
     Co2Input,
     HeatingInput,
+    HeatingLine,
     HeatingResult,
     HeatingRules,
     HeatingUnit,
+    OwnerResidualOrigin,
     WarmWaterInput,
     calculate_heating_statement,
 )
@@ -190,6 +192,16 @@ ROUNDING_NOTE = (
     "sodass eine Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann."
 )
 ROUNDED = "rd."
+
+# `docs/08` → "Die Eigentümerzeile" § 3 (14.08.2026). Block B is a
+# Liegenschafts-level table, so every empty/self-used unit's Bemessung is
+# aggregated into **one** row under this label, rendered **last** — one-for-one
+# with the money table, where it is the reconciling line rather than a party.
+# Block C decomposes a single unit and therefore keeps the per-segment party
+# label instead. Spelled here rather than imported from `lokara_pdf`, like every
+# other piece of required copy in this file: a gate that reads the expected word
+# off the renderer cannot see the renderer rename it.
+OWNER_LABEL = "Eigentümeranteil"
 
 _TAG = re.compile(r"<[^>]+>")
 _ROW = re.compile(r"<tr[^>]*>(.*?)</tr>", re.DOTALL)
@@ -806,17 +818,24 @@ class TestBlockBBemessungsgrundlagen:
         true only of the old 585/415 table where 146,25 and 103,75 came out exact —
         the premise moved with the table, not the rule.
 
-        The two rounded halves still sum to the exact 250 the meter recorded."""
+        The two rounded halves still sum to the exact 250 the meter recorded.
+
+        Since 14.08.2026 the second half is on the `Eigentümeranteil` row, which
+        renders **last** rather than in unit order — so the filter cannot be
+        `startswith("Wohnung")` (it would drop the row this test is about) and
+        the expected order is the printed one, owner last. No figure moved:
+        104,17 is where it always was, one row further down."""
         table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
-        heat_cells = [row[2] for row in table if len(row) == 4 and row[0].startswith("Wohnung")]
+        party_labels = ("Wohnung", OWNER_LABEL)
+        heat_cells = [row[2] for row in table if len(row) == 4 and row[0].startswith(party_labels)]
 
         assert heat_cells == [
             f"600 {HKV_UNIT}",
             f"rd. 145,83 {HKV_UNIT}",
-            f"rd. 104,17 {HKV_UNIT}",
             f"150 {HKV_UNIT}",
+            f"rd. 104,17 {HKV_UNIT}",
         ]
-        assert [cell.startswith(ROUNDED) for cell in heat_cells] == [False, True, True, False]
+        assert [cell.startswith(ROUNDED) for cell in heat_cells] == [False, True, False, True]
         assert Decimal("145.83") + Decimal("104.17") == Decimal("250.00")
 
     def test_the_rounding_is_disclosed_once_and_under_the_table_it_qualifies(self) -> None:
@@ -871,13 +890,22 @@ class TestBlockBBemessungsgrundlagen:
     def test_the_printed_bemessungen_sum_to_the_printed_gesamtbemessung(self) -> None:
         """The invariant of every allocation test, over rendered text: a document
         that is supposed to add up must add up as printed, not merely as computed
-        (`docs/08` → Block B, and the same rule as the NK reference totals)."""
+        (`docs/08` → Block B, and the same rule as the NK reference totals).
+
+        The addends are the Mietverhältnis rows **plus** the one
+        `Eigentümeranteil` row: 36.500 m²·Tage includes the vacancy's 5.520, and
+        a sum taken over `heating.lines` alone would be asserting that the
+        printed column does *not* add up (`docs/08` → "Die Eigentümerzeile" § 3).
+        """
         data = build_demo_statement()
         table = rows(block(statement_html(data), BLOCK_B))
         labels = {PARTY_LABELS[(line.unit_id, line.tenancy_id)] for line in _heating(data).lines}
+        labels.add(OWNER_LABEL)
 
         party_rows = [row for row in table if row and row[0] in labels]
-        assert len(party_rows) == len(_heating(data).lines), "one row per party"
+        assert len(party_rows) == len(_heating(data).lines) + 1, (
+            "one row per Mietverhältnis, plus the one Eigentümerzeile"
+        )
         total_row = next(row for row in table if row and row[0] == "Gesamtbemessung")
 
         # Three Bemessung columns since slice 5: Fläche·Tage, Verbrauch Heizung,
@@ -897,12 +925,19 @@ class TestBlockBBemessungsgrundlagen:
         Rounding each value independently prints 20 + 5,95 + 3,02 + 3,02 + 8 =
         39,99 under a Gesamtbemessung of 40 — the invariant above, broken by the
         one thing the invariant cannot express on the demo fixture (its splits
-        happen to round exactly)."""
+        happen to round exactly).
+
+        Five rows, not four: the fifth is the `Eigentümeranteil`, rendered last
+        (`docs/08` § 3). **No value moved** on 14.08.2026 — the column still
+        prints 20 / 5,95 / 3,03 / 8 / 3,02 and the +0,01 still lands on Doris,
+        who precedes the owner in party order. Only the owner row's position
+        changed, from third to last."""
         data = three_party_statement()
         table = rows(block(statement_html(data), BLOCK_B))
         labels = {
             THREE_PARTY_LABELS[(line.unit_id, line.tenancy_id)] for line in _heating(data).lines
         }
+        labels.add(OWNER_LABEL)
         party_rows = [row for row in table if row and row[0] in labels]
 
         printed = [_de(row[3]) for row in party_rows]
@@ -910,8 +945,8 @@ class TestBlockBBemessungsgrundlagen:
             Decimal(20),
             Decimal("5.95"),
             Decimal("3.03"),  # +0,01: largest remainder, ties by party order
-            Decimal("3.02"),
             Decimal(8),
+            Decimal("3.02"),  # the Eigentümerzeile, last
         ]
         assert sum(printed) == Decimal(40)
         assert has_row(table, "Gesamtbemessung", "36.500", HEAT_TOTAL_CELL, "40 m³")
@@ -920,8 +955,8 @@ class TestBlockBBemessungsgrundlagen:
             False,
             True,
             True,
-            True,
             False,
+            True,
         ]
 
     def test_the_heating_column_states_its_unit_where_the_building_records_one(self) -> None:
@@ -1190,22 +1225,43 @@ class TestBlockCNutzerwechsel:
         (5,9506849…) into a statement that is true, without printing a second
         figure for one quantity (the lead's ruling: reuse Block B's). And the
         unit's reading is still the **sum of its parties' Bemessungen**, never
-        carried twice."""
+        carried twice.
+
+        *Its parties'* now means both carriers: since 14.08.2026 the vacancy
+        segment's Bemessung lives on `owner_residual.origins` rather than on a
+        `HeatingLine` (`docs/08` → "Die Eigentümerzeile" § 5). Summing
+        `heating.lines` alone would make the printed reading 5,95 m³ instead of
+        the 12 m³ the meter recorded — i.e. it would assert that the two
+        segments are *not* halves of one reading, which is the one thing this
+        line exists to say. Block C keeps the per-segment party label (§ 3), so
+        the vacancy segment still reads `… → Vermieter` here even though its
+        money row is gone."""
         data = build_demo_statement()
         heating = _heating(data)
-        unit_b = [line for line in heating.lines if line.unit_id == "unit-b"]
-        weights = [line.ww_consumption_weight_m3 for line in unit_b]
+        unit_b: list[tuple[str, HeatingLine | OwnerResidualOrigin]] = [
+            *(
+                (PARTY_LABELS[(line.unit_id, line.tenancy_id)], line)
+                for line in heating.lines
+                if line.unit_id == "unit-b"
+            ),
+            *(
+                (PARTY_LABELS[(origin.unit_id, None)], origin)
+                for origin in heating.owner_residual.origins
+                if origin.unit_id == "unit-b"
+            ),
+        ]
+        weights = [segment.ww_consumption_weight_m3 for _, segment in unit_b]
         assert all(w is not None for w in weights)
         reading = sum((w for w in weights if w is not None), Decimal(0))
+        assert reading == Decimal(12), "the two segments must be halves of one reading"
         text = block_text(statement_html(data), BLOCK_C)
 
         assert "Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:" in text
-        for line, weight in zip(unit_b, weights, strict=True):
+        for (label, segment), weight in zip(unit_b, weights, strict=True):
             assert weight is not None
-            label = PARTY_LABELS[(line.unit_id, line.tenancy_id)]
             assert (
-                f"{label}: {_n(reading)} m³ × ({_n(Decimal(line.days))} von "
-                f"{_n(Decimal(line.unit_total_days))} Tagen) "
+                f"{label}: {_n(reading)} m³ × ({_n(Decimal(segment.days))} von "
+                f"{_n(Decimal(segment.unit_total_days))} Tagen) "
                 f"= {ROUNDED} {_n(weight.quantize(Decimal('0.01')))} m³"
             ) in text
 
@@ -1451,12 +1507,19 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
         # unit-B parties against each other. 149.553 + 128.110 = 277.663 =
         # 149.326 + 128.337 — the pair re-splits, the pot does not move, and the
         # two unaffected units do not move at all.
+        #
+        # 128.337 is asserted off `owner_residual` since 14.08.2026: the landlord
+        # segment is no longer a `HeatingLine` (`docs/08` → "Die Eigentümerzeile").
+        # It is **cent-identical** to the line it replaced, which is the whole
+        # point of that slice — the Eigentümer-Residuum re-labels a figure, it
+        # does not compute a new one — so this guard on the CO₂ blast radius
+        # holds unchanged, over the same four amounts.
         assert [int(line.total) for line in heating.lines] == [
             560_397,
             149_326,
-            128_337,
             176_232,
         ]
+        assert int(heating.owner_residual.total) == 128_337
         assert int(heating.total) == 1_030_000  # the invoice did not move
         assert int(heating.billable_cost) == 1_014_292
 

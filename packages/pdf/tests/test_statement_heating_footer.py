@@ -103,13 +103,23 @@ def test_heating_footer_drops_the_betriebskosten_arithmetic_claim() -> None:
 
 def test_heating_footer_states_the_gesamtkosten_and_the_co2_difference() -> None:
     """docs/08 → "Required rendered text (heating footer)". Both figures come
-    from the engine result; nothing here is typed in."""
+    from the engine result; nothing here is typed in.
+
+    *Die oben ausgewiesenen Anteile* are the rows the table prints, and since
+    14.08.2026 one of them is the `Eigentümeranteil` — a residual rather than a
+    `HeatingLine` (`docs/08` → "Die Eigentümerzeile"). `Σ lines` alone would
+    print 8.859,55 € under a table whose rows add up to 10.142,92 €, which is
+    the very defect this file's reword exists to remove: a footer figure that
+    reads as the column's sum without being it.
+    """
     data = build_demo_statement()
     heating = _heating(data)
     co2 = heating.co2
     assert co2 is not None, "the demo fixture carries a CO₂ split"
 
-    share_sum = _eur(sum(int(line.total) for line in heating.lines))
+    share_sum = _eur(
+        sum(int(line.total) for line in heating.lines) + int(heating.owner_residual.total)
+    )
     landlord_co2 = _eur(int(co2.landlord_amount))
     _nk, section = _sections(data)
 
@@ -126,7 +136,16 @@ def test_heating_footer_states_the_gesamtkosten_and_the_co2_difference() -> None
 def test_rendered_heating_shares_are_less_than_the_footer_figure() -> None:
     """The fact the reword exists for: the column really does not add up, and the
     gap is exactly the CO₂-Vermieteranteil. Read off the page, so a renderer bug
-    and an engine change both surface."""
+    and an engine change both surface.
+
+    The tbody carries **one row more than `heating.lines`**: the
+    `Eigentümeranteil`, which renders last and is a residual rather than a party
+    (`docs/08` → "Die Eigentümerzeile" § 1 — it renders even at 0,00 €). That is
+    by design, and it is what makes the last assertion here true: the gap
+    between the footer figure and the printed rows is the CO₂-Vermieteranteil
+    *only* once the owner row is counted. Without it the difference would be the
+    CO₂ share plus the whole Leerstandsanteil.
+    """
     data = build_demo_statement()
     heating = _heating(data)
     co2 = heating.co2
@@ -134,12 +153,17 @@ def test_rendered_heating_shares_are_less_than_the_footer_figure() -> None:
 
     _nk, section = _sections(data)
     body_rows = _ROW.findall(_block(section, "tbody"))
-    assert len(body_rows) == len(heating.lines)
+    assert len(body_rows) == len(heating.lines) + 1, (
+        "one row per Mietverhältnis, plus the one Eigentümerzeile"
+    )
     # Last numeric cell of each party row is that party's Summe.
     rendered_shares = [_cents_from_de(_NUM_CELL.findall(row)[-1]) for row in body_rows]
 
     # The page shows what the engine computed...
-    assert rendered_shares == [int(line.total) for line in heating.lines]
+    assert rendered_shares == [
+        *(int(line.total) for line in heating.lines),
+        int(heating.owner_residual.total),
+    ]
 
     footer_figures = _NUM_CELL.findall(_block(section, "tfoot"))
     assert len(footer_figures) == 1, "the footer's amount column carries exactly one figure"

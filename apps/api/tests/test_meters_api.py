@@ -119,11 +119,31 @@ def _statement(client: TestClient) -> dict[str, Any]:
     return body
 
 
+# `docs/08` → "Die Eigentümerzeile" (14.08.2026). The landlord side of a
+# Liegenschaft is **one** row — the residual `Gesamtkosten abzüglich Σ Mieteranteile` —
+# so it is labelled `Eigentümeranteil` and no longer
+# `Wohnung B — Leerstand … → Vermieter`. `docs/08` § 3's rule of thumb: a
+# Liegenschafts-total gets one row, a single-unit decomposition (Block C) keeps
+# the per-unit label.
+OWNER_LABEL = "Eigentümeranteil"
+
+
 def _unit_b_heating(client: TestClient) -> list[dict[str, Any]]:
+    """Unit B's renter row, then the Eigentümerzeile that carries its vacancy.
+
+    Deliberately not `startswith("Wohnung B")` any more: the second row is not a
+    party of unit B, it is the Liegenschafts-Residuum. The goldens below did not
+    move with the re-labelling — the demo has exactly one vacant unit, so the
+    residual is unit B's Leerstandsanteil plus a rounding difference of 0 ct
+    (34.514 / 55.474 / 11.505 / 26.844 = 128.337, byte-identical to the landlord
+    party it replaced). If a second vacancy is ever seeded into the demo, this
+    helper stops being an "unit B" reader and the goldens have to be restated
+    per unit off the Leerstandsaufstellung instead.
+    """
     return [
         line
         for line in _statement(client)["heatingLines"]
-        if line["partyLabel"].startswith("Wohnung B")
+        if line["partyLabel"].startswith("Wohnung B") or line["partyLabel"] == OWNER_LABEL
     ]
 
 

@@ -363,10 +363,20 @@ def test_the_columns_reconcile_to_their_printed_sums() -> None:
     )
 
     # ...and both engine totals are still what the columns reconcile to.
+    #
+    # The heating side is `Σ lines + owner_residual.total`, not `Σ lines`:
+    # since 14.08.2026 the Eigentümeranteil is a residual rather than a party
+    # (`docs/08` → "Die Eigentümerzeile"), so it is no longer one of
+    # `heating.lines` — while the block above still prints it as a row and the
+    # Σ row still counts it. `Σ lines` alone (8.859,55 €) would contradict the
+    # per-column reconciliation this same function asserts at the top, and the
+    # 11.342,92 € golden in `scripts/assert_statement_pdf.py`.
     heating = data.heating_result
     assert heating is not None, "fixture lost its heating section"
     assert printed_sums[0] == int(data.nk_result.total)
-    assert printed_sums[1] == sum(int(line.total) for line in heating.lines)
+    assert printed_sums[1] == sum(int(line.total) for line in heating.lines) + int(
+        heating.owner_residual.total
+    )
 
 
 def test_the_block_says_the_vorauszahlungen_are_not_deducted() -> None:
