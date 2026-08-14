@@ -151,8 +151,16 @@ class WarmWaterSeparation:
 
 @dataclass(frozen=True)
 class HeatingLine:
-    """One party's share, plus the Bemessung that produced it in each column.
-    tenancy_id=None → landlord (vacancy/self-use)."""
+    """One **Mietverhältnis**'s share, plus the Bemessung that produced it in
+    each column.
+
+    ``tenancy_id`` is `None` on no line the engine emits: since 14.08.2026 the
+    Eigentümeranteil is not a party but `HeatingResult.owner_residual`
+    (`docs/02` → *"The Eigentümeranteil is a residual line, not a party"*). The
+    field keeps its optional type because the NK engine's `PartyKey` vocabulary
+    is shared with it and still carries a landlord party until Seite 02 lands in
+    `docs/09`.
+    """
 
     unit_id: str
     tenancy_id: str | None
@@ -222,8 +230,85 @@ class Co2Result:
 
 
 @dataclass(frozen=True)
+class OwnerResidualOrigin:
+    """Block (a) of the Leerstandsaufstellung: one empty/self-used unit's own
+    share of each block, computed **for the annex** — its own `round_half_up`
+    against the full denominator, *not* a slice of the residual.
+
+    Never printed on the Gesamtübersicht: the printed Eigentümeranteil is the
+    residual, and the two differ by the line-wise rounding (his `08-F21`:
+    17.536 computed separately, 17.531 as a residual). Kept because the landlord
+    needs the vacancy share **per object** for Anlage V (§ 9 EStG) and because
+    § 9b Abs. 3 (Block C — Nutzerwechsel) still has to disclose the vacancy
+    segment's Zeitanteil even though its money row is gone.
+
+    Spec: `docs/08-statement-document.md` → "Die Eigentümerzeile" §§ 5-6.
+    """
+
+    unit_id: str
+    heating_base: Cents
+    heating_consumption: Cents
+    ww_base: Cents
+    ww_consumption: Cents
+    total: Cents
+    # The Bemessungen Block C still has to disclose for the vacancy segment, in
+    # the same shapes and with the same `None` semantics as `HeatingLine`.
+    days: int
+    unit_total_days: int
+    base_weight_sqm_days_x100: Decimal
+    heat_consumption_weight: Decimal | None
+    ww_consumption_weight_m3: Decimal | None
+    degree_day_promille: Decimal
+    unit_degree_day_promille_total: Decimal
+
+
+@dataclass(frozen=True)
+class OwnerResidual:
+    """The one Eigentümerzeile per Liegenschaft (Seite 01 **D12**).
+
+        eigentuemerCent[block] = blockbetragCent[block] - Σ mieteranteilCent[block]
+
+    For heating that is one line across **all four blocks** (§ 1.3 Frage 3). It
+    always exists — including at `0,00 €`, including in a fully-let building —
+    and it may be negative, because `round_half_up` biases the renter shares
+    upward and the residual absorbs the overshoot.
+
+    **Carries no quota, by shape rather than by discipline:** there is no
+    percentage field, so a renderer cannot print one. § 1.3 Frage 2: *"Eine
+    gedruckte Quote würde eine Verteilungsbasis suggerieren, die es nicht gibt —
+    der Betrag ist ein Rest, keine Quote."*
+    """
+
+    heating_base: Cents
+    heating_consumption: Cents
+    ww_base: Cents
+    ww_consumption: Cents
+    total: Cents
+    # (a) — one entry per empty/self-used unit, in the engine's unit order.
+    # Empty tuple in a fully-let building; the row still renders.
+    origins: tuple[OwnerResidualOrigin, ...]
+    # (c) = total - Σ origins.total. Belongs to no unit. In a fully-let building
+    # the whole line is block (c).
+    rounding_difference: Cents
+    # The Fiktivbelegung (D0) printed in the Bemessung column, aggregated over
+    # `origins`. `None` — not 0 — when there is no vacancy and no self-use: the
+    # column then stays empty, and `None` is what makes "empty" unprintable as a
+    # zero. Also `None` where the column's key was replaced under § 9a Abs. 2,
+    # exactly as on `HeatingLine`.
+    base_weight_sqm_days_x100: Decimal | None
+    heat_consumption_weight: Decimal | None
+    ww_consumption_weight_m3: Decimal | None
+
+
+@dataclass(frozen=True)
 class HeatingResult:
+    # Mietverhältnisse only — the Eigentümer is not a party, so there is no
+    # party slot an owner share could be written into (`docs/02`).
     lines: tuple[HeatingLine, ...]
+    # Required, never `None`: an `OwnerResidual | None` would re-create the
+    # branch § 1.3 Frage 1 removes, and the first renderer to write
+    # `if result.owner_residual:` would silently drop a `0,00 €` row.
+    owner_residual: OwnerResidual
     co2: Co2Result | None
     # Units whose missing readings were estimated per § 9a.
     estimated_unit_ids: tuple[str, ...]

@@ -14,15 +14,26 @@ Pipeline (every split reconciles to its input by construction):
 parts names its rounded side by the formula and gives the rest to the
 complement: `grund = round_half_up(pot × p)`, `verbrauch = pot - grund`. A
 Blockbetrag allocated across parties gives every renter its own
-`round_half_up` and puts the `Verteilungsrest` on the **owner bucket** — the
-first landlord party (§ 9.2 convention 1), the same row in all four blocks, so
-one Eigentümer line explains every ±ct of the statement. Where the building is
-fully let there is **no owner bucket**, and the engine may not make a block
-reconcile by handing the residual to a renter: such a block keeps
-largest-remainder (§ 9.2 convention 2), which minimises each party's deviation
-from its own quota. Both conventions are ours, not Berkay's, and both are
-flagged for him. K9 is `Konvention` / verify-before-production, Rechtsstand
-07/2026 — no output may present it as a norm.
+`round_half_up` and puts the `Verteilungsrest` on the **Liegenschafts-Residuum**
+— one Eigentümerzeile per Liegenschaft, the same line in all four blocks
+(§ 1.3 Frage 3), so one line explains every ±ct of the statement:
+
+    eigentuemerCent[block] = blockbetragCent[block] - Σ mieteranteilCent[block]
+
+That line is **not a party**. It is never derived from occupancy and never
+computed from a weight; the vacancy's Fiktivbelegung (D0) enters the
+**denominator** and nowhere else, which is what makes the residual come out at
+the vacancy share rather than at zero. It exists in every building, including a
+fully let one, where it is the pure line-wise Rundungsdifferenz and typically
+**-0,01 € per block** — negative because `round_half_up` biases the renter
+shares upward. Model: `docs/02` → *"The Eigentümeranteil is a residual line, not
+a party"*; engine wiring and the two conventions it superseded: `docs/03` § 9.2.
+
+Rechtsnatur: Berkay's **fixed model rule** (`Antwort-an-Emir_02.md` § 1.4 —
+*"meine feste Modellregel, keine offene Konvention"*), so the destination of the
+Verteilungsrest carries no `verify-before-production` flag. K9 keeps its flag
+for what remains of it, the `round_half_up` direction; no output may present
+that as a norm.
 """
 
 from dataclasses import dataclass
@@ -36,8 +47,8 @@ from lokara_domain import (
     build_unit_segments,
     cents,
     co2_grams_from_energy,
-    distribute_cents,
     distribute_cents_half_up,
+    distribute_cents_owner_residual,
 )
 
 from .co2 import split_co2_cost
@@ -49,6 +60,8 @@ from .inputs import (
     HeatingLine,
     HeatingResult,
     HeatingUnit,
+    OwnerResidual,
+    OwnerResidualOrigin,
     WarmWaterSeparation,
 )
 
@@ -76,31 +89,75 @@ class _Party:
     degree_day_promille: Decimal
 
 
-def _owner_index(parties: list[_Party]) -> int | None:
-    """The owner bucket of every block: the **first** landlord party, or `None`.
+@dataclass(frozen=True)
+class _Block:
+    """One Blockbetrag, allocated: the renter rows, block (a) per empty unit,
+    and the Eigentümerzeile's figure for that block."""
 
-    *First*, not last, so appending a unit to the input cannot move the residual
-    onto another row (`docs/03` § 9.2 convention 1); the same index is used in
-    all four blocks, which is the whole justification for K9 — one Eigentümer
-    line explains every ±ct of the statement.
+    renters: list[Cents]
+    # (a) — the empty/self-used units' *separately computed* shares, aligned
+    # with `_Split.owner_indexes`. Never an output on the Gesamtübersicht.
+    origins: list[Cents]
+    owner: Cents
 
-    `None` when the building is fully let: there is no Eigentümer row to hold a
-    Verteilungsrest, and handing it to a renter is exactly what K9 forbids, so
-    those blocks stay on largest-remainder (§ 9.2 convention 2). That is a
-    recorded convention awaiting the unconditional Eigentümer line, not an
-    omission.
+
+@dataclass(frozen=True)
+class _Split:
+    """Which of the engine's internal parties are Mietverhältnisse and which are
+    the empty/self-used segments the Eigentümerzeile aggregates.
+
+    Both index into the same `parties` list, because a consumption weight is
+    apportioned across *all* of a unit's segments and only then split — the
+    landlord segment is a denominator entry, never a row.
     """
-    return next((i for i, p in enumerate(parties) if p.tenancy_id is None), None)
+
+    renter_indexes: list[int]
+    owner_indexes: list[int]
 
 
-def _allocate_to_parties(
-    pot: Cents, weights: list[Decimal], owner_index: int | None
-) -> list[Cents]:
-    """R1/R5/K9 when there is an owner bucket, largest-remainder when there is
-    not. Either way `sum(shares) == pot` holds by construction."""
-    if owner_index is None:
-        return distribute_cents(pot, weights)
-    return distribute_cents_half_up(pot, weights, residual_index=owner_index)
+def _split_parties(parties: list[_Party]) -> _Split:
+    return _Split(
+        renter_indexes=[i for i, p in enumerate(parties) if p.tenancy_id is not None],
+        owner_indexes=[i for i, p in enumerate(parties) if p.tenancy_id is None],
+    )
+
+
+def _allocate_to_parties(pot: Cents, weights: list[Decimal], split: _Split) -> _Block:
+    """R1/R5 with the Liegenschafts-Residuum: every renter gets its own
+    `round_half_up` against a denominator that includes the owner's Bemessung,
+    and the Eigentümerzeile gets `pot - Σ Mieteranteile`.
+
+    `sum(renters) + owner == pot` holds by construction, in every composition —
+    including a fully let one, where the residual is the pure line-wise
+    Rundungsdifferenz. There is no second allocation method and no branch:
+    § 1.3 Frage 3 rejected the largest-remainder fallback outright.
+    """
+    renter_weights = [weights[i] for i in split.renter_indexes]
+    owner_weights = [weights[i] for i in split.owner_indexes]
+    renters, owner = distribute_cents_owner_residual(
+        pot, renter_weights, owner_weight=sum(owner_weights, Decimal(0))
+    )
+    # Block (a): each empty unit's **own** `round_half_up` against the same full
+    # denominator — what the Leerstandsaufstellung itemises for Anlage V, and
+    # what D12 forbids as the *printed* figure. The same primitive with the roles
+    # exchanged (R1 is symmetric); the rest it returns is the renters' and is
+    # discarded, because (a) and the printed residual are two routes to one
+    # quantity and their difference is block (c).
+    origins, _ = distribute_cents_owner_residual(
+        pot, owner_weights, owner_weight=sum(renter_weights, Decimal(0))
+    )
+    return _Block(renters=renters, origins=origins, owner=owner)
+
+
+def _zero_block(split: _Split) -> _Block:
+    """No warm-water column exists at all — every figure in it is `0`, the
+    Eigentümerzeile's included. Not a § 9a Abs. 2 fallback, and the statement
+    must not claim one happened."""
+    return _Block(
+        renters=[_ZERO] * len(split.renter_indexes),
+        origins=[_ZERO] * len(split.owner_indexes),
+        owner=_ZERO,
+    )
 
 
 def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
@@ -112,9 +169,8 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     assert window_to is not None  # _validate guarantees a bounded period
 
     parties = _build_parties(heating_input, window_from, window_to)
-    party_count = len(parties)
     base_weights = [p.base_weight for p in parties]
-    owner_index = _owner_index(parties)
+    split = _split_parties(parties)
 
     co2_result, billable = _apply_co2(heating_input)
 
@@ -129,7 +185,7 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     heat_base_pot, heat_cons_pot = distribute_cents_half_up(
         heating_pot, [1 - share, share], residual_index=_COMPLEMENT
     )
-    heat_base = _allocate_to_parties(heat_base_pot, base_weights, owner_index)
+    heat_base = _allocate_to_parties(heat_base_pot, base_weights, split)
 
     heat_values, heat_estimated, heat_fallback = _resolve_readings(
         heating_input.units, [u.heat_consumption for u in heating_input.units]
@@ -139,11 +195,11 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     heat_weights: list[Decimal] | None = None
     if heat_fallback:
         # Site #3 — § 9a Abs. 2 replaces the *key*, never the rounding rule.
-        heat_cons = _allocate_to_parties(heat_cons_pot, base_weights, owner_index)
+        heat_cons = _allocate_to_parties(heat_cons_pot, base_weights, split)
     else:
         # Site #4.
         heat_weights = _consumption_weights(parties, heat_values, by_degree_days=True)
-        heat_cons = _allocate_to_parties(heat_cons_pot, heat_weights, owner_index)
+        heat_cons = _allocate_to_parties(heat_cons_pot, heat_weights, split)
     # The unit follows the weights it labels: `None` under § 9a Abs. 2 means the
     # consumption key was *replaced*, so there is no Bemessung to put a unit on.
     heat_unit = None if heat_fallback else _resolve_heat_unit(heating_input.units)
@@ -157,49 +213,65 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
             ww_pot, [1 - share, share], residual_index=_COMPLEMENT
         )
         # Site #6.
-        ww_base = _allocate_to_parties(ww_base_pot, base_weights, owner_index)
+        ww_base = _allocate_to_parties(ww_base_pot, base_weights, split)
         ww_values, ww_estimated, ww_fallback = _resolve_readings(
             heating_input.units, [u.ww_consumption_m3 for u in heating_input.units]
         )
         if ww_fallback:
             # Site #7 — as #3.
-            ww_cons = _allocate_to_parties(ww_cons_pot, base_weights, owner_index)
+            ww_cons = _allocate_to_parties(ww_cons_pot, base_weights, split)
         else:
             # Site #8.
             ww_weights = _consumption_weights(parties, ww_values, by_degree_days=False)
-            ww_cons = _allocate_to_parties(ww_cons_pot, ww_weights, owner_index)
+            ww_cons = _allocate_to_parties(ww_cons_pot, ww_weights, split)
     else:
         # No warm-water column exists at all — that is not a § 9a Abs. 2
         # fallback, and the statement must not claim one happened.
         ww_base_pot, ww_cons_pot = _ZERO, _ZERO
-        ww_base = [_ZERO] * party_count
-        ww_cons = [_ZERO] * party_count
+        ww_base = _zero_block(split)
+        ww_cons = _zero_block(split)
 
     unit_days, unit_promille = _unit_totals(parties)
     lines = tuple(
         HeatingLine(
-            unit_id=party.unit_id,
-            tenancy_id=party.tenancy_id,
+            unit_id=parties[index].unit_id,
+            tenancy_id=parties[index].tenancy_id,
             heating_base=hb,
             heating_consumption=hc,
             ww_base=wb,
             ww_consumption=wc,
             total=cents(int(hb) + int(hc) + int(wb) + int(wc)),
-            days=party.days,
-            unit_total_days=unit_days[party.unit_id],
-            base_weight_sqm_days_x100=party.base_weight,
+            days=parties[index].days,
+            unit_total_days=unit_days[parties[index].unit_id],
+            base_weight_sqm_days_x100=parties[index].base_weight,
             heat_consumption_weight=None if heat_weights is None else heat_weights[index],
             ww_consumption_weight_m3=None if ww_weights is None else ww_weights[index],
-            degree_day_promille=party.degree_day_promille,
-            unit_degree_day_promille_total=unit_promille[party.unit_id],
+            degree_day_promille=parties[index].degree_day_promille,
+            unit_degree_day_promille_total=unit_promille[parties[index].unit_id],
         )
-        for index, (party, hb, hc, wb, wc) in enumerate(
-            zip(parties, heat_base, heat_cons, ww_base, ww_cons, strict=True)
+        for index, hb, hc, wb, wc in zip(
+            split.renter_indexes,
+            heat_base.renters,
+            heat_cons.renters,
+            ww_base.renters,
+            ww_cons.renters,
+            strict=True,
         )
+    )
+    owner_residual = _owner_residual(
+        parties,
+        split,
+        (heat_base, heat_cons, ww_base, ww_cons),
+        heat_weights,
+        ww_weights,
+        unit_days,
+        unit_promille,
     )
 
     landlord_co2 = int(co2_result.landlord_amount) if co2_result is not None else 0
-    total = cents(sum(int(line.total) for line in lines) + landlord_co2)
+    # `Σ Mieteranteile + Eigentümeranteil (+ CO₂-Vermieteranteil) == Gesamtkosten`
+    # — § 1.1, and the residual is *inside* that sum, never an exception to it.
+    total = cents(sum(int(line.total) for line in lines) + int(owner_residual.total) + landlord_co2)
     assert total == heating_input.total_cost  # reconciliation — never ship without it
 
     estimated = tuple(
@@ -209,6 +281,7 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     )
     return HeatingResult(
         lines=lines,
+        owner_residual=owner_residual,
         co2=co2_result,
         estimated_unit_ids=estimated,
         consumption_fallback_to_area=heat_fallback or ww_fallback,
@@ -226,6 +299,89 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
         split_bounds=heating_input.rules.split_bounds,
         warm_water_separation=separation,
         heat_consumption_unit=heat_unit,
+    )
+
+
+def _sum_weights(
+    weights: list[Decimal] | None, indexes: list[int], *, empty_is_none: bool
+) -> Decimal | None:
+    """The Bemessung the Eigentümerzeile prints, aggregated over the empty units.
+
+    Two distinct reasons for `None`, and both must stay `None` rather than `0`
+    (`docs/08` § 2). Either **no consumption Bemessung was applied to that
+    column at all** (§ 9a Abs. 2, or no central warm water — `weights is None`,
+    exactly as on every `HeatingLine`), or **nothing stood empty and nothing was
+    self-used**, in which case the column is empty rather than zero: a printed
+    `0` would imply an allocation base of zero instead of none.
+    """
+    if weights is None or (empty_is_none and not indexes):
+        return None
+    return sum((weights[index] for index in indexes), Decimal(0))
+
+
+def _owner_residual(
+    parties: list[_Party],
+    split: _Split,
+    blocks: tuple[_Block, _Block, _Block, _Block],
+    heat_weights: list[Decimal] | None,
+    ww_weights: list[Decimal] | None,
+    unit_days: dict[str, int],
+    unit_promille: dict[str, Decimal],
+) -> OwnerResidual:
+    """The one Eigentümerzeile, and block (a) underneath it.
+
+    `origins` are the empty/self-used units' *separately computed* shares, kept
+    because the landlord needs the vacancy share per object for Anlage V (§ 1.4
+    — *"Aggregation im Display, Herkunft in den Daten."*). What the statement
+    prints is the residual; `rounding_difference` is the difference, block (c),
+    and it belongs to no unit.
+    """
+    heat_base, heat_cons, ww_base, ww_cons = blocks
+    origins = tuple(
+        OwnerResidualOrigin(
+            unit_id=parties[index].unit_id,
+            heating_base=hb,
+            heating_consumption=hc,
+            ww_base=wb,
+            ww_consumption=wc,
+            total=cents(int(hb) + int(hc) + int(wb) + int(wc)),
+            days=parties[index].days,
+            unit_total_days=unit_days[parties[index].unit_id],
+            base_weight_sqm_days_x100=parties[index].base_weight,
+            heat_consumption_weight=None if heat_weights is None else heat_weights[index],
+            ww_consumption_weight_m3=None if ww_weights is None else ww_weights[index],
+            degree_day_promille=parties[index].degree_day_promille,
+            unit_degree_day_promille_total=unit_promille[parties[index].unit_id],
+        )
+        for index, hb, hc, wb, wc in zip(
+            split.owner_indexes,
+            heat_base.origins,
+            heat_cons.origins,
+            ww_base.origins,
+            ww_cons.origins,
+            strict=True,
+        )
+    )
+    total = cents(
+        int(heat_base.owner) + int(heat_cons.owner) + int(ww_base.owner) + int(ww_cons.owner)
+    )
+    base_weights = [p.base_weight for p in parties]
+    return OwnerResidual(
+        heating_base=heat_base.owner,
+        heating_consumption=heat_cons.owner,
+        ww_base=ww_base.owner,
+        ww_consumption=ww_cons.owner,
+        total=total,
+        origins=origins,
+        # (c) = Eigentümeranteil (Residuum) - Σ (a). Zero with exactly one empty
+        # unit, because the residual column then already *is* that unit's (a)
+        # figure; non-zero as soon as (a) is itemised across more than one.
+        rounding_difference=cents(int(total) - sum(int(origin.total) for origin in origins)),
+        base_weight_sqm_days_x100=_sum_weights(
+            base_weights, split.owner_indexes, empty_is_none=True
+        ),
+        heat_consumption_weight=_sum_weights(heat_weights, split.owner_indexes, empty_is_none=True),
+        ww_consumption_weight_m3=_sum_weights(ww_weights, split.owner_indexes, empty_is_none=True),
     )
 
 

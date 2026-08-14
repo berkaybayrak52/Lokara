@@ -18,6 +18,8 @@ from .inputs import (
     HeatingResult,
     HeatingRules,
     HeatingUnit,
+    OwnerResidual,
+    OwnerResidualOrigin,
     WarmWaterInput,
     WarmWaterSeparation,
 )
@@ -33,6 +35,8 @@ __all__ = [
     "HeatingResult",
     "HeatingRules",
     "HeatingUnit",
+    "OwnerResidual",
+    "OwnerResidualOrigin",
     "WarmWaterInput",
     "WarmWaterSeparation",
     "calculate_heating_statement",
