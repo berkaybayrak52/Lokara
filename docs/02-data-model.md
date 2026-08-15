@@ -596,9 +596,9 @@ class SelfUsePeriod(Base):
 
 ## The Eigentümeranteil is a **residual line**, not a party
 
-> **Source:** `berkay-work/Antwort-an-Emir_02.md` § 1 (1.1–1.4), 14.08.2026, answering
+> **Source:** `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 (1.1–1.4), 14.08.2026, answering
 > `FRAGEN-an-Berkay-02.md`. Primary rule text:
-> `berkay-work/…/Spec-Seiten/01 · Die Abrechnung ….md` → **D0** (Fiktivbelegung), **D12**
+> `berkay-work/Spec-Seiten/01 · Die Abrechnung ….md` → **D0** (Fiktivbelegung), **D12**
 > (Leerstandsaufstellung) and edge cases **E3**, **E17**, **E19**. Seite 01 is not otherwise
 > transcribed yet; only the blocks named here are.
 >
@@ -741,9 +741,9 @@ The Rechtsstand-Register row **`Verteilungsrest (K9)`** is worded as a house con
 (*"keine — reine Hauskonvention"*, `Konvention` / `verify-before-production`). Under this model the
 *destination* of the Verteilungsrest is no longer ours to choose: it is D12's residual, and Berkay
 has set it fest. K9's remaining content is the **rounding direction** (`round_half_up` per line,
-R1/R5), which is his too. `berkay-work/` is immutable and the register is imported as-is
-(`CLAUDE.md` precedence rule 3), so nothing is edited here — the mismatch is reported for the next
-register export.
+R1/R5), which is his too. Agents may edit `berkay-work/` only with Emir's explicit permission, and
+the register is imported as-is (`CLAUDE.md` precedence rule 3), so this legal mismatch is not edited
+here — it is reported for the next register export.
 
 ## Allocation keys
 

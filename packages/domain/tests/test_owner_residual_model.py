@@ -3,10 +3,10 @@
 Spec: `docs/02-data-model.md` -> "The Eigentümeranteil is a residual line, not a
 party"; `docs/03-nk-heating-engines.md` § 5 (R1/R5, the API-consequence block)
 and § 9.2; `docs/08` -> "Die Eigentümerzeile". Rule source:
-`berkay-work/Antwort-an-Emir_02.md` § 1 (14.08.2026) and, as primary rule text,
-`berkay-work/…/Spec-Seiten/01 · Die Abrechnung ….md` -> **D0**, **D12**, and
-edge cases **E3** / **E19**. Worked numbers:
-`berkay-work/…/Spec-Seiten/02 · BetrKV — Betriebskosten-Katalog ….md` ->
+`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 (14.08.2026)
+and, as primary rule text, `berkay-work/Spec-Seiten/01 · Die Abrechnung ….md`
+-> **D0**, **D12**, and edge cases **E3** / **E19**. Worked numbers:
+`berkay-work/Spec-Seiten/02 · BetrKV — Betriebskosten-Katalog ….md` ->
 `09-F07` (his `08-F22`) and `09-F08`. Both fixture numberings are named so the
 two pages can be matched later. Every figure asserted here is independently
 re-derived in `test_berkay_residual_oracles.py`, which is green today.

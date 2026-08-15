@@ -68,7 +68,7 @@ class TestWarmWaterFormula:
 
     The § 9 Abs. 2 substitute equation `Q = 2,5 x V x (tw - 10)` with tw = 60 °C
     (K5) and the § 9 Abs. 3 fallback `Q = 32 x A_Wohn` both survived the audit
-    unchanged (`berkay-work/COLLISION-MAP-01b.md` § 1). Recorded in `docs/03`
+    unchanged. Recorded in `docs/03`
     -> "What did not move".
     """
 

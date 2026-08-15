@@ -28,7 +28,7 @@ from lokara_heating_engine.co2 import split_co2_cost
 from lokara_heating_engine.inputs import Co2Result
 
 # DO NOT MOVE - bounds and shares both survived Berkay's audit unchanged
-# (`berkay-work/COLLISION-MAP-01b.md` § 1; `docs/03` -> "What did not move").
+# (`docs/03` -> "What did not move").
 # Intervals are left-closed, right-open on both sides of the audit.
 CO2_TABLE: Co2Table = (
     Co2Step(max_intensity_exclusive=Decimal(12), landlord_share_percent=0),

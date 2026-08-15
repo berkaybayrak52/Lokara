@@ -21,7 +21,7 @@
 | How does the agent system work, and what has it got wrong? | `AGENTS.md` |
 | What did the last Claude Code session do? | `LAST_OUTPUT.md` (verify it names HEAD) |
 | What is Berkay still owed / owing? | `FRAGEN-an-Berkay-02.md` |
-| What did Berkay actually write? | `berkay-work/` — **immutable, never edit** |
+| What did Berkay actually write? | `berkay-work/` — agents edit only with Emir's explicit permission |
 
 **Check this before believing `LAST_OUTPUT.md`:** `scripts/check_handoff.sh`. It has been red at
 least once with a handoff two commits stale, because it only runs at `gate.sh full`/`demo` and
@@ -31,19 +31,12 @@ sessions close on `fast`.
 
 ## 2. The rule that is easiest to break
 
-**`berkay-work/` is immutable.** Not "mostly". The point is that any transcription can be diffed
-against exactly what he sent. Two things currently violate the spirit of it:
-
-- `berkay-work/COLLISION-MAP-01b.md` — **we** wrote that. `FEEDBACK-to-Berkay-01b.md` was moved
-  out to the repo root for this reason; this one was missed.
-- `berkay-work/Calculations/Rechtsstand-Register 388f942f…csv` and
-  `berkay-work/FEEDBACK-to-Emir-01b/Rechtsstand-Register/Rechtsstand-Register 388f942f…csv` are
-  **the same filename with different content** — same Notion page, two exports, seven flags apart.
-  The hash suffix implies identity and does not deliver it. The newer one
-  (`FEEDBACK-to-Emir-01b/`, md5 `01a3f71…`) is current.
-
-A new export from Berkay is a **new source**, not an edit. It lands as a new immutable folder;
-the transcriptions get re-diffed against it.
+**`berkay-work/` is immutable to agents without Emir's explicit permission.** Its current view is
+deliberately small: `Rechtsstand-Register/` holds the one authoritative register, and
+the matching Notion pages with their additional notes; `Spec-Seiten/` holds the current specs,
+replies and supporting material. The CSV remains authoritative for structured fields and flags. A
+new export is integrated only as an authorised source update; agents never choose or rewrite it
+themselves.
 
 ---
 
@@ -167,13 +160,11 @@ Small, none blocking, all easy to lose:
 - [ ] Cherry-pick the ENVIRONMENT guard + `gate.sh` skip-hole fix from `slice/m5-pre-context-read`
       onto main — main currently has nothing guarding the dev-token minter, the seeder, or the
       published JWT secret
-- [ ] Move `COLLISION-MAP-01b.md` out of `berkay-work/`
-- [ ] Mark which Rechtsstand register is current (outside `berkay-work/`)
 - [ ] `check_agent_parity.py`: a reorder-only divergence prints "0 lines only in .claude, 0 only in
       .codex" and no detail
 - [ ] Reported, no legal exposure: Framer Motion is a locked decision and a UI-DoD checkbox but is
-      installed nowhere; `docs/04` lists four packages that do not exist; `README`/`AGENTS` never
-      mention `berkay-work/`; `pyproject` pins `httpx2` unrecorded
+      installed nowhere; `docs/04` lists four packages that do not exist; `README`/`AGENTS` do not
+      explain the `berkay-work/` source precedence; `pyproject` pins `httpx2` unrecorded
 
 ---
 

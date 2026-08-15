@@ -141,9 +141,10 @@ def distribute_cents_owner_residual(
 
     Deliberately **not** :func:`distribute_cents_half_up` with a
     ``residual_index``: that signature says *the owner is the party at index i*,
-    which is the model `berkay-work/Antwort-an-Emir_02.md` § 1 replaced, and it
-    lets a caller pass the owner as a party by accident. This one cannot express
-    that.
+    which is the model
+    `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 replaced, and
+    it lets a caller pass the owner as a party by accident. This one cannot
+    express that.
 
     Three consequences the callers rely on, all of them documented business
     cases rather than defects:
