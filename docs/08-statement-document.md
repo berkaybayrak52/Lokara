@@ -1899,6 +1899,12 @@ the first time a real building has eight units.
 > exists, and it was renamed rather than kept because an inverted meaning behind an old name is how
 > a renderer silently prints the wrong band. The § 5 Abs. 1 S. 4 reading below was carefully argued
 > and is left in place as the record of what it replaced; **do not "restore" it.**
+>
+> **Amended 15.08.2026 by**
+> `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` **§ 6:** after H2 annualises the
+> intensity, § 5 Abs. 1 S. 3 CO2KostAufG rounds it to one decimal and the rounded value is both
+> classified and printed. Official norm:
+> `https://www.gesetze-im-internet.de/co2kostaufg/__5.html`. R4/E3/`01b-F05` are superseded.
 
 § 7 Abs. 3 CO2KostAufG requires the landlord to show, **in the Heizkostenabrechnung**, the tenant's CO₂
 share, the building's **Einstufung**, and the **Berechnungsgrundlagen** of that Einstufung.
@@ -1909,7 +1915,7 @@ re-render:
 - the tenant's and the landlord's amounts (104,72 € / 157,08 €) and that the landlord's is deducted
   before allocation;
 - the landlord percentage (60 %);
-- the intensity (40 kg CO₂/m²/Jahr);
+- the intensity (40,0 kg CO₂/m²/Jahr, fixed one-decimal display);
 - the citation *CO2KostAufG* with `Rechtsstand 01/2023`.
 
 **The remainder** — the Berechnungsgrundlagen, i.e. the two inputs the intensity was computed from and
@@ -1917,8 +1923,14 @@ the band it selected. Appended to the existing block, same surface, no new block
 
 ```
 Berechnungsgrundlagen: CO₂-Emissionen des Gebäudes 4.000 kg · beheizte Fläche 100 m²
-→ 40 kg CO₂/m²/Jahr · Einstufung: 37 bis unter 42 kg CO₂/m²/Jahr · CO₂-Kosten 261,80 €
+→ 40,0 kg CO₂/m²/Jahr · Einstufung: 37 bis unter 42 kg CO₂/m²/Jahr · CO₂-Kosten 261,80 €
 ```
+
+**The intensity is the one fixed-precision exception to the generic number formatter.** The summary
+and the Berechnungsgrundlagen must use the same one-decimal display helper and retain the trailing
+zero: `12,0`, never `12`; `40,0`, never `40`. This is the printed value Berkay requires in § 6,
+not a reformatting of an unrounded value in the PDF layer. The renderer reads the already rounded
+`Co2Result.intensity_kg_per_sqm` and performs no classification arithmetic.
 
 - **The Einstufung is printed as its intensity band, not as a step number.** `Co2Step` carries
   `max_intensity_exclusive` and `landlord_share_percent` and **no ordinal**; the band is derivable
@@ -2214,7 +2226,7 @@ a pixel one — rendering and measuring glyphs would test Chromium.
   `meter_id`, no start, no end anywhere in `HeatingInput`. Rendering readings therefore needs a data
   path that does not exist (M3's Zähler slice), plus a decision on where the consistency check
   `Ende − Anfang == Verbrauch` lives. Named, not designed.
-- **CO₂ over a non-annual period — the pro-rating itself is implemented; what remains is the rounding.**
+- **CO₂ over a non-annual period — annualisation and S. 3 rounding are specified.**
   ~~`split_co2_cost` divides by area with no pro-rating~~ was true when this section was written and was
   fixed on 04.08.2026: § 5 Abs. 1 S. 4 CO2KostAufG shortens the **Anlage table** by
   `period_factor = min(1, days(period) / days(reference year))`, the emissions are *not* extrapolated,
@@ -2222,12 +2234,9 @@ a pixel one — rendering and measuring glyphs would test Chromium.
   `docs/03` → *"The Stufenmodell is a **per-year** table"*; fixtures
   `packages/heating-engine/tests/test_co2_short_period_annualisation.py`; `Co2Result.annualisation_factor` carries the
   applied factor and the contract above adds the two day counts, so item 5's short-period copy renders
-  without the template recomputing law. What genuinely remains open:
-  - **§ 5 Abs. 1 S. 3 rounding before classification** — the statute requires the specific emission
-    value to be rounded to one decimal place (*"auf die erste Nachkommastelle zu runden"*); the engine
-    classifies the unrounded `Decimal`, and at a bound (11,96 → 12,0) that changes the Stufe.
-    Scheduled: `PLAN.md` → *Carried over from the pitch-era order, not yet ranked*; recorded in `docs/03` → *"Known gap, deliberately
-    not implemented here"*. Not folded into any slice of this section.
+  without the template recomputing law. **Closed in Row 3:** annualise, round to one decimal, classify,
+  then print that same fixed-one-decimal value (`docs/03` R8; Antwort 03 § 6). What genuinely remains
+  open:
   - **Two conventions that are conventions, not statute**: *anteilig* read day-exact rather than
     month-exact, and S. 4 applied to a Rumpfperiode that was never *vereinbart*. A BMWSB Arbeitshilfe
     or a Mietrechtler's sign-off would resolve both (`docs/03`).
@@ -2305,8 +2314,9 @@ suggestion would be invented law, not a convenience.
       ~~the unit of the heating-consumption Bemessung~~ (**closed 06.08.2026**: the unit is carried,
       and withhold-vs-unit-free is answered *withhold*),
       **Zählerstände** (no data path into the engine),
-      **§ 5 Abs. 1 S. 3 rounding before the CO₂ classification** (`PLAN.md` → *Carried over from the pitch-era order, not yet ranked* — the period
-      factor itself shipped on 04.08.2026), **§ 9's flat-365 fallback divisor**,
+      ~~**§ 5 Abs. 1 S. 3 rounding before the CO₂ classification**~~ (**specified in Row 3**:
+      annualise → round to 1 dp → classify; the printed value keeps the trailing zero),
+      **§ 9's flat-365 fallback divisor**,
       **§§ 7/8 with different shares for heating and warm water** (not expressible in the input)
 - [ ] What closes BGH minimum #3: a rendered per-party calculation (the operator, and the Bemessung
       derived from its factors) — see the ◐ note under the four-minimums table

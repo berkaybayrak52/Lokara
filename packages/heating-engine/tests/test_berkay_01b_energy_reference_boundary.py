@@ -182,7 +182,7 @@ class TestTheFactorIsAppliedOnlyToItsOwnReference:
         # both of which divide exactly, so this reading's Eigentümerzeile is
         # 0,00 € — unlike the Brennwert one below. It still renders.
         assert int(result.owner_residual.total) == 0
-        # R4: derived as integer grams, then the unrounded value into the lookup.
+        # R4 keeps integer grams; R8 rounds the specific value before lookup.
         assert co2.total_co2_kg == Decimal(4020)
         assert co2.intensity_kg_per_sqm == Decimal("40.2")
         assert co2.landlord_share_percent == 60
@@ -340,7 +340,7 @@ class TestTheNormalPathIsUntouched:
         co2 = result.co2
         assert co2 is not None
         assert co2.total_co2_kg == Decimal(4000)
-        assert co2.intensity_kg_per_sqm == Decimal(40)
+        assert co2.intensity_kg_per_sqm == Decimal("40.0")
         assert co2.landlord_share_percent == 60
         assert int(co2.landlord_amount) == 15708
         assert result.total == TOTAL_COST
