@@ -9,9 +9,9 @@ The decision is to fail **at settings construction**, not per request: a per-req
 `if settings.auth_dev_token` is one forgotten branch away from being wrong, and the branch
 that matters is the one nobody adds.
 
-**Red today, on purpose** — `ApiSettings` has no `environment` field and no validator, so
-every `pytest.raises` here reports DID NOT RAISE. Owner: app-implementer, M5 remainder.
-No database, no app startup.
+**Red-window proof:** at `e5de947`, before the implementation existed, the eight guard
+cases failed with DID NOT RAISE. The implementation on this slice makes all ten tests
+green. No database, no app startup.
 
 Env vars beat the `.env` file in pydantic-settings' precedence order, so `monkeypatch`
 here overrides the developer's local file rather than fighting it.
