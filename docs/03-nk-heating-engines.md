@@ -1,10 +1,10 @@
 # 03 — NK & heating/CO₂ engines (the crown jewel)
 
 > **Source for the heating/CO₂ half of this file:**
-> `berkay-work/Calculations/Spec-Seiten/01b · Heizkosten- & CO₂-Verteilung 3a95fd420731814e9e5be043028d4856.md`
-> and `berkay-work/Calculations/Rechtsstand-Register 388f942f178942e9954f8e68238f91cd_all.csv`.
+> `berkay-work/Spec-Seiten/01b · Heizkosten- & CO₂-Verteilung 3a95fd420731814e9e5be043028d4856.md`
+> and `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`.
 > Transcribed, not copied (`CLAUDE.md` → *"The calculation spec lives in `berkay-work/`"*, rule 2).
-> `berkay-work/` is **immutable**: findings about it go in a report, never into the file.
+> Agents edit `berkay-work/` only with Emir's explicit permission; ordinary findings go in a report.
 > Where this file and his page disagree on a number, formula or legal value, **his page wins**.
 
 > These are the product. **Pure Python packages, no web-framework/DB/vendor imports.** Deterministic,
@@ -481,8 +481,8 @@ converted — which is exactly the behaviour the hard error gives.
 ## 2. What did **not** move — nine values independently confirmed
 
 Worth recording, because a reader who sees four rules move will otherwise assume everything did. The
-lead's value-by-value audit (`berkay-work/COLLISION-MAP-01b.md` § 1) found the engine's legal core
-already correct:
+lead's value-by-value audit during the Seite-01b transcription found the engine's legal core already
+correct:
 
 | Rule | Value | Where it already lives |
 | --- | --- | --- |
@@ -800,7 +800,7 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 > `verify-before-production`, **Rechtsstand 07/2026** in the Rechtsstand-Register. No output may
 > present either as a norm.
 >
-> ⚠️ **Amended 14.08.2026 — § 9.2 was replaced.** `berkay-work/Antwort-an-Emir_02.md` § 1 answers the
+> ⚠️ **Amended 14.08.2026 — § 9.2 was replaced.** `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 answers the
 > two conventions § 9.2 used to carry, and answers them by **replacing the model**: the
 > Eigentümeranteil is not a party derived from vacancy, it is one structural residual line per
 > `(Liegenschaft, Kostenart)`. The rounding decisions in the table below are unchanged and were
@@ -839,7 +839,7 @@ row inside the party list. The rounding column above is unaffected; § 9.2 has t
 
 > ⛔ **SUPERSEDED 14.08.2026.** The two conventions this section used to state are dead. They were
 > **ours**, written 13.08.2026 as a stopgap, and put to Berkay in `FRAGEN-an-Berkay-02.md`. He
-> answered in `berkay-work/Antwort-an-Emir_02.md` § 1 — not by picking one, but by replacing the
+> answered in `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 — not by picking one, but by replacing the
 > model they were both stopgaps for. **Do not restore either.** They are printed below, struck, so a
 > later reader recognises them as removed rather than missing.
 >

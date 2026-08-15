@@ -97,5 +97,6 @@ es nicht: zwei Regeln widersprechen sich und keine ist entschieden. Wir haben ih
 - **`geprüft`** führen wir jetzt ausdrücklich als „Normtext an der Primärquelle gegengelesen" —
   nicht als anwaltlich bestätigt. GEG § 82 und die Rechtsnatur der Emissionsfaktoren bleiben als
   noch-nicht-final markiert.
-- **Registerfassung**: wir nehmen die Fassung aus `FEEDBACK-to-Emir-01b/` (7 Flags mehr auf
-  `geprüft`) als maßgeblich. Die Datumsstempel ab dem nächsten Export lösen das dauerhaft.
+- **Registerfassung**: die maßgebliche Fassung liegt jetzt als eine kanonische Datei unter
+  `berkay-work/Rechtsstand-Register/` (7 Flags mehr auf `geprüft`). Die Datumsstempel ab dem
+  nächsten Export lösen das dauerhaft.

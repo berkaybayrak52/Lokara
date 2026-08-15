@@ -75,10 +75,11 @@ For **calculation rules**, the precedence is `berkay-work/` → `docs/` → the 
 Berkay's spec supersedes `docs/` and the code where they disagree. (`lokara-arch.md` stays
 canonical for *architecture*; this rule is about numbers, formulas and legal values.)
 
-1. **`berkay-work/` is committed and immutable.** Nobody edits anything under it — not a typo, not
-   a broken table, not a value that looks wrong. It stays exactly as exported so a transcription can
-   always be diffed against what he actually wrote. The moment someone "fixes" a value in there, the
-   transcriptions lose their oracle. Findings about its content go in a report, never in the file.
+1. **`berkay-work/` is committed and immutable to agents unless Emir explicitly authorises a
+   controlled change.** Its clean current view has exactly two top-level folders:
+   `Rechtsstand-Register/` and `Spec-Seiten/`. Agents never fix, reorganise or replace Berkay's
+   material on their own. An authorised reorganisation or source update preserves the prior bytes in
+   Git history, so every transcription can still be checked against what he actually sent.
 
 2. **Do not copy his `.md` files into `docs/` — transcribe them.** They are Notion exports with hash
    suffixes and URL-encoded links to `.csv` files that will not exist; they address "Seite 01b", not
@@ -91,27 +92,29 @@ canonical for *architecture*; this rule is about numbers, formulas and legal val
    (Comma-Separated Values) file of 180 rows: Wert, Betrag/Satz, Flag, Quelle, Rechtsgrundlage,
    Rechtsnatur, Rechtsstand. Import it into `rules-store` nearly as-is — no prose transformation.
 
-   > **Two copies carry the same filename; only one is authoritative.** Take
-   > **`berkay-work/FEEDBACK-to-Emir-01b/Rechtsstand-Register/`** — it is the later export and the
-   > one Berkay named as maßgeblich (`Antwort-an-Emir_02.md` § 5). The copy under
-   > `berkay-work/Calculations/` is the earlier one and differs in **7 rows** that have since moved
-   > from `verify-before-production` to `geprüft`; a Notion export has no date in the name, which is
-   > how two versions came to look identical. He date-stamps exports from the next one on
-   > (`…_2026-08-14`), so this is a one-time collision — but until then, check the path, not the
-   > filename. (Each directory also holds a `_all.csv` twin of the same 180 rows.)
+   The matching Notion pages remain under `Rechtsstand-Register/Eintraege/` because some contain
+   explanatory notes not represented in the CSV. For structured fields and flags, the CSV wins.
+
+   > **There is one authoritative file:**
+   > **`berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`**. It is the later export Berkay
+   > named as maßgeblich (`Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 5). The earlier export,
+   > preserved in Git history, differed in **7 rows** that later moved from
+   > `verify-before-production` to `geprüft`.
 
 4. **Every value lands with its flag intact.** Rechtsnatur (Gesetz / Verordnung / Konvention /
    Heuristik), Rechtsstand, source URL, and `verify-before-production` vs `geprüft`. **130 of the
    180 rows are `verify-before-production`**, the other 50 `geprüft`, in the authoritative copy
    named in rule 3; the figure was 137 in the earlier one, and quoting that number is the first
-   symptom of reading the wrong file. His `README-for-Emir.md` lists what must **not** be treated as
-   verified: Anlage-V line numbers, SKR03/SKR04 (Standardkontenrahmen) accounts, DATEV EXTF
+   symptom of reading the superseded export. His `Spec-Seiten/Anlagen/README-for-Emir.md` lists what
+   must **not** be treated as verified: Anlage-V line numbers, SKR03/SKR04
+   (Standardkontenrahmen) accounts, DATEV EXTF
    (the DATEV export text format) parameters, and three BFH (Bundesfinanzhof, the Federal Fiscal
    Court) case numbers marked `ZITAT UNSICHER`. **Transcribing a flagged value as fact is the error
    to avoid** —
    the computation paths are right, the numbers are placeholders of realistic magnitude.
 
-   > **What `geprüft` means, in his words** (`berkay-work/Antwort-an-Emir_02.md`, 14.08.2026):
+   > **What `geprüft` means, in his words**
+   > (`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md`, 14.08.2026):
    > *"Normtext an der Primärquelle gegengelesen"* — the statutory text was read at the primary
    > source. It does **not** mean a lawyer confirmed the legal classification, and no output may
    > imply that it does. Legal review is a **second stage**, planned once the Rechtsstand register

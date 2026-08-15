@@ -408,8 +408,8 @@ introduced elsewhere either), and the landlord row. Plus the two carrier-list ro
 
 ## Die Eigentümerzeile — always printed, never a Quote
 
-> **Source:** `berkay-work/Antwort-an-Emir_02.md` § 1.3 (Fragen 1–3) and § 1.4, 14.08.2026; primary
-> rule text `berkay-work/…/Spec-Seiten/01 · Die Abrechnung ….md` → **D0**, **D12**, **`08-F21`**
+> **Source:** `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1.3 (Fragen 1–3) and § 1.4, 14.08.2026; primary
+> rule text `berkay-work/Spec-Seiten/01 · Die Abrechnung ….md` → **D0**, **D12**, **`08-F21`**
 > (line 757) and edge cases **E3**, **E17**, **E19**. The figures behind it are his `09-F06`–`09-F09`
 > and `09-F19` on Seite 02, which his answer cites under the older IDs `08-F06` / `08-F21` /
 > `08-F22`; both numberings are named everywhere so they can be matched later.

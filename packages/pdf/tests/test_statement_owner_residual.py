@@ -2,7 +2,7 @@
 
 Spec: `docs/08-statement-document.md` → **"Die Eigentümerzeile — always printed,
 never a Quote"**, §§ 1-4. Model: `docs/02` → "The Eigentümeranteil is a residual
-line, not a party". Rule source: `berkay-work/Antwort-an-Emir_02.md` § 1
+line, not a party". Rule source: `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1
 (14.08.2026) and Seite 01 **D12**. Rechtsstand 08/2026. Written before the
 template change, **red on purpose**.
 

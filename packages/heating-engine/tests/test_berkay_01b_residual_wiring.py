@@ -31,9 +31,9 @@ from different inputs. They are **two data paths** and must never be asserted
 against each other. Nothing in this file mixes them; do not "unify" them.
 
 ⛔ **AMENDED 14.08.2026 — the owner bucket is one Liegenschafts-Residuum.**
-`berkay-work/Antwort-an-Emir_02.md` § 1 replaced the model this file was written
-against: the Eigentümeranteil is not a party derived from vacancy but one
-structural residual line per Liegenschaft, which exists even when nothing is
+`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 replaced the
+model this file was written against: the Eigentümeranteil is not a party derived
+from vacancy but one structural residual line per Liegenschaft, which exists even when nothing is
 vacant. R1 and R5 themselves were **confirmed and did not change** — what changed
 is where the Verteilungsrest goes and how many rows can hold it. Two consequences
 here, both dated so nobody restores what they replaced:

@@ -5,7 +5,7 @@ degree-day apportionment on renter change, CO2KostAufG 10-step split.
 Every fixture reconciles to the input total to the cent.
 
 **Re-shaped 14.08.2026 — an Eigentümerzeile at 0,00 €, and no cent moved.**
-`berkay-work/Antwort-an-Emir_02.md` § 1: the Eigentümeranteil is one residual
+`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1: the Eigentümeranteil is one residual
 line per Liegenschaft, and § 1.3 Frage 1 makes it exist *"auch bei 0,00 €, auch
 ohne Leerstand, auch ohne Eigennutzung"*. Every building in this file is fully
 let, so each fixture gained an owner row and none of them gained an amount:
