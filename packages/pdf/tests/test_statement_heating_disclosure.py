@@ -1348,7 +1348,7 @@ class TestCo2Berechnungsgrundlagen:
         assert (
             f"Berechnungsgrundlagen: CO₂-Emissionen des Gebäudes {_n(co2.total_co2_kg)} kg "
             f"· beheizte Fläche {_n(co2.heated_area_sqm)} m² "
-            f"→ {_n(co2.intensity_kg_per_sqm)} kg CO₂/m²/Jahr "
+            f"→ {format(co2.intensity_kg_per_sqm, '.1f').replace('.', ',')} kg CO₂/m²/Jahr "
             f"· Einstufung: {_n(co2.band_min_inclusive)} bis unter "
             f"{_n(co2.band_max_exclusive)} kg CO₂/m²/Jahr "
             f"· CO₂-Kosten {_eur(co2.co2_cost)}"
@@ -1373,6 +1373,28 @@ class TestCo2Berechnungsgrundlagen:
 
         assert "Einstufung: 37 bis unter 42" in text
         assert "Stufe 7" not in text
+
+
+class TestCo2S3FixedOneDecimalDisplay:
+    """Antwort 03 § 6: the rounded classified value is printed as `12,0`.
+
+    Both render sites are pinned because the generic number formatter suppresses
+    trailing zeros. These stay red after the engine is fixed until the statement
+    uses one fixed-one-decimal CO₂-intensity formatter in both places.
+    """
+
+    def test_the_co2_summary_prints_exactly_12_0(self) -> None:
+        data = build_statement(co2=Co2Input(total_co2_kg=Decimal(1196), co2_cost=cents(10_000)))
+        text = block_text(statement_html(data), BLOCK_CO2)
+
+        assert "Emissionsintensität 12,0 kg CO₂/m²/Jahr" in text
+        assert "Vermieteranteil 10 %" in text
+
+    def test_the_berechnungsgrundlagen_print_exactly_the_same_12_0(self) -> None:
+        data = build_statement(co2=Co2Input(total_co2_kg=Decimal(1196), co2_cost=cents(10_000)))
+        text = block_text(statement_html(data), BLOCK_CO2)
+
+        assert "→ 12,0 kg CO₂/m²/Jahr · Einstufung: 12 bis unter 17" in text
 
 
 class TestTheDemosCo2FixtureIsPlausibleOnItsFace:
@@ -1440,7 +1462,7 @@ class TestTheDemosCo2FixtureIsPlausibleOnItsFace:
 
         assert "CO₂-Emissionen des Gebäudes 4.000 kg" in text
         assert "CO₂-Kosten 261,80 €" in text
-        assert "40 kg CO₂/m²/Jahr" in text
+        assert "40,0 kg CO₂/m²/Jahr" in text
         assert "Vermieteranteil 60 %" in text
         assert "2.000 kg" not in text and "300,00 €" not in text
 

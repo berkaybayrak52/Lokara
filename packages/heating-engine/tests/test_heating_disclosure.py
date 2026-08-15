@@ -684,8 +684,8 @@ class TestCo2BandOverAShortPeriod:
         assert co2.landlord_share_percent == 60
         # The disclosed intensity is the annualised one — the header over it
         # reads kg CO₂/m²/**Jahr**, and now the figure under it does too.
-        assert co2.intensity_kg_per_sqm == Decimal("19.5") * Decimal(365) / Decimal(181)
-        assert co2.intensity_kg_per_sqm.quantize(Decimal("0.01")) == Decimal("39.32")
+        assert co2.intensity_kg_per_sqm == Decimal("39.3")
+        assert co2.intensity_kg_per_sqm.as_tuple().exponent == -1
         lower, upper = co2.band_min_inclusive, co2.band_max_exclusive
         assert lower is not None and upper is not None
         # Unscaled: the pair a tenant can look up in the published Anlage.

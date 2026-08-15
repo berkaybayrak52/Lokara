@@ -8,9 +8,10 @@ inklusive 1858-statt-1859 und 17.531-statt-17.536. Danke besonders für § 1.4: 
 Einheit erhalten bleiben muss, während das Display aggregiert, hätten wir sonst beim Kollabieren
 verloren — und damit die Leerstandsaufstellung für Anlage V.
 
-Fünf offene Punkte. **Punkt 1 ist der einzige, der etwas von dir braucht, das wir nicht selbst
-entscheiden dürfen**; 2 und 3 sind Korrekturen an deinen eigenen Seiten, die du bereits angekündigt
-hast; 4 und 5 stehen seit Runde 1 offen und sind in deiner Antwort nicht vorgekommen.
+Sechs offene Punkte. **1 und 6 sind die einzigen, die etwas von dir brauchen, das wir nicht selbst
+entscheiden dürfen** — und **6 blockiert unsere nächste Zeile**; 2 und 3 sind Korrekturen an deinen
+eigenen Seiten, die du bereits angekündigt hast; 4 und 5 stehen seit Runde 1 offen und sind in
+deiner Antwort nicht vorgekommen.
 
 ---
 
@@ -77,6 +78,52 @@ es nicht: zwei Regeln widersprechen sich und keine ist entschieden. Wir haben ih
 **nicht** gebaut und die Lücke in `docs/03` § 9.5 als solche vermerkt.
 
 **Frage:** Welche Regel gilt? Solange das offen ist, verweigert die Engine lieber, als zu schätzen.
+
+## 6. `R4` (Seite 01b) gegen § 5 Abs. 1 S. 3 CO2KostAufG — Lookup auf dem gerundeten Wert?
+
+Das ist der Punkt, der bei uns die nächste Zeile blockiert. Wir haben **nichts** geändert.
+
+Dein `R4` auf Seite 01b sagt (deine Formulierung):
+
+> „**Emissions** — gram (integer) internally. Display kg with 1 dp, kg/m²/a with 2 dp. **The step
+> lookup uses the unrounded value.**"
+
+`E3` schärft das nach: *„Lookup on the unrounded value (R4). Print the floored value, never `12,00`
+next to a 0 % share"*, mit `01b-F05` als ausgerechnetem Fixture.
+
+§ 5 Abs. 1 S. 3 CO2KostAufG sagt wörtlich:
+
+> „Der Wert des nach Satz 1 oder Satz 2 ermittelten spezifischen Kohlendioxidausstoßes ist auf die
+> **erste Nachkommastelle** zu runden."
+
+Der Satz steht vor der Einstufung und hat sonst keine Funktion — wir lesen ihn deshalb so, dass der
+**gerundete** Wert der einzustufende ist. An `01b-F05` entscheidet das den Fall:
+
+| | nach `R4`/`E3` | nach § 5 Abs. 1 S. 3 |
+| --- | --- | --- |
+| `spezifisch` | 11,999484535… | **12,0** |
+| Stufe | 1 → **0 %** | 2 → **10 %** |
+| `abzug` | 0 | **1.280** (12,80 €) |
+| `umlagefaehig` | 350.600 | **349.320** |
+
+Deine Ausgaberegel hängt mit daran: `11,99` abgeschnitten zu drucken begründest du damit, dass der
+Mieter den 0-%-Anteil sonst nicht nachvollziehen kann — bei 10 % entfällt diese Begründung, und nach
+S. 3 ist der ausgewiesene Wert ohnehin `12,0`.
+
+**Frage:** Gilt `R4` weiter, oder ersetzt S. 3 ihn? Wir halten S. 3 für vorrangig — `R4` ist bei uns
+als Rechenkonvention geführt, S. 3 ist Gesetzestext, und eine Hauskonvention kann eine Norm nicht
+verdrängen. Wir setzen aber keine deiner Fixtures gegen deine eigene Regel außer Kraft: `01b-F05`
+ist committet, und die Entscheidung ist deine.
+
+**Zusatzfrage, falls S. 3 gilt — in welcher Reihenfolge?** Wir annualisieren nach `H2` die
+Intensität und lassen die Anlage-Tabelle ungekürzt; S. 3 rundet den nach S. 1/S. 2 ermittelten Wert,
+S. 4 kürzt die Tabelle. Wird also **vor oder nach** der Annualisierung gerundet? `01b-F06`
+(28,734770… → 28,7) fällt in beiden Fällen in dieselbe Stufe und entscheidet es nicht. Ohne deine
+Festlegung würden wir hier raten, und das tun wir nicht.
+
+**Hinweis zur Nummerierung:** `R4` gibt es auf mehreren deiner Seiten mit unterschiedlicher
+Bedeutung (01b = Emissionen, 02 = Schlüssel-Kaskade, 04 = anteiliger Split, 07 = AfA-Bezug). Gemeint
+ist hier ausschließlich **`R4` auf Seite 01b**.
 
 ---
 

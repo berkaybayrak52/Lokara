@@ -1,4 +1,4 @@
-"""H2 - CO₂ Einstufung: step boundaries, unrounded lookup, short-period annualisation.
+"""H2/R8 - CO₂ Einstufung: annualise, round to one decimal, classify.
 
 Spec: `docs/03-nk-heating-engines.md` -> "Seite 01b … (3) CO₂ short billing
 period" and § 6 (E2/E3/E4). Source of every expected cent:
@@ -18,9 +18,13 @@ band (20,34-24,11) that appears in no statute annex.
 
 ⚠️ Do not "fix" this back to the shortened table. The superseded section is kept
 and marked in `docs/03`; read it before touching `co2.py`.
+
+Amended by `Antwort-an-Emir_03.md` § 6: R4/E3 and the old `01b-F05` are
+superseded. The annualised value is rounded to one decimal before lookup, and
+that same rounded value is printed.
 """
 
-from decimal import ROUND_DOWN, Decimal
+from decimal import Decimal
 
 from lokara_domain import Co2Step, Co2Table, Period, cents, period
 from lokara_heating_engine import landlord_share_percent_for_intensity
@@ -70,7 +74,7 @@ class TestStepBoundariesAreLeftClosed:
         -> umlagefaehig 350.600 - 1.280 = 349.320 (3.493,20 €).
         """
         result = _split("2328", 12_804)
-        assert result.intensity_kg_per_sqm == Decimal(12)
+        assert result.intensity_kg_per_sqm == Decimal("12.0")
         assert result.landlord_share_percent == 10
         assert int(result.landlord_amount) == 1_280
         assert int(result.renter_amount) == 11_524
@@ -83,14 +87,15 @@ class TestStepBoundariesAreLeftClosed:
         -> umlagefaehig 297.890 (2.978,90 €).
         """
         result = _split("10088", 55_484)
-        assert result.intensity_kg_per_sqm == Decimal(52)
+        assert result.intensity_kg_per_sqm == Decimal("52.0")
         assert result.landlord_share_percent == 95
         assert int(result.landlord_amount) == 52_710
         assert GESAMTKOSTEN - int(result.landlord_amount) == 297_890
 
     def test_the_bounds_themselves_did_not_move(self) -> None:
-        """Regression pin, not a change: nine bounds and ten shares confirmed."""
-        assert landlord_share_percent_for_intensity(Decimal("11.99"), CO2_TABLE) == 0
+        """The table stays fixed; R8 changes the value compared against it."""
+        assert landlord_share_percent_for_intensity(Decimal("11.99"), CO2_TABLE) == 10
+        assert landlord_share_percent_for_intensity(Decimal("11.9499"), CO2_TABLE) == 0
         assert landlord_share_percent_for_intensity(Decimal(12), CO2_TABLE) == 10
         assert landlord_share_percent_for_intensity(Decimal(17), CO2_TABLE) == 20
         assert landlord_share_percent_for_intensity(Decimal(22), CO2_TABLE) == 30
@@ -102,32 +107,22 @@ class TestStepBoundariesAreLeftClosed:
         assert landlord_share_percent_for_intensity(Decimal(52), CO2_TABLE) == 95
 
 
-class TestTheLookupUsesTheUnroundedValue:
-    """E3 / R4 - the display may round to a bound; the classification may not."""
+class TestTheLookupUsesTheRoundedValue:
+    """E3/R4 are superseded by § 5 Abs. 1 S. 3 and Antwort 03 § 6."""
 
-    def test_berkay_01b_f05_rounds_up_to_12_00_but_classifies_below_it(self) -> None:
-        """2.327,9 kg / 194 m² = 11,999484535… -> naively 12,00, but Stufe 1.
+    def test_berkay_01b_f05_rounds_to_12_0_and_classifies_in_step_2(self) -> None:
+        """2.327,9 kg / 194 m² = 11,999484535… -> 12,0 -> Stufe 2.
 
-        Vermieteranteil 0 %, abzug 0, umlagefaehig 350.600 unchanged.
+        Vermieteranteil 10 %, abzug 1.280, umlagefaehig 349.320.
         `co2Cent` = 2.327,9/1000 x 5.500 = 12.803,45 -> 12.803 (128,03 €).
         """
         result = _split("2327.9", 12_803)
-        intensity = result.intensity_kg_per_sqm
-        assert intensity < Decimal(12)
-        assert intensity.quantize(Decimal("0.01")) == Decimal("12.00")  # the naive display
-        assert result.landlord_share_percent == 0
-        assert int(result.landlord_amount) == 0
-        assert int(result.renter_amount) == 12_803
-
-    def test_the_pflichtausweis_truncates_rather_than_rounds(self) -> None:
-        """Berkay's Ausgaberegel for this case: print `11,99` - **truncated**,
-        not rounded - or the tenant cannot reconcile a 0 % share with a printed
-        `12,00`. The rule belongs to the renderer (`docs/08`); asserted here on
-        the value the renderer receives, so the requirement is pinned somewhere
-        while the CO₂ disclosure block is still being built.
-        """
-        intensity = _split("2327.9", 12_803).intensity_kg_per_sqm
-        assert intensity.quantize(Decimal("0.01"), rounding=ROUND_DOWN) == Decimal("11.99")
+        assert result.intensity_kg_per_sqm == Decimal("12.0")
+        assert result.landlord_share_percent == 10
+        assert int(result.landlord_amount) == 1_280
+        assert int(result.renter_amount) == 11_523
+        assert int(result.landlord_amount) + int(result.renter_amount) == 12_803
+        assert GESAMTKOSTEN - int(result.landlord_amount) == 349_320
 
 
 class TestShortBillingPeriodIsAnnualised:
@@ -146,8 +141,8 @@ class TestShortBillingPeriodIsAnnualised:
     def test_the_disclosed_intensity_is_the_annualised_figure(self) -> None:
         result = _split("4200", 23_100, self.SHORT_PERIOD)
         expected = Decimal(4200) / AREA * Decimal(365) / Decimal(275)
-        assert result.intensity_kg_per_sqm == expected
-        assert result.intensity_kg_per_sqm.quantize(Decimal("0.01")) == Decimal("28.73")
+        assert result.intensity_kg_per_sqm == expected.quantize(Decimal("0.1"))
+        assert result.intensity_kg_per_sqm == Decimal("28.7")
 
     def test_the_annualisation_factor_is_365_over_the_period_days(self) -> None:
         """Replaces `period_factor` (which was <= 1 and shortened the bounds).
@@ -188,7 +183,7 @@ class TestShortBillingPeriodIsAnnualised:
         calendar year, so nothing on it moves."""
         result = _split("5628", 30_954)
         assert result.annualisation_factor == Decimal(1)
-        assert result.intensity_kg_per_sqm == Decimal(5628) / AREA
+        assert result.intensity_kg_per_sqm == Decimal("29.0")
         assert result.landlord_share_percent == 40
         assert int(result.landlord_amount) == 12_382
 

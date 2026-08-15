@@ -26,6 +26,12 @@ def format_number_de(value: Decimal) -> str:
     return grouped.replace(",", "\0").replace(".", ",").replace("\0", ".")
 
 
+def format_co2_intensity_de(value: Decimal) -> str:
+    """German CO2 intensity with the engine's fixed one-decimal precision."""
+    grouped = f"{value:,.1f}"
+    return grouped.replace(",", "\0").replace(".", ",").replace("\0", ".")
+
+
 def display_figure(value: Decimal) -> Decimal:
     """At most two decimals. ``format_number_de`` drops the trailing zeros."""
     return value.quantize(DISPLAY_STEP)

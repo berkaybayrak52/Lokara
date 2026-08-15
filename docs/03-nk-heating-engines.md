@@ -2,7 +2,9 @@
 
 > **Source for the heating/CO₂ half of this file:**
 > `berkay-work/Spec-Seiten/01b · Heizkosten- & CO₂-Verteilung 3a95fd420731814e9e5be043028d4856.md`
-> and `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`.
+> and `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`; the correction to R4/E3 and
+> `01b-F05` is transcribed from
+> `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 6 (15.08.2026).
 > Transcribed, not copied (`CLAUDE.md` → *"The calculation spec lives in `berkay-work/`"*, rule 2).
 > Agents edit `berkay-work/` only with Emir's explicit permission; ordinary findings go in a report.
 > Where this file and his page disagree on a number, formula or legal value, **his page wins**.
@@ -280,11 +282,9 @@ over-classifies and overcharges the landlord. Neither is defensible, so the engi
 split for such a period and says so in German; the Heizkosten themselves still compute, exactly as with
 a missing meter (`docs/03` § 9a rule above). A conscious decision, open to being overruled by the lead.
 
-**Known gap, deliberately not implemented here.** § 5 Abs. 1 S. 3 requires the specific emission value
-to be **rounded to one decimal place** (*"auf die erste Nachkommastelle zu runden"*) — the engine
-currently classifies the unrounded `Decimal`. At a bound (e.g. 11,96 → 12,0) rounding *before*
-classification changes the Stufe, so it needs its own spec and its own fixture and is **not** folded
-into this one. Recorded, not guessed.
+**Closed by the Row-3 spec.** § 5 Abs. 1 S. 3 requires the specific emission value to be rounded to
+one decimal place before classification. The live rule is transcribed under R8 below; it applies to
+the annualised H2 value and supersedes the unrounded lookup in R4/E3 and `01b-F05`.
 
 **Uncertain / would resolve it:** whether *anteilig* is meant day-exact or month-exact, and whether S. 4
 applies to a Rumpfperiode that was never *vereinbart*. A published BMWSB Arbeitshilfe, the source of the
@@ -499,8 +499,8 @@ Interval semantics confirmed on both sides: **left-closed, right-open** — exac
 ## 3. Inputs (§ 3 of the page, condensed)
 
 Money is **integer cents**. Dates are **day-granular, both boundary days inclusive**. Areas are m²
-with two decimals. Emissions are **integer grams** internally (R4); the step lookup uses the
-**unrounded** value.
+with two decimals. Emissions remain **integer grams** internally (R4); the specific annualised value
+used for the step lookup is rounded to one decimal place (R8).
 
 | Group | Fields that reach the engine |
 | --- | --- |
@@ -536,7 +536,8 @@ gesamtCent = Σ rechnung.betragCent          (allocated per K8, see H1a)
 co2Gramm = Σ rechnung.co2Gramm                      # fallback K4 only on § 3 breach
 co2Cent  = Σ rechnung.co2KostenCent                 # see the open collision in § 7 below
 spezifisch = (co2Gramm / 1e6) / gesamtflaecheM2                                [R2, R4]
-if nTage not in (365, 366): spezifisch ×= 365 / nTage        # annualise BEFORE the lookup
+if nTage not in (365, 366): spezifisch ×= 365 / nTage        # annualise first (H2)
+spezifisch = round_half_up(spezifisch, 1 Nachkommastelle)       # then round (R8)
 
 gebaeudeTyp wohn|gemischt → vermieterAnteil = lookup10(spezifisch)   # Anlage CO2KostAufG
 gebaeudeTyp nichtwohn     → vermieterAnteil = 50                     # § 8 CO2KostAufG
@@ -623,17 +624,59 @@ not only a percentage. Import spec for the DWD file is referenced by his page bu
 `berkay-work/`**. PLZ in the DWD file carry **no leading zero** — pad to five digits on import or the
 adjustment silently disappears for all of eastern Germany.
 
-## 5. Rounding rules (R1 … R7) — these are the engine's rounding contract
+## 5. Rounding rules (R1 … R8) — these are the engine's rounding contract
 
 | ID | Rule |
 | --- | --- |
 | R1 | **Money** — integer cents everywhere. `round_half_up` to whole cents, **once**, at the moment a share is assigned. Never on an already-rounded value. |
 | R2 | **Quotas** — never rounded. Exact `Decimal` (≥ 28 significant digits). Recompute the quotient; never reuse a rounded factor. |
 | R3 | **Energy** — kWh, 3 dp, `round_half_up`. |
-| R4 | **Emissions** — integer **gram** internally. Display kg with 1 dp, kg/m²/a with 2 dp. **The step lookup uses the unrounded value.** |
+| R4 | **Emissions mass** — integer **gram** internally; display the mass in kg with 1 dp. The former rule to classify the unrounded kg/m²/a value and print it with 2 dp is superseded by R8. |
 | R5 | **Residual** — `Blockbetrag − Σ gerundete Mieteranteile = Verteilungsrest` → the **Liegenschafts-Residuum**, together with the vacancy share. ±1 ct per block on top of that share, sign either way (K9). *Amended 14.08.2026: "owner bucket" is one line per Liegenschaft, never a derived landlord party — § 9.2, `docs/02`.* |
 | R6 | **Statutory percentages** applied to cent amounts, `round_half_up`. |
 | R7 | **Device units** — 1 dp, `round_half_up` (K11). The flat's total is the sum of the **rounded** device values. |
+| **R8** | **Specific CO₂ intensity** — annualise under H2, then `round_half_up` to **one decimal place**, then classify. The same one-decimal value is printed, including a trailing zero (`12,0`). The round-before-classify rule is statutory; `ROUND_HALF_UP` is explicitly a **Lokara convention**, because neither § 5 Abs. 1 S. 3 nor Berkay specifies the tie mode. |
+
+### R8 — § 5 Abs. 1 S. 3 CO2KostAufG: annualise, round, classify, print
+
+> **Rechtsstand 08/2026. Source:**
+> `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 6 (15.08.2026), confirming that
+> sentence 3 wins and replaces R4. Official norm:
+> `https://www.gesetze-im-internet.de/co2kostaufg/__5.html`. The statutory 10-step table remains in
+> `packages/rules-store` with its own as-of date; neither its bounds nor its percentages change.
+
+The exact order is:
+
+```
+raw intensity = (integer CO₂ grams / 1_000_000) / heated area
+annualised     = raw intensity × 365 / period days     # H2, unless 365/366-day full year
+classified     = round_half_up(annualised, 1 decimal)    # R8
+step           = lookup10(classified)                    # unchanged table
+```
+
+Only the specific value is rounded. Internal integer grams, the unshortened Anlage table, its
+left-closed/right-open bounds and all unaffected cent totals remain unchanged. `Co2Result` carries
+one intensity field, `intensity_kg_per_sqm`, and it is the annualised, one-decimal value used for the
+classification. A second raw/unrounded intensity field is not added; the raw value remains
+reproducible from the carried mass, area and period-day fields.
+
+The fixed one-decimal display is part of the rule: `Decimal("12.0")` renders as **`12,0`** in both
+the CO₂ summary and the Berechnungsgrundlagen. The generic number formatter's trailing-zero
+suppression must not be used for this field.
+
+`01b-F05` is re-expected exactly as Berkay confirms:
+
+| Input/result | Superseded R4/E3 | R8 / S. 3 |
+| --- | --- | --- |
+| `2.327,9 kg / 194 m²` | `11,999484…`, classified raw | **`12,0`**, printed and classified |
+| Step / landlord share | Stufe 1 / 0 % | **Stufe 2 / 10 %** |
+| CO₂ landlord deduction | 0 ct | **1.280 ct** |
+| CO₂ renter amount | 12.803 ct | **11.523 ct** |
+| billable heating total (`350.600 - deduction`) | 350.600 ct | **349.320 ct** |
+
+Boundary and order fixtures cover `11,95 → 12,0` (promotion), `11,9499 → 11,9` (no
+promotion), `12,04 → 12,0` (no demotion), and a 275-day case where rounding before annualisation
+would select the wrong step. `01b-F06` remains in the same step: annualised `28,7347… → 28,7`.
 
 **API consequence for `packages/domain`.** `distribute_cents` (largest-remainder) is not this rule.
 Two primitives implement R5, and they are not interchangeable:
@@ -676,8 +719,8 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 | --- | --- | --- | --- |
 | E1 | Supplier states no CO₂ mass/cost (§ 3 CO2KostAufG breach) | K4 fallback + **warning** + § 7 Abs. 4 risk flag | `01b-F02` |
 | E2 | `spezifisch` exactly on a bound (12,00 / 52,00) | Left-closed → the **higher** step | `01b-F03`, `01b-F04` |
-| E3 | Rounds *up* to a bound but is below it | Lookup on the **unrounded** value (R4). Print the **truncated** figure (`11,99`), never `12,00` next to a 0 % share | `01b-F05` |
-| E4 | Billing period ≠ 12 months | Annualise `× 365 / nTage` **before** the lookup | `01b-F06` |
+| E3 | Rounds *up* to a bound but is below it | **Superseded by R8:** annualise, round to 1 dp, classify the rounded value, and print it with 1 dp (`11,999484… → 12,0 → 10 %`) | `01b-F05` (re-expected) |
+| E4 | Billing period ≠ 12 months | Annualise `× 365 / nTage`, **then round to 1 dp, then classify** | `01b-F06` + order fixture |
 | E5 | Nichtwohngebäude | Flat 50/50 (§ 8 CO2KostAufG); gemischt → step model | `01b-F07` |
 | E6 | Denkmal-/Milieuschutz | Landlord share **halved** (§ 9 Abs. 1); full exclusion only with stored proof (Abs. 2 + 3) | `01b-F08`, `01b-F09` |
 | E7 | Wärmepumpe / Biomasse | CO₂ module off: no deduction, **no** Pflichtausweis, **no** step indicator | `01b-F10` |
@@ -708,6 +751,11 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 
 These are for Berkay and the lead. None of them is decided in this transcription, and none of them has
 a fixture asserting a chosen answer.
+
+> **Routing note, 15.08.2026:** `Antwort-an-Emir_03.md` items 1–5 answer several entries in and around
+> this list (K9 wording, `08-F21`, D2, precise Erdgas factors, and the CO₂-cost fallback). They are
+> separate controlled slices. Row 3 transcribes **only item 6**: it does not change the authoritative
+> Rechtsstand CSV or Erdgas factors, does not implement D2, and keeps the CO₂-cost fallback refused.
 
 1. **Erdgas emission factor — two value pairs.** The lead's brief gives **Hu 0,2016 / Ho 0,1820**; the
    Rechtsstand-Register row *"Emissionsfaktor Erdgas (K4)"* gives **Hu 0,201 / Ho 0,181** with
@@ -1006,7 +1054,7 @@ HeatingInput.energy_reference: EnergyReference | None = None   # the Bezug of to
 | mass absent, no factor | `HeatingInputError` (German) — the § 3 breach is reported, never guessed around |
 | mass absent, factor present, `energy_reference is None` | `HeatingInputError` (German) — an undeclared Bezugsgröße is refused, **never** defaulted. Defaulting to Hu on an Ho invoice is precisely the silent 11 % error this rule exists to stop |
 | references **differ** | `EnergyReferenceMismatchError`, propagated **unwrapped** so its German text and its type both reach the API boundary. No coercion, no warning-and-continue, no `× 0,903` |
-| references match | `total_co2_kg = co2_grams_from_energy(total_energy_kwh, reference, factor) / 1000` — R4 integer grams, then the unrounded value into the step lookup |
+| references match | `total_co2_kg = co2_grams_from_energy(total_energy_kwh, reference, factor) / 1000` — R4 keeps integer grams; H2 annualises the derived specific value and R8 rounds it before the step lookup |
 
 **Why the mismatch is worth a hard error, as one fixture pair.** Same building, same invoice of
 20.000 kWh, Erdgas, 100 m² beheizte Fläche:

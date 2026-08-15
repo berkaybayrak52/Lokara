@@ -154,7 +154,7 @@ class TestInterimPeriodAnnualisesTheIntensity:
     factor is 365/181 = 2,0165…
 
     1.950 kg CO₂ over 100 m² = **19,5 kg CO₂/m² over the period**, annualised
-    **39,32 kg CO₂/m²/a**.
+    **39,32 kg CO₂/m²/a**, then § 5 Abs. 1 S. 3 rounds it to **39,3**.
 
     * Naively, comparing the period figure against the per-year table:
       17 ≤ 19,5 < 22 → Vermieter **20 %**. That is the defect.
@@ -179,8 +179,7 @@ class TestInterimPeriodAnnualisesTheIntensity:
         assert co2 is not None
         # H2 annualises the emissions figure; it does not shorten the table. The
         # disclosed value is therefore per year, as its column header claims.
-        assert co2.intensity_kg_per_sqm == annualised(Decimal(1950) / Decimal(100))
-        assert co2.intensity_kg_per_sqm.quantize(Decimal("0.01")) == Decimal("39.32")
+        assert co2.intensity_kg_per_sqm == Decimal("39.3")
         assert co2.annualisation_factor == ANNUALISATION_181
         assert co2.landlord_share_percent == 60  # not 20 — that is the defect
         assert int(co2.landlord_amount) == 18_000  # 180,00 € of 300,00 €
@@ -284,7 +283,7 @@ class TestFullYearIsUntouched:
         co2 = result.co2
         assert co2 is not None
         assert co2.annualisation_factor == Decimal(1)
-        assert co2.intensity_kg_per_sqm == Decimal(20)
+        assert co2.intensity_kg_per_sqm == Decimal("20.0")
         assert co2.landlord_share_percent == 20
         assert int(co2.landlord_amount) == 6_000
         assert int(co2.renter_amount) == 24_000
@@ -309,7 +308,7 @@ class TestFullYearIsUntouched:
         co2 = result.co2
         assert co2 is not None
         assert co2.annualisation_factor == Decimal(1)
-        assert co2.intensity_kg_per_sqm == Decimal(20)
+        assert co2.intensity_kg_per_sqm == Decimal("20.0")
         assert co2.landlord_share_percent == 20
         assert int(co2.landlord_amount) == 6_000
         assert int(co2.renter_amount) == 24_000
@@ -335,8 +334,7 @@ class TestNoOverCorrection:
         )
         co2 = result.co2
         assert co2 is not None
-        assert co2.intensity_kg_per_sqm == annualised(Decimal(5500) / Decimal(100))
-        assert co2.intensity_kg_per_sqm.quantize(Decimal("0.01")) == Decimal("110.91")
+        assert co2.intensity_kg_per_sqm == Decimal("110.9")
         assert co2.landlord_share_percent == 95
         assert co2.band_min_inclusive == Decimal(52)
         assert co2.band_max_exclusive is None

@@ -244,10 +244,12 @@ class TestCo2TenStepSplit:
         assert result.total == 1_030_000
 
     def test_step_selection_boundaries(self) -> None:
-        assert landlord_share_percent_for_intensity(Decimal("11.99"), CO2_TABLE) == 0
+        assert landlord_share_percent_for_intensity(Decimal("11.99"), CO2_TABLE) == 10
+        assert landlord_share_percent_for_intensity(Decimal("11.9499"), CO2_TABLE) == 0
         assert landlord_share_percent_for_intensity(Decimal(12), CO2_TABLE) == 10
         assert landlord_share_percent_for_intensity(Decimal(20), CO2_TABLE) == 20
-        assert landlord_share_percent_for_intensity(Decimal("51.99"), CO2_TABLE) == 80
+        assert landlord_share_percent_for_intensity(Decimal("51.99"), CO2_TABLE) == 95
+        assert landlord_share_percent_for_intensity(Decimal("51.9499"), CO2_TABLE) == 80
         assert landlord_share_percent_for_intensity(Decimal(52), CO2_TABLE) == 95
         assert landlord_share_percent_for_intensity(Decimal(60), CO2_TABLE) == 95
 

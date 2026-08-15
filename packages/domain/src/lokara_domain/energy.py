@@ -75,9 +75,9 @@ def co2_grams_from_energy(
 ) -> int:
     """kWh × kg CO₂/kWh → **integer grams** (R4), and only when the references match.
 
-    R4 keeps emissions in whole grams internally; kg with one decimal and
-    kg/m²/a with two are display roundings, and the CO₂ step lookup uses the
-    unrounded value.
+    R4 keeps emissions in whole grams internally. The later specific intensity
+    rounding belongs to the heating engine: § 5 Abs. 1 S. 3 / R8 annualises,
+    rounds to one decimal, then classifies. It does not change the grams here.
     """
     if not energy_kwh.is_finite() or energy_kwh < 0:
         raise ValueError(f"Energy quantity must be finite and >= 0, got: {energy_kwh}")

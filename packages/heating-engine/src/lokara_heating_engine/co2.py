@@ -1,11 +1,19 @@
 """CO2KostAufG 10-step split of the CO₂ cost portion of heating cost.
 
 The Anlage's bounds are per **year** (`kg CO2/m2/a`), so a billing period that is
-not a year is classified against an **annualised** intensity (H2):
+not a year is classified against an **annualised** intensity (H2). § 5 Abs. 1
+S. 3 then requires that intensity to be rounded to one decimal before the step
+lookup (R8):
 
     spezifisch = (co2Gramm / 1e6) / gesamtflaecheM2
-    if nTage not in (365, 366): spezifisch ×= 365 / nTage
+    if nTage not in (365, 366): spezifisch ×= 365 / nTage  # H2
+    spezifisch = round_half_up(spezifisch, 1 Nachkommastelle)
     step = lookup10(spezifisch)          # against the UNSHORTENED Anlage table
+
+The rounded value is both classified and carried for disclosure. `ROUND_HALF_UP`
+is Lokara's explicit tie convention; neither the statute nor Berkay specifies a
+tie mode. Source: `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 6;
+`docs/03-nk-heating-engines.md` R8. Rechtsstand 08/2026.
 
 ⚠️ **Do not "fix" this back to shortening the table.** The § 5 Abs. 1 S. 4
 reading (scale every finite bound by days/reference-year, leave the intensity as
@@ -22,12 +30,12 @@ Anlage. Spec: `docs/03` → "Seite 01b … (3) CO₂ short billing period".
 
 Periods longer than twelve months are refused, not annualised downward — a
 validation error inherited from Seite 01 (E6/E24), so annualisation never sees
-one. Rechtsstand 01/2023.
+one. The unchanged statutory step table has Rechtsstand 01/2023.
 """
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from lokara_domain import (
     Cents,
@@ -52,6 +60,7 @@ _RENTER_SIDE = 1
 # as an open convention in `docs/03` § 7 no. 8, not decided here.
 _ANNUALISATION_DIVISOR_DAYS = 365
 _FULL_YEAR_DAY_COUNTS = frozenset({365, 366})
+_S3_QUANTUM = Decimal("0.1")
 
 
 @dataclass(frozen=True)
@@ -125,21 +134,18 @@ def _period_basis_for(billing_period: Period) -> _PeriodBasis:
     )
 
 
-def _select_step(intensity_kg_per_sqm: Decimal, table: Co2Table) -> tuple[int, Co2Step]:
-    """The one place the Einstufung is decided — the percent and the band both
-    read off this single walk, so they can never disagree.
+def _select_step(intensity_kg_per_sqm: Decimal, table: Co2Table) -> tuple[Decimal, int, Co2Step]:
+    """Round under S. 3, then select the step from the unchanged Anlage table.
 
-    The bounds are the Anlage's own, unscaled: under H2 it is the intensity that
-    is brought onto a per-year basis, never the table.
+    The input must already be annualised under H2. Returning the quantized value
+    with the step keeps classification and disclosure on the same figure.
     """
+    rounded_intensity = intensity_kg_per_sqm.quantize(_S3_QUANTUM, rounding=ROUND_HALF_UP)
     for index, step in enumerate(table):
-        if (
-            step.max_intensity_exclusive is None
-            or intensity_kg_per_sqm < step.max_intensity_exclusive
-        ):
-            return index, step
+        if step.max_intensity_exclusive is None or rounded_intensity < step.max_intensity_exclusive:
+            return rounded_intensity, index, step
     raise HeatingInputError(
-        f"CO₂ table has no step for intensity {intensity_kg_per_sqm} (missing open-ended step)"
+        f"CO₂ table has no step for intensity {rounded_intensity} (missing open-ended step)"
     )
 
 
@@ -148,11 +154,10 @@ def landlord_share_percent_for_intensity(intensity_kg_per_sqm: Decimal, table: C
     falls under. Intervals are left-closed, right-open: exactly 12,00 is step 2,
     exactly 52,00 is the open-ended top step.
 
-    The value passed in must be **unrounded** (R4). Rounding to two decimals
-    first would put 11,99948… into the 10 % step and print a band the renter's
-    own figure contradicts (E3, `01b-F05`).
+    This helper applies § 5 Abs. 1 S. 3 itself: it rounds the annualised value
+    to one decimal with Lokara's `ROUND_HALF_UP` convention before selection.
     """
-    return _select_step(intensity_kg_per_sqm, table)[1].landlord_share_percent
+    return _select_step(intensity_kg_per_sqm, table)[2].landlord_share_percent
 
 
 def split_co2_cost(
@@ -172,7 +177,9 @@ def split_co2_cost(
     intensity = total_co2_kg / heated_area_sqm
     if basis.period_days not in _FULL_YEAR_DAY_COUNTS:
         intensity = intensity * Decimal(_ANNUALISATION_DIVISOR_DAYS) / Decimal(basis.period_days)
-    index, step = _select_step(intensity, table)
+    # R8: raw → annualise above → round to one decimal → classify. The same
+    # rounded Decimal is carried in the result for the statement.
+    intensity, index, step = _select_step(intensity, table)
     landlord_percent = step.landlord_share_percent
     previous_bound = table[index - 1].max_intensity_exclusive if index > 0 else None
     # R6 + H2: the *statutory percentage* is what gets `round_half_up`, and H2
