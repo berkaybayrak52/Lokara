@@ -142,10 +142,7 @@ def _select_step(intensity_kg_per_sqm: Decimal, table: Co2Table) -> tuple[Decima
     """
     rounded_intensity = intensity_kg_per_sqm.quantize(_S3_QUANTUM, rounding=ROUND_HALF_UP)
     for index, step in enumerate(table):
-        if (
-            step.max_intensity_exclusive is None
-            or rounded_intensity < step.max_intensity_exclusive
-        ):
+        if step.max_intensity_exclusive is None or rounded_intensity < step.max_intensity_exclusive:
             return rounded_intensity, index, step
     raise HeatingInputError(
         f"CO₂ table has no step for intensity {rounded_intensity} (missing open-ended step)"
