@@ -106,9 +106,10 @@ Every one of those checks in one step, which is the whole requirement:
 not chosen.** The demo building burns 20.000 kWh on 100 m² = 200 kWh/m²/a. With *any* fossil fuel that
 lands near 40 kg CO₂/m²/a; the old 20 kg/m²/a was only reachable by an emission factor no fuel has.
 Per the lead's constraint — *"do not bend the physics to protect a fixture"* — the band moves. Both
-bounds are comfortably clear of 40,0, so the step selection stays an unambiguous golden, and 40,0 is
-already at one decimal place, so the demo does **not** depend on the unimplemented § 5 Abs. 1 S. 3
-rounding (`docs/03` → *"Known gap"*, `PLAN.md` → *Carried over from the pitch-era order, not yet ranked*).
+bounds are comfortably clear of 40,0, so the step selection stays an unambiguous golden. **Row 3 is
+implemented:** the engine annualises, rounds to one decimal before classification and carries that
+same fixed-one-decimal value to both rendered locations (`docs/03` R8). The demo's exact `40,0` is
+not itself a rounding-boundary case, so the separate boundary fixtures remain the proof of ordering.
 
 **Story value, unexpectedly better.** A building at 40 kg CO₂/m²/a is a Sanierungsfall, the statute
 puts **60 %** of the CO₂ cost on the landlord, and that is exactly the incentive the CO2KostAufG was

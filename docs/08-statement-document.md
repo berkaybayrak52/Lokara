@@ -1,8 +1,9 @@
 # 08 — The Abrechnung document (formal content)
 
-> **Status: ⏳ spec pending.** This file records the **known gaps** found by reviewing the first
-> rendered statement, so they aren't lost. The full layout spec replaces the body below when it lands;
-> build from this file, not from a pasted spec.
+> **Status: living document specification.** The current landlord overview implements the heating
+> disclosure blocks specified below. The remaining formal gaps are named explicitly: the rendered
+> allocation equation and derived numerator, plus the M6 advances/Saldo and independently rendered
+> tenant documents. Build from this file, not from a pasted spec.
 >
 > ⚠️ **Not legal advice.** The requirements below are the well-established formal minimums; confirm the
 > specifics with a Fachanwalt/Steuerberater before shipping to real tenants (`docs/07`).
@@ -23,13 +24,13 @@ Settled BGH case law: a Betriebskostenabrechnung must contain all four.
 | --- | --- | --- |
 | 1 | **Zusammenstellung der Gesamtkosten** (per cost type) | ✅ |
 | 2 | **Angabe + Erläuterung des Verteilerschlüssels** | ✅ — e.g. "Wohnfläche (m²·Tage)" |
-| 3 | **Berechnung des Anteils des Mieters** | ◐ **half** in the **Betriebskosten** table — every figure is on the page, the calculation joining them is not (spelled out below) · ❌ in the **heating** table — no key, no Bemessung, no denominator at all (see *"The heating table is not ◐ — it is ❌"*) |
+| 3 | **Berechnung des Anteils des Mieters** | ◐ in both tables — the keys, party Bemessungen, Gesamtbemessungen/denominators and euro results render; the equation joining them and each numerator's derivation from its factors remain missing |
 | 4 | **Abzug der geleisteten Vorauszahlungen** → **Saldo** | ❌ **absent by decision** — blocked on the M6 Payment Ledger, not on rendering ([why](#4-is-blocked-on-the-m6-ledger-by-decision)) |
 
 Markers: **✅** rendered · **◐** partly rendered — what is and is not on the page is named exactly,
 never left to the reader · **❌** absent.
 
-### #3 is half closed, and this is which half
+### #3 is partly closed, and this is which part
 
 The share the engine computes is `Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung`. Checked
 against the rendered PDF (`packages/pdf/output/nk-heating-statement-demo.pdf`), **all four figures of
@@ -52,25 +53,18 @@ there:
    tenant can re-use the figure but cannot check it, so a wrong area or a wrong move-out date is
    invisible in the document.
 
-### The heating table is not ◐ — it is ❌
+### The heating disclosures are present; the shared equation gap remains
 
-The ◐ above is a statement about the **Betriebskosten** table only. Verified 03.08.2026 by reading the
-rendered PDF (`packages/pdf/output/nk-heating-statement-demo.pdf`), not the template source: in the
-heating section the page prints six euro columns and **nothing else**.
+The first PDF state recorded here was ❌. That historical finding is now closed. The current heating
+section renders all four Umlageschlüssel, each party's Bemessung, every Gesamtbemessung/denominator,
+the §§ 7/8 applied ratio and bounds, § 9 separation, the § 9b degree-day/period disclosure, and the
+§ 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen. The result carries those values; the template does not
+recalculate them.
 
-- No Umlageschlüssel for any of the four money columns.
-- No Bemessung column, therefore no per-party numerator.
-- No Gesamtbemessung, therefore no denominator.
-- No §§ 7/8 base/consumption ratio — the demo runs 30/70 and the page never says so.
-- No § 9 warm-water separation.
-- No Gradtagszahlen: the 583,3/416,7 ‰ split exists on the page **only** as the ratio between two printed
-  euro amounts (776,52 / 554,74). Text search over the rendered PDF: `HeizkostenV` **0**, `583,3` **0**,
-  `416,7` **0**, `‰` **0**.
-
-So for heating the defect is not "the operator is missing" (that is the Betriebskosten state). There is
-no equation on the page to be missing an operator from. The spec that closes it is
-[Heizkostenabrechnung — the heating table's disclosure](#heizkostenabrechnung--the-heating-tables-disclosure)
-below.
+Heating is therefore ◐ for the same two document-level reasons as Betriebskosten: the page still
+does not print `Anteil = Kostenblock × Bemessung ÷ Gesamtbemessung`, and a displayed numerator such
+as `5.430 m²·Tage` is not yet expanded to `30 m² × 181 Tage`. Those two gaps, plus M6's advances and
+Saldo, are the remaining formal-minimum work at the top of this file.
 
 **#4 is the point of the document for the tenant:** advances paid − share owed = **Nachzahlung oder
 Guthaben**. The data model already anticipates it (`docs/02`: the statement's Nachzahlung/Guthaben
@@ -554,10 +548,15 @@ building — the demo's own residual does not move in this slice and is unchange
 The old per-unit landlord party was 345,14 / 554,74 / 115,05 / 268,44 = 1.283,37 €, byte-identical
 to today's `owner_residual`, which is why no golden in the suite moved with the re-labelling.)
 
-Der Eigentümeranteil ist der Restbetrag: Gesamtkosten abzüglich der Summe der Mieteranteile. Er
-enthält den auf Leerstand und Eigennutzung entfallenden Anteil sowie die zeilenweise
-Rundungsdifferenz. Er wird nicht aus einer Quote berechnet.
+Der Eigentümeranteil ist der Restbetrag: umlagefähige Heiz- und Warmwasserkosten abzüglich der
+Summe der Mieteranteile. Er enthält den auf Leerstand und Eigennutzung entfallenden Anteil sowie
+die zeilenweise Rundungsdifferenz. Er wird nicht aus einer Quote berechnet.
 ```
+
+For the demo this wording is arithmetic, not editorial: **10.142,92 € umlagefähige Heiz- und
+Warmwasserkosten − 8.859,55 € Mieteranteile = 1.283,37 € Eigentümeranteil**. Starting from the
+**10.300,00 € Gesamtkosten** would incorrectly include the separately deducted 157,08 €
+CO₂-Vermieteranteil in the residual a second time.
 
 - **The last sentence is required copy wherever the row renders.** Without it a reader who tries to
   reconstruct the row from a Bemessung finds no quota and concludes the page is wrong.
@@ -735,6 +734,24 @@ The first render shows **every party's name and share to everyone**. That is rig
 | **Mieter-Einzelabrechnung** | one tenant (the envelope) | **only that tenant's** share, their advances, their balance. **No other tenant's name or amount.** |
 
 Both derive from the same engine result — this is a rendering split, not a second calculation.
+The split is enforced **before rendering on the server**: one tenant document is constructed from
+only that covered tenancy's selected result/data. Never render an all-renters PDF and crop, cover or
+hide the other rows; that leaves personal data in the document structure and makes one missed CSS
+rule a disclosure incident.
+
+### Preview versus finalization (M6)
+
+- **Preview** is a live recomputation of current inputs and creates no archive. Today that preview is
+  the landlord's building-wide calculation/QA overview and must not be sent to a tenant.
+- **Finalization** creates one immutable, versioned snapshot for account/building/period containing
+  normalized inputs, engine/rule versions and `Rechtsstand`, results and party lines, `created_at`,
+  content hashes, and archived document bytes or immutable storage keys with their hashes.
+- The finalized snapshot archives one **Vermieter-Gesamtübersicht** and one independently rendered
+  **Mieter-Einzelabrechnung for each covered tenancy**. A sendable tenant statement waits for M6
+  because it must include actual paid advances and the resulting Saldo.
+- A correction creates `vN+1`, retains and supersedes `vN`, and never overwrites archived bytes.
+  Inputs referenced by a finalized version cannot be destructively deleted; their corrections append
+  or supersede so every version remains reproducible.
 
 ## Also missing from the tenant document
 
@@ -1182,26 +1199,26 @@ designed in this section.
 ## Heizkostenabrechnung — the heating table's disclosure
 
 > **Rechtsstand 08/2026** (transcribed 03.08.2026). This section introduces **no legal value** into
-> `packages/rules-store` and computes nothing new: every figure it specifies is either already in the
-> engine result or is an intermediate the engine already computes and currently discards (named below).
+> `packages/rules-store` and computes nothing new: every figure it specifies is carried by the
+> engine result. The historical intermediates that once were discarded are named below.
 > The statutory references — §§ 7, 8, 9, 9a, 9b HeizkostenV and § 7 CO2KostAufG — were checked against
 > the consolidated texts as of 08/2026. Standard caveat of this file applies (`docs/07`): confirm with
 > a Fachanwalt before real tenants.
 
-**What this section is for.** A Betriebskostenabrechnung is legible on the page since the reference
-totals landed; the Heizkostenabrechnung is not (see *"The heating table is not ◐ — it is ❌"*). The
-rule the whole document is built on — *a tenant must be able to re-perform the calculation, not just
-read its result* — applies to the heating section exactly as it applies to the NK section, and the
-heating section has more of it to disclose: two cost pots, four money columns, three different
-denominators and one apportionment convention.
+**What this section is for.** The first render made the Betriebskostenabrechnung legible but left the
+Heizkostenabrechnung without its keys and bases. That historical defect is closed: the current page
+shows two cost pots, four money columns, three different denominators and the applied apportionment
+rules. The document-level operator and derived-numerator gap named at the top still applies to both
+tables.
 
-### The fact that shapes every slice below: `HeatingResult` cannot supply these figures
+### Historical implementation seam — closed: `HeatingResult` supplies the disclosure figures
 
-Verified against `packages/heating-engine/src/lokara_heating_engine/` on 03.08.2026. `HeatingResult`
-carries exactly `lines`, `co2`, `estimated_unit_ids`, `consumption_fallback_to_area`, `total`. Every
-intermediate this spec needs is computed in `engine.py` as a local and then dropped:
+The 03.08.2026 review found that `HeatingResult` could not supply the values below. The
+carried-intermediates slice closed that seam: the current frozen result carries these values and the
+statement renders them. This table remains as the provenance for why each carrier belongs on the
+engine result rather than being recomputed in the template:
 
-| Discarded today | Where | Needed for |
+| Originally discarded | Where computed | Needed for |
 | --- | --- | --- |
 | `q_ww` (warm-water energy) and the § 9 formula inputs applied | `_separate_warm_water` | § 9 disclosure |
 | `ww_pot` / `heating_pot` | `_separate_warm_water` | § 9 disclosure |
@@ -1216,10 +1233,9 @@ intermediate this spec needs is computed in `engine.py` as a local and then drop
 Field-by-field, that table is resolved in **"The carried-intermediates contract (slice 3)"** below —
 names, types, demo values, and which statute makes each one required rather than merely useful.
 
-**Consequence:** the renderer *cannot* show any of this today, and no amount of template work changes
-that. The engine result must carry it first — a pure-package change under CLAUDE.md rule 1
-(framework-free, golden fixtures, `mypy --strict`, `Decimal`/cents), then a template change. The
-proposed split at the end of this section is built on that seam.
+**Current consequence:** the renderer reads these values from the engine result and shows the key,
+Bemessung, denominator, §§ 7–9 split, degree-day disclosure and CO₂ Berechnungsgrundlagen. The seam
+still matters: future document work must not bypass it by recalculating from inputs.
 
 **A rule the template must not break to get around it:** the disclosure figures come from the **engine
 result**, never from the engine *input* passed alongside it. Two sources drift; the page would then
@@ -1937,8 +1953,9 @@ not a reformatting of an unrounded value in the PDF layer. The renderer reads th
   (previous step's bound → this step's bound), a step number would be invented. If the Anlage's own
   numbering is wanted on the page it is transcribed into `packages/rules-store` first — **not** counted
   off the tuple index.
-- `total_co2_kg`, `co2_cost` and `heated_area_sqm` are engine inputs today and reach `Co2Result`
-  nowhere; they must be carried on the result, for the same drift reason as everything else here.
+- **Closed/current:** `total_co2_kg`, `co2_cost` and `heated_area_sqm` reach `Co2Result` and render in
+  the Berechnungsgrundlagen. They stay on the result for the same drift reason as everything else
+  here; the template must not recover them from a second input source.
 
 **`kg CO₂/m²/Jahr` is a false label on any period shorter than a year.** `docs/03` §*"The Stufenmodell
 is a per-year table"* follows § 5 Abs. 1 S. 4 CO2KostAufG literally: the **Anlage table is shortened**

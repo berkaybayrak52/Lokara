@@ -28,10 +28,12 @@ Block C prints `585,0 ‰ von 1.000 ‰` legitimately under § 9b Abs. 2 Heizkos
 so a page-wide ban would forbid a required disclosure. `docs/08` § 2 carries the
 same correction.
 
-**No euro amount is typed in here.** Every expected figure is read off the engine
-result and every actual figure off the rendered page, the way
-`test_statement_party_totals.py` does it — if the demo re-bases, these assertions
-move with it and only this docstring goes stale.
+The row/column assertions read every expected figure from the engine result and
+every actual figure from the rendered page, the way
+`test_statement_party_totals.py` does it. One copy-regression fixture deliberately
+pins the demo arithmetic (10.142,92 - 8.859,55 = 1.283,37): those three numbers
+are the evidence that ``umlagefähige Kosten`` and ``Gesamtkosten`` are not
+interchangeable in the required sentence.
 """
 
 import re
@@ -48,10 +50,10 @@ OWNER_LABEL = "Eigentümeranteil"
 # Required wherever the row renders. Without it a reader who tries to reconstruct
 # the row from a Bemessung finds no quota and concludes the page is wrong.
 RESIDUAL_SENTENCE = (
-    "Der Eigentümeranteil ist der Restbetrag: Gesamtkosten abzüglich der Summe "
-    "der Mieteranteile. Er enthält den auf Leerstand und Eigennutzung "
-    "entfallenden Anteil sowie die zeilenweise Rundungsdifferenz. Er wird nicht "
-    "aus einer Quote berechnet."
+    "Der Eigentümeranteil ist der Restbetrag: umlagefähige Heiz- und "
+    "Warmwasserkosten abzüglich der Summe der Mieteranteile. Er enthält den auf "
+    "Leerstand und Eigennutzung entfallenden Anteil sowie die zeilenweise "
+    "Rundungsdifferenz. Er wird nicht aus einer Quote berechnet."
 )
 
 # Forbidden **on this row**. `Quote` is the word § 1.3 Frage 2 names; `%` and `‰`
@@ -228,3 +230,22 @@ class TestTheRequiredSentence:
         copies drift into two wordings."""
         html = _text(statement_html(build_demo_statement()))
         assert html.count(_plain(RESIDUAL_SENTENCE)) == 1
+
+    def test_the_demo_sentence_describes_the_billable_residual_not_total_cost(self) -> None:
+        """The residual closes the renter-facing, CO₂-adjusted pot.
+
+        It is not ``Gesamtkosten - Mieteranteile``: that would leave the
+        landlord's CO₂ share inside the owner residual a second time.
+        """
+        data = build_demo_statement()
+        heating = data.heating_result
+        assert heating is not None
+        renter_cents = sum(int(line.total) for line in heating.lines)
+        owner_cents = int(heating.owner_residual.total)
+
+        assert int(heating.billable_cost) == 1_014_292
+        assert renter_cents == 885_955
+        assert owner_cents == 128_337
+        assert int(heating.billable_cost) - renter_cents == owner_cents
+        assert int(heating.total) == 1_030_000
+        assert int(heating.total) - renter_cents != owner_cents

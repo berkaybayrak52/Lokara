@@ -9,24 +9,43 @@
 
 ```bash
 export PATH="$HOME/.bun/bin:$PATH"        # Homebrew's bun 1.1 shadows ~/.bun/bin (needs ≥ 1.3)
+set -a                                    # export the local example values into this process
+source .env.example                       # do not copy it to .env: ENVIRONMENT must stay process-only
+set +a
+export ENVIRONMENT=local                  # required, explicit, and inherited by the commands below
 lsof -ti:3000,3001 | xargs -r kill        # kill stale servers — a stale :3001 served old code once
 docker compose up -d                      # Postgres on :54322 (container lokara-db)
 uv sync && bun install
 uv run alembic -c packages/db/alembic.ini upgrade head
 ```
 
-Start the two servers in **separate terminals** (so you can see errors):
+Before starting, verify the local values documented by `.env.example` are present: runtime
+`DATABASE_URL` for `lokara_app`, owner `DIRECT_URL` for migrations, a ≥32-character
+`SUPABASE_JWT_SECRET`, `AUTH_DEV_TOKEN=true`, and `DEMO_SEED_ENABLED=true`. `ENVIRONMENT` is different:
+the API requires it with no default, so the demo shell exports `ENVIRONMENT=local` and both server
+terminals must inherit it.
+
+Start the two servers in **separate terminals** (so you can see errors). In the API terminal, load
+the same process environment first:
 
 ```bash
-DEMO_SEED_ENABLED=true uv run lokara-api  # ⚠️ REQUIRED — see below. FastAPI on 127.0.0.1:3001
+set -a
+source .env.example
+set +a
+ENVIRONMENT=local DEMO_SEED_ENABLED=true uv run lokara-api  # FastAPI on 127.0.0.1:3001
 bun run --filter @lokara/web dev          # web on :3000
 ```
 
-> **⚠️ Trap 1 — `DEMO_SEED_ENABLED`.** `POST /demo/load` is **off by default in code** (it's a
-> bootstrap endpoint that creates its own membership, so it's gated like `/auth/dev-token`). It's set
-> to `true` in `.env`/`.env.example`, so it normally just works — but if you demo from a fresh clone
-> without `.env`, or the API is started with a different environment, the button returns **403** and
-> the demo dead-ends on an empty dashboard. **Click it once during pre-flight.**
+> **⚠️ Trap 1 — missing environment or secrets is a startup failure.** `ENVIRONMENT` has no default,
+> and `SUPABASE_JWT_SECRET` is required and length-checked. If the shell did not export
+> `ENVIRONMENT=local`, or the local settings from `.env.example` were not provided, the API process
+> exits during startup; there is no working `/demo/load` route that merely returns 403. Read the
+> terminal error, restore the missing setting, and restart the process.
+>
+> **⚠️ Trap 1a — `DEMO_SEED_ENABLED`.** Once the API has started safely, `POST /demo/load` is still
+> **off by default in code** (it creates its own membership, so it is gated like `/auth/dev-token`).
+> If `DEMO_SEED_ENABLED` is false, the button deliberately returns **403**. The local value in
+> `.env.example` is `true`; the explicit API command above also pins it. **Click once in pre-flight.**
 >
 > **⚠️ Trap 1b — seed once from the CLI *before* you click it.** Run `uv run lokara-seed-demo` in
 > pre-flight. Since migration `0005` the global `person` table is under a deny-by-default policy and
@@ -135,7 +154,10 @@ This is the pitch. Slow down here.
 - Then the differentiator: *"Heating splits by degree-days, so unit B's mid-year change comes out
   **583,3/416,7 ‰** — €776,52 to the tenant, €554,74 to the landlord. And the CO₂ split follows the
   10-step model with the **Rechtsstand** printed on the statement. That's the legal depth."*
-- Open the downloaded PDF: *"This is what the tenant receives."*
+- Open the downloaded PDF: *"This is the landlord's building-wide calculation and QA overview — all
+  parties reconcile here. It must not be sent to a tenant. Finalization will generate one separate,
+  independently rendered statement per tenancy, containing only that tenant's data, advances and
+  balance."*
 
 ---
 
@@ -174,6 +196,7 @@ This is the pitch. Slow down here.
 
 | Symptom | Fix |
 | --- | --- |
+| **API exits during startup** | Export `ENVIRONMENT=local` in the API process and provide the required local DB/JWT settings from `.env.example`; restart and read the first validation error if it still exits. |
 | **403** on "Demo-Szenario laden" | `DEMO_SEED_ENABLED=true` missing — restart the API with it |
 | **Page renders but nothing is clickable** | Hydration broken — a `bun run build` was run **while the dev server was live** and clobbered `.next`. Stop dev, `rm -rf apps/web/.next`, restart dev. **Never run a production build during the demo session.** |
 | Dashboard empty, no error | Seed didn't run: `uv run lokara-seed-demo` |

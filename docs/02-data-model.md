@@ -32,7 +32,7 @@ roles across accounts at once.
 Not peer roles: **Hausverwaltung** = an account _shape_; **Landlord (Vermieter)** = a _data entity_
 (the legal lessor on statements), separate from the person operating it.
 
-### SQLAlchemy 2.0 (identity + relationships — verified: 9 models, 3 enums, no orphans)
+### SQLAlchemy 2.0 identity sketch (historical core, not a live model count)
 
 ```python
 import enum
@@ -794,6 +794,35 @@ rows are shown struck through, never hidden — the audit trail is the feature.
   10-day rule around New Year. Driven by **payment date**.
 - They meet in **one** place: an NK statement's Nachzahlung/Guthaben becomes a **Payment in the
   Ledger** when actually paid. Statements feed the ledger; the ledger feeds tax.
+
+## Statement preview and finalization — live draft, immutable archive
+
+> **Design decision 08/2026; implementation belongs to M6.** Previewing is cheap and repeatable;
+> finalizing is an auditable event that creates documents fit to retain and, once M6 supplies the
+> actual paid advances and Saldo, send.
+
+- **Draft preview is live and creates no archive.** It reads the current normalized rows, runs the
+  engines and renders the landlord calculation overview on demand. Editing an input and previewing
+  again replaces nothing because no statement version exists yet.
+- **Finalization creates exactly one immutable, versioned statement snapshot** for
+  `(account_id, building_id, billing_period, version)`. It contains the normalized inputs used by
+  the engines; engine and rule versions plus every applicable `Rechtsstand`; calculated results and
+  party lines; `created_at`; content hashes; and the archived document bytes or immutable storage
+  keys with their hashes.
+- **One calculation produces separate documents.** Finalization archives one internal
+  **Vermieter-Gesamtübersicht** with the building-wide reconciliation and one independently rendered
+  **Mieter-Einzelabrechnung per covered tenancy**. The server selects that tenancy's data before
+  rendering. It never renders one all-renters PDF and then crops, hides or masks sections.
+- **Corrections append.** A correction finalizes `vN+1`, retains `vN`, and records that `vN+1`
+  supersedes `vN`; neither the snapshot nor its archived documents are overwritten.
+- **Referenced inputs become retention-bound.** A cost, heating-cost row, meter reading, tenancy or
+  other normalized input referenced by a finalized snapshot cannot be destructively deleted.
+  Corrections append a new row or supersede the old row, preserving the bytes needed to reproduce
+  every finalized version. Draft-only inputs remain editable under their ordinary domain rules.
+
+The snapshot is not a cache of the current database. It is the complete evidence package for what
+was calculated and rendered at finalization time; later previews may legitimately differ without
+changing an older version.
 
 ### Payment Ledger (source of truth for tax — built at M6)
 

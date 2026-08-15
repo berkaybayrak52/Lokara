@@ -299,9 +299,9 @@ conventions above stand as conventions.
 - **The disclosure intermediates the result must carry** (`test_heating_disclosure.py`): the pots of
   the §§ 7/8/9 vertical split, the per-party Bemessungen of the horizontal one, the § 9 branch that
   ran with its operands, and the CO₂ Berechnungsgrundlagen incl. the Einstufung band. Contract:
-  `docs/08` → *"The carried-intermediates contract (slice 3)"*. Nothing it pins renders yet and no
-  euro figure moves — the fixtures exist so that the numbers the tenant will be shown are the numbers
-  the engine actually used.
+  `docs/08` → *"The carried-intermediates contract (slice 3)"*. **Closed/current:** those
+  intermediates are carried on the result and render in Blocks A, B, C and the CO₂
+  Berechnungsgrundlagen; the fixtures ensure the document shows the numbers the engine actually used.
 - ⛔ **SUPERSEDED — Interim period (< 1 year) → the Anlage table is shortened**
   (`test_co2_period_factor.py`). The rule is now H2 (annualise the intensity, unshortened table); this
   file's fixtures move with it in slice 2. Description of the **old** behaviour follows: 1.950 kg

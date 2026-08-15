@@ -8,11 +8,13 @@ fixes the carriers, the order, and the four places where the drafted copy names
 a fact the engine result does not carry. Rechtsstand 08/2026. Written before the
 template change, red on purpose.
 
-Today the heating section prints six euro columns and nothing else: no
-Umlageschlüssel, no Bemessung, no denominator, no §§ 7/8 ratio, no § 9
-separation, no Gradtagszahlen (`docs/08` → "The heating table is not ◐ — it is
-❌"). Every figure these blocks need is on `HeatingResult` since the
-carried-intermediates slice; nothing here is a new calculation and no euro moves.
+The original red state printed six euro columns and nothing else. The current
+statement now renders the Umlageschlüssel, Bemessung and denominator for all
+four columns, the §§ 7/8 ratio, § 9 separation and Gradtagszahlen. The remaining
+BGH-minimum-#3 work is the shared document-level operator and the derivation of
+each numerator from its factors; those are not regressions in these disclosure
+blocks. Every figure asserted here comes from `HeatingResult`; nothing here is a
+new calculation and no euro moves.
 
 Four rules this file exists to hold, all from `docs/08`:
 
@@ -1469,9 +1471,9 @@ class TestTheDemosCo2FixtureIsPlausibleOnItsFace:
     def test_the_intensity_is_not_a_boundary_case_of_its_band(self) -> None:
         """`docs/06`: the band moved 17–22 → 37–42 because the physics forced it
         (200 kWh/m²/a of any fossil fuel lands near 40 kg CO₂/m²/a). It has to
-        stay an *unambiguous* golden, so the intensity sits clear of both bounds
-        — and at one decimal place, so the demo does not depend on the
-        unimplemented § 5 Abs. 1 S. 3 rounding (`docs/03`, `PLAN.md` row 4.5)."""
+        stay an *unambiguous* golden, so the intensity sits clear of both bounds.
+        Row 3 now implements S. 3 rounding before classification; this exact
+        demo value simply is not a rounding-boundary case (`docs/03` R8)."""
         co2 = _heating(build_demo_statement()).co2
         assert co2 is not None
         assert co2.band_min_inclusive is not None and co2.band_max_exclusive is not None
