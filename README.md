@@ -121,24 +121,23 @@ top to bottom.
 
 ## Read order
 
-1. **`LAST_OUTPUT.md`** — the session's end-of-task handoff, overwritten every task and gitignored:
-   scratch, not project history. **Read it first** — it is the only file that says where things stand
-   *right now*. `scripts/check_handoff.sh` fails the gate unless it names HEAD, so it cannot quietly
-   go stale.
-2. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + the locked
+`LAST_OUTPUT.md` sits outside this read order. It is Emir's short, gitignored summary window after a
+session. It is not an input for agent work and never overrides Git or the tracked documentation.
+
+1. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + the locked
    tech decisions + the two Definitions of Done.
-3. **`AGENTS.md`** — how work is actually executed here: six agents with **disjoint write scopes**
+2. **`AGENTS.md`** — how work is actually executed here: six agents with **disjoint write scopes**
    (no agent may both write a test and satisfy it), and the deterministic gates underneath them —
    `scripts/gate.sh`, `scripts/verify_demo_path.sh`, and the engine-purity / RLS-coverage /
    FK-isolation / PDF-fingerprint checks. Gates are trusted; agents are not.
-4. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
+3. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
    M0–M4 are built and green; work since then follows PLAN's **execution order** — ranked by *what
    closes the legally-required surface first* — rather than the milestone numbering. **It carries no
    deadline on purpose:** dates in `lokara-arch.md` are communication events (when something gets
    shown), never planning inputs, and they do not reorder the work.
-5. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
-6. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
-7. **`docs/`** — modular specs:
+4. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
+5. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
+6. **`docs/`** — modular specs:
    - `00-product-overview.md` — what/why/who, competitive thesis, pitch framing
    - `01-tech-stack-and-decisions.md` — locked defaults for every flagged decision (ADR-style)
    - `02-data-model.md` — identity three-layer model, temporal core, allocation keys, two time-axes

@@ -1,314 +1,195 @@
 # AGENTS.md — how Lokara is built with agents
 
-> Read `CLAUDE.md` first: it is the contract. This file is the **operating manual** for the
-> agent system that enforces it. Whatever this file says, the three rules in `CLAUDE.md` win.
+> Read `CLAUDE.md` first. It is the contract. This file explains how the agent system
+> follows that contract. If they disagree, `CLAUDE.md` wins.
 
----
+## 1. Purpose and control
 
-## The idea in one paragraph
+Lokara uses agents with separate roles. Each role protects one project invariant and has a
+limited write lane. Implementers build. Reviewers report. The main session verifies the work and
+decides what to present to Emir.
 
-Correctness here is not a matter of taste — it is a set of named invariants that already
-exist in writing (`CLAUDE.md`'s three rules, `PLAN.md`'s five hard rules, the two Definitions
-of Done). So the agent system is organised **one role per invariant**, not one role per
-activity. Each agent owns a lane, writes only inside it, and is judged by whether its
-invariant still holds. Nothing that can be checked by a script is left to an agent, and
-nothing an agent asserts is trusted without a script.
+Emir controls:
 
-Three layers, in order of trust:
+- scope and priorities;
+- whether agents are used;
+- whether work is merged;
+- whether work is pushed.
 
-| Layer | What | Can it be wrong? |
+There is no manager agent. Coordination comes from the tracked sources of truth:
+
+| Question | Source |
+| --- | --- |
+| What rules override everything? | `CLAUDE.md` |
+| What is built and what comes next? | `PLAN.md` |
+| How do agents and gates work? | `AGENTS.md` |
+| How does the main session review and close work? | `LEAD-HANDOFF.md` |
+| What happened in the latest session? | `LAST_OUTPUT.md` |
+
+`LAST_OUTPUT.md` is only Emir's short session summary. It does not coordinate work or define
+project status.
+
+## 2. Trust model
+
+| Layer | Role |
+| --- | --- |
+| **Gates** | Run deterministic checks against the repository and database. |
+| **Agents** | Apply judgement inside one limited role. |
+| **Main session** | Verifies evidence, resolves findings and follows Emir's decisions. |
+
+Gates are stronger than an agent's claim, but they can still have blind spots. A new gate must be
+run locally and should have a test that proves it can fail. Claims such as counts, survey results
+and “verified” findings must be checked against the repository or command output.
+
+The `.claude/` and `.codex/` systems are mirrors. Their agent definitions, hook scripts and hook
+wiring must stay aligned. `scripts/check_agent_parity.py` enforces this.
+
+## 3. Agent roles and write lanes
+
+| Agent | Responsibility | Write lane |
 | --- | --- | --- |
-| **0 — Gates** | `scripts/*` + `.claude/hooks/*`, run by hooks and CI | No. Deterministic. |
-| **1 — Agents** | `.claude/agents/*.md`, judgement inside one lane | Yes — which is why layer 0 exists |
-| **2 — You** | The main session. Reads reports, decides, merges | You are the lead |
+| `spec-scribe` | Transcribe specs and create golden fixtures before implementation. | `docs/**`, tests, `PLAN.md`, `lokara-arch.md`, `DEMO-RUNBOOK.md`, `AGENTS.md` |
+| `engine-implementer` | Implement pure engines, domain code, rules, adapters, models and migrations. | `packages/*/src/**`, `packages/db/alembic/**` |
+| `app-implementer` | Implement API, web, UI and PDF framework code. | `apps/api/src/**`, `apps/web/src/**`, selected `apps/web` config files, `packages/{ui,pdf}/src/**` |
+| `boundary-auditor` | Audit isolation, immutability and adapter boundaries. | Read-only |
+| `statement-reviewer` | Review rendered statements and landlord-facing UI. | Read-only |
+| `docs-reconciler` | Report drift between documentation and code. | Read-only |
 
-There is deliberately **no manager agent**. `PLAN.md`, `CLAUDE.md`, `LAST_OUTPUT.md` and the
-`demo-green-<n>` tags already are the coordination layer, and unlike an LLM they cannot drift,
-get optimistic, or declare a milestone done because the summary sounded finished. Status is
-derived from gates going green, never from an agent's opinion of its own work.
+The exact paths are enforced by `.claude/hooks/write-scope.sh` and its `.codex` mirror.
 
----
+The lane rules are strict:
 
-## The roster
+- Implementers do not write tests. A missing fixture goes to `spec-scribe` first.
+- Reviewers never fix their own findings.
+- Do not widen a lane only to let an agent finish.
+- The main session is not restricted to an agent lane, but it must preserve unrelated user changes.
 
-| Agent | Owns the invariant | Writes | Reads |
-| --- | --- | --- | --- |
-| `spec-scribe` | *No calculation without a transcribed spec + golden fixture* | `docs/**`, `PLAN.md`, `*/tests/**` | everything |
-| `engine-implementer` | *Engines are pure, deterministic, cent-exact* | `packages/*/src/**`, `packages/db/alembic/**` | everything |
-| `app-implementer` | *The framework layer never trusts the client, and the UI is AA* | `apps/*/src/**`, `packages/{ui,pdf}/src/**` | everything |
-| `boundary-auditor` | *Isolation enforced twice; data immutable + versioned* | **nothing** | everything |
-| `statement-reviewer` | *The rendered document is right* | **nothing** | everything |
-| `docs-reconciler` | *Docs and code agree* | **nothing** | everything |
+The hooks are guardrails, not a full sandbox. Always inspect the resulting diff.
 
-**No two agents can write the same file.** That is the property that makes the whole thing
-worth having. Concretely:
+## 4. Working on a slice
 
-- The implementer **cannot write tests**, so it cannot move the goalposts. If the fixture
-  doesn't exist, it must stop and ask for `spec-scribe` — which is exactly `PLAN.md` hard
-  rule 1, enforced mechanically instead of remembered.
-- The auditors **cannot write anything**, so a green report is information rather than a
-  self-assessment. An auditor that can edit is an auditor you cannot trust.
-
-Enforced by `.claude/hooks/write-scope.sh` (a `PreToolUse` hook that reads `agent_type` and
-the target path). It is a guardrail, not a sandbox — a determined agent could shell out — so
-the two **implementers** also run `isolation: worktree`, and stray writes land in a throwaway
-copy of the repo rather than in your tree.
-
-`spec-scribe` deliberately does **not** get a worktree. It writes only `docs/**` and tests,
-the hook already fences it, and anything stray shows up in `git status` immediately. The
-isolation bought nothing there and cost a copy-back on every run.
-
-### Worktrees do not sync back
-
-A worktree agent reports success while your tree is still clean. Its edits stay in
-`.claude/worktrees/agent-<id>/` on a `worktree-agent-<id>` branch, **uncommitted**, and
-nothing merges them for you. After every worktree run:
+Every slice starts from `main`, never from another slice branch. Check the current branch and local
+changes before creating it. Do not pull, merge or push unless Emir asks.
 
 ```bash
-W=.claude/worktrees/agent-<id>
-git -C "$W" status --short        # what it actually touched — trust this, not the report
-cp "$W/<path>" <path>             # copy each file across
-scripts/gate.sh fast              # re-run the gates HERE
-git worktree remove --force "$W"  # only once the diff is in and verified
+git status --short
+git switch main
+git switch -c slice/<name>
 ```
 
-Re-run the gates in the main tree rather than trusting the agent's output — a worktree can be
-green on a stale base. Read the agent's factual claims the same way: counts, survey results
-and "I verified X" are worth re-deriving, and both runs so far have had one number wrong.
+The normal flow is:
 
-**A worktree agent must not run `scripts/verify_demo_path.sh`, and cannot.** The script does
-`docker compose up`, which derives its project name from the working directory — so from a
-worktree it tries to start a *second* stack and dies on
-`Conflict. The container name "/lokara-db" is already in use`, after creating a stray volume
-and network you then have to remove by hand.
+1. **Spec** — for legal or calculation work, `spec-scribe` transcribes the source and creates the
+   failing fixture.
+2. **Implement** — the correct implementer satisfies the existing fixture.
+3. **Review** — use the matching read-only reviewer for the affected invariant.
+4. **Verify** — copy back any worktree changes and run the gates in the main tree.
+5. **Close** — show Emir the result. Merge or push only when he asks.
 
-Generalise from that: **DB-backed gates run in the main tree only.** The Postgres container is
-a single shared resource, and a worktree agent driving it is driving *your* database —
-`alembic upgrade`/`downgrade`, seeds and probes from a worktree all land in the same instance
-the main tree is using. That is acceptable for `check_rls_coverage.py`, `check_fk_isolation.py`
-and `pytest` (read-mostly, and a migration left at head is the state you want anyway); it is not
-acceptable for anything that recreates the stack. One run cost the demo seed three tables when
-an agent misread a swallowed `downgrade` and ran it twice. So: let agents run the query-level
-gates, and run `verify_demo_path.sh` yourself after the copy-back.
+The red fixture and its implementation stay on the same slice branch. `main` receives only green
+work.
 
----
+For work without a legal or calculation rule, such as a screen or a framework refactor, the spec
+step may be skipped. Review is still required for anything a landlord will read.
 
-## The gates
+Use one agent at a time unless Emir explicitly asks for parallel agent work. Parallel work is most
+useful for independent read-only reviews of a frozen diff. Implementation and its fixture remain
+sequential.
 
-Run them directly, or let the hooks run them.
+## 5. Worktrees and shared resources
+
+Some implementers run in isolated worktrees. Their changes do not automatically appear in the main
+tree. After a worktree run:
+
+1. Inspect the worktree with `git status --short`.
+2. Confirm every changed path belongs to the agent's lane.
+3. Copy the intended files into the main tree.
+4. Run the relevant gates in the main tree.
+5. Remove the worktree only after the copy is verified.
+
+A worktree may be based on stale code, so its green result is not enough.
+
+Postgres and the Docker stack are shared resources. An isolated agent must not recreate the stack,
+run destructive database commands or run `scripts/verify_demo_path.sh`. Run DB-backed verification
+in the main tree after the work has been copied back.
+
+## 6. Gates
 
 ```bash
-scripts/gate.sh fast          # ruff + mypy + purity + pure-package pytest   (seconds)
-scripts/gate.sh full          # + all pytest, eslint, tsc, vitest           (CI parity)
-scripts/gate.sh demo          # + the whole demo path                        (milestone end)
-
-scripts/verify_demo_path.sh           # clean DB -> migrate -> seed -> statement -> PDF -> read it
-scripts/verify_demo_path.sh --fresh   # ...starting from an empty volume (destroys local pg data)
-
-uv run python scripts/check_engine_purity.py    # CLAUDE.md rule 1
-uv run python scripts/check_rls_coverage.py     # CLAUDE.md rule 3 (needs a migrated DB)
-uv run python scripts/check_fk_isolation.py     # docs/02 isolation rule (needs a migrated DB)
+scripts/gate.sh fast    # lint, types, purity, parity and pure-package tests
+scripts/gate.sh full    # fast checks plus all tests and both application lanes
+scripts/gate.sh demo    # full checks plus the complete demo path
 ```
 
-**What each one turns from discipline into a command:**
+Use `fast` during implementation. Use `full` before merging a normal slice. Use `demo` when a
+milestone or output change requires the complete statement path.
 
-- `check_agent_parity.py` — the whole `.codex` mirror: agent **definitions**, hook
-  **scripts**, and hook **wiring** (`.claude/settings.json` ↔ `.codex/hooks.json`).
-  `.codex/` is read by the external `codex` CLI and by **nothing in this repository**, and it
-  is the fallback used when tokens run out — i.e. exactly when nobody is watching it. It
-  drifts unnoticed: on 13.08.2026 `.codex`'s `statement-reviewer` carried a heating pair two
-  re-bases old and both `engine-implementer` definitions stated the retired blanket
-  *"rounding is largest-remainder"* — an instruction to revert correct code — while all three
-  `.codex` hooks were the **pre-fix** versions, so `>>` was unguarded there and worktree
-  agents were graded against the wrong tree.
-  **The first version of this check missed all of that**, because it compared definitions and
-  not the mechanism. Definitions are what an agent is told; hooks are what actually stops it.
-  It now compares executable lines (comments excluded — the two trees may explain themselves
-  differently), the event/matcher/script/timeout wiring, and refuses an absolute path in
-  `.codex/hooks.json`. Only the tokens each tool spells its own way are exempt:
-  `CLAUDE.md`↔`AGENTS.md`, `.claude`↔`.codex`, `CLAUDE_PROJECT_DIR`↔`CODEX_PROJECT_DIR`.
-  `scripts/tests/test_agent_parity.py` pins nine cases, including the `>>` one, so the check
-  is known to go red rather than merely never having done so.
-- `check_engine_purity.py` — rule 1. AST-level: forbidden imports, no I/O, no clock, and
-  engines never importing `rules-store`. Runs on every Python edit via `PostToolUse`.
-- `check_rls_coverage.py` — rule 3. Queries the **live migrated database**, because the
-  policies are created inside `for table in (...)` loops and any grep-based checker gives
-  false answers in both directions. Checks ENABLE, **FORCE**, a policy, and that the table is
-  named in the isolation test.
-  **The rule it enforces, stated once so the gate has a home to cite:** *every new tenant table
-  needs an RLS policy **and** a line in the isolation test — a table without a policy is a silent
-  leak.* This lived in `MIGRATION-PLAN.md` §8 until that file was retired; it is an operating rule,
-  not migration history, which is why it moved here rather than going away with the file.
-- `check_fk_isolation.py` — the other half of rule 3, which RLS structurally cannot cover.
-  Postgres checks foreign keys with **RLS bypassed**, so a correctly stamped row can still
-  point at another account's parent. Fails on any FK whose child and parent are both
-  account-scoped and which is not composite on `(id, account_id)` — and on `MATCH FULL`
-  over a nullable link, which would silently make an optional relationship mandatory.
-- `verify_demo_path.sh` + `assert_statement_pdf.py` — `PLAN.md` hard rule 2, and the one
-  documented blind spot in the test suite. `docs/03` says it outright: *"tests comparing
-  integers stay green through this bug — read the rendered PDF."* So the script reads the
-  rendered PDF and asserts `18.250` is present and `1.825.000` is not.
-- `stop-gate.sh` — an agent cannot end its turn on red. Set `LOKARA_GATE=off` for
-  exploratory sessions, `full` or `demo` when it matters.
-
-**`gate.sh demo` is expected red until M5 — and step 2 is now two DB gates, not one.**
-`verify_demo_path.sh` runs `check_rls_coverage.py` and then `check_fk_isolation.py`, and gates
-on each one's **exit code**. Their status differs, so read them separately:
-
-| Gate | Status | Why |
-| --- | --- | --- |
-| `check_fk_isolation.py` | **green** since the FK-Isolation slice (`0004`) | all 17 tenant-to-tenant edges are composite |
-| `check_rls_coverage.py` | **green** since M3's meter slice | 15 tenant tables ENABLEd + FORCEd + policied + named in the isolation test; 3 exempt. (Was red on `landlord` + `self_use_period`; those tables are now exercised.) |
-
-Note the ordering trap: RLS runs **first**, so `verify_demo_path.sh` aborts there and never
-reaches the FK step. Run `uv run python scripts/check_fk_isolation.py` directly to see it
-green — do not conclude from a red demo path that the FK work regressed. Everything
-downstream (seed → statement → PDF → `assert_statement_pdf.py`) still passes when run by
-hand. And do not add a tolerance to either gate to make the path green: a canary tuned until
-it goes green is worse than no canary.
-
----
-
-## How to run a piece of work
-
-### Every slice gets its own branch
-
-**Decision, 03.08, after CI went red on `main` for exactly this reason.** The spec-before-
-implementation split is not optional here — `spec-scribe` writes the failing test, and only
-then may an implementer satisfy it. That guarantees a **red window on every slice**, and
-`main` is the wrong place to spend it: `.github/workflows/ci.yml` runs `uv run pytest` with
-`LOKARA_REQUIRE_DB=1`, so a committed red fixture is a red push, indistinguishable from a
-real regression by anyone reading the badge.
-
-So:
+Important focused checks:
 
 ```bash
-git switch main && git pull      # ALWAYS from main — see below
-git switch -c slice/<name>       # BEFORE dispatching spec-scribe
-# ... red tests commit, then the implementation commit(s), on the branch
-scripts/gate.sh full             # green in the main tree, on the branch
-git switch main && git merge --no-ff slice/<name>
-git push                         # main is only ever pushed green
-git push -u origin slice/<name>  # push the slice too: ci.yml's slice/** trigger
-                                 # fires on push, and on nothing else
+uv run python scripts/check_engine_purity.py
+uv run python scripts/check_agent_parity.py
+uv run python scripts/check_rls_coverage.py
+uv run python scripts/check_fk_isolation.py
 ```
 
-**A slice is cut from `main`, never from another slice branch.** Branching
-`slice/b` off `slice/a` because `b` "needs the spec from `a`" couples them
-permanently: merging `b` drags every commit of `a` along with it, whether or not
-`a` was ready, and the two red windows become one. If `b` genuinely needs `a`,
-merge `a` to `main` first and cut `b` from the new tip — that is a two-command
-fix before the fact and a rebase after it. (Cost 03.08: `slice/heating-typography`
-was cut from `slice/heating-disclosure` and had to be re-cut with
-`git rebase --onto main <old-base> slice/heating-typography`.)
+- `check_engine_purity.py` protects pure, deterministic engine packages.
+- `check_agent_parity.py` protects the `.claude` and `.codex` mirror.
+- `check_rls_coverage.py` requires every tenant table to have RLS and isolation-test coverage.
+- `check_fk_isolation.py` rejects unsafe cross-account foreign keys.
+- `verify_demo_path.sh` validates migration, seed, statement, PDF and rendered figures.
 
-⚠️ **`git reset --hard origin/<branch>` when local is ahead silently discards
-those commits.** No prompt, no summary, and the branch afterwards looks
-plausible — it just quietly lost work. Whether that work is still recoverable
-depends on something git never mentions at the prompt: another ref pointing at
-the same objects, or the reflog. On 03.08 the discarded commits stayed reachable
-the whole time, because `slice/heating-typography` had already been cut from them
-— a property of the branch layout that happened to hold, not a safety net you can
-count on. Reach for `git status` and `git log origin/<branch>..HEAD` first; if
-that list is non-empty, `reset --hard` is not the command you want. `git pull
---ff-only` fails loudly instead, which is the point.
+`scripts/verify_demo_path.sh --fresh` destroys local Postgres data. Run it only with Emir's explicit
+permission.
 
-The red tests and the implementation land on the **same** branch. Merge to `main` only once
-the gates are green. This does not relax the lane rules — `spec-scribe` still cannot satisfy
-its own test, it just does so on a branch instead of on the trunk.
+The stop hook prevents an agent from ending on a red configured gate. `LOKARA_GATE=off` is only for
+explicit exploratory work. It is never evidence that a slice is complete.
 
-The worktree note above still applies and is a different thing: worktrees isolate an *agent's
-writes*, slice branches isolate a *red window*. An implementer in a worktree branches from
-`HEAD`, so create the slice branch first and let the worktree fork from it.
+## 7. Review requirements
 
-### The loop
+Use `boundary-auditor` after changes to tables, endpoints, roles, tenant isolation, immutable data
+or external adapters.
 
-The normal loop, for anything with a calculation in it:
+Use `statement-reviewer` after changes to the PDF, statement data, calculation engines or any
+landlord-facing screen.
 
-1. **Spec** — `> Use spec-scribe to transcribe <spec> into docs/ and write the failing fixture.`
-   It reports a docs path and a red test. If the spec contradicts `docs/`, it stops and asks —
-   that is correct behaviour, not a failure.
-2. **Implement** — `> Use engine-implementer to make packages/nk-engine/tests/test_x.py pass.`
-   The `Stop` gate won't let it finish red.
-3. **Audit** — `> Use boundary-auditor to review the diff` for anything touching tables,
-   endpoints or roles. `> Use statement-reviewer` for anything touching output.
-4. **You** read the findings and decide. Fixes go back through an implementer.
-5. **Close** — `scripts/gate.sh demo`, **merge the slice branch to `main`**, then
-   `git tag demo-green-<n>`, then write `LAST_OUTPUT.md`.
+Use `docs-reconciler` at milestone close or when code and documentation may have drifted.
 
-**When a slice claims to change the document — or claims not to — record
-`scripts/pdf_fingerprint.sh` before and after in `LAST_OUTPUT.md`.** Both directions are claims, and
-both are cheap to check and easy to assert instead. An engine refactor that swears it is invisible
-and a typography slice that swears it is visible are the same bet, and the fingerprint settles it in
-one line. It is deliberately **not** in `gate.sh`: most slices are supposed to move the page, so a
-standing assertion would be red by default and ignored within a week. Nothing else prompts you —
-that is why it is written here, in the step where you are already writing the handoff.
+For any slice that claims the rendered document changed or stayed unchanged, record the output of
+`scripts/pdf_fingerprint.sh` before and after. Put only the short result in `LAST_OUTPUT.md`; Git and
+the slice evidence hold the details.
 
-For work with no calculation in it (a screen, a refactor), skip step 1 and go straight to
-`app-implementer` — but the reviewer step is not optional for anything a landlord will read.
+Review reports are findings, not fixes or completion decisions. The main session verifies them and
+returns required changes to the correct implementer.
 
-**A handoff that accuses — "unauthorized change", "the agent did this unprompted", "fabricated" —
-is verified against git before anyone acts on it.** `git log`, `git show`, `md5` the file against
-what you actually wrote. A session that compacts mid-task reconstructs its own history from a
-summary and writes the reconstruction fluently and confidently; fluency is not evidence. On 04.08
-such a claim came within one command of a history rewrite over a commit that was correct in every
-particular — the attribution it called fabricated was byte-accurate, and the "unprompted" actions
-were all in the prompt. The cost of checking is one `git show`. The cost of not checking is
-reverting good work and distrusting a lane that was behaving.
+## 8. Merge and session close
 
-**A tool the lead hands you is unverified until it has run on *your* machine.** The same standard
-this file applies to agent claims applies to the lead's. `scripts/pdf_fingerprint.sh` arrived
-described as verified — and it was, on Linux. It piped to `md5sum`, which darwin does not ship, and
-`set -uo pipefail` without `-e` let the failure through: it printed an **empty hash and exited 0**.
-Before and after would have compared equal, which is precisely the failure the script exists to
-catch — a verification tool that passes by producing nothing. "It works on the machine it was
-written on" is a claim about that machine. Run it, look at the output, and check it against a value
-you already know before you trust it with a question that matters.
+Before proposing a merge:
 
-### Parallelism — where it pays and where it doesn't
+- inspect staged and unstaged changes separately;
+- confirm the slice contains only its intended work;
+- preserve unrelated local edits;
+- run `scripts/gate.sh full`;
+- use the demo gate when the milestone or rendered output requires it;
+- confirm required review findings are resolved.
 
-Subagents run one at a time by default and that is usually right. Implementer and tester on
-the same code are inherently sequential; forcing them to run together only spends tokens.
+Do not merge, tag or push automatically. Emir decides when each action happens.
 
-Parallel review, on the other hand, is genuinely better than sequential review, because a
-single reviewer anchors on the first problem it finds. At the end of a milestone, on a frozen
-build, run the three read-only agents at once:
+At the end of the main session, overwrite `LAST_OUTPUT.md` with the short format in `CLAUDE.md`.
+Only the main session writes it. Put durable execution status in `PLAN.md`, specifications in
+`docs/`, legal questions in the relevant `FRAGEN-an-Berkay-*.md`, and history in Git.
 
-```
-Review the M5 diff with three agents in parallel: boundary-auditor on isolation,
-statement-reviewer on the rendered output, docs-reconciler on doc drift.
-Do not let them fix anything — I want three separate reports.
-```
+## 9. Maintenance
 
-**Agent teams** (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) are worth it for exactly one thing
-here: competing-hypothesis debugging, where teammates argue each other out of a wrong theory.
-They are the wrong tool for building a milestone — M-sized work is sequential, touches shared
-files, and the known limitations (no session resumption, task status lag, the lead declaring
-victory early) all bite hardest there.
+Keep this file limited to permanent operating rules. Do not add completed threads, dated incidents,
+old branch names, commit histories or temporary status.
 
----
+When a rule changes:
 
-## Things this system deliberately does not do
+- add a scriptable invariant to `scripts/` and wire it into the gates;
+- add a judgement-based invariant to one existing role and its write lane;
+- update both `.claude` and `.codex` copies;
+- update golden statement figures in `docs/` before changing the PDF assertion;
+- turn repeated agent mistakes into a clearer instruction or a stronger gate.
 
-- **No agent decides what to build next.** That is `PLAN.md`'s execution order and the cut list.
-- **No agent marks a milestone done.** Gates do, or you do.
-- **No agent invents a legal number.** `spec-scribe` is instructed to report a gap instead of
-  filling it, and `PLAN.md` hard rule 1 says an unbuilt milestone beats a guessed AfA rate.
-- **No auto-merge, no auto-push.** `git push` is in the `ask` list in `.claude/settings.json`.
-
----
-
-## Maintenance
-
-The system is only as good as the invariants it encodes, so when a rule changes:
-
-- New invariant that a script can check → add it to `scripts/`, wire it into `gate.sh`.
-- New invariant that needs judgement → give it to an existing agent, or add one and give it a
-  lane in `write-scope.sh`. Two agents sharing a lane is the failure mode to avoid.
-- New golden figure on the statement → `docs/` first, then `assert_statement_pdf.py`. Never
-  the other way round.
-- An agent keeps making the same mistake → that is a missing line in its definition or a
-  missing gate, not a reason to supervise it more closely.
-
-Related: `CLAUDE.md` (contract) · `PLAN.md` (what and in what order) · `docs/` (specs) ·
-`DEMO-RUNBOOK.md` (the human rehearsal the scripts can't replace).
+Related: `CLAUDE.md` · `PLAN.md` · `LEAD-HANDOFF.md` · `docs/` · `DEMO-RUNBOOK.md`
