@@ -44,7 +44,12 @@ from lokara_heating_engine import (
     WarmWaterSeparation,
 )
 
-from .formatting import display_figure, format_number_de, largest_remainder_display
+from .formatting import (
+    display_figure,
+    format_co2_intensity_de,
+    format_number_de,
+    largest_remainder_display,
+)
 from .measurement_units import HEAT_KEY_BY_UNIT, UNIT_SYMBOLS
 
 # Glyphs are copy, not decoration (docs/08 → 4a). Written as escapes: a literal
@@ -869,7 +874,8 @@ def co2_grounds(co2: Co2Result) -> str:
         '<span class="co2-grounds">Berechnungsgrundlagen:'
         f" CO₂-Emissionen des Gebäudes {_with_unit(co2.total_co2_kg, 'kg')}"
         f" · beheizte Fläche {_with_unit(co2.heated_area_sqm, 'm²')}"
-        f" → {_with_unit(co2.intensity_kg_per_sqm, 'kg CO₂/m²/Jahr')}"
+        f" → {escape(format_co2_intensity_de(co2.intensity_kg_per_sqm))}{NBSP}"
+        "kg CO₂/m²/Jahr"
         f"{einstufung}"
         f" · CO₂-Kosten {_eur(co2.co2_cost)}</span>"
     )

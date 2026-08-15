@@ -15,7 +15,7 @@ from lokara_domain import AllocationKey, MeasurementUnit, cents, format_eur
 from lokara_heating_engine import HeatingResult
 from lokara_nk_engine import CostItem, NkResult, ShareLine
 
-from .formatting import format_number_de
+from .formatting import format_co2_intensity_de, format_number_de
 from .heating_disclosure import (
     OWNER_LABEL,
     OWNER_RESIDUAL_SENTENCE,
@@ -282,7 +282,7 @@ def _heating_section(data: StatementData) -> str:
         co2_block = f"""
   <div class="co2">
     <strong>CO₂-Kostenaufteilung (CO2KostAufG, {escape(co2.rechtsstand)}):</strong>
-    Emissionsintensität {escape(format_number_de(co2.intensity_kg_per_sqm))} kg CO₂/m²/Jahr
+    Emissionsintensität {escape(format_co2_intensity_de(co2.intensity_kg_per_sqm))} kg CO₂/m²/Jahr
     → Vermieteranteil {co2.landlord_share_percent} %
     ({escape(format_eur(co2.landlord_amount))}, vor der Umlage abgezogen);
     Mieteranteil {escape(format_eur(co2.renter_amount))}.
