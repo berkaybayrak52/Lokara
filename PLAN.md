@@ -53,9 +53,9 @@ date reappears.)*
 | 1 | ~~**Wire R1/R5/K9 + Ho/Hu into `heating-engine`**~~ — ✅ **done** 13.08.2026, `slice/wire-01b-rules` | Existed because `CLAUDE.md` DoD 4 described a legal rounding rule the code did not follow: `distribute_cents_half_up` had **zero production callers** and no boundary refused an Ho/Hu mismatch. Six of the ten sites moved to half-up and four provably could not move money. At that slice boundary, the fully-let case still used largest-remainder; Row 2 immediately below later replaced that temporary rule with the Eigentümer-Residuum. The demo pair did **not** move. | medium |
 | 2 | ~~**The Eigentümer-Residuum** — one reconciliation line per Liegenschaft and Kostenart, always printed~~ — ✅ **done** 15.08.2026 | Berkay did not confirm our model, he **replaced** it (`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1): the Eigentümeranteil is **not a party** and is **never derived from occupancy** — it is a pure residual, `gesamt − Σ mieteranteile`, per Kostenart (Seite 01 D12, *"ALWAYS as a residual, NEVER computed separately"*). The per-unit landlord parties collapse into one line, and both superseded conventions are retired. Where a figure can be computed two ways, the residual ships (`09-F07`: 1858, not 1859). Landed in `docs/02`, `docs/03`, `docs/08`, the domain and heating engines, the API and the PDF. The demo gate, PDF fingerprint comparison and rendered-output review are green. NK stays on largest-remainder until the separate Seite 02 → `docs/09` row. | medium |
 | 3 | ~~**§ 5 Abs. 1 S. 3 CO₂ rounding** — classify *after* rounding to one decimal~~ — ✅ **done** 15.08.2026 | `Antwort-an-Emir_03.md` § 6 is transcribed: the engine annualises, applies the Lokara `ROUND_HALF_UP` convention to one decimal, then classifies and carries that same value. The PDF prints fixed one-decimal intensity in both the CO₂ summary and Berechnungsgrundlagen; the statutory table is unchanged. Full and demo gates, rendered-statement review and PDF fingerprint comparison are green (pre `93bc516676058c0fc6277f2218099b00`, post `3569940d3e913df4ade956771ba67a01`). | low |
-| 4 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | Everything tenant-facing sits behind it. `slice/m5-pre-context-read` still carries the **25 pre-context-read fixtures**; the two things it was also carrying have since been taken off it and shipped on their own — the `gate.sh` skip-hole fix (`338dece`, on `main`) and the **ENVIRONMENT guard** (`slice/environment-guard`, `docs/01` D9). Neither depended on the role model, and holding them behind it was holding a security guard behind a feature. | medium |
+| 4 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | Everything tenant-facing sits behind it. `slice/m5-pre-context-read` carries the remaining DB/bootstrap and API call-site pre-context fixtures; its sanctioned bootstrap implementation and checker remain explicitly pending here. Every nested building route also needs deliberate URL-building validation before work. The two independent guards it once carried have shipped separately: the `gate.sh` skip-hole fix (`338dece`, on `main`) and the **ENVIRONMENT guard** (`slice/environment-guard`, `docs/01` D9). | medium |
 | 5 | **Page 02 → `docs/09`** + BetrKV catalogue in `rules-store` | Two **built** screens take a free-text `Kostenart` today (`kosten/costs-page.tsx`, `beleg/review-step.tsx`), so nothing validates that a cost is even umlagefähig — and **M4 deliberately refuses to derive an Umlageschlüssel** because the catalogue does not exist. Catalogue import: structured data, not prose. | low |
-| 6 | **M6** bank + Payment Ledger (finAPI stubbed) — **and BGH formal minimum #4** | The ledger closes the **Abzug der Vorauszahlungen**, the last of the four settled BGH minimums (`docs/08`). Until it exists the statement is formally *incomplete*, not merely thin. Page 08 (Bank-Matching) is specced. | high |
+| 6 | **M6** bank + Payment Ledger (finAPI stubbed), finalized statement snapshots and separate landlord/tenant documents — **and BGH formal minimum #4** | The ledger closes the **Abzug der Vorauszahlungen**, the last of the four settled BGH minimums (`docs/08`). Finalization then archives one immutable version and independently renders the landlord overview and each **eligible tenancy with >0 usage days**; a 0-day tenancy gets no document/portal visibility and is footnoted only in the overview (Seite 01 E8 / `08-F17`). Until that exists the statement is formally *incomplete*, not merely thin. Page 08 (Bank-Matching) is specced. | high |
 | 7 | **Page 05 → `docs/12`** — the Wächter set | § 556 Frist, Eichfrist, UVI-Turnus. One guard mechanism, three uses (`CLAUDE.md`: Guard/Wächter is one reusable pattern, not bespoke code each time). | medium |
 | 8 | **Copy-and-citation slice** | The accumulated `statement-reviewer` findings — ligatures, blank space, footer citations. Genuinely polish, and it is *now* polish rather than a gap, because the rows above closed the substance. | low |
 | 9 | **Block D2 — Heizspiegel-Vergleichswert** (K13 in `rules-store`) | **Unblocked 14.08.2026** by `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` §§ 2–4, and deliberately **not** folded into row 2. Three decisions arrived at once: D2 compares **heating only**, so the Normwert has warm water subtracted (`mittel − ww_kwh_m2`, his § 2 — this **supersedes his own earlier D2 spec**, which compared against Wärme+WW); the deduction is **24 kWh/(m²·a)** per Energieträger except **Wärmepumpe ≈ 8**, because Heizspiegel heat-pump values are electricity after COP (his § 2.2, a `Konvention` on a JAZ assumption, to be confirmed with co2online) plus a `(mittel − ww) <= 0` guard; and the co2online licence is **no longer a gate** (§ 4 — build it, counter-sign a real §6a output later). Open and handled: `über-500` for Wärmepumpe and Holzpellets does not exist in any public table, so the MVP ships a **labelled fallback to the 250–500 class** and extrapolates nothing (§ 3). | medium |
@@ -108,11 +108,15 @@ them ships to a real Steuerberater** without the values being confirmed first.
 - Polyglot monorepo: **Bun + Turborepo** (TS) + **uv** (Python). **`apps/web` (Next.js) +
   `apps/mobile` (Expo, skeleton) + `apps/api` (FastAPI)** + `packages/*` layout
   (see `docs/04-web-app-structure.md`).
-- TS `strict` + ESLint/Prettier/Husky + Vitest; Python **Ruff + mypy strict + pytest**; Turbo pipelines; CI.
+- TS `strict` + ESLint/Prettier + Vitest; Python **Ruff + mypy strict + pytest**; Turbo pipelines; CI.
+  **Husky, React Compiler and React Scan are not installed/enabled** and are deferred until their
+  first actual use. Framer Motion remains the chosen future animation library but is likewise not
+  installed today.
 - Tailwind wired to the **design tokens** from `docs/05-design-system.md` (colors, Montserrat/Manrope);
   **shadcn/ui** initialized and themed to the tokens.
-- Supabase project (EU/Frankfurt) provisioned; **SQLAlchemy + Alembic initialized inside `apps/api`**
-  against Supabase Postgres. `apps/web` / `apps/mobile` call the API over HTTP and never touch the DB.
+- Supabase project (EU/Frankfurt) provisioned; **SQLAlchemy models and Alembic migrations initialized
+  in the server-side `packages/db` package**, consumed by `apps/api` against Supabase Postgres.
+  `apps/web` / `apps/mobile` call the API over HTTP and never touch the DB.
 - **FastAPI skeleton**: a Supabase-JWT auth **dependency** + RLS-context, one health endpoint, and a
   typed HTTP client (with the shared `api.ts` auth/refresh interceptor) in `apps/web`.
   (No workers/webhooks yet — those arrive at M6.)
@@ -304,17 +308,28 @@ demo path (clean DB → seed → statement → PDF) is re-verified.
   verifies the relationship in the URL, then scopes the query.
 - Enforce roles in app logic on top of M5a's RLS backstop: an EMPLOYEE is limited to their
   `BuildingAssignment`s (zero assignments ⇒ sees nothing); TAX_ADVISOR is read-only.
+- **Validate every nested building route before doing work.** Every
+  `/a/{accountId}/buildings/{buildingId}/…` handler — especially costs and extraction — must load and
+  authorize the URL building through `PathAccountSession`, including EMPLOYEE assignment scope and
+  TAX_ADVISOR read-only rules. A guessed foreign `buildingId` returns a deliberate 404/403; it never
+  falls through to an incidental empty result or a raw foreign-key/integrity error.
 - **Name the bootstrap path for `person`.** M5a's policy denies by default, so the login lookup
   (find the Person behind a Supabase Auth user, before any account context exists) must run through a
   `SECURITY DEFINER` function or a dedicated role. Pick one and record it in `docs/02`.
+- **The pre-context read and its checker are still pending Row 4 work.** Land the single sanctioned
+  lookup together with `scripts/check_pre_context_reads.py` and its mutation/failure proof; existing
+  prose describing the boundary is not evidence that the implementation or gate exists.
 - **Guard the `renter.person_id` ordering rule with an artifact, not a comment.** The column is
   written by **exactly one** path — M10's activation-code redemption — so at this milestone the
   provable statement is a **negative**: no API route sets `person_id`, asserted over the OpenAPI paths
   the same way create-only `meter_reading` asserts the absence of PUT/PATCH.
 
-**DoD:** an EMPLOYEE with no building assignments sees nothing; a renter context exposes zero landlord
-data (verified in app logic **and** RLS); a Person holding two contexts can switch between them by URL
-and each request re-verifies; the OpenAPI surface contains no write path that sets `renter.person_id`.
+**DoD:** an EMPLOYEE with no building assignments sees nothing; a TAX_ADVISOR cannot mutate; every
+nested building route deliberately validates the URL building and assignment through
+`PathAccountSession`; a renter context exposes zero landlord data (verified in app logic **and** RLS);
+a Person holding two contexts can switch between them by URL and each request re-verifies; the one
+sanctioned pre-context read and its checker are green; the OpenAPI surface contains no write path that
+sets `renter.person_id`.
 
 ---
 
@@ -335,11 +350,27 @@ and each request re-verifies; the OpenAPI surface contains no write path that se
   *both* the ledger (the **geleistete** Vorauszahlungen; `advance × months` is the agreed figure and
   is rejected — `docs/08` → "#4 is blocked on the M6 ledger, by decision") **and** the temporal
   advance above. It is not a rendering task and must not be shipped as one.
+- **Finalization and statement archive.** A draft preview remains live/recomputed and writes no
+  archive. Finalizing creates exactly one immutable, versioned snapshot per
+  account/building/period/version containing normalized inputs, engine/rule versions and
+  `Rechtsstand`, result/party lines, `created_at`, content hashes, and archived document bytes or
+  immutable storage keys with hashes. A correction creates `vN+1`, retains/supersedes `vN`, and
+  inputs referenced by any finalized version cannot be destructively deleted.
+- **Separate outputs from the finalized snapshot.** Archive one building-wide internal
+  Vermieter-Gesamtübersicht and independently server-render one Mieter-Einzelabrechnung for each
+  eligible covered tenancy whose period-clipped usage days are **> 0**, selected from only that
+  tenancy's data. Per Berkay Seite 01 **E8 / `08-F17`**, a tenancy clipped to 0 usage days receives no
+  document and is not visible in the tenant portal; the landlord overview carries the required
+  footnote, and the case is **not** converted into vacancy. Never generate an all-renters PDF and crop
+  or hide sections. The tenant document includes M6's actual paid advances and Saldo.
 - Background jobs (Celery/Arq on Redis): sync, 180-day reconsent cleanup, deadline watchers.
 
 **DoD:** seeded bank transactions auto-match to renters; an NK Nachzahlung becomes a ledger Payment;
-a tenancy's advance can change mid-lease without ending the tenancy, and a statement's Saldo deducts
-the **paid** advances, not the agreed ones.
+a tenancy's advance can change mid-lease without ending the tenancy; a statement's Saldo deducts the
+**paid** advances, not the agreed ones; previewing creates no archive; finalization creates an
+immutable reproducible version plus one landlord overview and isolated per-tenancy documents; a
+correction retains the superseded version and referenced inputs cannot be destructively deleted;
+0-usage-day tenancies create no tenant document or portal entry and are footnoted in the overview.
 
 ---
 

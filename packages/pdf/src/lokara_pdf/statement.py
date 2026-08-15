@@ -490,6 +490,8 @@ def statement_html(data: StatementData) -> str:
   }}
   body {{
     font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "clig" 0;
     color: var(--color-ink);
     background: var(--color-paper);
     margin: 0;

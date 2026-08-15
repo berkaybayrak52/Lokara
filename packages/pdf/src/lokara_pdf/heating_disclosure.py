@@ -126,10 +126,10 @@ OWNER_LABEL = "Eigentümeranteil"
 # tries to reconstruct the row from a Bemessung finds no quota and concludes the
 # page is wrong.
 OWNER_RESIDUAL_SENTENCE = (
-    "Der Eigentümeranteil ist der Restbetrag: Gesamtkosten abzüglich der Summe "
-    "der Mieteranteile. Er enthält den auf Leerstand und Eigennutzung "
-    "entfallenden Anteil sowie die zeilenweise Rundungsdifferenz. Er wird nicht "
-    "aus einer Quote berechnet."
+    "Der Eigentümeranteil ist der Restbetrag: umlagefähige Heiz- und "
+    "Warmwasserkosten abzüglich der Summe der Mieteranteile. Er enthält den auf "
+    "Leerstand und Eigennutzung entfallenden Anteil sowie die zeilenweise "
+    "Rundungsdifferenz. Er wird nicht aus einer Quote berechnet."
 )
 
 

@@ -9,11 +9,11 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 | --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Language                    | **Python** (backend + engines) + **TypeScript** (frontend + mobile)    | Money math in isolated tested Python packages (integer cents + `decimal.Decimal`). See D2.  |
 | Repo                        | Polyglot monorepo: **Bun + Turborepo** (TS) + **uv** (Python)          | TS workspace: web, mobile, ui. Python workspace: api + engine packages (nk, heating, afa, export) + adapters. See D7. |
-| Web                         | Next.js (App Router) + React + Tailwind + Framer Motion + **shadcn/ui** | Apple-like polish, **WCAG 2.1 AA / BFSG mandatory**. shadcn themed to the brand tokens.      |
+| Web                         | Next.js (App Router) + React + Tailwind + **shadcn/ui**                 | Apple-like polish, **WCAG 2.1 AA / BFSG mandatory**. Framer Motion is the chosen animation library when animation first needs it; it is not installed today. |
 | Mobile                      | **Expo / React Native**                                                | Same API + shared patterns as web. `react-native-ease` animation; responsive from the start. See D8. |
 | Client state / data / forms | **Jotai** + **TanStack Query** + **React Hook Form + Zod**             | Jotai = client state, TanStack Query = server state, RHF+Zod = forms. Same on web **and** mobile. |
 | DB / Auth / Storage         | **Supabase** (Postgres + Auth + Storage + RLS)                         | See D1. Auth gives password + magic-link + verification + reset.                             |
-| ORM                         | **SQLAlchemy 2.0 + Alembic** against Supabase Postgres                 | RLS enforces isolation underneath. DB layer lives in `apps/api` only.                        |
+| ORM                         | **SQLAlchemy 2.0 + Alembic** against Supabase Postgres                 | Models and migrations live server-side in `packages/db`; `apps/api` consumes them. Client apps never touch the DB. |
 | Backend / API               | **FastAPI (`apps/api`, Python) from day 1**                            | Standalone HTTP/JSON API; web + native apps consume it. Routers per domain. See D2.          |
 | Runtime validation          | **Pydantic** (backend) + **Zod** (frontend/mobile)                     | Validate at every boundary; the backend is the authority.                                   |
 | Async / jobs                | **Celery or Arq** on **Redis** (from M6)                               | finAPI sync, reconsent cleanup, deadline watchers, email retries.                            |
@@ -21,7 +21,7 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 | PDF                         | HTML→PDF via headless Chrome (**Playwright for Python**)               | One shared document service: NK, UVI, AfA, Anlage V, contracts.                              |
 | Money                       | integer **cents** + `decimal.Decimal`                                  | Never floats. Largest-remainder (NK); `round_half_up` + Verteilungsrest (heating) — CLAUDE.md DoD 4. |
 | Testing                     | **pytest** (engines, golden fixtures) + **Vitest** (TS) + **Locust** (load) | Engines: deterministic, byte-/cent-exact. Locust simulates ~100 concurrent users.       |
-| Code quality                | Python: **Ruff + mypy strict**. TS: **ESLint + Prettier + Husky + strict TS**. **React Compiler** on; **React Scan** for web perf | Enforced automatically, not by discipline.                             |
+| Code quality                | Python: **Ruff + mypy strict**. TS: **ESLint + Prettier + strict TS**  | Current gates enforce these. Husky, React Compiler and React Scan are not installed/enabled; add each only with its first real use. |
 | Hosting (prod)              | EU/DE (target Hetzner)                                                 | DSGVO: EU/DE hosting is the operating licence. Dev anywhere.                                 |
 | UI copy                     | **German**                                                             | Code/comments/docs/identifiers in **English**. i18n-ready (i18n lib) on web + mobile.        |
 
@@ -45,8 +45,9 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
   extraction pipeline, Anschreiben generation), which is why the whole backend + engines are Python.
   FastAPI gives async I/O, first-class **Pydantic** validation, and auto-generated OpenAPI docs.
   Auth + RLS context are **FastAPI dependencies**; engines stay framework-free Python packages the API imports.
-- **`apps/web` and `apps/mobile` are frontend only** — they call `apps/api` over HTTP; **the
-  SQLAlchemy/DB layer lives in `apps/api`**, never in a client app.
+- **`apps/web` and `apps/mobile` are frontend only** — they call `apps/api` over HTTP. The
+  SQLAlchemy models and Alembic migrations live in the server-side **`packages/db`** package, which
+  `apps/api` consumes; no client app imports or accesses that layer.
 - **Modular monolith:** one deployable FastAPI app, split into per-domain routers/modules with clear
   boundaries (nk, heating, ledger, tax, documents, …). Not microservices.
 - **Local auth without Supabase creds:** the auth dependency verifies **HS256** against
@@ -107,8 +108,10 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 - **Note:** Bun replaces the earlier pnpm/Node setup — migrate `pnpm-*`/`package.json` scripts to Bun.
   Expo + Next.js on Bun have occasional rough edges; if a tool breaks under Bun, fall back to Node for
   that one command, don't re-platform.
-- **Quality gates:** Python = **Ruff + mypy strict**; TS = **ESLint + Prettier + Husky + strict TS**;
-  **React Compiler** on for web + mobile; **React Scan** for web render profiling, Expo tooling for mobile.
+- **Quality gates today:** Python = **Ruff + mypy strict**; TS = **ESLint + Prettier + strict TS**.
+  **Husky, React Compiler and React Scan are not currently installed/enabled.** They are optional
+  tooling, deferred until the first change that actually uses and verifies each one. Framer Motion
+  remains the chosen future web animation library, likewise added only with its first animation.
 - **Revisit-when:** if Bun causes recurring CI friction, reconsider pnpm for the TS workspace only.
 
 ### D8 — Mobile: **Expo / React Native, shared stack with web**
@@ -146,8 +149,10 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
   you want for "this deployment is unsafe".
 - **The `.env.example` gains `ENVIRONMENT="local"`** and keeps the three dev switches as they are: the
   example file is the local file, and local is where those values are correct.
-- **It also gates the demo router's unmembered session** (`docs/02` → "The pre-context read" → ruling on
-  `/demo/load`), which is the third of that endpoint's three locks.
+- **It also gates the demo router's unmembered session.** The relevant boundary is `docs/02` →
+  *"The `person` edge splits: READ is a policy (M5a), WRITE is an ordering rule (M10)"* → read-side
+  constraint 1; the sanctioned login/bootstrap design and checker remain pending in `PLAN.md` Row 4.
+  This environment flag is the third of `/demo/load`'s three locks.
 - **`ENVIRONMENT` is a process env var locally — not a `.env` line, and this is not a style
   preference.** pydantic-settings consults the `.env` file whenever the process environment has no
   value, so a `.env` line **survives `monkeypatch.delenv`**. Put `ENVIRONMENT` there and

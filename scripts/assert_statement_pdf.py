@@ -128,6 +128,14 @@ STRUCTURE_REQUIRED: dict[str, str] = {
 # formatting. Kept separate from MUST_NOT_APPEAR so the message can be specific.
 LONG_DIGIT_RUN = re.compile(r"(?<!\d)\d{7,}(?!\d)")
 
+# Search/copy/accessibility checks over the actual PDF text layer. Presentation-form
+# ligatures can look correct while turning ``Wohnfläche`` into ``Wohnﬂäche`` for search
+# and assistive technology. The fixed CO2 intensity must appear in both its summary and
+# its Berechnungsgrundlagen, not merely somewhere in the HTML before Chromium renders it.
+SEARCHABLE_WORDS = ("Wohnfläche", "Differenz", "Rundungsdifferenz")
+FIXED_CO2_INTENSITY = "40,0 kg CO₂/m²/Jahr"
+FIXED_CO2_INTENSITY_LOCATIONS = 2
+
 
 def extract_text(pdf: Path) -> str:
     try:
@@ -194,6 +202,7 @@ def main(argv: list[str]) -> int:
     text = extract_text(pdf)
     # PDF extraction sometimes splits a number across a line break inside a table cell.
     flat = re.sub(r"\s+", "", text)
+    searchable_text = " ".join(text.replace("\xa0", " ").replace("\u202f", " ").split())
 
     failures: list[str] = []
 
@@ -209,6 +218,27 @@ def main(argv: list[str]) -> int:
         failures.append(
             f"SUSPECT  {match.group()!r} — 7+ digit run; no figure on this statement is "
             f"that long. Likely an un-de-scaled cents value or x100 weight (docs/03)."
+        )
+
+    missing_words = [word for word in SEARCHABLE_WORDS if word not in text]
+    for word in missing_words:
+        failures.append(
+            f"MISSING  {word!r} from searchable PDF text — presentation ligature or "
+            "text-layer regression"
+        )
+
+    ligatures = sorted({character for character in text if "\ufb00" <= character <= "\ufb06"})
+    for character in ligatures:
+        failures.append(
+            f"PRESENT  U+{ord(character):04X} presentation ligature {character!r} — "
+            "use ordinary letters in the searchable PDF text layer"
+        )
+
+    intensity_locations = searchable_text.count(FIXED_CO2_INTENSITY)
+    if intensity_locations != FIXED_CO2_INTENSITY_LOCATIONS:
+        failures.append(
+            f"COUNT    {FIXED_CO2_INTENSITY!r} appears {intensity_locations} time(s), "
+            f"expected {FIXED_CO2_INTENSITY_LOCATIONS} (summary + Berechnungsgrundlagen)"
         )
 
     failures.extend(check_structure(pdf))
