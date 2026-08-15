@@ -121,6 +121,61 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 - **Design reference:** use **Mobbin** (catalog of real app screens) when designing mobile flows.
 - **Revisit-when:** if a native module Expo doesn't support is needed, evaluate a dev-client/bare workflow.
 
+### D9 — One required `ENVIRONMENT` variable gates every dev-only switch (M5 remainder)
+
+> Specified 09.08.2026, **implemented 15.08.2026** on `slice/environment-guard` (`Rechtsstand` n/a —
+> this is deployment configuration, not a legal rule). The spec and its failing test were lifted off
+> `slice/m5-pre-context-read`, where they had been waiting on a role model they never needed.
+
+- **The finding, exactly.** `.env.example` ships `AUTH_DEV_TOKEN="true"`, `DEMO_SEED_ENABLED="true"` and
+  `SUPABASE_JWT_SECRET="local-dev-secret-change-me-min-32-chars!!"`, and **no `ENVIRONMENT` / `APP_ENV`
+  is read anywhere in the tree**. That is three independent routes into a deployment with auth
+  effectively off — a dev-token minter (D2), a seeder that also `DELETE`s, and a signing secret that is
+  published in the repo — each one copied `.env` away, and none of them noisy when wrong.
+- **Decision.** `ApiSettings` gains `environment: Environment` (`local | ci | staging | production`)
+  with **no default**: a missing `ENVIRONMENT` is a startup failure, never a silent `local`. A Pydantic
+  **model validator** refuses to construct the settings object when `environment` is `staging` or
+  `production` and any of these holds:
+  - `auth_dev_token` is true;
+  - `demo_seed_enabled` is true;
+  - `supabase_jwt_secret` equals the placeholder shipped in `.env.example` — which becomes a named
+    constant in the API so the comparison is exact rather than a substring guess.
+- **Fail at construction, not per request.** A per-request `if settings.auth_dev_token` is one forgotten
+  branch away from being wrong, and the branch that matters is the one nobody adds. A validator that
+  refuses to build the settings object takes the process down once, loudly, at boot — the failure mode
+  you want for "this deployment is unsafe".
+- **The `.env.example` gains `ENVIRONMENT="local"`** and keeps the three dev switches as they are: the
+  example file is the local file, and local is where those values are correct.
+- **It also gates the demo router's unmembered session** (`docs/02` → "The pre-context read" → ruling on
+  `/demo/load`), which is the third of that endpoint's three locks.
+- **`ENVIRONMENT` is a process env var locally — not a `.env` line, and this is not a style
+  preference.** pydantic-settings consults the `.env` file whenever the process environment has no
+  value, so a `.env` line **survives `monkeypatch.delenv`**. Put `ENVIRONMENT` there and
+  `test_a_missing_environment_is_a_startup_failure` stops being able to fail locally — while staying
+  genuinely red in CI, which ships no `.env`. That is the worst shape a guard's test can take: green
+  on the machine where someone would notice, red only where nobody reads it. Measured, not reasoned:
+  with the line in `.env`, constructing after `delenv` returns `environment='local'` instead of
+  raising. So `scripts/gate.sh` exports `ENVIRONMENT="${ENVIRONMENT:-local}"` (the local counterpart
+  of `ci.yml`'s `ENVIRONMENT: ci`), and `.env.example` ships the line the test pins **with a comment
+  saying to export it instead** once copied. A `conftest.py` under `apps/api/tests` would be the
+  tidier home for the default; it is deliberately not created, because it sits outside
+  `app-implementer`'s lane and the lane rule outranks the tidier fix.
+- **The guard fails at *import*, not merely at first construction.** `lokara_api/__init__.py` imports
+  `.main`, which runs `app = create_app()` at module level. So a missing or unsafe `ENVIRONMENT`
+  takes the process down before a single request is served — which is D9 working exactly as intended,
+  and is also why the collateral shows up as pytest **collection** errors covering whole files rather
+  than as individual test failures.
+- **Cost accepted: `ApiSettings(...)` keyword arguments are no longer type-checked.** pydantic's mypy
+  plugin synthesises an `__init__` in which a required field becomes a required keyword argument, so
+  making `environment` required turned all 23 bare `ApiSettings()` sites into `[call-arg]` errors —
+  for a class whose entire purpose is to read the environment. `settings.py` declares a
+  `TYPE_CHECKING`-only `__init__(self, **overrides: Any)`, which the plugin defers to and which is
+  erased at runtime. Every site in the tree constructs it with zero arguments, so nothing is lost
+  today. **Revisit if a call site ever passes keywords** — at that point the checking is worth having
+  back, and the alternative is 23 `# type: ignore[call-arg]` comments spread across two write lanes.
+- **Failing test:** `apps/api/tests/test_environment_guard.py`. **Revisit-when:** the first real
+  deployment target exists — the enum may need `preview`; the fail-closed rule may not weaken.
+
 ## What "stubbed behind an adapter" means (do this consistently)
 
 For every paid/external edge (finAPI, Vision, email, billing, MDL, Destatis, DATEV):
