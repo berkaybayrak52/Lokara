@@ -149,8 +149,10 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
   you want for "this deployment is unsafe".
 - **The `.env.example` gains `ENVIRONMENT="local"`** and keeps the three dev switches as they are: the
   example file is the local file, and local is where those values are correct.
-- **It also gates the demo router's unmembered session** (`docs/02` → "The pre-context read" → ruling on
-  `/demo/load`), which is the third of that endpoint's three locks.
+- **It also gates the demo router's unmembered session.** The relevant boundary is `docs/02` →
+  *"The `person` edge splits: READ is a policy (M5a), WRITE is an ordering rule (M10)"* → read-side
+  constraint 1; the sanctioned login/bootstrap design and checker remain pending in `PLAN.md` Row 4.
+  This environment flag is the third of `/demo/load`'s three locks.
 - **`ENVIRONMENT` is a process env var locally — not a `.env` line, and this is not a style
   preference.** pydantic-settings consults the `.env` file whenever the process environment has no
   value, so a `.env` line **survives `monkeypatch.delenv`**. Put `ENVIRONMENT` there and

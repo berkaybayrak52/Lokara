@@ -77,9 +77,10 @@ class TestDeployedEnvironmentsRefuseDevSwitches:
     def test_demo_seeding_is_refused(
         self, monkeypatch: pytest.MonkeyPatch, environment: str
     ) -> None:
-        """`/demo/reset` DELETEs, and `/demo/load` runs on the unmembered session
-        (`docs/02` → "The pre-context read" → ruling on `/demo/load`). This flag is one of
-        that endpoint's three locks."""
+        """`/demo/reset` DELETEs, and `/demo/load` runs on the unmembered session.
+        The boundary is `docs/02` Person read-side constraint 1; its sanctioned
+        bootstrap design and checker remain pending in `PLAN.md` Row 4. This flag
+        is one of that endpoint's three locks."""
         _base_env(monkeypatch)
         monkeypatch.setenv("ENVIRONMENT", environment)
         monkeypatch.setenv("DEMO_SEED_ENABLED", "true")

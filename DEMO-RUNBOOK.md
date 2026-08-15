@@ -25,14 +25,22 @@ Before starting, verify the local values documented by `.env.example` are presen
 the API requires it with no default, so the demo shell exports `ENVIRONMENT=local` and both server
 terminals must inherit it.
 
-Start the two servers in **separate terminals** (so you can see errors). In the API terminal, load
-the same process environment first:
+Start the two servers in **separate terminals** so you can see errors.
+
+**API terminal** — load the local example values into this process, then set the required environment
+explicitly:
 
 ```bash
 set -a
 source .env.example
 set +a
-ENVIRONMENT=local DEMO_SEED_ENABLED=true uv run lokara-api  # FastAPI on 127.0.0.1:3001
+export ENVIRONMENT=local
+uv run lokara-api                         # FastAPI on 127.0.0.1:3001
+```
+
+**Web terminal:**
+
+```bash
 bun run --filter @lokara/web dev          # web on :3000
 ```
 

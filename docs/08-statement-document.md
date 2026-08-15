@@ -747,8 +747,11 @@ rule a disclosure incident.
   normalized inputs, engine/rule versions and `Rechtsstand`, results and party lines, `created_at`,
   content hashes, and archived document bytes or immutable storage keys with their hashes.
 - The finalized snapshot archives one **Vermieter-Gesamtübersicht** and one independently rendered
-  **Mieter-Einzelabrechnung for each covered tenancy**. A sendable tenant statement waits for M6
-  because it must include actual paid advances and the resulting Saldo.
+  **Mieter-Einzelabrechnung for each eligible covered tenancy with >0 period-clipped usage days**.
+  Per Berkay Seite 01 **E8 / `08-F17`**, a tenancy clipped to 0 usage days gets no document and no
+  tenant-portal visibility; the landlord overview carries the required footnote. It is **not treated
+  as vacancy**. A sendable tenant statement waits for M6 because it must include actual paid advances
+  and the resulting Saldo.
 - A correction creates `vN+1`, retains and supersedes `vN`, and never overwrites archived bytes.
   Inputs referenced by a finalized version cannot be destructively deleted; their corrections append
   or supersede so every version remains reproducible.

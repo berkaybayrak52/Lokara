@@ -811,8 +811,12 @@ rows are shown struck through, never hidden — the audit trail is the feature.
   keys with their hashes.
 - **One calculation produces separate documents.** Finalization archives one internal
   **Vermieter-Gesamtübersicht** with the building-wide reconciliation and one independently rendered
-  **Mieter-Einzelabrechnung per covered tenancy**. The server selects that tenancy's data before
-  rendering. It never renders one all-renters PDF and then crops, hides or masks sections.
+  **Mieter-Einzelabrechnung per eligible covered tenancy with >0 period-clipped usage days**. The
+  server selects that tenancy's data before rendering. Per Berkay Seite 01 **E8 / `08-F17`**, a
+  tenancy clipped to 0 usage days gets no document and is not visible in the tenant portal; the
+  Vermieter-Gesamtübersicht carries the required footnote. This case is **not vacancy** and must not
+  create a landlord vacancy segment. The system never renders one all-renters PDF and then crops,
+  hides or masks sections.
 - **Corrections append.** A correction finalizes `vN+1`, retains `vN`, and records that `vN+1`
   supersedes `vN`; neither the snapshot nor its archived documents are overwritten.
 - **Referenced inputs become retention-bound.** A cost, heating-cost row, meter reading, tenancy or
