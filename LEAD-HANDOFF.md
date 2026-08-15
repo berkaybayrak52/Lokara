@@ -1,183 +1,69 @@
-# LEAD-HANDOFF.md — context for the reviewing session
+# LEAD-HANDOFF.md — permanent guide for the main session
 
-> **Who reads this.** The chat session that acts as lead: reviews Claude Code's output, decides
-> what ships, writes the prompts, and talks to Berkay. Not an agent. Agents read `AGENTS.md`.
->
-> **Why it exists.** `PLAN.md` records *what* to build and `AGENTS.md` records *how* work is
-> executed. Neither records the reviewing posture — which claims turned out false, what to
-> re-derive rather than trust, and which conventions are ours rather than Berkay's. That lived
-> only in one long conversation, which is a bad place for it.
->
-> Tracked in git, unlike `LAST_OUTPUT.md`. This is durable; that is scratch.
+This file defines how the main conversation reviews and closes work. It is tracked and durable.
+It is not a session log, backlog, legal specification or status report. Update this file in place
+only when a lasting review practice changes. Git keeps its history; never create dated copies.
 
----
+## 1. Where truth lives
 
-## 1. Where to look first
-
-| Question | File |
+| Question | Source |
 | --- | --- |
-| What is the contract? | `CLAUDE.md` |
-| What is built, what is next, in what order? | `PLAN.md` → "Execution order" |
-| How does the agent system work, and what has it got wrong? | `AGENTS.md` |
-| What did the last Claude Code session do? | `LAST_OUTPUT.md` (verify it names HEAD) |
-| What is Berkay still owed / owing? | `FRAGEN-an-Berkay-02.md` |
-| What did Berkay actually write? | `berkay-work/` — agents edit only with Emir's explicit permission |
+| What rules override everything? | `CLAUDE.md` |
+| What is built and what comes next? | `PLAN.md` → execution order |
+| How do agents, lanes, worktrees and gates operate? | `AGENTS.md` |
+| What is the architecture? | `lokara-arch.md` |
+| What is the calculation source? | `berkay-work/` → `docs/` → engines |
+| What does a specific feature require? | The matching file under `docs/` |
+| What happened in the latest session? | `LAST_OUTPUT.md` |
 
-**Check this before believing `LAST_OUTPUT.md`:** `scripts/check_handoff.sh`. It has been red at
-least once with a handoff two commits stale, because it only runs at `gate.sh full`/`demo` and
-sessions close on `fast`.
+`LAST_OUTPUT.md` is only Emir's short summary window. It never overrides Git or tracked docs.
+Use `scripts/check_handoff.sh` only to confirm that it names the current HEAD.
 
----
+## 2. What the main session owns
 
-## 2. The rule that is easiest to break
+- Emir controls scope, priorities and whether work is merged or pushed.
+- The main session reads agent reports, verifies them, decides what ships and writes
+  `LAST_OUTPUT.md`.
+- Agents do not decide what to build next, mark milestones complete, merge, push or write the
+  session summary.
+- Preserve existing user changes. Separate unrelated edits before committing or merging.
+- Ask Emir only when a missing choice would materially change the result or expand the scope.
 
-**`berkay-work/` is immutable to agents without Emir's explicit permission.** Its current view is
-deliberately small: `Rechtsstand-Register/` holds the one authoritative register, and
-the matching Notion pages with their additional notes; `Spec-Seiten/` holds the current specs,
-replies and supporting material. The CSV remains authoritative for structured fields and flags. A
-new export is integrated only as an authorised source update; agents never choose or rewrite it
-themselves.
+## 3. Review standard
 
----
+- Re-derive counts, survey results, arithmetic and every claim that says "verified".
+- Check the code and command output, not the plan or an agent's confidence.
+- A correct conclusion with the wrong mechanism is still wrong.
+- Verify accusations and destructive Git advice with `git log`, `git show`, `git status` and the
+  exact diff before acting.
+- Treat a new tool as unverified until it runs locally and produces a known, non-empty result.
+- Label every convention invented by Lokara as ours. Never present it as Berkay's rule or law.
+- Preserve legal flags and provenance. `geprüft` does not mean lawyer-approved.
 
-## 3. Conventions that are OURS, not Berkay's
+## 4. Reviewing agent work
 
-These must never be cited as if they were German law or his spec. All three are flagged as ours
-in `docs/03` § 9.2 and in `FRAGEN-an-Berkay-02.md` § 1.
+- Worktree edits do not sync back. Inspect the worktree status, copy the exact files, then rerun
+  gates in the main tree.
+- Never run `scripts/verify_demo_path.sh` from an agent worktree. The database and Docker stack are
+  shared resources.
+- Read-only reviewers report findings; they never fix them.
+- Implementers never write their own tests. Missing fixtures go back to `spec-scribe`.
+- Keep `.claude` and `.codex` aligned. `check_agent_parity.py` is the authority.
+- Do not widen a write lane to make an agent finish. A refusal can be the correct result.
 
-1. **Several landlord parties → the residual goes to the *first* in deterministic order**, and the
-   same one in all four blocks, so a single Eigentümer row explains every ±ct. *First*, not last,
-   so appending a unit cannot move it.
-2. **No landlord party at all → the block keeps largest-remainder.** The engine must never hand a
-   residual to a renter to force a block to reconcile. **This is the majority of buildings**, which
-   is why row 2 exists: without it, Berkay's rounding rule governs only buildings with a vacancy.
-3. **`nk-engine` stays largest-remainder** until page 01/02 is transcribed. Deliberate, not an
-   oversight — the canonical €1.200 fixture is identical under both methods (residual exactly 0),
-   so nobody may claim the change moved it.
+## 5. Before merging
 
----
+- Confirm the slice was cut from `main` and contains only the intended work.
+- Inspect staged and unstaged changes separately. Preserve unrelated local edits.
+- Run `scripts/gate.sh full`; use the demo gate when the milestone or output requires it.
+- Record the PDF fingerprint before and after any slice that claims the document changed or stayed
+  unchanged.
+- Merge only green work. Do not push unless Emir asks.
 
-## 4. Berkay thread
+## 6. Closing a session
 
-**Answered (his `Antwort-an-Emir_01b-Uebergabe.md`, 13.08.2026):**
-
-- **F19** — we were right, `abzug` = 90.121 ct. Corrected in Notion.
-- **F16/F26** — *we* were wrong. 4.227 is the Verteilungsrest, not a rounded share. **Our fix.**
-- Ho/Hu, K3, R1/R5/K9, H2 — unchanged.
-- Emissionsfaktor Erdgas: **the register wins** (0,201 Hu / 0,181 Ho), not the looser figures in
-  his earlier message.
-- **7 flags flipped** to `geprüft` (3 Emissionsfaktoren, 3 AfA rates, the 15 % rule). Mietpreis-
-  bremse was already `geprüft`, so his "8 verified" is accurate. Verified by diffing both CSVs.
-- **DWD importer: two bugs.** CSV headers are `DatAnf;DatEnd;PLZ;KF`, not the XML names; the
-  plausibility band widens to 0.40–1.80 because the real minimum is 0,49.
-- **§ 6a Abs. 3 S. 4 Bekanntmachung exists** — BAnz AT 16.04.2021 B1. Its method *is* K12, so K12
-  gets stronger. **But** it is nominally issued under GEG § 82 and whether it legally *is* the
-  § 6a one needs a Fachanwalt. Record the qualification, do not cite it flat.
-- **K12: 12-month Klimafaktor per billing period.** The 36-month mean is Energieausweis logic and
-  would be wrong here.
-- **CO₂: take `co2Cent` from the invoice's stated € amount**, never recompute from kg × price. We
-  satisfy this today only because the K4 price fallback isn't built.
-- **Block D2** — new: normed average-user fallback from the Heizspiegel when Block D has too few
-  comparable units.
-
-**Open — `FRAGEN-an-Berkay-02.md`:**
-
-1. **Eigentümer line (blocking row 2).** He never saw this; his reply predates the question by
-   three hours.
-2. **The Heizspiegel norm includes Warmwasser, our figure can't.** § 9 HeizkostenV forces the
-   split, so comparing our heating-only kWh against a combined norm flatters every renter — on a
-   document § 6a Abs. 2 Nr. 3 makes mandatory.
-3. **"über 500 m²" gap** — Wärmepumpe and Holzpellets values are missing from the CSV. A fallback
-   with its own hole needs defined behaviour.
-4. **co2online licence** — general use confirmed by mail; the § 6a-UVI use is not.
-5. Housekeeping: date future exports.
-
-**Do not guess any of these into `docs/`.** Row 2's fixture values differ depending on answer 1.
-
----
-
-## 5. How to review a Claude Code report
-
-The reports are careful and mostly right. They are also the only account of work you did not
-watch. Both worktree runs so far contained one wrong number.
-
-**Re-derive, don't accept:**
-
-- **Counts and survey results.** "Six of ten call sites", "four cannot move money", "25 red
-  fixtures" — check them. One near-miss: a claimed 10 sites vs 6 found reconciled only because
-  party allocations share a dispatch helper.
-- **Arithmetic against Berkay's fixtures.** Recomputing all three disputed values is what
-  established that F19 was his error and F16/F26 were ours.
-- **"Verified X" claims.** Ask what command produced the evidence. `gate.sh fast` does not run
-  `check_handoff.sh`, `pytest`, `eslint`, `tsc`, `vitest` or the demo path.
-- **Whether a gate has ever been red.** A check that has only ever passed is an assertion. Ask for
-  the failing output, or better, a test that pins the failure.
-
-**Structural checks:**
-
-- **Worktrees do not sync back.** `git -C .claude/worktrees/agent-<id> status --short` is the
-  truth; the report is not. Re-run gates in the main tree.
-- **Did `LAST_OUTPUT.md` get rewritten?** It is the next session's only inheritance.
-- **Is a new convention labelled as ours?** Anything invented at the seam between his model and
-  our data structure is ours until he confirms it.
-
----
-
-## 6. Failure modes that have actually happened
-
-Recorded because each one cost real time and none was obvious in advance.
-
-**From the lead (me):**
-
-| What | Lesson |
-| --- | --- |
-| `pdf_fingerprint.sh` piped to GNU-only `md5sum` with no `-e`; printed an empty hash and exited 0 — I "verified" it on Linux | **A tool handed over is unverified until it runs on their machine.** A verification tool that can pass by producing nothing is worse than none. |
-| Relayed `git reset --hard origin/main` on a claim about "6 commits from a backed-out fast-forward" | Two of them existed nowhere else. **Never relay a destructive command from an unverified premise.** |
-| Said Phase G was `MIGRATION-PLAN.md`'s only live content | §8 held an RLS rule two scripts cite as their reason for existing. **Read the whole file before recommending deletion.** |
-| Told Berkay four rule changes were "eingebaut" | Only two were wired. **Check the code, not the plan, before telling a third party something shipped.** |
-| Diagnosed K9/F26 with the right conclusion and the wrong mechanism | The named call site did not exist. Right answer, wrong reason, still wrong. |
-
-**From the agents:**
-
-- `engine-implementer` uses a worktree even when told to work in place. Check for one.
-- `statement-reviewer` never returns an empty finding list, so it can loop indefinitely and pull
-  sessions off the execution order. Only a human stops it.
-- Both implementers correctly **refused to end green the wrong way** (satisfying their own
-  fixtures, editing the write-scope hook). That refusal is the system working — do not "unblock"
-  it by widening a lane. Finish the step yourself.
-
----
-
-## 7. Housekeeping backlog
-
-Small, none blocking, all easy to lose:
-
-- [ ] `LAST_OUTPUT.md` is stale — records `4cce4ee`, HEAD is `c796e0d`
-- [ ] F16/F26: fix our reading; `FEEDBACK-to-Berkay-01b.md` claims two defects where there is one
-- [ ] Import the fresh register (180 rows) into `rules-store` **with provenance** — `geprüft` must
-      record who verified and when, or nobody can later tell "spec author read the statute" from
-      "lawyer signed off"
-- [ ] Cherry-pick the ENVIRONMENT guard + `gate.sh` skip-hole fix from `slice/m5-pre-context-read`
-      onto main — main currently has nothing guarding the dev-token minter, the seeder, or the
-      published JWT secret
-- [ ] `check_agent_parity.py`: a reorder-only divergence prints "0 lines only in .claude, 0 only in
-      .codex" and no detail
-- [ ] Reported, no legal exposure: Framer Motion is a locked decision and a UI-DoD checkbox but is
-      installed nowhere; `docs/04` lists four packages that do not exist; `README`/`AGENTS` do not
-      explain the `berkay-work/` source precedence; `pyproject` pins `httpx2` unrecorded
-
----
-
-## 8. Standing decisions
-
-- **No deadline.** Stated twice, including after a 27.08 pitch date surfaced. Hard rule 3 makes a
-  demo date cheap anyway: show the last `demo-green-<n>` tag, never reorder work to reach one.
-- **Transcription is the first step of each row, not a separate phase.** Hard rule 1. A
-  transcription's only real test is a golden fixture that passes, and 130 of 180 register values
-  are still `verify-before-production` — batch-transcribing would bake placeholders into `docs/`
-  at scale. The one exception is the register itself: structured data, import it nearly as-is.
-- **`.codex/` stays** as the fallback for when tokens run out. Now at real parity (hooks identical
-  modulo the env-var name; `check_agent_parity.py` compares definitions, hook scripts and wiring,
-  with nine tests). **Nobody has actually run `codex` against the repo since** — equivalent on
-  paper, unproven in practice.
-- **New Claude Code session per row.** Hard rule 4. The repo is the memory.
+- Overwrite `LAST_OUTPUT.md` using the short format in `CLAUDE.md`.
+- Put temporary status in `LAST_OUTPUT.md`, execution status in `PLAN.md`, legal questions in the
+  relevant `FRAGEN-an-Berkay-*.md`, specifications in `docs/`, and history in Git.
+- Keep this file free of completed threads, old commit hashes, housekeeping lists and session
+  stories. Add only guidance that should still be useful in a future conversation.

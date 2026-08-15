@@ -287,12 +287,27 @@ Anything marked "to confirm" in `lokara-arch.md` has a pragmatic default locked 
   it from `README.md`.
 - **If a new spec contradicts `docs/`, stop and ask.** Don't silently pick one; a `docs/` rule may
   encode a decision the newer spec hasn't caught up with.
-- **The session writes its end-of-task summary to `LAST_OUTPUT.md`** at the repo root, overwriting it
-  each time — same content as the chat summary (what was built, decisions worth knowing, gates,
-  what's next). It's the handoff other tools read. Gitignored on purpose: it's scratch, not project
-  history.
-  **This is the session's file, not an agent's.** A subagent reports to the session and never writes
-  it: it sees one lane, and a handoff composed from one lane is the stale handoff `check_handoff.sh`
-  exists to catch. `.claude/hooks/write-scope.sh` therefore blocks every agent from creating it, and
-  that is correct — an agent that hits the block should report the conflict, not widen its lane.
-  Composing the agents' reports into one handoff is the session's job.
+- **At the end of every main session, overwrite `LAST_OUTPUT.md`** at the repo root. It is Emir's
+  short summary window. It is not a prompt source, coordination layer, project memory or source of
+  truth. Git and the tracked docs hold the durable state. The summary must be understandable without
+  the chat and use exactly this structure:
+
+  ```markdown
+  # Last output — <short title>
+
+  HEAD `<commit>` on `<branch>` · `<date>`
+  Status: Complete | Partial | Blocked
+
+  ## Wanted
+  ## Done
+  ## Not done
+  ## Optional next step
+  ```
+
+  Keep the whole summary to roughly 15 non-empty lines. Use short bullets. `Wanted` is one sentence.
+  Put outcomes and gate results under `Done`. Put blockers or unfinished work under `Not done`;
+  write `None` when there are none. The final section contains at most one recommendation; write
+  `None` when no next step is useful. It is never an instruction or commitment. Do not include
+  transcripts, prompts, long logs, reasoning or raw agent reports.
+  **This is the main session's file, not an agent's.** Subagents report to the main session and never
+  write it. `.claude/hooks/write-scope.sh` and its `.codex` mirror enforce that boundary.
