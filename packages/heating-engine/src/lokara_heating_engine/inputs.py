@@ -193,7 +193,9 @@ class HeatingLine:
 @dataclass(frozen=True)
 class Co2Result:
     # kg CO₂/m²/**Jahr** — annualised (H2), which is what the Anlage's column
-    # header asks for and what § 7 Abs. 3 has the tenant check.
+    # header asks for, then rounded to one decimal under § 5 Abs. 1 S. 3 (R8).
+    # This is the value used for classification and disclosure; the raw value
+    # remains reproducible from the carried mass, area and period-day fields.
     intensity_kg_per_sqm: Decimal
     # H2: `365 / nTage`, which is **>= 1** for a short period and exactly 1 when
     # nTage is 365 or 366. Deliberately not called `period_factor`: that name
