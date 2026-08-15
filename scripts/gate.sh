@@ -13,6 +13,22 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.bun/bin:$PATH"
 
+# docs/01 D9: ApiSettings requires ENVIRONMENT and deliberately has no default, so the
+# eleven bare ApiSettings() sites under apps/api/tests fail without it. This is the local
+# counterpart of ci.yml's `ENVIRONMENT: ci`.
+#
+# It is exported here rather than written into .env, and the difference is not cosmetic.
+# pydantic-settings consults the .env file whenever the process env has no value, so a
+# .env line survives monkeypatch.delenv -- and test_environment_guard.py's "a missing
+# ENVIRONMENT is a startup failure" would then pass for the wrong reason, locally,
+# forever, while still being genuinely red in CI (which has no .env). A guard whose own
+# test cannot fail is an assertion. Verified, not assumed: with the line in .env, that
+# test reports environment='local' instead of raising.
+#
+# `:-` so an explicit `ENVIRONMENT=production scripts/gate.sh` still overrides -- which is
+# a useful thing to run: it should go red, and that is the guard working.
+export ENVIRONMENT="${ENVIRONMENT:-local}"
+
 LEVEL="${1:-fast}"
 FAILED=()
 
