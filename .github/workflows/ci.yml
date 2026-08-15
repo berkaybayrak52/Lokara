@@ -54,6 +54,11 @@ jobs:
       # gated demo-seed endpoint in its enabled state.
       SUPABASE_JWT_SECRET: ci-only-secret-not-used-in-prod-123456
       DEMO_SEED_ENABLED: 'true'
+      # docs/01 D9: required, no default. It must be `ci` and not staging/production
+      # -- this job runs with DEMO_SEED_ENABLED above, which the guard refuses in a
+      # deployed environment. `ci` is a real environment in the enum for exactly that
+      # reason: the suite needs the dev switches on and is not a deployment.
+      ENVIRONMENT: ci
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
