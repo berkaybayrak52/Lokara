@@ -5,8 +5,9 @@ This file answers two questions:
 1. What is built?
 2. What comes next?
 
-Build in the execution order below. Each slice ends green. Engines and golden fixtures come before
-UI. Dates are communication events, not planning inputs.
+Build in the execution order below. The current program completes and approves all documentation
+before any implementation resumes. Each later slice ends green. Engines and golden fixtures come
+before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
@@ -14,7 +15,7 @@ UI. Dates are communication events, not planning inputs.
   verified against all Berkay specifications.
 - The v4 migration is complete. The old TypeScript backend is gone. Mobile moved to M10.
 - Composite foreign-key isolation and M5a identity/RLS are complete.
-- Execution rows 1–3 are complete for their bounded fixes. The Page 01b source transcription is
+- Three earlier Page 01b fixes are complete. The Page 01b source transcription is
   complete; its executable-golden-test gate, confirmed implementation gaps and final verification
   still block M2 spec closure.
 - Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
@@ -22,16 +23,16 @@ UI. Dates are communication events, not planning inputs.
   confirmed implementation gaps remain. Pages 02–08 and the full UVI annex still need transcription
   before their related implementation work.
 - Phase D1 is the current work: reconcile `docs/00` through `docs/08` without implementation source
-  changes. Slice A coding is paused until the documentation gates have been reviewed and approved.
+  changes. All implementation is paused until D1–D3 have been reviewed and approved.
 - Phase D2 starts only after Emir reviews and approves D1. It creates the source-backed
   `docs/09`–`docs/16` specs and golden fixtures before the final retirement gate.
 - Phase D3 starts only after Emir reviews and approves D2. It proves that the six Berkay
   correspondence files have been completely extracted, moves every genuinely unresolved item into
   one current `FRAGEN-an-Berkay-04.md`, updates governance references and then deletes the retired
   correspondence. Implementation remains paused through D3.
-- Row 4 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
+- M5 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
   but the slice is not merged yet.
-- Row 4 has not added a new dashboard, portal or account switcher.
+- That M5 foundation has not added a new dashboard, portal or account switcher.
 
 ---
 
@@ -44,15 +45,15 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks M3/M4 spec closure and final M6 statements. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F02's CSV factor values/reference behaviour, rules data and factor-independent cost refusal are green, but its end-to-end statement remains open: derived-mass warning/provenance and § 7 Abs. 4 risk output are missing. Slice A capability seams, the self-billing capability and exact F18 are green, but capability evidence does not close the full fixtures. Blocks M2 implementation closure, D2 and UVI. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F02's CSV factor values/reference behaviour, rules data and factor-independent cost refusal are green, but its end-to-end statement remains open: derived-mass warning/provenance and § 7 Abs. 4 risk output are missing. Slice A capability seams, the self-billing capability and exact F18 are green, but capability evidence does not close the full fixtures. Blocks M2 implementation closure and dependent UVI implementation; it does not block D2 transcription. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
-| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Missing. Blocks Row 7, M9 and the UVI due-date guard. |
+| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Missing. Blocks the shared guard foundation, M9 and the UVI due-date guard. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Missing. Blocks M8. The source defines routing and risk rules, but not a complete clause-text catalogue. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | Rename `KPI-F01…F14` to `14-F01…F14`, with an alias map | Missing. Blocks the M10 investment cockpit. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Missing. Blocks the bank-matching part of M6. |
-| UVI + DWD annexes | `docs/16-uvi.md` | Every annex fixture, including the DWD import set | Missing. Blocks Rows 9–10. |
+| UVI + DWD annexes | `docs/16-uvi.md` | Every annex fixture, including the DWD import set | Missing. Blocks the UVI implementation slice. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
 engine contract; it does not create a second competing heating specification.
@@ -95,7 +96,7 @@ doc section and golden test. It must also record conflicts, superseded decisions
 unresolved values. `spec-scribe` must mark that table complete before implementation begins. A
 missing, conflicting or unverified value stays explicit; it is never guessed.
 
-Current trace audit, 16.08.2026:
+Current trace status through checkpoint `fe88b96` on 17.08.2026:
 
 - Page 01 has no current doc/test trace for `08-F02…F05`, `F07…F16`, `F18…F20` and `F23…F24`.
 - Page 01b now has a complete 34-ID data oracle and source-section trace, but a data table is not an
@@ -135,7 +136,7 @@ correspondence history after deletion; the approved `docs/` transcription become
 project knowledge.
 
 **Phase D1 — current.** Reconcile the existing documentation only. Do not change implementation
-source. Slice A coding remains paused. Work in this exact order:
+source. All implementation remains paused. Work in this exact order:
 
 1. Align `docs/03` with the restored single Slice A and record the unresolved DWD uncertainty as a
    dependency, without importing the future `docs/16` contract.
@@ -191,7 +192,20 @@ Stop for Emir's review and approval first.
    is left only in Git history.
 6. Delete the six files together, inspect the complete deletion diff, and stop for Emir's approval.
 
-Implementation resumes only after D3 has passed and Emir has approved the retirement diff.
+Implementation resumes only after D3 has passed and Emir has approved the retirement diff. At that
+point the approved `docs/00`–`docs/16`, their golden fixtures, the original Pages and annexes, and
+the Rechtsstand register form the complete implementation baseline. Later slices and milestones use
+that baseline; they do not restart transcription or silently reinterpret a source.
+
+The documentation program is complete only when:
+
+1. every existing doc is reconciled and every planned `docs/09`–`docs/16` file is approved;
+2. every Page, annex, register row and correspondence section has a documented destination or an
+   explicit unresolved/superseded disposition;
+3. every calculation example that defines behaviour has a golden fixture, and every unverified
+   value remains visibly blocked; and
+4. the correspondence-retirement and governance-reference diff is approved with no information
+   left only in the retiring files.
 
 ---
 
@@ -200,32 +214,33 @@ Implementation resumes only after D3 has passed and Emir has approved the retire
 The order closes legal billing exposure first. Missing UVI or CO₂ disclosure can each reduce the
 heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 
-| # | Status | Work | Required result |
+Three bounded Page 01b fixes already precede the current sequence and remain preserved: R1/R5/K9
+and Ho/Hu wiring, the Eigentümer residual, and § 5 Abs. 1 S. 3 CO₂ rounding. They are green but do
+not replace the complete documentation or reconciliation gates.
+
+| Stage | Status | Work | Required result |
 | --- | --- | --- | --- |
-| 1 | ✅ Done 13.08.2026 | Wire R1/R5/K9 and Ho/Hu into `heating-engine` | Heating uses the required half-up allocation path. |
-| 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Slice C. |
-| 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
 | D1 | **Current** | Reconcile existing `docs/00`–`docs/08` | Follow the exact D1 order above. Documentation and golden fixtures only; no implementation source changes. Stop for Emir's review and approval. |
-| D2 | After D1 approval | Create source-backed `docs/09`–`docs/16` | Use separate spec slices, the source registry assignments, coverage tables and golden fixtures. Follow the dependency order above; no implementation before review. |
+| D2 | After D1 approval | Create source-backed `docs/09`–`docs/16` | Use separate spec slices, the source registry assignments, coverage tables and golden fixtures. Follow the dependency order above and stop for review; no implementation. |
 | D3 | After D2 approval | Complete extraction and retire Berkay correspondence | Close the six-file coverage ledger, create only one current `FRAGEN-an-Berkay-04.md` if needed, update governance references, verify no dependent paths, delete the six files together and stop for Emir's approval. |
-| A | Paused for D1–D3 | Reinforce M2 from Page 01b | Resume the single Slice A after the documentation and correspondence-retirement gates. Integrate the complete Page 01b specification into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
-| B | After A | Reinforce M3–M4 from Page 01 | Revalidate the D1 Page 01 contract against the current persisted calculation and extraction scope; implement confirmed gaps that belong to M3/M4 and leave M6-only ledger/finalization work explicitly assigned to M6. |
-| C | After B | Reinforce M1 from Page 02 | Revalidate NK eligibility, allocation and rounding against the approved D2 `docs/09` contract and fixtures. This replaces the former separate Row 5. |
-| 4 | Paused until D1–D3 and A–C | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
-| 6 | Open | M6 bank, ledger and finalized statements | Complete Page 01 → `docs/08` first. Transcribe Page 08 → `docs/15` before bank matching. Add actual paid advances, BGH minimum #4, immutable snapshots, one landlord overview and isolated tenant documents. |
-| 7 | Open | Page 05 → `docs/12` Wächter set | Implement § 556 deadline, Eichfrist and UVI cadence through one reusable guard mechanism. |
-| 8 | Open | Statement copy and citations | Resolve the remaining reviewer findings on ligatures, spacing, copy and footer citations. |
-| 9 | Ready after transcription | D2 Heizspiegel comparison value | Reconcile Page 01b and transcribe the UVI/DWD annexes → `docs/16`. Then implement the specified heating-only comparison, guards and labelled fallbacks without extrapolation. |
-| 10 | Open | UVI calculation and document | Implement the calculation and tenant document from `docs/16`. Needs monthly readings, Page 05 W4 and Row 9 comparison values. Scheduled delivery waits for M9; portal publication waits for M10 activation. |
-| 11 | Ready after transcription; values blocked | M7 tax export and AfA | Transcribe Page 03 → `docs/10` and Page 04 → `docs/11`. Build only the computation paths; flagged register values still block real output. |
-| 12 | Open | M8, M10 modules and mobile | Transcribe Page 06 → `docs/13` before the clause engine and Page 07 → `docs/14` before the investment cockpit. Then build documents, tickets, activation, investment, billing and native apps. |
+| A | Paused for D1–D3 | Reconcile M2 with Page 01b | Integrate the approved Page 01b contract into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
+| B | After A | Reconcile M3–M4 with Page 01 | Revalidate the approved Page 01 contract against persisted calculation and extraction, close M3/M4 gaps and leave ledger/finalization work to M6. |
+| C | After B | Reconcile M1 with Page 02 | Revalidate NK eligibility, allocation, classification and rounding against approved `docs/09` and close M1. |
+| M5 | After A–C | Roles, URL context and switcher | Finish the prepared secure bootstrap slice, role enforcement, owner contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
+| M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`: actual advances, BGH minimum #4, immutable snapshots, bank matching, landlord overview, isolated tenant documents, and remaining statement copy/citation findings. |
+| G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
+| U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
+| M7 | After U | Tax export and AfA | Implement approved `docs/09`–`docs/11`. Build computation paths and archives; flagged register values continue to block real output. |
+| M8 | After M7 | Document and letter engine | Implement approved `docs/13` with versioned clauses and risk gates. |
+| M9 | After M8 | Reminders, email and checklists | Complete the guard-driven reminder and delivery system from approved `docs/12`, including UVI scheduling. |
+| M10 | After M9 | Portals, investment, billing and native apps | Implement renter activation and portal work, the approved `docs/14` investment cockpit, billing and mobile apps. |
 
 ### Slice A — progress and closure
 
-Progress preserved through the current worktree:
+Progress preserved on the current branch:
 
-- The complete source trace and 34-ID data oracle are transcribed. Rows 1–3 remain green for their
-  bounded fixes.
+- The complete source trace and 34-ID data oracle are transcribed. The three earlier Page 01b fixes
+  remain green for their bounded scope.
 - `01b-F28b` gross rescaling is executable and green: exact gross quotient, accepted one-cent source
   residual and owner reconciliation.
 - Device and segmented-reading capabilities are green at `716f741`: H5 typed device/span
@@ -262,13 +277,12 @@ These capability seams are not end-to-end Page 01b closure. Slice A closes only 
 5. Full and demo gates pass, the before/after PDF fingerprint is recorded, and statement review has
    no unresolved Slice A findings.
 
-The D1–D3 documentation and correspondence-retirement gates precede the existing A–C implementation
-reconciliation gate. Do not continue Row 4 or start later feature work until all three phases are
-approved, all three slices are spec-closed and the full and demo gates pass. Rows 1–3 remain
-complete only for
-their named fixes; they do not count as full Page 01b coverage. Row 9 is no longer blocked by the
-co2online licence, but it is blocked by the `docs/16` transcription gate. A real § 6a output must
-still be checked later.
+The D1–D3 documentation and correspondence-retirement gates precede the A–C implementation
+reconciliation gate. Do not resume M5 or start later feature work until D1–D3 are approved, A–C are
+spec-closed and the full and demo gates pass. The three earlier Page 01b fixes remain complete only
+for their named scope; they do not count as full Page 01b coverage. UVI implementation is no longer
+blocked by the co2online licence, but it remains blocked until `docs/16`, the shared guard
+foundation and Slice A are approved and green. A real § 6a output must still be checked later.
 
 ### M7 value warning
 
@@ -292,13 +306,15 @@ or Finanzamt until each value is confirmed.
    coverage-table gate. Transcribe first, create every golden fixture, then implement. Never invent
    a legal value. The authoritative register currently has 130 of 180 rows marked
    `verify-before-production`.
-2. **Keep the demo path green.** Every milestone re-verifies database → migration → seed → statement
+2. **Finish the documentation program before implementation.** D1–D3 run without implementation
+   source changes. Every implementation stage begins only from the approved documentation baseline.
+3. **Keep the demo path green.** Every milestone re-verifies database → migration → seed → statement
    → PDF. Fix or revert any break before continuing.
-3. **Tag green milestone states.** Use `demo-green-<n>` only after the required gates pass.
-4. **Finish one milestone or bounded slice at a time.** Do not merge half-built subsystems.
-5. **Keep external services stubbed behind adapters** until their integration slice. No real keys or
+4. **Tag green milestone states.** Use `demo-green-<n>` only after the required gates pass.
+5. **Finish one milestone or bounded slice at a time.** Do not merge half-built subsystems.
+6. **Keep external services stubbed behind adapters** until their integration slice. No real keys or
    vendor SDKs in engines or domain code.
-6. **Docs and code must agree.** A documented rule that code does not follow is a defect.
+7. **Docs and code must agree.** A documented rule that code does not follow is a defect.
 
 ---
 
@@ -327,8 +343,8 @@ The Expo mobile skeleton is not part of the completed foundation. It moved to M1
 - Per-period `AllocationKeyAssignment`; changing a key does not delete entered data.
 - Canonical €1,200 golden fixture passes exactly.
 
-**Spec-closed when:** the original gates still pass after complete Page 02 transcription, every
-`09-Fxx` fixture exists and all confirmed differences are resolved.
+**Spec-closed when:** Slice C proves the existing engine against approved `docs/09`, every `09-Fxx`
+fixture passes and all confirmed differences are resolved.
 
 ### M2 — Heating and CO₂ engine 🟡 Page 01b transcribed; implementation reconciliation pending
 
@@ -338,8 +354,9 @@ The Expo mobile skeleton is not part of the completed foundation. It moved to M1
 - CO₂ 10-step landlord/renter split.
 - Versioned ratios, tables and `Rechtsstand`.
 
-**Spec-closed when:** complete Page 01b coverage exists, every `01b-Fxx` fixture is traced, Rows 1–3
-remain correct and the statement prints the verified split with `Rechtsstand`.
+**Spec-closed when:** Slice A proves complete Page 01b coverage, every `01b-Fxx` fixture passes, the
+three earlier bounded fixes remain correct and the statement prints the verified split with
+`Rechtsstand`.
 
 ### M3 — Web vertical slice and PDF 🟡 built and green; Page 01 reconciliation pending
 
@@ -354,8 +371,8 @@ Built:
 - autosave so leaving a flow does not lose entered data;
 - statement inputs from persisted rows, not fixture constants.
 
-**Spec-closed when:** the original demo remains green after complete Page 01 transcription and all
-`08-Fxx` statement fixtures pass.
+**Spec-closed when:** Slice B proves the persisted path against approved `docs/08`, the original demo
+remains green and all `08-Fxx` statement fixtures pass.
 
 ### M4 — Document extraction demo 🟡 built and green; Page 01 reconciliation pending
 
@@ -390,7 +407,7 @@ Slice B, without bypassing review or tenant-document isolation.
 
 ---
 
-## 4. M5 remainder — paused until Slices A–C close
+## 4. M5 remainder — paused until D1–D3 and Slices A–C close
 
 ### Prepared on the unmerged `slice/m5-bootstrap-contexts`
 
@@ -429,9 +446,8 @@ and renter portal authorization are M10 work.
 
 ### M6 — Bank, ledger and finalized statements
 
-**Spec gate:** finish Page 01 in `docs/08`. Finish Page 08 in `docs/15` before implementing bank
-matching. If bank matching is deferred, Page 08 does not block the remaining ledger and statement
-work.
+**Approved-spec prerequisite:** D1's `docs/08` and D2's `docs/15`. If bank matching is deferred,
+`docs/15` does not block the remaining ledger and statement work.
 
 - Add Redis workers and webhooks.
 - Keep finAPI stubbed behind the bank adapter.
@@ -456,11 +472,23 @@ work.
 advances work; preview creates no archive; finalization is immutable and reproducible; landlord and
 tenant documents are separated; zero-day tenancies are excluded and footnoted.
 
+### Shared guard foundation and UVI implementation slice
+
+**Approved-spec prerequisite:** `docs/12`, `docs/16` and spec-closed Slice A.
+
+- Implement the shared § 556, Eichfrist and UVI cadence guards needed before M9.
+- Implement the specified heating-only comparison with labelled fallbacks and no extrapolation.
+- Add monthly readings, the UVI calculation and the separate tenant document.
+- Keep scheduled delivery in M9 and portal publication in M10.
+
+**Done when:** every `docs/16` calculation fixture passes, the DWD conflicts are resolved, the UVI
+document is tenant-isolated, and the shared due-date guard is executable. If the DWD inputs remain
+unresolved, this slice stays blocked.
+
 ### M7 — Tax export and AfA
 
-**Spec gate:** transcribe Page 03 into `docs/10` and Page 04 into `docs/11`, including every fixture
-and every `verify-before-production` marker. Page 02 must already be transcribed where its cost
-classification feeds the export.
+**Approved-spec prerequisite:** `docs/09`–`docs/11`, including every fixture and every
+`verify-before-production` marker.
 
 - Pure `packages/export-engine` for Anlage V and DATEV EXTF.
 - DATEV output is byte-exact Windows-1252 with semicolons and CRLF.
@@ -473,7 +501,7 @@ immutably. Production use remains blocked until flagged values are verified.
 
 ### M8 — Document and letter engine
 
-**Spec gate:** transcribe Page 06 into `docs/13`, including its legal/convention labels, risk gates,
+**Approved-spec prerequisite:** `docs/13`, including its legal/convention labels, risk gates,
 non-goals and all `CLAUSES-Fxx` fixtures.
 
 - Versioned clause blocks and stored clause composition.
@@ -486,7 +514,8 @@ affected contract.
 
 ### M9 — Reminders, email and checklists
 
-**Spec gate:** transcribe Page 05 into `docs/12` before building any deadline or reminder rule.
+**Approved-spec prerequisite:** `docs/12`. The bounded shared guard foundation lands before the UVI
+slice; M9 completes reminders, email and checklists without redefining those rules.
 
 - Shared trigger/state-machine engine for § 556, arrears, move-in/out and UVI.
 - Stubbed email provider using Lokara's domain and the landlord as the From-name, with an immutable
@@ -500,9 +529,8 @@ affected contract.
 
 ### M10 — Portals, modules and native apps
 
-**Spec gate:** transcribe Page 07 into `docs/14` before the investment cockpit. The calculation
-depends on the completed Page 02, Page 03 and Page 04 contracts. Renter activation remains governed
-by `docs/02` and the M5 no-write guard.
+**Approved-spec prerequisite:** `docs/14`; its calculations also depend on approved `docs/09`–
+`docs/11`. Renter activation remains governed by `docs/02` and the M5 no-write guard.
 
 - Renter activation, renter portal, tickets and tax-adviser guest access.
 - Investment pipeline and seven-KPI cockpit.
