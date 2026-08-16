@@ -365,15 +365,21 @@ are enforced by `test_berkay_01b_complete_coverage.py`. The feature test column 
 closest executable test. **The data-only oracle is a transcription aid, not an executable golden
 test and not permission to change source.** `F28b` was intentionally RED; its H7 gross-rescaling
 seam is now implemented and the case is green.
-`F02` contains no factor-derived number while the Hu/Ho sources conflict.
+`F02` contains no factor-derived number while the Hu/Ho sources conflict. Its independent
+supplier-cost boundary is executable: a missing supplier euro amount must be refused without
+looking up, selecting or deriving any emission factor.
 
 Executable golden-test closure is therefore still open:
 
-- Exact current executable cases: `F03–F06`, `F16` and `F28b`.
+- Exact current green cases: `F03–F06`, `F16` and `F28b`.
+- Current RED hand-offs are the factor-independent `F02` supplier-cost refusal, the exact
+  WE-03-only `F18` area fallback, and A2's device/segmented-reading contracts for
+  `F01/F15/F17/F22/F27`. A2 also re-exercises `F16` through the missing-interim-reading shape;
+  that does not replace its existing green degree-day golden.
 - `F01` and `F26` have useful allocation-primitive coverage, but not their complete worked-example
   pipeline.
-- Before their corresponding implementation changes, executable goldens must still be added for
-  `F01`, `F07–F15`, `F17–F27` including `F26b/c`, `F28a`, and `F29–F31` — 27 cases total.
+- No count in this section treats a capability contract or primitive test as full fixture closure.
+  The A2–A7 rows in `PLAN.md` assign every case that is not already exact and green.
 - `F02` cannot become a value-dependent golden until the Hu/Ho CSV conflict is resolved. Its
   executable reference-boundary tests may use synthetic factors, but must not select either legal
   pair.
@@ -381,7 +387,7 @@ Executable golden-test closure is therefore still open:
 | Fixture | Rule / result | Feature test |
 | --- | --- | --- |
 | `01b-F01` | full self-billing pipeline; four renter totals + owner reconcile to 338.218 ct | `test_berkay_01b_residual_wiring.py`, `test_heating_golden.py` |
-| `01b-F02` | missing supplier data; mass fallback value **blocked by Hu/Ho conflict**; cost fallback refused | `test_berkay_01b_energy_reference_boundary.py` + blocked oracle |
+| `01b-F02` | missing supplier data; mass fallback value **blocked by Hu/Ho conflict**; cost fallback refused without consulting a factor | RED `test_berkay_01b_f02_cost_refusal.py`; value oracle remains blocked |
 | `01b-F03` | exact 12,0 boundary → 10 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F04` | exact 52,0 boundary → 95 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F05` | annualise/round/classify; corrected 12,0 → 10 % | `test_berkay_01b_co2_s3_rounding.py`, `test_berkay_01b_co2_stufen.py` |
@@ -397,9 +403,9 @@ Executable golden-test closure is therefore still open:
 | `01b-F15` | heat-meter kWh weights instead of HKV units | `test_heat_consumption_unit.py` + complete oracle |
 | `01b-F16` | no interim reading: K3, owner vacancy segment | `test_berkay_01b_degree_days.py` + complete oracle |
 | `01b-F17` | ≤25 % estimated, amount unchanged, provenance required | `test_heating_golden.py`, `test_heating_disclosure.py` + complete oracle |
-| `01b-F18` | >25 %: all consumption blocks dissolve to area | `test_heating_golden.py`, `test_heating_disclosure.py` + complete oracle |
+| `01b-F18` | only WE-03 readings missing: 58/194 = 29,90 %; all consumption blocks dissolve to area; Berkay's printed cents are authoritative | RED `test_berkay_01b_f18_area_fallback.py` |
 | `01b-F19` | oil stock/weighted cost; CO₂ on consumption; cost fallback refused | complete oracle; oil-input seam pending |
-| `01b-F20` | district heating pass-through, step model still applied | complete oracle; energy-source seam pending |
+| `01b-F20` | district heating pass-through, step model still applied; H1 aggregation and § 6a network disclosures are part of closure | partial CO₂ primitive only; H1/disclosure seams pending |
 | `01b-F21` | zero denominator hard stop; no silent area fallback | `test_heating_golden.py` + complete oracle |
 | `01b-F22` | negative delta rejected; two device segments | complete oracle; device aggregation seam pending |
 | `01b-F23` | 5–70 plausibility band warns, never blocks | complete oracle; warning channel pending |
@@ -411,7 +417,7 @@ Executable golden-test closure is therefore still open:
 | `01b-F27` | device rounding/aggregation and two change readings | complete oracle; `bewertungsfaktor`/device seam pending |
 | `01b-F28a` | MDL net branch; no second CO₂ deduction | complete suffix oracle; H7 pending |
 | `01b-F28b` | MDL gross branch; exact rescale, 1 ct accepted, owner residual | ✅ `test_berkay_01b_complete_coverage.py`; H7 `rescale_mdl_gross_positions` |
-| `01b-F29` | OCR decimal shift: hard control-sum refusal | complete oracle; H7 pending |
+| `01b-F29` | OCR decimal shift: hard control-sum refusal in the MDL **net** branch | complete oracle; net-branch M3 seam pending; gross rescaling is not a substitute |
 | `01b-F30` | no CO₂ evidence: separate 3 % risks, no deduction | complete oracle; H7/readiness output pending |
 | `01b-F31` | annual graph: heat adjusted, WW raw; missing data has labelled fallbacks | complete structural oracle; H8/DWD/output pending |
 
@@ -442,27 +448,32 @@ CSV. The rows are grouped below without changing their individual status.
    Antwort 03 § 5 says the engine must refuse when the supplier did not state the euro amount.
    Only supplier-stated cost is current. The F19 stock/mass oracle remains; its historical fallback
    deduction is not an implementation oracle.
-5. **Unresolved legal application — reduction cumulation.** Page F25 says cumulation of the three
+5. **Superseded — F18 per-block R1 override.** An earlier implementation attempt replaced Berkay's
+   printed `108.090 / 74.932 / 43.121 / 101.117 / 10.958` table with a separately derived
+   per-block table. Emir withdrew that override on 16.08.2026. Berkay's table is authoritative.
+   The executable input is exactly the source case: only WE-03's relevant readings are missing,
+   so the affected area is `58 / 194 = 29,90 %`; do not make every unit unread.
+6. **Unresolved legal application — reduction cumulation.** Page F25 says cumulation of the three
    3 % rights and the 15 % right is uncertain and forbids summing. The CSV entry
    `Kürzungsrecht — CO₂-Anteil nicht ausgewiesen` says the three 3 % rights cumulate. Do not sum;
    render each risk separately until the register is reconciled.
-6. **K12 dependency.** The DWD CSV importer uses `DatAnf;DatEnd;PLZ;KF`, pads PLZ to five digits,
+7. **K12 dependency.** The DWD CSV importer uses `DatAnf;DatEnd;PLZ;KF`, pads PLZ to five digits,
    accepts `0.40–1.80`, and keeps old periods. The import spec's later test bullet still says
    `0.50–1.80`; its verified 13.08 correction and Antwort handoff supersede that bullet. The annual
    H8 comparison uses one 12-month factor per year, not the UVI annex's monthly degree-day ratio.
-7. **K13/D2 dependency.** The UVI annex's old Wärme+WW D2 formula is superseded by Antworten 02/03:
+8. **K13/D2 dependency.** The UVI annex's old Wärme+WW D2 formula is superseded by Antworten 02/03:
    compare heat to heat, subtract versioned WW values (24 kWh/m² for combustion/district heat;
    heat-pump 8 is a flagged convention), guard non-positive results, and use the labelled 250–500
    fallback for missing over-500 heat-pump/pellet cells. This belongs to `docs/16`/Rows 9–10, not
    H8. The current CSV K13 row still describes an annual electronic-statement link and must not be
    presented as the UVI rule.
-8. **Pre-legal § 6a notice identity.** The BAnz 16.04.2021 B1 notice exists and supports the DWD
+9. **Pre-legal § 6a notice identity.** The BAnz 16.04.2021 B1 notice exists and supports the DWD
    direction, but whether the GEG § 82 notice is the intended § 6a Abs. 3 S. 4 notice remains for
    legal review. Keep the CSV row flagged.
-9. **H5/H7/H8 dependencies.** H5 needs device `bewertungsfaktor` and segmented readings; H7 needs
+10. **H5/H7/H8 dependencies.** H5 needs device `bewertungsfaktor` and segmented readings; H7 needs
    confirmed OCR fields and a pure MDL validation/rescaling seam; H8 needs versioned DWD factors and
    the statement graph. These are confirmed gaps, not reasons to invent defaults.
-10. **Non-goals stay excluded.** No MDL recalculation from raw inputs, floor-heating reimbursement,
+11. **Non-goals stay excluded.** No MDL recalculation from raw inputs, floor-heating reimbursement,
     renovation ROI, device-installation/eich/K-value audit, renter evidence-inspection portal,
     automatic reduction, or proprietary Lokara average-user dataset is introduced here.
 
@@ -641,7 +652,7 @@ used for the step lookup is rounded to one decimal place (R8).
 | Group | Fields that reach the engine |
 | --- | --- |
 | Plant | `energietraeger` {erdgas, heizoel, fluessiggas, fernwaerme, waermepumpe, biomasse} · `verbundeneAnlage` · `gebaeudeTyp` {wohn, nichtwohn, gemischt} · `denkmalschutz` / `milieuschutz` / `ausschlussNachweis` (each requires a stored document) · `grundkostenAnteilProzent` 30–50, default 30 (K1) |
-| Invoices | `zeitraumVon/Bis` · `mengeKwh` **with its energy reference (Ho/Hu)** · `betragCent` · `co2Gramm` (nullable → K4 fallback) · `co2KostenCent` (nullable) · `energiemix`, `thgGprokWh`, `primaerenergiefaktor`, `steuernCent` (§ 6a Abs. 3 Nr. 1 disclosure) · `tankAnfangL` / `tankEndeL` (oil) |
+| Invoices | `zeitraumVon/Bis` · `mengeKwh` **with its energy reference (Ho/Hu)** · `betragCent` · `co2Gramm` (nullable → K4 fallback) · `co2KostenCent` (nullable only at the boundary; null → hard refusal) · `energiemix`, `thgGprokWh`, `primaerenergiefaktor`, `steuernCent` (§ 6a Abs. 3 Nr. 1 disclosure) · `tankAnfangL` / `tankEndeL` (oil) |
 | Operating costs | `betriebsstromCent`, `wartungCent`, `messungCent`, `ausstattungCent`, `sonstigeCent` |
 | Meters | `heizgeraet.typ` {hkv, waermezaehler, wwZaehler} · `nummer` · `raum` · **`bewertungsfaktor`** (K-Wert, 2 dp) · `ablesung.wertAlt/wertNeu` (1 dp) · `ablesung.datum/anlass` {jahres, zwischen, einzug, auszug} · `vWwM3` · `tw` (default 60 °C, K5) · `wohnung.wwM3` · `fernablesbar` |
 | Rules tables | `co2PreisCentProTonne` · `emissionsfaktor` **+ its Bezug** · `co2Stufentabelle` · `gradtagstabelle` (**Zehntelpromille, Σ 10 000**) · `klimafaktor` (PLZ, Periodenende) |
@@ -682,7 +693,7 @@ gesamtCent = Σ rechnung.betragCent          (allocated per K8, see H1a)
 
 ```
 co2Gramm = Σ rechnung.co2Gramm                      # fallback K4 only on § 3 breach
-co2Cent  = Σ rechnung.co2KostenCent                 # see the open collision in § 7 below
+co2Cent  = Σ rechnung.co2KostenCent                 # missing supplier cents → HARD REFUSAL
 spezifisch = (co2Gramm / 1e6) / gesamtflaecheM2                                [R2, R4]
 if nTage not in (365, 366): spezifisch ×= 365 / nTage        # annualise first (H2)
 spezifisch = round_half_up(spezifisch, 1 Nachkommastelle)       # then round (R8)
@@ -734,6 +745,39 @@ A tenant change needs **two** readings (Auszug **and** Einzug, § 9b Abs. 1). Wi
 vacancy period cannot be separated from the following tenancy (`01b-F27`: ~54 units of somebody
 else's consumption would land on the incoming tenant). A segment without its own reading is
 apportioned by K3 instead (§ 9b Abs. 3).
+
+### A2 executable input/output contract — device and segmented readings
+
+**Rechtsstand 08/2026.** Source: Page 01b §§ 3.3, 4 H5/H6, E11–E14, E18 and E25; K10/K11
+remain `verify-before-production`. This contract introduces no new rate or legal value.
+
+The pure heating boundary must accept two frozen shapes:
+
+- `HeatingDevice(device_id, unit_id, room, measurement_unit, valuation_factor)`; and
+- `DeviceReadingSpan(device_id, allocation_kind, target_id, opening, closing,
+  previous_period_units)`, where `allocation_kind` is `PARTY`, `OWNER` or
+  `ANNUAL_UNSEGMENTED`. `target_id` is required only for a measured party/owner usage segment.
+
+`aggregate_device_reading_spans` returns, in stable input order, each device's one-decimal units,
+the party totals, the owner total, each unit total, any annual unsegmented unit total, and the
+estimated-device IDs with their stated basis. It also retains device number, room, readings and
+factor for K10 disclosure. It applies only H5/R7; it does not allocate money.
+
+The RED fixture `test_berkay_01b_a2_device_segments.py` fixes these branches:
+
+- `F27 → F01`: all device spans aggregate to Muster `4.100,0`, Schneider `2.520,0`, measured
+  August owner `0,0`, Weber `1.080,0`, Beispiel `3.050,0`; the plant denominator is `10.750,0`.
+- `F15`: heat-meter kWh use factor `1,00` and retain the `kWh` unit; they are not relabelled HKV.
+- `F16`: one annual WE-02 total without Auszug/Einzug spans is returned as
+  `ANNUAL_UNSEGMENTED = 3.600,0`; H6 must use the already-green K3 branch, never invent measured
+  party spans.
+- `F17`: the missing WE-03 device uses its stated prior-period `620,0` units, is flagged estimated,
+  and preserves the estimation basis; it is not silently treated as a measured zero.
+- `F22`: `closing < opening` is refused. Two valid replacement-device spans aggregate to
+  `420,0 + 1.040,0 = 1.460,0`; `abs(-1.460,0)` is forbidden.
+
+Every units allocation asserts `sum(party units) + owner units == unit/plant input total` just as
+every money allocation asserts renter shares plus owner residual equals the input pot.
 
 **H6 — Distribution to Mietverhältnisse**
 
@@ -1026,6 +1070,14 @@ same operation, so they do not all get the same answer.
 | 9 | `engine.py:363` | umlagefähig → (Warmwasser, Heizung), § 9 | **half-up**, residual on the **heating** pot | complement pot | H3: `kostenWwCent = round_half_up(umlagefaehigCent × anteilWw)`, `kostenHzCent = umlagefaehigCent − kostenWwCent` — his own comment reads *"complement, so the sum is exact"*. |
 | 10 | `co2.py:166` | CO₂ cost → (Vermieteranteil, Mieteranteil) | **half-up**, residual on the **renter** side | **no owner bucket at all** — see 9.3 | R6 + H2: `co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil/100)`, then `umlagefaehigCent = gesamtCent − co2Abzug`. The rounded quantity is the *deduction*; the renter side is what is left of it. |
 | — | `nk-engine/engine.py:55` | an NK cost block → parties | **stays largest-remainder** | — | Out of scope by decision, not oversight: `CLAUDE.md` DoD 4 splits the rule per engine, and NK switches when Berkay's Seite 02 is transcribed into `docs/09`. The canonical €1.200 fixture is identical under both methods, so nothing is at risk in the meantime. **And the two are a package:** the residual model of § 9.2 *requires* half-up on the renter side (`docs/02`), so NK cannot take the Eigentümer line without also moving every NK figure — which is a transcription this repo does not have yet. |
+
+> **F18 output override, decided 16.08.2026.** The site table above remains the general R1/R5 map,
+> but it does not authorize replacing a named worked-example oracle. Emir withdrew the earlier
+> derived per-block override for `F18`; Berkay's printed totals
+> `108.090 / 74.932 / 43.121 / 101.117 / 10.958` are authoritative. The source does not state a
+> new general rounding formula for this exception, so none is invented here. The RED end-to-end
+> fixture fixes the exact input and output; any broader method change needs a separate confirmed
+> specification.
 
 **Six sites move money (#2, 3, 4, 6, 7, 8). Four provably do not (#1, 5, 9, 10)** — see 9.4. Both
 halves are stated so that a reviewer who sees four sites change with no fixture behind them knows

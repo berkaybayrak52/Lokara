@@ -37,7 +37,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks M3/M4 spec closure and final M6 statements. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F28b is green — its H7 gross-rescaling seam is implemented; 27 cases still need executable tests before their source changes. F02's factor-dependent value is blocked by the Hu/Ho conflict. Blocks M2 implementation closure, D2 and UVI. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F28b is green. F02's factor-dependent value remains blocked by the Hu/Ho conflict, while its missing-supplier-cost refusal is RED without choosing a factor. F18 and the A2 device contracts are RED. The A2–A7 rows below assign every case not already exact and green. Blocks M2 implementation closure, D2 and UVI. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
@@ -89,9 +89,10 @@ Current trace audit, 16.08.2026:
 
 - Page 01 has no current doc/test trace for `08-F02…F05`, `F07…F16`, `F18…F20` and `F23…F24`.
 - Page 01b now has a complete 34-ID data oracle and source-section trace, but a data table is not an
-  executable golden test. Current exact executable cases are `F03–F06`, `F16` and `F28b`.
-  `F01`, `F07–F15`, `F17–F27` including `F26b/c`, `F28a`, and `F29–F31` still need executable
-  goldens before their implementation changes. `F02` stays value-blocked by the Hu/Ho conflict.
+  executable golden test. Current exact green cases are `F03–F06`, `F16` and `F28b`. RED hand-offs
+  now exist for the factor-independent `F02` cost refusal, exact `F18`, and A2 device spans. A RED
+  capability contract or primitive test does not count as full fixture closure. The A2–A7 rows
+  assign every remaining case; `F02` stays value-blocked for its factor-dependent result.
 - Pages 02–08 have no complete transcription. Existing references to a few Page 02 fixtures from
   owner-residual work do not count as Page 02 coverage.
 - Page 06's routing and risk rules can be transcribed, but its missing clause-text/version catalogue
@@ -109,7 +110,13 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 1 | ✅ Done 13.08.2026 | Wire R1/R5/K9 and Ho/Hu into `heating-engine` | Heating uses the required half-up allocation path. |
 | 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Slice C. |
 | 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
-| A | Current — fixture gate | Reinforce M2 from Page 01b | Source transcription and the 34-ID data oracle are in place. `01b-F28b`/H7 is implemented and green. Before any later source change, promote that case's data oracle to an executable golden; 27 cases remain. Keep factor-dependent `01b-F02` blocked until the Hu/Ho CSV conflict is resolved. Then revalidate M2 and Rows 1–3. |
+| A1 | ✅ Green | MDL gross rescaling | `01b-F28b` is executable and green: exact gross quotient, accepted one-cent source residual and owner reconciliation. |
+| A2 | RED spec ready | Device and segmented readings | Implement H5's typed device/span model, one-decimal factor aggregation and H6 hand-off. RED: `F01/F27`, `F15`, `F17`, `F22`; `F16` is a new-shape regression over its existing green K3 golden. Exact WE-03-only `F18` is RED and must reproduce Berkay's authoritative cents. |
+| A3 | Pending after A2 | Self-billing inputs and plant aggregation | Close `F02`, `F11–F14`, `F19`, `F20`, `F24`. F02 cost refusal is RED now; its factor-dependent mass remains blocked. F20 is partial until H1 aggregates all three positions and the § 6a network disclosures exist. |
+| A4 | Pending after A3 | CO₂ applicability branches | Close `F07–F10`: non-residential, protection half/full exclusion, and heat-pump/biomass module-off paths with required proof/disclosure state. |
+| A5 | Pending after A4 | Readiness and warning channels | Close `F21`, `F23`, `F25`, `F26/F26b/F26c`: hard denominator stop, plausibility warnings, separate unsummed risk amounts, and the two WW-gap thresholds. |
+| A6 | Pending after A5 | MDL net and readiness branches | Close `F28a`, `F29`, `F30`. F29 belongs to the net M2/M3 branch; the gross-rescaling seam is not a closure scaffold. |
+| A7 | Pending after A6 | Annual § 6a comparison | Close `F31`: heat adjusted with each year's DWD factor, WW raw, labelled missing-factor fallback, no empty graph, and complete disclosure/risk output. |
 | B | After A | Reinforce M3–M4 from Page 01 | Fully transcribe Page 01 into `docs/08` and required `docs/02` changes. Map every `08-Fxx` fixture. Revalidate the current persisted calculation and extraction scope; implement confirmed gaps that belong to M3/M4 and leave M6-only ledger/finalization work explicitly assigned to M6. |
 | C | After B | Reinforce M1 from Page 02 | Transcribe Page 02 into `docs/09`, add all `09-Fxx` fixtures and revalidate NK eligibility, allocation and rounding. This replaces the former separate Row 5. |
 | 4 | Paused until A–C | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |

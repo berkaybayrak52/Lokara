@@ -29,6 +29,7 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
     "01b-F02": {
         "blocked_by": "erdgas_hu_ho_register_conflict",
         "warning": "supplier_co2_missing",
+        "missing_supplier_cost": "refuse_without_factor_lookup",
     },
     "01b-F03": {
         "intensity": "12.0",
@@ -123,6 +124,9 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
         "provenance_required": True,
     },
     "01b-F18": {
+        "missing_unit_ids": ("WE-03",),
+        "affected_area_sqm": "58",
+        "building_area_sqm": "194",
         "affected_area_percent": "29.90",
         "distribution": "area_only",
         "billable_total": 338_218,
@@ -143,6 +147,7 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
         "landlord_percent": 30,
         "co2_landlord": 8_040,
         "billable_total": 430_560,
+        "closure": "partial_until_h1_aggregation_and_section_6a_disclosure",
     },
     "01b-F21": {"error": "zero_consumption_denominator", "sample_risk_15_percent": 19_083},
     "01b-F22": {
@@ -195,6 +200,7 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
         "owner_total": 3_285,
     },
     "01b-F29": {
+        "branch": "mdl_net",
         "control_total": 338_218,
         "ocr_positions_total": 306_914,
         "difference": 31_304,
