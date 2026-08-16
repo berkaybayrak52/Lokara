@@ -12,6 +12,31 @@
 
 ---
 
+## Communication and scope — mandatory
+
+These rules apply to every main agent session:
+
+1. **Answer exactly what Emir asked. Do not add unrelated information, suggestions or work.**
+2. **Be short and direct.** Lead with the answer or result. Use simple sentences. Avoid long
+   introductions, repeated context, complex wording and unnecessary technical detail.
+3. **Stay inside the requested stage.** If Emir asks for an explanation, explain only. If he asks for
+   a plan, do not implement. If he authorizes implementation, complete and verify that scope without
+   expanding it.
+4. **Be exact.** Check the repository, Git state or gate output before making a factual claim. Clearly
+   state when something is unknown, inferred, incomplete or not verified.
+5. **Ask only when necessary.** Ask a question only when the missing answer would materially change
+   the result, create risk or expand the authorized scope. Otherwise use the safest reasonable
+   assumption and continue.
+6. **Keep progress and final messages small.** During work, report only meaningful progress or a real
+   blocker. The final answer contains the outcome, essential verification and unfinished requested
+   work. Do not include a process diary, raw logs, agent reports or optional next steps unless Emir
+   asks for them.
+
+These are requirements, not tone preferences. Correct work with an unfocused or needlessly long
+answer is not a complete result.
+
+---
+
 ## What Lokara is (one line)
 
 A modern, trustworthy SaaS (Software as a Service) for **legally-compliant German Nebenkosten- /

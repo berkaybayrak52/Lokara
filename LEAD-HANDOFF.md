@@ -22,12 +22,18 @@ Use `scripts/check_handoff.sh` only to confirm that it names the current HEAD.
 ## 2. What the main session owns
 
 - Emir controls scope, priorities and whether work is merged or pushed.
+- Follow the mandatory communication rules in `CLAUDE.md`: answer only what Emir asked, lead with the
+  result, use short simple sentences and omit unrelated detail or advice.
+- Stop at the requested stage. An explanation does not authorize a plan; a plan does not authorize
+  implementation; implementation does not authorize commit, merge or push.
 - The main session reads agent reports, verifies them, decides what ships and writes
   `LAST_OUTPUT.md`.
 - Agents do not decide what to build next, mark milestones complete, merge, push or write the
   session summary.
 - Preserve existing user changes. Separate unrelated edits before committing or merging.
 - Ask Emir only when a missing choice would materially change the result or expand the scope.
+- Keep progress updates limited to meaningful results and blockers. Final answers contain only the
+  requested outcome, essential verification and unfinished requested work.
 
 ## 3. Review standard
 

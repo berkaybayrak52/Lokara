@@ -53,7 +53,7 @@ date reappears.)*
 | 1 | ~~**Wire R1/R5/K9 + Ho/Hu into `heating-engine`**~~ — ✅ **done** 13.08.2026, `slice/wire-01b-rules` | Existed because `CLAUDE.md` DoD 4 described a legal rounding rule the code did not follow: `distribute_cents_half_up` had **zero production callers** and no boundary refused an Ho/Hu mismatch. Six of the ten sites moved to half-up and four provably could not move money. At that slice boundary, the fully-let case still used largest-remainder; Row 2 immediately below later replaced that temporary rule with the Eigentümer-Residuum. The demo pair did **not** move. | medium |
 | 2 | ~~**The Eigentümer-Residuum** — one reconciliation line per Liegenschaft and Kostenart, always printed~~ — ✅ **done** 15.08.2026 | Berkay did not confirm our model, he **replaced** it (`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1): the Eigentümeranteil is **not a party** and is **never derived from occupancy** — it is a pure residual, `gesamt − Σ mieteranteile`, per Kostenart (Seite 01 D12, *"ALWAYS as a residual, NEVER computed separately"*). The per-unit landlord parties collapse into one line, and both superseded conventions are retired. Where a figure can be computed two ways, the residual ships (`09-F07`: 1858, not 1859). Landed in `docs/02`, `docs/03`, `docs/08`, the domain and heating engines, the API and the PDF. The demo gate, PDF fingerprint comparison and rendered-output review are green. NK stays on largest-remainder until the separate Seite 02 → `docs/09` row. | medium |
 | 3 | ~~**§ 5 Abs. 1 S. 3 CO₂ rounding** — classify *after* rounding to one decimal~~ — ✅ **done** 15.08.2026 | `Antwort-an-Emir_03.md` § 6 is transcribed: the engine annualises, applies the Lokara `ROUND_HALF_UP` convention to one decimal, then classifies and carries that same value. The PDF prints fixed one-decimal intensity in both the CO₂ summary and Berechnungsgrundlagen; the statutory table is unchanged. Full and demo gates, rendered-statement review and PDF fingerprint comparison are green (pre `93bc516676058c0fc6277f2218099b00`, post `3569940d3e913df4ade956771ba67a01`). | low |
-| 4 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | Everything tenant-facing sits behind it. `slice/m5-pre-context-read` carries the remaining DB/bootstrap and API call-site pre-context fixtures; its sanctioned bootstrap implementation and checker remain explicitly pending here. Every nested building route also needs deliberate URL-building validation before work. The two independent guards it once carried have shipped separately: the `gate.sh` skip-hole fix (`338dece`, on `main`) and the **ENVIRONMENT guard** (`slice/environment-guard`, `docs/01` D9). | medium |
+| 4 | **M5 remainder** — roles in the API, portals, URL-carried context, switcher | ✅ The secure bootstrap foundation is complete in `1c71a2d`: subject-only JWT auth, one bounded `app_bootstrap_contexts(text)` read, live account contexts through `/me`, URL-scoped demo summary access, migration `0006`, and the deterministic boundary checker. **No new dashboard or portal was added in this slice.** Still open: role enforcement, owner/renter portals, the multi-context switcher, deliberate nested-building authorization, and the negative guard for `renter.person_id`. The two independent guards from the old slice shipped separately: the `gate.sh` skip-hole fix (`338dece`, on `main`) and the **ENVIRONMENT guard** (`slice/environment-guard`, `docs/01` D9). | medium |
 | 5 | **Page 02 → `docs/09`** + BetrKV catalogue in `rules-store` | Two **built** screens take a free-text `Kostenart` today (`kosten/costs-page.tsx`, `beleg/review-step.tsx`), so nothing validates that a cost is even umlagefähig — and **M4 deliberately refuses to derive an Umlageschlüssel** because the catalogue does not exist. Catalogue import: structured data, not prose. | low |
 | 6 | **M6** bank + Payment Ledger (finAPI stubbed), finalized statement snapshots and separate landlord/tenant documents — **and BGH formal minimum #4** | The ledger closes the **Abzug der Vorauszahlungen**, the last of the four settled BGH minimums (`docs/08`). Finalization then archives one immutable version and independently renders the landlord overview and each **eligible tenancy with >0 usage days**; a 0-day tenancy gets no document/portal visibility and is footnoted only in the overview (Seite 01 E8 / `08-F17`). Until that exists the statement is formally *incomplete*, not merely thin. Page 08 (Bank-Matching) is specced. | high |
 | 7 | **Page 05 → `docs/12`** — the Wächter set | § 556 Frist, Eichfrist, UVI-Turnus. One guard mechanism, three uses (`CLAUDE.md`: Guard/Wächter is one reusable pattern, not bespoke code each time). | medium |
@@ -303,22 +303,31 @@ demo path (clean DB → seed → statement → PDF) is re-verified.
 
 ## M5 remainder — roles in the API, portals, context switching
 
-- Portals + **URL-carried context** (`/a/{accountId}/…`, `/renter/{tenancyId}/…`); switcher only when
-  a Person holds >1 context. Menu is navigation, not authorization — every request independently
-  verifies the relationship in the URL, then scopes the query.
+### Done — secure bootstrap foundation (`1c71a2d`, 16.08.2026)
+
+- JWT authentication carries only the verified Person subject. Expiry, issuer, exact audience and
+  authenticated role are validated; account context is never trusted from the token.
+- `app_bootstrap_contexts(text)` is the single bounded pre-account database read. Migration `0006`
+  gives its dedicated role only the exact privileges and policies it needs.
+- `GET /me` resolves the Person and returns all live account contexts from the database.
+- The token-scoped account session and `/demo/summary` were retired. The existing demo summary now
+  uses `/a/{accountId}/summary` and re-authorizes the account from the URL.
+- `scripts/check_pre_context_reads.py` and its mutation tests enforce the boundary. The full gate,
+  demo path and boundary audit are green.
+- This was foundation work only: **no new dashboard, portal or account switcher was added.**
+
+### Still open in Row 4
+
+- Build the owner portal and the renter-facing context. Keep account and tenancy context in the URL:
+  `/a/{accountId}/…` and `/renter/{tenancyId}/…`.
+- Add the visible account/context switcher when a Person holds more than one context. Navigation is
+  not authorization; every request must still verify the relationship from the URL.
 - Enforce roles in app logic on top of M5a's RLS backstop: an EMPLOYEE is limited to their
-  `BuildingAssignment`s (zero assignments ⇒ sees nothing); TAX_ADVISOR is read-only.
+  `BuildingAssignment`s (zero assignments means no visibility); TAX_ADVISOR is read-only.
 - **Validate every nested building route before doing work.** Every
   `/a/{accountId}/buildings/{buildingId}/…` handler — especially costs and extraction — must load and
   authorize the URL building through `PathAccountSession`, including EMPLOYEE assignment scope and
-  TAX_ADVISOR read-only rules. A guessed foreign `buildingId` returns a deliberate 404/403; it never
-  falls through to an incidental empty result or a raw foreign-key/integrity error.
-- **Name the bootstrap path for `person`.** M5a's policy denies by default, so the login lookup
-  (find the Person behind a Supabase Auth user, before any account context exists) must run through a
-  `SECURITY DEFINER` function or a dedicated role. Pick one and record it in `docs/02`.
-- **The pre-context read and its checker are still pending Row 4 work.** Land the single sanctioned
-  lookup together with `scripts/check_pre_context_reads.py` and its mutation/failure proof; existing
-  prose describing the boundary is not evidence that the implementation or gate exists.
+  TAX_ADVISOR read-only rules. A guessed foreign `buildingId` must return a deliberate 404/403.
 - **Guard the `renter.person_id` ordering rule with an artifact, not a comment.** The column is
   written by **exactly one** path — M10's activation-code redemption — so at this milestone the
   provable statement is a **negative**: no API route sets `person_id`, asserted over the OpenAPI paths

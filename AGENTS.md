@@ -16,6 +16,18 @@ Emir controls:
 - whether work is merged;
 - whether work is pushed.
 
+Every session must also follow `CLAUDE.md`'s mandatory communication and scope rules:
+
+- answer only the question asked and perform only the authorized work;
+- lead with the result, using short and simple language;
+- do not continue from explanation to plan, or from plan to implementation, without authorization;
+- verify factual claims against the repository or command output;
+- ask only when a missing decision materially changes the result or risk;
+- keep progress updates and final answers brief; do not add unsolicited advice or process narration.
+
+The main session must enforce this style when presenting subagent work. A long agent report is input
+for verification, not text to forward to Emir.
+
 There is no manager agent. Coordination comes from the tracked sources of truth:
 
 | Question | Source |
