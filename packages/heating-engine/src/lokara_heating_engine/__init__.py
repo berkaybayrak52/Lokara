@@ -31,11 +31,19 @@ from .inputs import (
     WarmWaterSeparation,
 )
 from .mdl import MdlGrossRescalingResult, rescale_mdl_gross_positions
+from .plant_co2 import (
+    Co2PlausibilityWarning,
+    PlantCo2Input,
+    PlantCo2Result,
+    assess_co2_plausibility,
+    evaluate_plant_co2,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
     "Co2Input",
+    "Co2PlausibilityWarning",
     "Co2Result",
     "DeviceReadingAggregation",
     "DeviceReadingLine",
@@ -50,11 +58,15 @@ __all__ = [
     "MdlGrossRescalingResult",
     "OwnerResidual",
     "OwnerResidualOrigin",
+    "PlantCo2Input",
+    "PlantCo2Result",
     "WarmWaterInput",
     "WarmWaterSeparation",
     "aggregate_device_reading_spans",
+    "assess_co2_plausibility",
     "calculate_heating_statement",
     "degree_day_weight",
+    "evaluate_plant_co2",
     "landlord_share_percent_for_intensity",
     "rescale_mdl_gross_positions",
     "segment_degree_day_weights",
