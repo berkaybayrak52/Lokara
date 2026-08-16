@@ -1,62 +1,61 @@
 # 00 — Product overview
 
-## In one sentence
+## Product promise
 
-Lokara is a modern, trustworthy SaaS for **legally-compliant German Nebenkosten-/Betriebskosten-
-abrechnung** (operating-cost & heating-cost statements) for **private landlords and property managers
-(Hausverwaltungen)** — from a single unit upward, no cap — competing on **domain depth, fair pricing,
-and AI-assisted UX**.
+Lokara is a responsive German operating-cost and heating-cost statement platform for private
+landlords and property managers, from one unit upward. It prioritizes auditable calculations,
+tenant isolation and clear German output. The web app comes first; native apps are future M10 work.
 
-## Who it's for
+`rechtskonform` describes the product's intended use, not a warranty that every current preview is a
+sendable legal statement. Lokara is a tool, not legal or tax advice, and never uses `rechtssicher`.
 
-Broad from day 1: private small/mid landlords (≥1 unit, no upper limit) **and** Hausverwaltungen
-(multi-user). One person can hold several roles at once (landlord who also rents a flat and does a
-friend's taxes) — the identity model is built for this (see `docs/02-data-model.md`).
+## Shipped floor
 
-## Why now
+M1–M4 are a green, demoable floor:
 
-Incumbents (objego, immocloud, vermietet.de) have known, painful weaknesses: **data loss**, **price
-bait-and-switch**, **domain gaps** (no sub-meters, weak heating), and **slow UX**. There's a live
-churn wave (objego pricing revolt, vermietet.de migration chaos). Lokara occupies that gap. Launch
-targets **before the NK season (from September)**.
+- persisted buildings, units, tenancies, operating costs, allocation keys, meters/readings and
+  heating-cost inputs behind a FastAPI API and account-scoped Postgres access;
+- pure NK and heating/CO₂ engines with deterministic fixtures;
+- a responsive Next.js landlord portal for the demo workflow;
+- a landlord-only calculation/QA overview and PDF that reconcile the seeded NK and heating paths;
+- canned document extraction behind a provider adapter, with human review before a cost is stored.
 
-## The competitive thesis
+This floor is not yet spec-closed. The current PDF is **not** the finalized Page 01 tenant document:
+it contains the landlord's building-wide view, lacks actual paid advances and Saldo, and is not the
+independently rendered per-tenancy archive required for dispatch. D1–D3 pause implementation while
+the documentation baseline is completed and approved.
 
-Mandatory features only buy parity. Lokara wins on five levers competitors can't quickly counter:
+## Billing-period boundary
 
-1. **Trust & fair-price DNA as a weapon** — transparent prices, price guarantee (no retroactive
-   upgrades), all units included (no licence-per-garage trap), no subscription trap, fair cancellation.
-2. **Domain depth nobody delivers** — sub-meters, clean heating, freely changeable allocation keys,
-   > 12-month and interim statements, multi-party leases. Lokara's Excel heritage; the industry blind spot.
-3. **Speed & AI-native UX** — fast interface + strong receipt OCR — while **keeping human support**,
-   which competitors are automating away.
-4. **Painless switch + data guarantee** — import from objego/immocloud/vermietet.de/Excel as an
-   onboarding feature; export guaranteed anytime; data-integrity promise.
-5. **Human support + tax-advisor bridge** — bidirectional DATEV/Steuerberater interface as real lock-in.
+Page 01 is binding for residential operating-cost statements:
 
-> ⚠️ Reality check baked into strategy: **human support** is a strong _brand_ differentiator but a
-> cost/scaling load for a 2-person team — reframe as a premium tier or deliberate early-phase edge,
-> not an unconditional always-on guarantee. The **DATEV/tax-advisor bridge** is the more durable moat.
+- a shorter Rumpfperiode is allowed and uses its actual inclusive day count;
+- a billing period **longer than 12 months is a hard block** before calculation or rendering;
+- leap years use 366 actual days.
 
-## The "entry ticket" (parity requirements — see `docs/07-compliance.md` & arch)
+The former product claim that periods over 12 months were a differentiator is withdrawn. No product,
+demo or sales copy may advertise that case as supported.
 
-Without these, Lokara isn't even considered: complete **rechtskonforme** NK statement with all common
-allocation keys; **CO₂ split (CO2KostAufG)**; bank connection (finAPI, PSD2/AISP — consumed, not
-built); integrated heating incl. external MDL data; meter/sub-meter management; freely changeable keys
-without data loss; **autosave / no data loss**; rent-monitoring & dunning; Anlage-V/DATEV export;
-fast/stable operation; **data export anytime (DSGVO portability)**; usable mobile web; multi-party
-leases; reachable human support.
+## Intended audience and future scope
 
-> **"Tool, not advice."** Everything is _rechtskonform / nach aktueller Rechtslage_ — **never
-> "rechtssicher"** (a liability trap). State in AGB: Lokara is a tool, not legal or tax advice.
+The account model supports `SOLO` and `HAUSVERWALTUNG`, with roles on Membership rather than Account.
+The shipped demo uses one owner membership and one account. Employee role enforcement, account
+switching, renter activation/portal, tax-adviser guest access, bank matching, tax export, contracts,
+billing and native apps remain future milestones in `PLAN.md`.
 
-## Status & team
+Future product breadth includes the BetrKV catalogue, final tenant statements, UVI, a payment ledger,
+Anlage V/DATEV, guards/reminders and mobile clients. Those are roadmap dependencies, not shipped
+capabilities.
 
-Concept/planning phase; an Excel tool already serves as lead-gen. Small team (developer Emir back
-full-time). Broad scope, hard Tier-1 prioritisation required. Pitch **27.08** (Tolga Önal).
+## Competitive thesis
 
-## Pitch framing
+Lokara competes on:
 
-Demo a _mostly-real_ app with stubs where APIs cost money (finAPI, Vision, email, billing) and
-**seeded example scenarios** for the common cases. The crown jewel to show live: a **correct,
-CO₂-compliant NK/heating statement rendered to PDF**. See `docs/06-demo-scenarios.md`.
+1. auditable, cent-exact domain depth rather than a shallow form-to-PDF flow;
+2. freely changeable allocation assignments without deleting entered cost data;
+3. account isolation in both application logic and Postgres RLS;
+4. adapter-backed extraction, bank, meter and delivery edges;
+5. clear pricing, exportability and human support as product commitments once implemented.
+
+The current demo should be framed exactly as `docs/06` and `DEMO-RUNBOOK.md` describe: a real
+persisted landlord workflow with stubs named as stubs, ending in an internal calculation/QA PDF.

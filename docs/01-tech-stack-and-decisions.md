@@ -3,6 +3,14 @@
 Every item in `lokara-arch.md` marked "to confirm" gets a **pragmatic MVP default** here so Claude
 Code is never blocked. Format: **Decision → Why → Revisit-when**.
 
+## D1 shipped-status boundary — 17.08.2026
+
+The v4 architecture is current. Shipped today: FastAPI, SQLAlchemy/Alembic, local Postgres with RLS,
+pure Python domain/NK/heating/rules/adapter packages, Playwright PDF, Next.js, Bun/Turborepo and the
+shared web UI package. No Supabase project, Redis/worker, mobile app, payment provider or real
+bank/Vision/email integration is wired. Rows below may lock a future selection without claiming that
+its package or service exists.
+
 ## Stack (locked)
 
 | Category                    | Pick                                                                   | Notes                                                                                       |
@@ -10,15 +18,15 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 | Language                    | **Python** (backend + engines) + **TypeScript** (frontend + mobile)    | Money math in isolated tested Python packages (integer cents + `decimal.Decimal`). See D2.  |
 | Repo                        | Polyglot monorepo: **Bun + Turborepo** (TS) + **uv** (Python)          | TS workspace: web, mobile, ui. Python workspace: api + engine packages (nk, heating, afa, export) + adapters. See D7. |
 | Web                         | Next.js (App Router) + React + Tailwind + **shadcn/ui**                 | Apple-like polish, **WCAG 2.1 AA / BFSG mandatory**. Framer Motion is the chosen animation library when animation first needs it; it is not installed today. |
-| Mobile                      | **Expo / React Native**                                                | Same API + shared patterns as web. `react-native-ease` animation; responsive from the start. See D8. |
-| Client state / data / forms | **Jotai** + **TanStack Query** + **React Hook Form + Zod**             | Jotai = client state, TanStack Query = server state, RHF+Zod = forms. Same on web **and** mobile. |
-| DB / Auth / Storage         | **Supabase** (Postgres + Auth + Storage + RLS)                         | See D1. Auth gives password + magic-link + verification + reset.                             |
+| Mobile                      | **Expo / React Native**                                                | Selected for future M10; no `apps/mobile` exists today. Same API + shared patterns as web. See D8. |
+| Client state / data / forms | **Jotai** + **TanStack Query** + **React Hook Form + Zod**             | Shipped on web where needed; selected for future mobile too. |
+| DB / Auth / Storage         | **Supabase** (Postgres + Auth + Storage + RLS)                         | Production target. Current development uses local Postgres and a dev JWT; no Supabase project is wired. See D1. |
 | ORM                         | **SQLAlchemy 2.0 + Alembic** against Supabase Postgres                 | Models and migrations live server-side in `packages/db`; `apps/api` consumes them. Client apps never touch the DB. |
 | Backend / API               | **FastAPI (`apps/api`, Python) from day 1**                            | Standalone HTTP/JSON API; web + native apps consume it. Routers per domain. See D2.          |
 | Runtime validation          | **Pydantic** (backend) + **Zod** (frontend/mobile)                     | Validate at every boundary; the backend is the authority.                                   |
-| Async / jobs                | **Celery or Arq** on **Redis** (from M6)                               | finAPI sync, reconsent cleanup, deadline watchers, email retries.                            |
-| Cache / rate-limit          | **Redis**                                                              | Response/computation caching + per-user/IP rate limiting.                                    |
-| PDF                         | HTML→PDF via headless Chrome (**Playwright for Python**)               | One shared document service: NK, UVI, AfA, Anlage V, contracts.                              |
+| Async / jobs                | **Celery or Arq** on **Redis**                                         | Future selection when a real worker slice needs it; not installed.                           |
+| Cache / rate-limit          | **Redis**                                                              | Future cache/rate-limit dependency; not installed.                                           |
+| PDF                         | HTML→PDF via headless Chrome (**Playwright for Python**)               | Shipped for the current statement; later document types reuse the service after their specs. |
 | Money                       | integer **cents** + `decimal.Decimal`                                  | Never floats. Largest-remainder (NK); `round_half_up` + Verteilungsrest (heating) — CLAUDE.md DoD 4. |
 | Testing                     | **pytest** (engines, golden fixtures) + **Vitest** (TS) + **Locust** (load) | Engines: deterministic, byte-/cent-exact. Locust simulates ~100 concurrent users.       |
 | Code quality                | Python: **Ruff + mypy strict**. TS: **ESLint + Prettier + strict TS**  | Current gates enforce these. Husky, React Compiler and React Scan are not installed/enabled; add each only with its first real use. |
@@ -30,7 +38,8 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 ### D1 — Supabase hosting: **Supabase Cloud, EU region (Frankfurt) + signed DPA**
 
 - **Why:** fastest path; gives Postgres + Auth + Storage + RLS out of the box; EU region + DPA
-  satisfies DSGVO for the MVP. List Supabase as a **sub-processor** in the AVV.
+  is the selected MVP production route. List Supabase as a **sub-processor** in the AVV. This is not
+  live today and no compliance claim is made until the project, region and signed DPA are verified.
 - **Tension:** Supabase Inc. is US-HQ'd; the Datenschutz page wants EU/DE with no unguaranteed non-EU
   sub-processor. The EU region + DPA is the accepted MVP compromise.
 - **Revisit-when:** **before onboarding real tenant data** — evaluate **self-hosted Supabase on
@@ -39,8 +48,8 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 
 ### D2 — Backend framework: **FastAPI (`apps/api`, Python) from day 1**
 
-- **Why:** native iOS/Android ship at public launch (~08.09) and **cannot consume Next.js server
-  actions** — they need a real HTTP/JSON API. One standalone FastAPI service means web **and** native
+- **Why:** the future native iOS/Android clients cannot consume Next.js server actions — they need a
+  real HTTP/JSON API. One standalone FastAPI service means web **and** native
   consume the same backend. Python is also the natural home for the **AI/OCR/Vision** work (the doc-
   extraction pipeline, Anschreiben generation), which is why the whole backend + engines are Python.
   FastAPI gives async I/O, first-class **Pydantic** validation, and auto-generated OpenAPI docs.
@@ -103,7 +112,7 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 ### D7 — Toolchain: **Bun (TS side) + uv (Python side)** in one polyglot monorepo
 
 - **Why:** the repo is polyglot now. **Bun** is the package manager + runtime + test runner for the TS
-  workspace (`apps/web`, `apps/mobile`, `packages/ui`), with Turborepo orchestrating tasks. **uv** is
+  workspace (`apps/web`, `packages/ui`; future `apps/mobile`), with Turborepo orchestrating tasks. **uv** is
   the fast Python package/venv manager for the Python workspace (`apps/api` + engine packages).
 - **Note:** Bun replaces the earlier pnpm/Node setup — migrate `pnpm-*`/`package.json` scripts to Bun.
   Expo + Next.js on Bun have occasional rough edges; if a tool breaks under Bun, fall back to Node for
@@ -116,8 +125,8 @@ Code is never blocked. Format: **Decision → Why → Revisit-when**.
 
 ### D8 — Mobile: **Expo / React Native, shared stack with web**
 
-- **Why:** native iOS/Android ship at public launch. Expo is the fastest path to both stores from one
-  RN codebase and matches the "mobile at launch" commitment. It consumes the **same FastAPI**.
+- **Status:** selected future M10 architecture. No mobile workspace or client is shipped today.
+- **Why:** Expo is the selected path to both stores from one RN codebase. It consumes the **same FastAPI**.
 - **Shared with web:** Jotai (client state), TanStack Query (server state), React Hook Form + Zod
   (forms), i18n, a shared theme, **feature-based folder structure**. Mobile-specific: `react-native-ease`
   (animation), **secure storage + Bearer JWT** (web uses cookie JWT instead).

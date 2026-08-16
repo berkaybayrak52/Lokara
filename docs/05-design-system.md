@@ -4,6 +4,11 @@
 > but **understandable "from 7 to 70"**, made measurable via **WCAG 2.1 AA / BFSG**.
 > Apple-style reduction is for aesthetics only (white space, typography) — **never** at the cost of a
 > clear label or contrast.
+>
+> **D1 drift review 17.08.2026:** the web app uses these color/status tokens through
+> `packages/ui/src/tokens.css` and loads Montserrat/Manrope through `next/font`. Framer Motion remains
+> selected but is not installed; current transitions are CSS/Tailwind. No Berkay calculation rule is
+> owned by this file.
 
 ## Color palette
 
@@ -282,7 +287,7 @@ feels flat, cramped, or cluttered.
 - **Calm surfaces** — Paper background, soft **radius** (8–12px on cards, 8px on inputs/buttons), a
   single very soft shadow for elevation (no heavy drop shadows, no double borders).
 
-### Motion (Framer Motion)
+### Motion (CSS today; Framer Motion when installed)
 
 - **Fast and subtle.** Durations **150–250ms** for most UI (hovers ~120–150ms, page/section
   transitions ~250–300ms). If a user notices the duration, it's too slow.
@@ -318,4 +323,5 @@ these, it's not done.
 - [ ] Visible focus states on all interactive elements (keyboard nav works end to end).
 - [ ] Labels are explicit and always visible (no icon-only critical actions without a label/aria-label).
 - [ ] Type scales with user zoom; layout survives 200% zoom.
-- [ ] Motion (Framer Motion) respects `prefers-reduced-motion`.
+- [ ] Motion respects `prefers-reduced-motion`, whether implemented with current CSS/Tailwind or the
+      selected future Framer Motion dependency.

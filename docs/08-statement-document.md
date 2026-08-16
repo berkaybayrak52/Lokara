@@ -16,6 +16,175 @@
 the engine's output faithfully and is still not an Abrechnung a landlord could send. The math is the
 hard part and it's correct — what's missing is document completeness, not new calculation.
 
+## Page 01 transcription and fixture gate — D1, 17.08.2026
+
+This is the current statement contract. Source:
+`berkay-work/Spec-Seiten/01 · Die Abrechnung 3a95fd420731816c9048ed7a517c3e9e.md`, the 26 Page-01
+rows in `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`, and the later method corrections
+mapped below. Structured values and flags follow the CSV. A later Antwort may correct a method but
+does not silently replace a CSV value or flag.
+
+This section specifies the complete Page 01 output. It does **not** claim that the current PDF has
+implemented it. Today the demo PDF is the internal landlord calculation/QA view. M6 still owns actual
+paid advances, Saldo, immutable finalization and separately rendered tenant documents.
+
+### Source-section coverage
+
+| Page 01 source | Transcription home | Golden evidence |
+| --- | --- | --- |
+| § 1 purpose and the three-document projection | this section; "Two documents from one calculation" below | `08-F01`, F06, F17, F21 |
+| § 2 legal basis and conventions | this section; formal minimums, disclaimer, owner row and legal-copy sections below | CSV inventory and fixture table below |
+| § 3.1 object/period inputs | `docs/02` Page 01 statement model; this section | F01, F14–F15, F18–F20 |
+| § 3.2 tenancy inputs | `docs/02` Page 01 statement model; tenant projection below | F01–F05, F10, F16–F19 |
+| § 3.3 cost-line inputs | `docs/02` Page 01 statement model; reference totals below | F01, F05, F08, F11–F12 |
+| § 3.4 heating/CO₂ inputs | `docs/03`; Page 01b output reconciliation below | F05, F07–F09, F24 |
+| § 3.5 vacancy inputs | `docs/02` residual/origin model; owner row and annex below | F01, F06, F21–F23 |
+| D0 fictional occupancy | `docs/02` residual model; owner row below | F01, F21–F23 |
+| D1 audience selection | three-document rule below | F06, F17, F21 |
+| D2 fixed tenant section order | Page 01 output contract below | F02–F05, F07, F09, F18–F19 |
+| D3 cost line and reference totals | formal minimums and reference-total sections below | F01, F08, F11–F14, F16, F20 |
+| D4 party subtotal | `Ihr Anteil gesamt` below | F01–F05, F08, F10, F12, F16, F18–F19, F24 |
+| D5 actual advances and Saldo | formal minimum #4 below; M6 ledger dependency | F01–F04, F08, F10, F12, F14, F16, F18–F19, F24 |
+| D6 heating verification | heating disclosure and device-evidence sections below | F07–F08, F24 |
+| D7 CO₂ box | Page 01b output reconciliation and CO₂ sections below | F09, F24 |
+| D8 § 35a block | Page 01 output contract below | F01–F05, F24 |
+| D9 legal notices/deadline result | Page 01 output contract below; detailed guard cadence waits for `docs/12` | F14, F18–F19 |
+| D10 footer/disclaimer/page breaks | disclaimer and pagination sections below | all rendered cases |
+| D11 owner overview | owner row and reconciliation sections below | F01, F06, F08, F12, F17, F21–F24 |
+| D12 vacancy annex | owner residual/origin and annex sections below | F21–F23 |
+| § 5 E1–E21 | Page 01 output contract and fixture table below | F05, F08, F10–F23; E15/E16/E20/E21 remain guards/dependencies as stated below |
+| § 6 F01–F24 | fixture table below | `berkay_01_golden.py` and `test_berkay_01_complete_coverage.py` |
+| § 7 ownership/out of scope | dependencies below | documentation-only scope assertions |
+
+### Page 01 output contract
+
+- **One calculation, three projections.** `TENANT` produces exactly one
+  Mieter-Einzelabrechnung; `OWNER` produces the internal Vermieter-Gesamtübersicht; `TAX` produces
+  the Leerstandsaufstellung. Selection happens before rendering. A missing/foreign `tenancy_id`
+  fails and never falls back to an owner view.
+- **The tenant section order is fixed:** Anschreiben; object/period header; cost table; party
+  subtotal; heating evidence when applicable; CO₂ box when applicable; actual advances and Saldo;
+  § 35a only when non-zero; payment/credit handling; legal notices; disclaimer and `Rechtsstand`.
+- **Every cost line receives engine output, never recalculated document math.** It shows cost total,
+  applied key, the tenant numerator, object-level denominator with unit, and the rounded share. A
+  credit stays a separate negative line. A zero consumption denominator gives every renter `0` and
+  leaves the full cost with the owner; it is never silently changed to an area key.
+- **Saldo uses actual payments:** `saldo = party subtotal − geleistete Vorauszahlungen`. Missing
+  actual advances hard-blocks a tenant document; confirmed zero is valid. Positive, negative and zero
+  branches render as Nachzahlung, Guthaben and ausgeglichen. The current scalar Soll advance is not
+  a substitute; M6 supplies the temporal contract and payment ledger.
+- **The § 556 deadline blocks only a late Nachforderung.** The arithmetic remains visible as
+  `Rechnerischer Saldo`; a late Guthaben remains payable. A landlord assertion that delay was not
+  their responsibility needs an explicit reason. Cadence, reminders and escalation belong to
+  `docs/12`, not this output spec.
+- **Period validation is a hard boundary.** A shorter Rumpfperiode is allowed and stays day-exact. A
+  billing period longer than 12 months is rejected before an engine run or document render. Leap
+  years use 366 actual days; there is no document-layer special calculation.
+- **One tenancy change yields separate documents.** Each uses only its clipped dates, actual advances
+  and result, and names no other renter. Zero clipped usage days yields no tenant document and no
+  portal item; that is not itself a vacancy event.
+- **The owner overview always reconciles.** It contains all covered tenancy columns plus one
+  unconditional Eigentümer residual per cost type, including `0,00 €` or a negative amount. It is
+  internal, watermarked, and never shares a PDF or delivery channel with a tenant document.
+- **The vacancy annex keeps origin.** Block (a) itemises vacancy by unit and cost type, block (b)
+  carries non-allocable costs, and block (c) carries no economic item. Antwort 03 § 2 corrects
+  `08-F21` block (b) to `100.800` ct (Verwaltung `42.000`, Hauswart `30.000`, Rauchwarnmelder
+  `16.800`, Ziergarten `12.000`); the Page's old `0,00 [Seite 02 pending]` is superseded. Detailed
+  BetrKV classification waits for `docs/09`, and Anlage-V line mapping waits for `docs/11`.
+- **Heating and CO₂ are projections of `docs/03`.** MDL pass-through and self-billing are distinct
+  inputs. `08-F01` and `08-F24` must never be compared as two expected results of one path. The
+  heating evidence, mandatory CO₂ inputs/results and Page 01b readiness risks follow the next section.
+- **§ 35a is line-wise.** Calculate each eligible line once, half-up to cents, then add; omit the
+  whole section at zero. The CSV distinguishes the renter's statutory § 35a entitlement from
+  Lokara's flagged convention of always printing a separate statement block.
+- **Copy and pagination are binding.** Never use `rechtssicher`; use the approved tool/not-advice
+  disclaimer. Do not split subtotal from Saldo, split a cost row, or place another renter's data on a
+  tenant copy.
+
+### Inputs and immutable result shape
+
+All money is integer cents, dates are inclusive and day-granular, and areas are fixed-point decimal
+m². The normalized statement input must carry:
+
+- object identity/address, total area/unit count, period, rule/register version and creation date;
+- one covered tenancy's addressee, current delivery address, unit, clipped usage period, people,
+  consumption, actual advances, optional heating path and payment details;
+- each cost line's total, applied key, numerator, denominator, units, engine share, optional § 35a
+  labor amount and warning/provenance;
+- the complete `docs/03` heating/CO₂ result where applicable;
+- derived vacancy periods, fictional-occupancy mode and evidence metadata.
+
+`docs/02` owns the durable model: draft preview is live; finalization stores an immutable versioned
+snapshot with normalized inputs, engine/rule versions, every `Rechtsstand`, results, hashes and
+separate archived documents. No finalized document is rebuilt from current mutable rows.
+
+### Fixture coverage — exactly `08-F01` through `08-F24`
+
+Every row has a data-only oracle in `packages/domain/tests/berkay_01_golden.py`. Completeness and
+arithmetic consistency are green checks in `test_berkay_01_complete_coverage.py`. These are
+transcription oracles, not claims that the current application implements every branch.
+
+| Fixture | Current rule/result |
+| --- | --- |
+| `08-F01` | MDL reference run: `1.072.600` total, `1.055.069` allocated, `17.531` owner residual; party totals, advances, Saldi and § 35a all reconcile |
+| `08-F02` | positive Saldo: `288.577 − 288.000 = 577` Nachzahlung |
+| `08-F03` | negative Saldo: `116.007 − 120.000 = −3.993` Guthaben |
+| `08-F04` | zero Saldo: `288.577 − 288.577 = 0`, no payment block |
+| `08-F05` | heat-pump/no-labor branch: heating share `93.876`, total `293.453`, no CO₂ or § 35a section |
+| `08-F06` | internal owner overview reconciles F01 and prints the Eigentümer column, including zeros |
+| `08-F07` | MDL heating evidence is passed through; device delta is shown, not recomputed into money |
+| `08-F08` | one-tenancy area fallback gives `40.034`; mixed-path overhang `9.034` is a hard warning, never hidden balancing |
+| `08-F09` | CO₂ box: `30.954 = 12.382 + 18.572`; four tenant CO₂ shares sum to `18.572` |
+| `08-F10` | NULL actual advances hard-block; confirmed `0` produces a `288.577` Nachzahlung |
+| `08-F11` | separate gross/credit rounding gives `10.943 − 882 = 10.061`; net-first `10.060` is forbidden |
+| `08-F12` | zero consumption denominator leaves `126.000` with owner and flips Erika to `−24.871` Guthaben |
+| `08-F13` | 31-day overlap over-allocates `2.294` m²-days and hard-blocks |
+| `08-F14` | 275-day period: `12.412 / 53.350` area-days, share `22.800`, Saldo `1.800` |
+| `08-F15` | 455-day period hard-blocks as longer than 12 months |
+| `08-F16` | two isolated tenant documents: `245.571/15.571` and `116.007/−3.993`; no cross-leakage |
+| `08-F17` | zero clipped usage days: no tenant document, no portal item, not vacancy |
+| `08-F18` | late positive `577` becomes `Rechnerischer Saldo`; no payment request |
+| `08-F19` | late negative `−3.993` stays payable as Guthaben |
+| `08-F20` | leap year uses 366 days/`71.004` area-days; printed examples remain cent-exact |
+| `08-F21` | vacancy block (a) `17.531`; counterfactual separate computation `17.536`; corrected block (b) `100.800`; block (c) `0` for the one-unit example |
+| `08-F22` | fictional occupancy moves `1.858` waste cost to owner and keeps `62.000` reconciled |
+| `08-F23` | whole-year vacancy stays in denominators: owner gets `37.381` property tax and `20.667` waste |
+| `08-F24` | self-billing path: `338.218` allocable heating, `1.076.002` allocated total, `20.816` owner residual and independent Saldi/CO₂ checks |
+
+### Register inventory and flags
+
+The authoritative CSV has **26 rows affecting Page 01**: **11 `geprüft`** and
+**15 `verify-before-production`**. The latter stay visibly flagged even when their arithmetic is
+fixtured. `geprüft` means the primary source was checked, not lawyer approval.
+
+| Status | Exact CSV rows |
+| --- | --- |
+| `geprüft` | CO₂-Stufenmodell Wohngebäude · CO₂-Pflichtangaben in der Abrechnung · § 35a-Ausweis für den Mieter · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Abrechnungsfrist Betriebskosten · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Leerstand bleibt im Gesamtverteiler · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Einwendungsfrist des Mieters · Belegeinsicht — elektronische Bereitstellung zulässig (Wohnraum) |
+| `verify-before-production` | Fiktivbelegung bei Leerstand · Gradtagszahltabelle VDI (K3) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Rundungsweg · Geräteliste auf der Mieterausfertigung (K10) · Zahlungsfrist bei Nachzahlung · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · § 35a-Block auf der Betriebskostenabrechnung · Wording Leerstandsaufstellung · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung |
+
+K9 contains two different claims: the half-up rounding direction remains a flagged convention, while
+Antwort 03 § 1 fixes the residual destination as a model rule. This does not edit the CSV; it records
+the later method correction until the structured row is split in a future export.
+
+### D1 correspondence ledger and deferred ownership
+
+| Source section | Destination | Disposition |
+| --- | --- | --- |
+| `FRAGEN-an-Berkay-02.md` § 1; `Antwort-an-Emir_02.md` §§ 1.1–1.4 | `docs/02` residual model; owner row/annex below; `docs/03` § 9.2 | **Current resolution**: one unconditional Liegenschafts-Residuum, never a party or quota |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4; `Antwort-an-Emir_02.md` §§ 2–4 | future `docs/16` | **Deferred to D2**: heat-only D2, over-500 fallback and comparison-source handling |
+| `FRAGEN-an-Berkay-02.md` § 5; `Antwort-an-Emir_02.md` § 5 | `docs/03` register inventory | **Current source rule**, no Page 01 document value added |
+| `Antwort-an-Emir_02.md` § 6 | fixture oracles here and in `docs/03`; D2 arithmetic in future `docs/16` | **Current evidence**, routed by owner |
+| `FRAGEN-an-Berkay-03.md` § 1; `Antwort-an-Emir_03.md` § 1 | `docs/03` § 9.2 and K9 note above | **Current method correction** |
+| `FRAGEN-an-Berkay-03.md` § 2; `Antwort-an-Emir_03.md` § 2 | `08-F21` oracle and annex below | **Current correction**: block (b) is `100.800` ct; `0,00 [Seite 02 pending]` is superseded |
+| `FRAGEN-an-Berkay-03.md` § 3; `Antwort-an-Emir_03.md` § 3 | future `docs/16` | **Deferred to D2**; older Wärme+WW wording is superseded |
+| `FRAGEN-an-Berkay-03.md` §§ 4–6; `Antwort-an-Emir_03.md` §§ 4–6 | `docs/03` F02/R8; Page 01b projection below | **Current/superseded as mapped in `docs/03`**; no second statement rule |
+| `FEEDBACK-to-Berkay-01b.md` §§ 1–6, 9; `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | `docs/03`; Page 01b projection below | **Current or superseded** exactly as `docs/03`'s D1 ledger records |
+| `FEEDBACK-to-Berkay-01b.md` §§ 7–8; `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–11 | future `docs/09` and `docs/16` | **Deferred to D2**; DWD/UVI details and unresolved notice identity are not duplicated here |
+
+Page 01 out-of-scope ownership remains explicit: the BetrKV catalogue belongs to `docs/09`, tax and
+Anlage-V mappings to `docs/11`, reusable deadline/guard orchestration to `docs/12`, bank matching to
+`docs/15`, and UVI/DWD to `docs/16`. D1 creates none of those documents.
+
 ## Page 01b output reconciliation — 16.08.2026
 
 This section is the document-side projection of the complete Page 01b transcription in `docs/03`
@@ -603,15 +772,15 @@ WE-02 vacant 01.08.–31.08.2025, 31 days, 74 m², fiktive Belegung 2 Personen:
 
 ```
 (a) Leerstandsanteil = Werbungskosten § 9 EStG          175,31
-(b) nicht umlagefähige Kosten                             0,00   [Seite 02 pending]
+(b) nicht umlagefähige Kosten                         1.008,00
 (c) Rundungsdifferenz                                     0,00
-Eigentümeranteil gesamt (= Gesamtübersicht)             175,31
+Eigentümeranteil gesamt                                1.183,31
 ```
 
 | Block | What it is | Granularity | Status here |
 | --- | --- | --- | --- |
 | **(a)** | Leerstandsanteil → Werbungskosten § 9 EStG, Anlage V | **per empty unit and per Kostenart** | in scope — `OwnerResidual.origins` |
-| **(b)** | nicht umlagefähige Kosten → a different Anlage-V line | per cost position | **out of scope.** Not a heating concept at all; it is Seite 02 / `docs/09`, which fixes it at **1.008,00 €** for the reference object. Berkay's own rendering still shows `0,00 [Seite 02 pending]`. **That 0,00 is not a settled value** — do not pin it |
+| **(b)** | nicht umlagefähige Kosten → a different Anlage-V line | per cost position | **value corrected by Antwort 03 § 2:** **1.008,00 €** for the reference object. Detailed classification is still owned by Page 02 / `docs/09`; Anlage-V mapping is owned by `docs/11` |
 | **(c)** | Rundungsdifferenz — no economic item | belongs to **no** unit | in scope — `OwnerResidual.rounding_difference` |
 
 **Why (a) and the printed residual differ, and why (c) is 0,00 in his example.** (a) is each empty
@@ -2290,8 +2459,8 @@ a pixel one — rendering and measuring glyphs would test Chromium.
   - **Two conventions that are conventions, not statute**: *anteilig* read day-exact rather than
     month-exact, and S. 4 applied to a Rumpfperiode that was never *vereinbart*. A BMWSB Arbeitshilfe
     or a Mietrechtler's sign-off would resolve both (`docs/03`).
-  - **A > 12-month period with a CO₂ split is refused**, which is lawful for Nichtwohngebäude
-    (CO2KostAufG § 8) — recorded as drift in `docs/03` → *"Additional fixtures to add"*.
+  - **A period longer than 12 months is refused** by the Page 01 statement boundary. Any future
+    non-residential exception needs a separate source-backed contract and must not weaken this rule.
 - **§ 9's area fallback divides by a flat 365, the CO₂ period factor does not.** `_separate_warm_water`
   pro-rates the 32 kWh/m²/a Ersatzwert over `days / 365`, so a leap-year statement pro-rates to
   366/365 = 1,0027 while `co2.py` anchors its reference year on `valid_from` and returns exactly 1. One
@@ -2347,38 +2516,34 @@ extracted* (`docs/04` → "Beleg-Upload"). Once the catalogue exists, that mappi
 key with a `Rechtsstand`, and the non-umlagefähig types become a warning on entry. Until then a
 suggestion would be invented law, not a convenience.
 
-## Open questions the spec must answer
+## D1 closure and remaining implementation/dependency gaps
 
-- [ ] Layout of the Mieter-Einzelabrechnung (sections, order, what appears per cost type)
-- [ ] Exact **Vorauszahlung → Saldo** block wording and arithmetic — **blocked on M6** (the ledger
-      supplies the *geleistete* figure; `advance × months` is rejected, see "#4 is blocked on the M6
-      ledger, by decision")
-- [x] Which reference totals accompany each allocation key → **"Reference totals (Gesamtbemessung)"**
-      above. The one open sub-question — the **unit** of a `CONSUMPTION` total — is closed by
-      **"`MeasurementUnit` travels with the value — the plumbing decision (slice 5)"** (06.08.2026).
-- [x] Heating: how consumption values and the CO₂ split are presented to the tenant →
-      **"Heizkostenabrechnung — the heating table's disclosure"** above (Umlageschlüssel +
-      Gesamtbemessung per column, §§ 7/8, § 9, Gradtagszahlen, § 7 Abs. 3 CO2KostAufG). Still open:
-      **the CO₂-Vermieteranteil as a visible row** in the heating table, which the footer reword is
-      standing in for; and the sub-questions that section names —
-      ~~the unit of the heating-consumption Bemessung~~ (**closed 06.08.2026**: the unit is carried,
-      and withhold-vs-unit-free is answered *withhold*),
-      **Zählerstände** (no data path into the engine),
-      ~~**§ 5 Abs. 1 S. 3 rounding before the CO₂ classification**~~ (**specified in Row 3**:
-      annualise → round to 1 dp → classify; the printed value keeps the trailing zero),
-      **§ 9's flat-365 fallback divisor**,
-      **§§ 7/8 with different shares for heating and warm water** (not expressible in the input)
-- [ ] What closes BGH minimum #3: a rendered per-party calculation (the operator, and the Bemessung
-      derived from its factors) — see the ◐ note under the four-minimums table
-- [ ] Required legal notices (§556 frist, Einwendungsfrist, disclaimer placement)
-- [ ] BetrKV cost-type catalogue + default keys + non-umlagefähig flags
-- [ ] A **worked example** with real numbers → becomes the golden fixture for the document layer
+Page 01 now answers the former document-spec questions:
 
-## Interim framing for the 27.08 pitch
+- the tenant section order and per-cost contents are fixed by D2/D3;
+- the exact advances/Saldo arithmetic and all three result branches are fixed by D5 and
+  `08-F02`–`08-F04`; implementation waits for M6's *actual paid* advances;
+- § 556 notice wording and late-Nachforderung behaviour are fixed by D9 and `08-F18`–`08-F19`;
+- the three projections, owner residual, vacancy annex and reference examples are fixed by
+  D1/D11/D12 and the complete `08-F01`–`08-F24` oracle.
+
+The remaining gaps are not permission to invent missing rules:
+
+- **Implementation:** BGH minimum #3 still needs the rendered operator and numerator derivation;
+  minimum #4, immutable finalization and isolated tenant documents remain M6 work.
+- **Page 01b implementation:** device evidence, supplier-fallback provenance, readiness/risk output
+  and the annual comparison remain as recorded in `docs/03` and the Page 01b projection above.
+- **D2 dependencies:** cost classification/default keys/non-allocable flags (`docs/09`), tax/Anlage-V
+  mapping (`docs/11`), reusable guards (`docs/12`), bank matching (`docs/15`) and UVI/DWD
+  (`docs/16`).
+- **Unresolved source questions:** the DWD annex inconsistencies and § 6a notice identity stay with
+  `docs/16`; Page 01's E16 tenant disclosure and E21 tax timing remain unguessed and visibly open.
+
+## Current demo framing
 
 The current PDF is the **landlord's calculation view**, and it's honest to present it as such:
 
 > *"This is the landlord's calculation view — every party, reconciling to the cent. The tenant letter,
 > with advance payments and the resulting balance, is the next document off the same engine."*
 
-True, and it reads as roadmap rather than gap. Do **not** present it as the document a tenant receives.
+This remains true of the shipped demo. Do **not** present its PDF as the Page 01 tenant document.

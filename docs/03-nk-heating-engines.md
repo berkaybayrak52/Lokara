@@ -7,7 +7,8 @@
 > `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` and their explanatory entries,
 > `Non-Goals V1`, `README-for-Emir.md`, `Emir_Spec_UVI.md`,
 > `DWD-Klimafaktoren-Import-Spec.md`, `LETZTER-STAND.md`, and the Heizspiegel 2025 CSV.
-> Source set reconciled 16.08.2026. The correction to R4/E3 and `01b-F05` is from Antwort 03 § 6.
+> Source set reconciled for D1 on 17.08.2026. The correction to R4/E3 and `01b-F05` is from
+> Antwort 03 § 6.
 > Transcribed, not copied (`CLAUDE.md` → *"The calculation spec lives in `berkay-work/`"*, rule 2).
 > Agents edit `berkay-work/` only with Emir's explicit permission; ordinary findings go in a report.
 > Structured values/flags follow the current CSV; later Antworten may supersede a method. If those
@@ -76,15 +77,10 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - `DIRECT` cost to a single unit (no spread).
 - `PERSONS` key with a mid-period person-count change.
 - `CONSUMPTION` key from metered readings.
-- Interim statement (<12 months) and >12-month period (domain-depth differentiators).
-  ⚠️ **Neither fixture exists yet, and the >12-month half is now partly contradicted below.** The CO₂
-  split *refuses* a period longer than a year (§ 5 Abs. 1 S. 4 shortens the table only *downward*; see
-  "Why a period > 12 months is refused rather than scaled"). NK is unaffected and heating still
-  computes when `co2 is None`, so the refusal bites in exactly one place: a **Gewerbe** building with a
-  CO₂ split. § 556 Abs. 3 S. 1 BGB's 12-month cap is Wohnraum-only and CO2KostAufG **§ 8** governs
-  Nichtwohngebäude, so that combination is lawful and we currently reject it. Recorded as drift, not
-  resolved: closing it means either dropping >12 months as a differentiator, or specifying what the
-  Einstufung means over such a period — which needs a source we do not have.
+- Interim statement (<12 months). A Page 01 residential statement **hard-blocks beyond 12 months**
+  before an engine run or document and is not a product differentiator. The pure NK primitive does
+  not independently validate that document boundary; callers must not treat that as support. Any
+  future non-residential exception needs its own source-backed spec rather than weakening Page 01.
 
 ---
 
@@ -338,7 +334,7 @@ conventions above stand as conventions.
 > interface is **one € amount per Mietverhältnis**, which fills `heizkostenMessdienstCent` in the NK
 > engine — one cost block, never two, never a double deduction.
 
-## 0. Page 01b source-transcription and fixture gate — 16.08.2026
+## 0. Page 01b source-transcription and fixture gate — 17.08.2026
 
 This section is the trace gate. It does not make flagged values production-safe. `geprüft` means
 the primary text was read, not lawyer approval. A `verify-before-production` row remains visibly
@@ -465,16 +461,12 @@ CSV. The rows are grouped below without changing their individual status.
    3 % rights and the 15 % right is uncertain and forbids summing. The CSV entry
    `Kürzungsrecht — CO₂-Anteil nicht ausgewiesen` says the three 3 % rights cumulate. Do not sum;
    render each risk separately until the register is reconciled.
-7. **K12 dependency.** The DWD CSV importer uses `DatAnf;DatEnd;PLZ;KF`, pads PLZ to five digits,
-   accepts `0.40–1.80`, and keeps old periods. The import spec's later test bullet still says
-   `0.50–1.80`; its verified 13.08 correction and Antwort handoff supersede that bullet. The annual
-   H8 comparison uses one 12-month factor per year, not the UVI annex's monthly degree-day ratio.
-8. **K13/D2 dependency.** The UVI annex's old Wärme+WW D2 formula is superseded by Antworten 02/03:
-   compare heat to heat, subtract versioned WW values (24 kWh/m² for combustion/district heat;
-   heat-pump 8 is a flagged convention), guard non-positive results, and use the labelled 250–500
-   fallback for missing over-500 heat-pump/pellet cells. This belongs to `docs/16`/Rows 9–10, not
-   H8. The current CSV K13 row still describes an annual electronic-statement link and must not be
-   presented as the UVI rule.
+7. **K12 dependency.** The DWD import sources disagree on an acceptance boundary and on one update
+   date. The exact file/import contract and resolution belong to `docs/16`; this file asserts only
+   the Page 01b H8 output dependency and does not select between the conflicting annex notes.
+8. **K13/D2 dependency.** Antworten 02/03 supersede the UVI annex's old Wärme+WW comparison method.
+   The corrected method, values, guards and source licence belong to `docs/16`, not H8. The current
+   CSV K13 row describes an annual-statement link and must not be presented as the UVI rule.
 9. **Pre-legal § 6a notice identity.** The BAnz 16.04.2021 B1 notice exists and supports the DWD
    direction, but whether the GEG § 82 notice is the intended § 6a Abs. 3 S. 4 notice remains for
    legal review. Keep the CSV row flagged.
@@ -484,6 +476,35 @@ CSV. The rows are grouped below without changing their individual status.
 11. **Non-goals stay excluded.** No MDL recalculation from raw inputs, floor-heating reimbursement,
     renovation ROI, device-installation/eich/K-value audit, renter evidence-inspection portal,
     automatic reduction, or proprietary Lokara average-user dataset is introduced here.
+
+### D1 correspondence ledger
+
+This table is the D1 retirement trace for correspondence that affects Page 01b. It does not retire or
+edit any source file. A `D2` disposition means the content remains in the correspondence set until its
+assigned target document and fixture exist; it is not copied into this file.
+
+| Source section | D1 destination | Disposition |
+| --- | --- | --- |
+| `FEEDBACK-to-Berkay-01b.md` §§ 1–6 | §§ 0.3–0.4, 1–7 and 9 below | **Current**, except the earlier factor disagreement is superseded by the authoritative CSV pair `0,201` Hu / `0,181` Ho and `geprüft`; F19's corrected consumption basis, the F16/F26 reading and K3 remain current |
+| `FEEDBACK-to-Berkay-01b.md` § 7 | future `docs/09` | **Deferred to D2**: Page 02 catalogue and allocation rules |
+| `FEEDBACK-to-Berkay-01b.md` § 8 | future `docs/16` | **Deferred to D2**: DWD import, notice identity, K13 and UVI; the legal identity of the § 6a notice remains unresolved |
+| `FEEDBACK-to-Berkay-01b.md` § 9 | `docs/02` residual model; §§ 9.1–9.2 below; `docs/08` owner row | **Superseded question**: Antworten 02/03 fix one unconditional Liegenschafts-Residuum |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | §§ 0.3–0.4, 7 and 9 below | **Current**: F19 correction, F16/F26 confirmation and CSV precedence; § 4 confirms that Antwort 03's more precise factor pair and older flag do not control |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–8 | future `docs/16` | **Deferred to D2**: DWD/K12, § 6a notice and K13/D2. Conflicting range/date notes remain for that transcription |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 9–11 | this ledger and future `docs/16` | **Current routing/history**; no calculation value is introduced here |
+| `FRAGEN-an-Berkay-02.md` § 1 and `Antwort-an-Emir_02.md` § 1 | `docs/02` residual model; §§ 9.1–9.2 below; `docs/08` owner row | **Current resolution**: owner is a residual, not a party; it exists at `0,00 €` and may be negative |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4 and `Antwort-an-Emir_02.md` §§ 2–4 | future `docs/16` | **Deferred to D2**: heat-only D2, over-500 fallback and co2online/Heizspiegel source handling |
+| `FRAGEN-an-Berkay-02.md` § 5 and `Antwort-an-Emir_02.md` § 5 | §§ 0.3–0.4 | **Current source rule**: one authoritative CSV; `geprüft` means primary-source checked, not lawyer-approved |
+| `Antwort-an-Emir_02.md` § 6 | §§ 0.4 and 7; future `docs/16` for D2 arithmetic | **Current evidence**, split by ownership; no extra default is inferred |
+| `FRAGEN-an-Berkay-03.md` § 1 and `Antwort-an-Emir_03.md` § 1 | § 9.2 | **Current method correction**: residual destination is a fixed model rule; rounding direction remains flagged |
+| `FRAGEN-an-Berkay-03.md` § 2 and `Antwort-an-Emir_03.md` § 2 | `docs/08`, Page 01 oracle `08-F21` | **Current correction**: block (b) is `100.800` ct, not the Page's stale `0,00 [Seite 02 pending]` |
+| `FRAGEN-an-Berkay-03.md` § 3 and `Antwort-an-Emir_03.md` § 3 | future `docs/16` | **Deferred to D2**: D2 compares heat with heat; the older Wärme+WW wording is superseded |
+| `FRAGEN-an-Berkay-03.md` § 4 and `Antwort-an-Emir_03.md` § 4 | § 0.4 item 1 | **Superseded by the CSV**: `0,2016 / 0,1820` and `verify-before-production` do not replace the current structured values or flag |
+| `FRAGEN-an-Berkay-03.md` § 5 and `Antwort-an-Emir_03.md` § 5 | §§ 0.4, 7 and 9.5 | **Current resolution**: missing supplier CO₂ cost is refused; only the mass fallback survives |
+| `FRAGEN-an-Berkay-03.md` § 6 and `Antwort-an-Emir_03.md` § 6 | R8 and corrected `01b-F05` below | **Current resolution**: annualise, round to one decimal, classify, and print that same value |
+
+The annual DWD comparison and UVI method are therefore dependencies on `docs/16`, not partially
+specified features of `docs/03`. D1 preserves the existing 34-ID Page 01b oracle unchanged.
 
 ## 1. What changed on this branch, and why it must not be reverted
 
@@ -873,15 +894,11 @@ Messdienst rounds every position, so ≤ 1 ct per position is normal); the refer
 `umlagefaehigCent` in the net branch and `mdl.gesamtkostenCent` in the gross branch. An OCR decimal
 shift is orders of magnitude larger and is still caught (`01b-F29`: 313,04 €).
 
-**H8 — § 6a Abs. 3 Nr. 5 annual-statement comparison.** Both years are weather-adjusted, each with its **own** DWD
-Klimafaktor (K12); `KF > 1` (mild year) **raises** the adjusted value. **Only heat is adjusted; warm
-water passes through unadjusted** (§ 6a Abs. 3 S. 2–3). Missing KF → print the comparison
-**unadjusted with a note**, never substitute `1,00`. Output is a **graph** (§ 6a Abs. 3 S. 1 Nr. 5),
-not only a percentage. The import contract is
-`berkay-work/Spec-Seiten/Anlagen/DWD-Klimafaktoren-Import-Spec.md`: CSV columns
-`DatAnf;DatEnd;PLZ;KF`, semicolon delimiter, five-digit `zfill`, real observed range 0,49–1,33 and
-acceptance band 0,40–1,80. Old periods remain reproducible; missing data never becomes an implicit
-factor 1,00. This H8 yearly comparison is separate from UVI Block C's monthly degree-day method.
+**H8 — § 6a Abs. 3 Nr. 5 annual-statement comparison.** Page 01b requires a graphical prior-year
+comparison, with heat weather-adjusted and warm water left raw. A missing climate factor produces a
+labelled unadjusted comparison, never an implicit neutral factor. The exact DWD import, versioning,
+validation and UVI comparison contracts are deferred to `docs/16`, whose sources still contain
+conflicting notes. H8 and UVI must not be collapsed into one method.
 
 ## 5. Rounding rules (R1 … R8) — these are the engine's rounding contract
 
