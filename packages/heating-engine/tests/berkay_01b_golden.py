@@ -57,24 +57,29 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
         "billable_total": 341_360,
     },
     "01b-F07": {
+        "energy_source": "erdgas",
         "building_type": "nichtwohn",
+        "connected_plant": True,
         "landlord_percent": 50,
         "co2_landlord": 15_477,
         "billable_total": 335_123,
     },
     "01b-F08": {
+        "protection_kinds": ("denkmalschutz", "milieuschutz"),
         "landlord_percent": 20,
         "co2_landlord": 6_191,
         "billable_total": 344_409,
         "proof_required": True,
     },
     "01b-F09": {
+        "full_exclusion": True,
         "landlord_percent": 0,
         "co2_landlord": 0,
         "billable_total": 350_600,
         "proof_required": True,
     },
     "01b-F10": {
+        "energy_sources": ("waermepumpe", "biomasse"),
         "co2_module": "off",
         "co2_landlord": 0,
         "billable_total": 350_600,
@@ -155,7 +160,11 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
         "replacement_segments": ("420.0", "1040.0"),
         "replacement_total": "1460.0",
     },
-    "01b-F23": {"high_intensity": "74.74", "low_intensity": "4.12", "warning_only": True},
+    "01b-F23": {
+        "high_intensity": "74.7",
+        "low_intensity": "4.1",
+        "warning_only": True,
+    },
     "01b-F24": {
         "invoice_days": 365,
         "overlap_days": 304,

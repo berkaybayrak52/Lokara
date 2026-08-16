@@ -392,10 +392,10 @@ Executable golden-test closure is therefore still open:
 | `01b-F04` | exact 52,0 boundary → 95 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F05` | annualise/round/classify; corrected 12,0 → 10 % | `test_berkay_01b_co2_s3_rounding.py`, `test_berkay_01b_co2_stufen.py` |
 | `01b-F06` | 275-day annualisation before S. 3 rounding | `test_co2_short_period_annualisation.py`, `test_berkay_01b_co2_stufen.py` |
-| `01b-F07` | non-residential 50/50 | complete oracle; engine building-type seam pending |
-| `01b-F08` | protected building: landlord percentage halved, proof required | complete oracle; protection seam pending |
-| `01b-F09` | proven full exclusion; disclosure still prints | complete oracle; protection seam pending |
-| `01b-F10` | heat pump: CO₂ module and disclosure off | complete oracle; energy-source seam pending |
+| `01b-F07` | non-residential 50/50 | RED A3 plant/CO₂ applicability contract; not yet E2E closure |
+| `01b-F08` | protected building: landlord percentage halved, proof required | RED A3 protection/proof contract; not yet E2E closure |
+| `01b-F09` | proven full exclusion; disclosure still prints | RED A3 exclusion/proof contract; not yet E2E closure |
+| `01b-F10` | heat pump and biomass: CO₂ module and disclosure off | RED A3 energy-source contract; not yet E2E closure |
 | `01b-F11` | priority WW heat-meter path, 9.100 kWh | complete oracle; measured-energy WW seam pending |
 | `01b-F12` | 32 kWh/m² fallback plus warning | `test_heating_golden.py`, `test_heating_disclosure.py` + complete oracle |
 | `01b-F13` | non-connected plant, one heat block | `test_heating_golden.py` + complete oracle |
@@ -408,7 +408,7 @@ Executable golden-test closure is therefore still open:
 | `01b-F20` | district heating pass-through, step model still applied; H1 aggregation and § 6a network disclosures are part of closure | partial CO₂ primitive only; H1/disclosure seams pending |
 | `01b-F21` | zero denominator hard stop; no silent area fallback | `test_heating_golden.py` + complete oracle |
 | `01b-F22` | negative delta rejected; two device segments | complete oracle; device aggregation seam pending |
-| `01b-F23` | 5–70 plausibility band warns, never blocks | complete oracle; warning channel pending |
+| `01b-F23` | 5–70 plausibility band warns, never blocks; warning carries the R8 values `74,7` / `4,1` | RED A3 warning-channel contract; not yet E2E closure |
 | `01b-F24` | day-linear invoice overlap and non-dismissible coverage warning | complete oracle; invoice aggregation seam pending |
 | `01b-F25` | four risks shown separately, never auto-deducted or summed | complete oracle; readiness/output seam pending |
 | `01b-F26` | 5,13 % WW gap silent; 4.227 ct stays with owner | `test_berkay_01b_residual_wiring.py` + complete oracle |
@@ -660,6 +660,26 @@ used for the step lookup is rounded to one decimal place (R8).
 ⚠️ **`bewertungsfaktor` does not exist in our data model.** H5 cannot be implemented without it; that
 is a `docs/02` change and its own slice.
 
+### A3 plant/CO₂ boundary contract
+
+The engine boundary receives the plant state explicitly. It must not infer fuel, building type,
+connected-plant state or protection from the presence of CO₂ figures. `denkmalschutz` and
+`milieuschutz` are valid only with a stored protection-proof reference. A full § 9 Abs. 2 exclusion
+is valid only with its own stored exclusion-proof reference. A claimed protected/excluded branch
+without that proof is a blocking input error, not an unproven percentage change. If both a protected
+state and a proven full exclusion are present, the full exclusion wins and its proof reference is
+the applied one.
+
+The result carries the applied proof reference and the output switches that the document layer
+needs. `waermepumpe` and `biomasse` leave the whole CO₂ module off: no split, no intensity, no
+Pflichtausweis and no step indicator. `verbundeneAnlage` controls whether H3 separates warm water;
+it does not by itself turn the CO₂ module on or off.
+
+Executable RED contract:
+`packages/heating-engine/tests/test_berkay_01b_a3_plant_co2_state.py`. It proves the exact
+F07–F10 money branches and F23's warning shape. These are capability tests, not full Page-01b
+closure.
+
 ## 4. Formula (H0 … H8)
 
 **H0 — path selection.** This runs before all arithmetic:
@@ -701,8 +721,8 @@ spezifisch = round_half_up(spezifisch, 1 Nachkommastelle)       # then round (R8
 gebaeudeTyp wohn|gemischt → vermieterAnteil = lookup10(spezifisch)   # Anlage CO2KostAufG
 gebaeudeTyp nichtwohn     → vermieterAnteil = 50                     # § 8 CO2KostAufG
 energietraeger ∈ {waermepumpe, biomasse} → CO₂ module OFF, Abzug = 0
-denkmalschutz || milieuschutz            → vermieterAnteil /= 2      # § 9 Abs. 1
-ausschlussNachweis                       → vermieterAnteil = 0       # § 9 Abs. 2
+denkmalschutz || milieuschutz            → require protection proof; Anteil /= 2  # § 9 Abs. 1, 3
+ausschlussNachweis                       → require exclusion proof; Anteil = 0    # § 9 Abs. 2, 3
 
 co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil / 100)         [R1, R6]
 umlagefaehigCent      = gesamtCent − co2AbzugVermieterCent
@@ -929,7 +949,7 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 | E16 | Fernwärme | Supplier states cost + CO₂ → pass through, **but the step model still runs** | `01b-F20` |
 | E17 | No consumption data at all (denominator 0) | **Hard stop.** No silent area fallback | `01b-F21` |
 | E18 | Negative reading delta (meter swap/rollover) | Reading **rejected**; two segments must be summed. Never `abs()` | `01b-F22` |
-| E19 | `spezifisch` outside 5–70 kg/m²/a (K6) | Warning only, **never** a block — an efficient building must stay billable | `01b-F23` |
+| E19 | `spezifisch` outside 5–70 kg/m²/a (K6) | Warning only, **never** a block — an efficient building must stay billable. The warning carries the same R8 one-decimal value used for classification: F23 raw `74,742… / 4,123…` becomes **`74,7 / 4,1`**. The Page-01b prose's `74,74 / 4,12` predates R8 and is not a current output oracle. | `01b-F23` |
 | E20 | Invoice period overlaps the billing period | K8 linear day allocation + **non-dismissible** coverage warning | `01b-F24` |
 | E21 | Not remote-readable / no UVI / no CO₂ disclosure | Display the 15 % / 3 % / 3 % **risk amounts**. **Never auto-reduce** — the reduction is the tenant's right, not the landlord's calculation. Whether the three 3 % rights cumulate is `[UNSICHER]`: **do not implement summation** | `01b-F25` |
 | E22 | Σ unit WW meters ≠ measured central volume | `qWwKwh` from the **central** value; distribute by unit meters against the **central** denominator; the gap stays with the owner. Thresholds: ≤ 10 % silent (Verkehrsfehlergrenze), > 10 % Hinweis, > 20 % Warnung with the legal consequence | `01b-F26`, `F26b`, `F26c` |
