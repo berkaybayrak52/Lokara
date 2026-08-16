@@ -1,75 +1,109 @@
-# LEAD-HANDOFF.md — permanent guide for the main session
+# LEAD-HANDOFF.md — next main session
 
-This file defines how the main conversation reviews and closes work. It is tracked and durable.
-It is not a session log, backlog, legal specification or status report. Update this file in place
-only when a lasting review practice changes. Git keeps its history; never create dated copies.
+This file gets a new main agent aligned quickly. It contains the permanent lead rules and the current
+continuation point. Verify current facts against Git before acting.
 
-## 1. Where truth lives
+## 1. Read in this order
+
+1. `CLAUDE.md` — binding rules and communication style.
+2. `AGENTS.md` — agents, lanes, branches and gates.
+3. `git status --short --branch` and `git log -5 --oneline` — actual repository state.
+4. `PLAN.md` — current state and execution order.
+5. `LAST_OUTPUT.md` — short summary of the latest completed session.
+6. For remaining M5 work: `docs/02-data-model.md` and `docs/04-web-app-structure.md`.
+
+Source order:
 
 | Question | Source |
 | --- | --- |
-| What rules override everything? | `CLAUDE.md` |
-| What is built and what comes next? | `PLAN.md` → execution order |
-| How do agents, lanes, worktrees and gates operate? | `AGENTS.md` |
-| What is the architecture? | `lokara-arch.md` |
-| What is the calculation source? | `berkay-work/` → `docs/` → engines |
-| What does a specific feature require? | The matching file under `docs/` |
-| What happened in the latest session? | `LAST_OUTPUT.md` |
+| Binding rules | `CLAUDE.md` |
+| Current work | `PLAN.md` |
+| Agent workflow | `AGENTS.md` |
+| Architecture | `lokara-arch.md` |
+| Calculation rules | `berkay-work/` → `docs/` → code |
+| Feature contract | Matching file under `docs/` |
+| Latest short summary | `LAST_OUTPUT.md` |
 
-`LAST_OUTPUT.md` is only Emir's short summary window. It never overrides Git or tracked docs.
-Use `scripts/check_handoff.sh` only to confirm that it names the current HEAD.
+## 2. Current repository state — 16.08.2026
 
-## 2. What the main session owns
+- Branch: `slice/m5-bootstrap-contexts`.
+- `1c71a2d` contains the secure M5 bootstrap implementation.
+- `b8a63d5` contains the Row 4 status and mandatory communication rules.
+- The slice has not been merged or pushed.
+- Uncommitted documentation cleanup currently affects `CLAUDE.md`, `PLAN.md`,
+  `DEMO-RUNBOOK.md` and this file.
+- The last implementation verification was green: full gate, non-destructive demo path and boundary
+  audit. The statement PDF fingerprint did not change.
+- Do not commit, merge or push until Emir asks.
 
-- Emir controls scope, priorities and whether work is merged or pushed.
-- Follow the mandatory communication rules in `CLAUDE.md`: answer only what Emir asked, lead with the
-  result, use short simple sentences and omit unrelated detail or advice.
-- Stop at the requested stage. An explanation does not authorize a plan; a plan does not authorize
-  implementation; implementation does not authorize commit, merge or push.
-- The main session reads agent reports, verifies them, decides what ships and writes
-  `LAST_OUTPUT.md`.
-- Agents do not decide what to build next, mark milestones complete, merge, push or write the
-  session summary.
-- Preserve existing user changes. Separate unrelated edits before committing or merging.
-- Ask Emir only when a missing choice would materially change the result or expand the scope.
-- Keep progress updates limited to meaningful results and blockers. Final answers contain only the
-  requested outcome, essential verification and unfinished requested work.
+## 3. Where M5 stands
 
-## 3. Review standard
+### Complete — secure bootstrap foundation
 
-- Re-derive counts, survey results, arithmetic and every claim that says "verified".
-- Check the code and command output, not the plan or an agent's confidence.
-- A correct conclusion with the wrong mechanism is still wrong.
-- Verify accusations and destructive Git advice with `git log`, `git show`, `git status` and the
-  exact diff before acting.
-- Treat a new tool as unverified until it runs locally and produces a known, non-empty result.
-- Label every convention invented by Lokara as ours. Never present it as Berkay's rule or law.
+- JWT auth carries only the verified Person subject.
+- Expiry, issuer, exact audience and authenticated role are validated.
+- Account context is loaded from the database, never trusted from the token.
+- Migration `0006` adds the single bounded `app_bootstrap_contexts(text)` read.
+- `GET /me` returns every live account Membership context.
+- `/demo/summary` and the token-scoped account session are retired.
+- The demo summary uses `/a/{accountId}/summary`.
+- `scripts/check_pre_context_reads.py` enforces the function, role, policies, privileges and API call
+  sites.
+- No new dashboard, portal or account switcher was added.
+
+### Remaining M5 work
+
+1. Enforce Membership roles in the API:
+   - OWNER has full account access;
+   - EMPLOYEE sees only assigned buildings;
+   - EMPLOYEE with no assignments sees nothing;
+   - TAX_ADVISOR is read-only.
+2. Validate every nested `/a/{accountId}/buildings/{buildingId}/…` route before doing work.
+3. Return a deliberate 403/404 for unauthorized or foreign buildings.
+4. Make the existing owner portal role-aware.
+5. Add the visible account switcher when `/me` returns more than one context.
+6. Add the OpenAPI guard proving no current route writes `renter.person_id`.
+
+Do not build renter activation or the renter portal in this M5 continuation. M10 owns activation,
+the `renter.person_id` write and renter-portal context. M6 owns separate finalized tenant documents.
+If `PLAN.md` uses the broader phrase "renter-facing context" under M5, follow the narrower ownership
+defined in `docs/02`: M5 adds only the no-write guard; M10 builds the actual renter context.
+
+The next implementation should start with role enforcement and nested-building authorization. The
+visible switcher follows after those boundaries are green.
+
+## 4. How to work with Emir
+
+- Answer only what he asks.
+- Lead with the result. Use short, simple sentences.
+- Stop at the requested stage.
+- Verify claims before stating them.
+- Ask only when a missing decision materially changes scope or risk.
+- Do not add advice, next steps or work unless requested.
+
+## 5. Lead responsibilities
+
+- Emir controls scope, priorities, agents, commits, merges and pushes.
+- Preserve unrelated user changes.
+- Inspect staged and unstaged changes separately.
+- Verify agent reports against code, Git and command output.
+- Reviewers report findings; they never fix them.
+- Implementers do not write their own tests.
+- Worktree changes do not sync back automatically.
+- Never run `scripts/verify_demo_path.sh` from an agent worktree.
+- Keep `.claude` and `.codex` aligned through `scripts/check_agent_parity.py`.
 - Preserve legal flags and provenance. `geprüft` does not mean lawyer-approved.
 
-## 4. Reviewing agent work
+## 6. Before merge
 
-- Worktree edits do not sync back. Inspect the worktree status, copy the exact files, then rerun
-  gates in the main tree.
-- Never run `scripts/verify_demo_path.sh` from an agent worktree. The database and Docker stack are
-  shared resources.
-- Read-only reviewers report findings; they never fix them.
-- Implementers never write their own tests. Missing fixtures go back to `spec-scribe`.
-- Keep `.claude` and `.codex` aligned. `check_agent_parity.py` is the authority.
-- Do not widen a write lane to make an agent finish. A refusal can be the correct result.
+- Confirm the slice contains only intended work.
+- Run `scripts/gate.sh full`.
+- Run the demo gate when the milestone or output requires it.
+- Record the PDF fingerprint for any claimed document change or non-change.
+- Merge only green work. Push only when Emir asks.
 
-## 5. Before merging
+## 7. Close the session
 
-- Confirm the slice was cut from `main` and contains only the intended work.
-- Inspect staged and unstaged changes separately. Preserve unrelated local edits.
-- Run `scripts/gate.sh full`; use the demo gate when the milestone or output requires it.
-- Record the PDF fingerprint before and after any slice that claims the document changed or stayed
-  unchanged.
-- Merge only green work. Do not push unless Emir asks.
-
-## 6. Closing a session
-
-- Overwrite `LAST_OUTPUT.md` using the short format in `CLAUDE.md`.
-- Put temporary status in `LAST_OUTPUT.md`, execution status in `PLAN.md`, legal questions in the
-  relevant `FRAGEN-an-Berkay-*.md`, specifications in `docs/`, and history in Git.
-- Keep this file free of completed threads, old commit hashes, housekeeping lists and session
-  stories. Add only guidance that should still be useful in a future conversation.
+- Overwrite `LAST_OUTPUT.md` using the format in `CLAUDE.md`.
+- Put execution status in `PLAN.md` and durable feature rules in `docs/`.
+- Keep raw logs, prompts and agent reports out of the handoff.
