@@ -23,6 +23,7 @@ from .inputs import (
     WarmWaterInput,
     WarmWaterSeparation,
 )
+from .mdl import MdlGrossRescalingResult, rescale_mdl_gross_positions
 
 __version__ = "0.1.0"
 
@@ -35,6 +36,7 @@ __all__ = [
     "HeatingResult",
     "HeatingRules",
     "HeatingUnit",
+    "MdlGrossRescalingResult",
     "OwnerResidual",
     "OwnerResidualOrigin",
     "WarmWaterInput",
@@ -42,6 +44,7 @@ __all__ = [
     "calculate_heating_statement",
     "degree_day_weight",
     "landlord_share_percent_for_intensity",
+    "rescale_mdl_gross_positions",
     "segment_degree_day_weights",
     "split_co2_cost",
 ]
