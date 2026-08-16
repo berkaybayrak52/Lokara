@@ -26,8 +26,16 @@ that same rounded value is printed.
 
 from decimal import Decimal
 
-import pytest
-from lokara_domain import Co2Step, Co2Table, Period, cents, period
+from lokara_domain import (
+    Co2Step,
+    Co2Table,
+    EmissionFactor,
+    EnergyReference,
+    Period,
+    cents,
+    co2_grams_from_energy,
+    period,
+)
 from lokara_heating_engine import landlord_share_percent_for_intensity
 from lokara_heating_engine.co2 import split_co2_cost
 from lokara_heating_engine.inputs import Co2Result
@@ -196,7 +204,17 @@ class TestShortBillingPeriodIsAnnualised:
 
 
 class TestBerkay01bF02TheFallbackReachesTheSameStep:
-    """E1 is value-blocked; only the generic reference mismatch remains testable."""
+    """E1 mass fallback uses the CSV factor; supplier cost is a separate input."""
 
-    def test_the_factor_dependent_fallback_has_no_oracle_until_the_csv_is_reconciled(self) -> None:
-        pytest.skip("01b-F02 has no legal-value oracle until the Hu/Ho CSV conflict is resolved")
+    def test_the_csv_hu_factor_reproduces_the_f02_mass_and_f01_step(self) -> None:
+        factor = EmissionFactor(Decimal("0.201"), EnergyReference.HU)
+        grams = co2_grams_from_energy(Decimal(28000), EnergyReference.HU, factor)
+        assert grams == 5_628_000
+
+        # 30.954 ct is supplied here only to exercise downstream F02/F01 parity.
+        # The separate F02 refusal fixture forbids deriving it when the supplier omitted it.
+        result = _split(str(Decimal(grams) / Decimal(1000)), 30_954)
+        assert result.intensity_kg_per_sqm == Decimal("29.0")
+        assert result.landlord_share_percent == 40
+        assert int(result.landlord_amount) == 12_382
+        assert GESAMTKOSTEN - int(result.landlord_amount) == 338_218

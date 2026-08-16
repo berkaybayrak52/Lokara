@@ -57,18 +57,17 @@ und nicht nach der Seite. Solange beide existieren und sich widersprechen, ist f
 Leser nicht erkennbar, welche gewinnt — und unsere Regel ist, dass die Seite gewinnt, nicht die
 Mail. Bei uns ist der Vorrang deshalb ausdrücklich vermerkt.
 
-## 4. Emissionsfaktor Erdgas — zwei Werte, zwei Flags (offen seit Runde 1)
+## 4. Emissionsfaktor Erdgas — zwei Werte, zwei Flags (gelöst)
 
-Unverändert offen aus `FEEDBACK-to-Berkay-01b.md` § 4a:
+Gelöst durch den aktuellen CSV-Export und `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b:
 
-- Deine Nachricht nannte Hu **0,2016** / Ho **0,1820**, das Rechtsstand-Register **0,201 / 0,181**.
-  Wir rechnen mit den Registerwerten, weil das Register bei uns die Quelle ist.
-- Dein `README-for-Emir.md` führt den Erdgas-Faktor unter den Einträgen, die auf
-  `verify-before-production` stehen — das Register selbst flaggt ihn anders.
+- Maßgeblich sind die Registerwerte Hu **0,201** / Ho **0,181** und die Umrechnungsrelation
+  **0,903**.
+- Der Status ist **`geprüft`**, Rechtsstand **07/2026**.
+- Die Fallback-Nutzung bleibt eine **Konvention**, keine Rechtsnorm.
 
-**Frage:** Welcher Wert und welches Flag gelten? Der Unterschied ist klein, aber er sitzt direkt vor
-der CO₂-Stufenzuordnung, und dort entscheidet eine Nachkommastelle im Grenzfall über eine ganze
-Stufe und damit über den Vermieteranteil.
+Dieser Punkt ist nicht mehr offen. Antwort 03s `0,2016 / 0,1820` und
+`verify-before-production` sind für diese Regel superseded.
 
 ## 5. CO₂-**Kosten**-Fallback: H2 und unser `docs/03` widersprechen sich (offen seit Runde 1)
 

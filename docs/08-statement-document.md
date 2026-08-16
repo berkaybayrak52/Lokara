@@ -28,7 +28,7 @@ the annual statement, the UVI, and the landlord overview from being conflated.
 | Eigentümer residual | Landlord overview: one unconditional row across all four blocks, no quote/percentage, `0,00 €` and negative values allowed. Tenant copy: do not expose another party's row. | F01, F13–F18, F26, F28a/b |
 | CO₂ Pflichtausweis | Show tenant CO₂ cost share, landlord deduction, one-decimal annualised/classified intensity, unchanged Anlage band and reproducible mass/area/cost operands. No CO₂ block for heat pump/biomass. | F03–F10, F20 |
 | R8 display | Print the exact one-decimal value used for classification, trailing zero included (`12,0`); never restore `11,99` or shortened bands. | corrected F05, F06 |
-| Supplier fallback provenance | A derived mass must be labelled and warned. No derived cost is permitted after Antwort 03 § 5. F02's Erdgas mass value is blocked by the unresolved Hu/Ho register conflict. | F02 |
+| Supplier fallback provenance | A derived mass must be labelled and warned. F02 uses the authoritative CSV values `0,201` Hu / `0,181` Ho, conversion metadata `0,903`, status `geprüft`, Rechtsstand `07/2026`. No derived cost is permitted after Antwort 03 § 5. | F02 |
 | Device evidence | Print device number, room, old/new reading, factor and one-decimal units when the self-billing path used them; label § 9a estimates and their basis. | F17, F22, F27 |
 | Readiness and reduction risks | Show 15 % and each 3 % risk separately; never auto-deduct and never print a combined amount while the cumulation sources conflict. A hard-stop run produces no statement. | F21, F23–F25, F29–F31 |
 | WW central/unit difference | Leave unmetered consumption in the owner residual; show the 10 % notice and 20 % warning branches without blocking. | F26/F26b/F26c |
@@ -39,8 +39,8 @@ the annual statement, the UVI, and the landlord overview from being conflated.
 The annual average-user item may use the electronic-statement link described by the current K13
 CSV row. The UVI has a different no-omission duty and its later D2 heat-only/Heizspiegel method is
 owned by `docs/16`; it must not be copied into this annual-statement section. The BAnz notice's
-identity under § 6a Abs. 3 S. 4 and the Hu/Ho values remain explicitly pre-legal/unresolved as
-recorded in `docs/03` § 0.4.
+identity under § 6a Abs. 3 S. 4 remains explicitly pre-legal. The Hu/Ho values are resolved by the
+authoritative CSV as recorded in `docs/03` § 0.4.
 
 The older short-period passage later in this file that shortens the Anlage band is retained only as
 superseded history. Current output is H2/R8: annualise, round to one decimal, classify against the

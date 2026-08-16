@@ -4,9 +4,10 @@ Source: Page 01b E1/F02 as corrected by Antwort 03 § 5. Transcription:
 `docs/03-nk-heating-engines.md` §§ 0, 3, 4 H2, 6 E1 and 7 no. 5.
 Rechtsstand 08/2026.
 
-The Erdgas mass fallback remains value-blocked by the Hu/Ho register conflict.
-This executable contract supplies the mass and omits only the supplier's euro
-amount, so no emission factor is needed or permitted to decide the result.
+The Erdgas mass fallback values are resolved by the authoritative CSV. This
+executable contract deliberately supplies the mass and omits only the supplier's
+euro amount, so no emission factor is needed or permitted to decide the result:
+missing supplier CO₂ cost remains a hard refusal and is never derived.
 """
 
 from decimal import Decimal

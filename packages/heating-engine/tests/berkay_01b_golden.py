@@ -8,8 +8,9 @@ Money is integer cents.  ``renter_totals`` plus ``owner_total`` always reconcile
 Source precedence applied here:
 
 * Antwort 03 § 6 replaces Page 01b R4/E3 and therefore re-expects F05.
-* Antwort 03 § 4 conflicts with the current Rechtsstand CSV on the Erdgas Hu/Ho values.
-  No value-dependent mass-fallback oracle is added for that unresolved pair.
+* The Rechtsstand CSV is authoritative for F02: Erdgas Hu 0.201, Ho 0.181,
+  conversion metadata 0.903, status geprüft, Rechtsstand 07/2026. The later
+  Antwort-an-Emir_01b-Uebergabe.md § 4a/4b confirms that Antwort 03's pair is stale.
 * F31's two Cologne climate factors are placeholders.  Only its structural assertions and
   the real DWD import values are test oracles.
 """
@@ -27,7 +28,14 @@ PAGE_01B_GOLDENS: Final[dict[str, Golden]] = {
         "owner_total": 3_285,
     },
     "01b-F02": {
-        "blocked_by": "erdgas_hu_ho_register_conflict",
+        "energy_kwh": "28000",
+        "hu_factor_kg_per_kwh": "0.201",
+        "ho_factor_kg_per_kwh": "0.181",
+        "hu_to_ho_conversion": "0.903",
+        "factor_status": "geprüft",
+        "factor_rechtsstand": "07/2026",
+        "hu_fallback_mass_grams": 5_628_000,
+        "ho_fallback_mass_grams": 5_068_000,
         "warning": "supplier_co2_missing",
         "missing_supplier_cost": "refuse_without_factor_lookup",
     },

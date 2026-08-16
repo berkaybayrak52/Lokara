@@ -155,16 +155,19 @@ never a computation input.
 | Preis je Emissionszertifikat 2025 (= 1 t CO₂) | **55,00 €** | § 10 Abs. 2 BEHG — *"im Zeitraum vom 1. Januar 2025 bis zum 31. Dezember 2025: 55 Euro"* |
 | 2026 | **kein Festpreis** — Versteigerung im Preiskorridor 55,00 € bis 65,00 € | § 10 Abs. 2 BEHG |
 | Umsatzsteuer auf diesen Betrag | **+ 19 %** ⇒ **65,45 €/t** für 2025 | § 3 Abs. 3 CO2KostAufG — der Preisbestandteil ergibt sich *"durch Multiplikation der Brennstoffemissionen … mit dem … Preis der Emissionszertifikate … **zuzüglich einer auf diesen Betrag anfallenden Umsatzsteuer**"* |
-| Emissionsfaktor Erdgas (heizwertbezogen, H<sub>i</sub>) | **0,0558 t CO₂/GJ = 0,20088 kg CO₂/kWh** | Anlage 2 Teil 4 EBeV 2030 (in Kraft seit 01.01.2023) |
+| Emissionsfaktor Erdgas (heizwertbezogen, H<sub>i</sub>) | **0,0558 t CO₂/GJ = 0,20088 kg CO₂/kWh**; K4 stores the CSV value **0,201 kg CO₂/kWh (Hu)** | Anlage 2 Teil 4 EBeV 2030 (in Kraft seit 01.01.2023); Rechtsstand-Register `07/2026` |
 | Emissionsfaktor Gasöl zu Heizzwecken (Heizöl EL) | **0,074 t CO₂/GJ = 0,2664 kg CO₂/kWh** | as above |
 | Emissionsfaktor Flüssiggas | **0,0655 t CO₂/GJ = 0,2358 kg CO₂/kWh** | as above |
 
 - **The figure a renter sees on a heating invoice is the gross one.** § 3 Abs. 3 says *zuzüglich
   Umsatzsteuer* in so many words, so for 2025 the invoice rate is **65,45 €/t**, not 55,00 €/t. A
   fixture that implies the bare certificate price is understating the cost being split by 16 %.
-- Conversion: `t CO₂/GJ × 3,6 = kg CO₂/kWh` (1 kWh = 3,6 MJ). The invoice factor is **heizwertbezogen**
-  (H<sub>i</sub>) because § 3 Abs. 1 Nr. 3 says so; the brennwertbezogene figure (Erdgas 0,1820
-  kg CO₂/kWh<sub>Hs</sub>) belongs to energy certificates and must not be used here.
+- Conversion: `t CO₂/GJ × 3,6 = kg CO₂/kWh` (1 kWh = 3,6 MJ). The invoice factor is
+  **heizwertbezogen** (H<sub>i</sub>) because § 3 Abs. 1 Nr. 3 says so. For the K4 fallback, the
+  authoritative CSV additionally records **0,181 kg CO₂/kWh (Ho)** and `× 0,903`. The engine uses
+  the directly matching Hu or Ho factor and refuses a reference mismatch; it never silently
+  performs that conversion. These fallback values live in the versioned rules store, not engine
+  code.
 - Real supplier factors vary with gas quality (Erdgas H/L) around the EBeV standard value; a demo
   fixture within roughly ±1 % of it is plausible, one at half of it is not.
 
@@ -365,14 +368,18 @@ are enforced by `test_berkay_01b_complete_coverage.py`. The feature test column 
 closest executable test. **The data-only oracle is a transcription aid, not an executable golden
 test and not permission to change source.** `F28b` was intentionally RED; its H7 gross-rescaling
 seam is now implemented and the case is green.
-`F02` contains no factor-derived number while the Hu/Ho sources conflict. Its independent
-supplier-cost boundary is executable: a missing supplier euro amount must be refused without
-looking up, selecting or deriving any emission factor.
+`F02` uses the authoritative Rechtsstand-Register CSV values: Erdgas **0,201 kg CO₂/kWh (Hu)**,
+**0,181 kg CO₂/kWh (Ho)**, conversion metadata **0,903**, status **`geprüft`**, Rechtsstand
+**07/2026**. `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms that the CSV replaces the stale
+`0,2016 / 0,1820` answer. Its independent supplier-cost boundary remains executable: a missing
+supplier euro amount must be refused without looking up, selecting or deriving any emission factor.
 
 Executable golden-test closure is therefore still open:
 
-- Exact current green cases include `F02`'s factor-independent supplier-cost refusal,
-  `F03–F06`, `F16`, exact `F18` and `F28b`. F02's factor-dependent mass value remains blocked.
+- Exact current end-to-end green cases include `F03–F06`, `F16`, exact `F18` and `F28b`.
+- F02's CSV factor values/reference behaviour, rules data and factor-independent supplier-cost
+  refusal are green components. They do **not** close the F02 statement: derived-mass
+  warning/provenance and the § 7 Abs. 4 risk output remain unimplemented.
 - A2's device/segmented-reading capability contracts are green for
   `F01/F15/F17/F22/F27`; A2 also re-exercises `F16` through the missing-interim-reading shape.
   A3's applicability/warning capability contracts are green for `F07–F10/F23`. None of those
@@ -381,14 +388,14 @@ Executable golden-test closure is therefore still open:
   pipeline.
 - No count in this section treats a capability contract or primitive test as full fixture closure.
   The A2–A7 rows in `PLAN.md` assign every case that is not already exact and green.
-- `F02` cannot become a value-dependent golden until the Hu/Ho CSV conflict is resolved. Its
-  executable reference-boundary tests may use synthetic factors, but must not select either legal
-  pair.
+- `F02` retains a data oracle with the CSV pair and exact Hu/Ho arithmetic. Its focused executable
+  tests assert those components separately from the later hard refusal for missing supplier CO₂
+  cost; none is a substitute for the missing end-to-end warning/provenance and risk projection.
 
 | Fixture | Rule / result | Feature test |
 | --- | --- | --- |
 | `01b-F01` | full self-billing pipeline; four renter totals + owner reconcile to 338.218 ct | ✅ A2 device input contract plus allocation primitives; full pipeline still open |
-| `01b-F02` | missing supplier data; mass fallback value **blocked by Hu/Ho conflict**; cost fallback refused without consulting a factor | ✅ `test_berkay_01b_f02_cost_refusal.py`; value oracle remains blocked |
+| `01b-F02` | missing supplier mass: K4 Hu `0,201` gives `5.628.000 g` for `28.000 kWh`; K4 Ho is `0,181`, conversion metadata `0,903`, status `geprüft`; missing supplier cost is refused without deriving cents | Component tests: `test_rule_data.py`, `test_energy_reference.py`, `test_berkay_01b_co2_stufen.py`, `test_berkay_01b_f02_cost_refusal.py`; **E2E statement open** for derived-mass warning/provenance and § 7 Abs. 4 risk output |
 | `01b-F03` | exact 12,0 boundary → 10 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F04` | exact 52,0 boundary → 95 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F05` | annualise/round/classify; corrected 12,0 → 10 % | `test_berkay_01b_co2_s3_rounding.py`, `test_berkay_01b_co2_stufen.py` |
@@ -435,12 +442,12 @@ CSV. The rows are grouped below without changing their individual status.
 
 ### Conflicts, superseded rules, dependencies and unresolved values
 
-1. **Hard conflict — Erdgas Hu/Ho.** Current CSV and the 13.08 handoff say
-   `0,201 Hu / 0,181 Ho` and CSV flag `geprüft`; later Antwort 03 § 4 says
-   `0,2016 / 0,1820`, asks for a register update, and asks for
-   `verify-before-production`. That update is absent. No new factor-dependent oracle may choose a
-   pair. The mismatch-refusal path remains usable; real F02 mass fallback is blocked until Berkay
-   supplies a reconciled CSV row.
+1. **Resolved — Erdgas Hu/Ho.** The authoritative CSV selects `0,201 Hu / 0,181 Ho`, conversion
+   metadata `0,903`, status `geprüft`, Rechtsstand `07/2026`. The later
+   `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms that Antwort 03's
+   `0,2016 / 0,1820` and `verify-before-production` wording was stale and that the register wins.
+   The values remain `Konvention` fallback rules in `packages/rules-store`; `geprüft` means the
+   primary source was checked, not lawyer approval.
 2. **Superseded — R4/E3/F05.** Antwort 03 § 6 replaces raw lookup/truncated display with
    annualise → one-decimal half-up → classify/print. R8 below is current.
 3. **Superseded — owner as party.** Antwort 02/03 makes one unconditional Liegenschafts-Residuum
@@ -614,13 +621,24 @@ not stated the mass under § 3 CO2KostAufG. Where the supplier states it (the no
 case), no factor is read at all and the Ho/Hu question does not arise.
 
 **Values — taken from the Rechtsstand-Register, as-is (precedence rule 3), with flags intact.**
+For Erdgas, `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms the CSV values and status.
 
 | Fuel | kg CO₂/kWh | Bezug | Flag | Source |
 | --- | --- | --- | --- | --- |
-| Erdgas (K4) | **0,201** | Hu | `verify-before-production`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 6 |
-| Erdgas (K4) | **0,181** | Ho | `verify-before-production`, Konvention | same row, *"alternativ direkt 0,181 kg CO₂/kWh(Ho)"* |
-| Heizöl EL (K4) | **0,266** | Hu | `verify-before-production`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 3b |
-| Flüssiggas (K4) | **0,236** | Hu | `verify-before-production`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 5b (corrected 27.07.2026 from 0,234) |
+| Erdgas (K4) | **0,201** | Hu | `geprüft`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 6; Rechtsstand `07/2026` |
+| Erdgas (K4) | **0,181** | Ho | `geprüft`, Konvention | same row, `× 0,903` or *"alternativ direkt 0,181 kg CO₂/kWh(Ho)"*; Rechtsstand `07/2026` |
+| Heizöl EL (K4) | **0,266** | Hu | `geprüft`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 3b; Rechtsstand `07/2026` |
+| Flüssiggas (K4) | **0,236** | Hu | `geprüft`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 5b (corrected 27.07.2026 from 0,234); Rechtsstand `07/2026` |
+
+**Public provenance boundary.** `CO2_FALLBACK_EMISSION_FACTORS` is one shared rule for Erdgas,
+Heizöl and Flüssiggas. Its public `ResolvedRule.source` therefore contains only the common EBeV
+citation, fallback scope and `Konvention` classification. It must not expose the internal
+verification flag `geprüft`, the Register review date `07/2026`, or Erdgas-only conversion metadata
+`0,903`. `rechtsstand_entry()` appends only the rule version's effective-date stamp `01/2023`.
+Printing both `07/2026` and `01/2023` would conflate register verification with legal effectiveness.
+The CSV retains those internal metadata unchanged; removing them from the shared public label does
+not change the factor values, reference behaviour or source-of-truth precedence. Rechtsstand:
+EBeV 2030 in force `01/2023`; Register entry reviewed `07/2026`.
 
 ⚠️ **The register states no Ho counterpart for Heizöl or Flüssiggas.** None is invented here. Until
 one is sourced, an Ho quantity of oil or LPG has **no factor** and must be refused rather than
@@ -692,7 +710,7 @@ The next boundary is split into small pure capabilities before the full H1–H6 
   non-blocking but non-dismissible warning below 100 % coverage.
 - H1b values consumed oil from opening stock plus purchases minus closing stock. Heating value and
   emissions factor arrive as resolved rule inputs. It computes no CO₂ cost: the missing-cost branch
-  is refused, and the Hu/Ho conflict remains untouched.
+  is refused. Erdgas Hu/Ho is independently resolved by the authoritative CSV.
 - H3 prioritizes measured warm-water energy over the volume equation. With no measurement it uses
   the area fallback and emits the F12 warning. A non-connected plant produces one heating block.
 - H4 forms complementary base/consumption pots for a configured 30–50 % base share. A custom share
@@ -958,7 +976,7 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 
 | # | Case | Behaviour | Fixture |
 | --- | --- | --- | --- |
-| E1 | Supplier states no CO₂ mass/cost (§ 3 CO2KostAufG breach) | **Mass:** K4 only after the Hu/Ho CSV conflict is resolved, with warning/provenance. **Cost:** later Antwort 03 § 5 requires refusal; never derive cents from a price. | `01b-F02` (value-blocked) |
+| E1 | Supplier states no CO₂ mass/cost (§ 3 CO2KostAufG breach) | **Mass:** K4 uses the matching CSV factor (`0,201` Hu / `0,181` Ho), with warning/provenance. **Cost:** later Antwort 03 § 5 requires refusal; never derive cents from a price. | `01b-F02` |
 | E2 | `spezifisch` exactly on a bound (12,00 / 52,00) | Left-closed → the **higher** step | `01b-F03`, `01b-F04` |
 | E3 | Rounds *up* to a bound but is below it | **Superseded by R8:** annualise, round to 1 dp, classify the rounded value, and print it with 1 dp (`11,999484… → 12,0 → 10 %`) | `01b-F05` (re-expected) |
 | E4 | Billing period ≠ 12 months | Annualise `× 365 / nTage`, **then round to 1 dp, then classify** | `01b-F06` + order fixture |
@@ -997,20 +1015,17 @@ it remains undecided and no fixture asserts a chosen legal value.
 > full reconciliation in § 0 now records items 1–5 too. It still does not change the authoritative
 > CSV, implement D2, or turn the refused CO₂-cost fallback into an engine path.
 
-1. **Erdgas emission factor — two value pairs.** The 13.08 handoff and current
-   Rechtsstand-Register row *"Emissionsfaktor Erdgas (K4)"* give **Hu 0,201 / Ho 0,181** with
-   `× 0,903`; the later Antwort 03 § 4 gives **Hu 0,2016 / Ho 0,1820** and requests a register
-   update that is absent. Both pairs are internally consistent and differ by ~0,3 %. This is now a
-   hard source conflict: **neither pair is selected for a new value-dependent fixture or real
-   fallback run** until the CSV is reconciled.
-2. **The register's own Ho/Hu pair is not exactly reciprocal.** `0,201 × 0,903 = 0,181503`, not
-   `0,181`. The register says *"beide Wege führen zum selben Ergebnis"*; they agree to about 0,3 %,
-   not exactly. On 28.000 kWh that is 5.068 kg (direct Ho) vs 5.082 kg (converted) — 14 kg. This is a
-   further argument for the no-conversion design, and a question for Berkay.
-3. **The register row contradicts itself on whether to convert.** The *Betrag* field says Ho-kWh must
-   be converted `× 0,903`; the *Rechtsgrundlage* field on the same row says the `3,2508 GJ/MWh` factor
-   *"betrifft die BEHG-Meldekette des Inverkehrbringers … nicht die Rechnungsausweisung nach § 3"*.
-   The adopted design (carry the reference, never convert) is consistent with the second half.
+1. **Resolved — Erdgas emission factor.** The current Rechtsstand-Register CSV is authoritative:
+   **Hu 0,201 / Ho 0,181**, conversion metadata **`0,903`**, status **`geprüft`**, Rechtsstand
+   **07/2026**. `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms that Antwort 03's
+   `0,2016 / 0,1820` and old flag are superseded.
+2. **The register's Ho/Hu values are separately rounded.** `0,201 × 0,903 = 0,181503`, while the
+   direct Ho value is `0,181`. Both remain authoritative CSV metadata. The engine does not derive
+   one from the other: it selects the factor whose reference matches the input and refuses a
+   mismatch, avoiding a hidden or double conversion.
+3. **Conversion metadata is not an engine coercion rule.** The CSV records `× 0,903` and the direct
+   Ho alternative. Lokara stores both matching factors and preserves `0,903` as source metadata;
+   its adopted safety design carries the reference and never silently converts between Hu and Ho.
 4. **No Ho factor exists for Heizöl or Flüssiggas** in the register. Not invented; an Ho quantity of
    either is refused.
 5. **The CO₂ *cost* fallback is refused.** Page H2 allows
@@ -1021,7 +1036,7 @@ it remains undecided and no fixture asserts a chosen legal value.
    fallback as **unsafe from 2026** (no single BEHG price: auction 55–65 €/t, sales phase 68 €,
    make-up 70 €). Antwort 03 § 5 resolves the method conflict: ask the user for the supplier amount
    or block. The engine must never derive the cost from a price. The mass fallback remains a
-   separate method, but its Erdgas value is blocked by discrepancy 1.
+   separate method and uses the resolved CSV factors from item 1.
 6. **`01b-F19`'s counter-example does not recompute.** The trap figure (CO₂ on purchased instead of
    consumed oil) is printed as `abzug 90.204 ct`, difference `492,40 €`. Recomputed:
    7.700 l × 10 kWh/l × 0,266 = 20.482 kg → 112.651 ct → 80 % = **90.121 ct**, difference **491,57 €**.
@@ -1086,10 +1101,11 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 > wired now — the table below is the map of what the code does, not a plan. K3 and H2 had already
 > landed and were not touched.
 >
-> Rechtsstand: the *methods* below are §§ 7/8/9/9b HeizkostenV and §§ 3/7 CO2KostAufG; the
-> **residual convention K9** and the **K4 emission factors** are `Konvention` /
-> `verify-before-production`, **Rechtsstand 07/2026** in the Rechtsstand-Register. No output may
-> present either as a norm.
+> Rechtsstand: the *methods* below are §§ 7/8/9/9b HeizkostenV and §§ 3/7 CO2KostAufG. The
+> **residual convention K9** is `Konvention` / `verify-before-production`. The Erdgas **K4 emission
+> factors** are `Konvention` / `geprüft`, **Rechtsstand 07/2026**, in the Rechtsstand-Register.
+> No output may present either convention as a norm; `geprüft` records a primary-source check, not
+> lawyer approval.
 >
 > ⚠️ **Amended 14.08.2026 — § 9.2 was replaced.** `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 answers the
 > two conventions § 9.2 used to carry, and answers them by **replacing the model**: the
@@ -1310,7 +1326,7 @@ HeatingInput.energy_reference: EnergyReference | None = None   # the Bezug of to
 **Why the mismatch is worth a hard error, as one fixture pair.** Same building, same invoice of
 20.000 kWh, Erdgas, 100 m² beheizte Fläche:
 
-| Bezug | Factor (K4, register, `verify-before-production`) | Emissions | kg CO₂/m²/a | Stufe | Vermieteranteil |
+| Bezug | Factor (K4, register, `geprüft`) | Emissions | kg CO₂/m²/a | Stufe | Vermieteranteil |
 | --- | --- | --- | --- | --- | --- |
 | Hu | **0,201** kg CO₂/kWh | 4.020 kg | 40,2 | 37 – < 42 | **60 %** |
 | Ho | **0,181** kg CO₂/kWh | 3.620 kg | 36,2 | 32 – < 37 | **50 %** |
@@ -1324,8 +1340,6 @@ intermediates looks wrong, which is why it must be refused rather than checked f
 
 - a **CO₂ cost fallback** (`co2Cent` from a price) — Antwort 03 § 5 now forbids it; missing supplier
   cost must block after asking the user for the real amount;
-- a value-dependent **Erdgas mass fallback** while discrepancy 1 remains unresolved. The reference
-  mismatch boundary stays valid, but neither Hu/Ho pair is approved for a new real calculation;
 - E1's **warning + § 7 Abs. 4 risk flag** when the fallback ran, and any provenance field saying the
   printed Brennstoffemissionen were derived rather than stated. `HeatingResult` has no warning
   channel at all; that is a `docs/08` slice. **Until it exists, the fallback path prints a § 3

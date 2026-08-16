@@ -34,18 +34,21 @@ from lokara_domain import (
     co2_grams_from_energy,
 )
 
-# Synthetic values prove only the reference-type boundary.  The current CSV and
-# Antwort 03 disagree on both Erdgas factors, so this test must not select either
-# legal pair (`docs/03` § 0.4).  Oil/LPG are separate, non-conflicting rows.
-SYNTHETIC_ERDGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.2"), reference=EnergyReference.HU)
-SYNTHETIC_ERDGAS_HO = EmissionFactor(kg_co2_per_kwh=Decimal("0.18"), reference=EnergyReference.HO)
+# Authoritative Rechtsstand-Register CSV values for F02, confirmed by
+# Antwort-an-Emir_01b-Uebergabe.md § 4a/4b. Rechtsstand 07/2026, status geprüft.
+ERDGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.201"), reference=EnergyReference.HU)
+ERDGAS_HO = EmissionFactor(kg_co2_per_kwh=Decimal("0.181"), reference=EnergyReference.HO)
+ERDGAS_HU_TO_HO = Decimal("0.903")
 HEIZOEL_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.266"), reference=EnergyReference.HU)
 FLUESSIGGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.236"), reference=EnergyReference.HU)
 
 
 class TestMatchingReferences:
-    def test_berkay_01b_f02_is_blocked_until_the_csv_factor_conflict_is_resolved(self) -> None:
-        pytest.skip("01b-F02 has no legal-value oracle until the Hu/Ho CSV conflict is resolved")
+    def test_berkay_01b_f02_uses_the_authoritative_csv_pair(self) -> None:
+        assert ERDGAS_HU.reference is EnergyReference.HU
+        assert ERDGAS_HO.reference is EnergyReference.HO
+        assert co2_grams_from_energy(Decimal(28000), EnergyReference.HU, ERDGAS_HU) == 5_628_000
+        assert co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HO) == 5_068_000
 
     def test_heizoel_and_fluessiggas_carry_the_heizwert_reference(self) -> None:
         """Both register rows are Hu (EBeV Anlage 2 Teil 4 Nr. 3b / 5b) and the
@@ -73,11 +76,11 @@ class TestAReferenceMismatchIsAHardError:
         """The exact silent-failure case: an Erdgas invoice (Ho) met by the
         EBeV Hu factor. It must not compute a number at all."""
         with pytest.raises(EnergyReferenceMismatchError):
-            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, SYNTHETIC_ERDGAS_HU)
+            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HU)
 
     def test_heizwert_kwh_against_a_brennwert_factor_is_refused(self) -> None:
         with pytest.raises(EnergyReferenceMismatchError):
-            co2_grams_from_energy(Decimal(28000), EnergyReference.HU, SYNTHETIC_ERDGAS_HO)
+            co2_grams_from_energy(Decimal(28000), EnergyReference.HU, ERDGAS_HO)
 
     def test_the_error_does_not_coerce_a_value_on_the_way_out(self) -> None:
         """There is no conversion path, so there is nothing to fall back to.
@@ -85,7 +88,7 @@ class TestAReferenceMismatchIsAHardError:
         this design removed.
         """
         with pytest.raises(EnergyReferenceMismatchError) as raised:
-            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, SYNTHETIC_ERDGAS_HU)
+            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HU)
         assert "0.903" not in str(raised.value)
 
     def test_an_ho_quantity_of_oil_has_no_factor_and_is_refused(self) -> None:
@@ -95,6 +98,7 @@ class TestAReferenceMismatchIsAHardError:
             co2_grams_from_energy(Decimal(56000), EnergyReference.HO, HEIZOEL_HU)
 
 
-class TestTheRegisterPairIsNotExactlyReciprocal:
-    def test_the_pair_is_not_an_engine_oracle_while_its_sources_conflict(self) -> None:
-        pytest.skip("the current CSV pair is recorded in docs, not selected as an engine oracle")
+class TestTheRegisterConversionMetadata:
+    def test_the_csv_conversion_is_preserved_but_the_engine_uses_direct_factors(self) -> None:
+        assert ERDGAS_HU.kg_co2_per_kwh * ERDGAS_HU_TO_HO == Decimal("0.181503")
+        assert ERDGAS_HO.kg_co2_per_kwh == Decimal("0.181")

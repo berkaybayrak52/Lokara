@@ -21,7 +21,14 @@ UI. Dates are communication events, not planning inputs.
 - Page 01 is partly represented in current `docs/`. Page 01b's transcription is complete but its
   confirmed implementation gaps remain. Pages 02–08 and the full UVI annex still need transcription
   before their related implementation work.
-- The M1–M4 reconciliation gate is current and must finish before new feature work continues.
+- Phase D1 is the current work: reconcile `docs/00` through `docs/08` without implementation source
+  changes. Slice A coding is paused until the documentation gates have been reviewed and approved.
+- Phase D2 starts only after Emir reviews and approves D1. It creates the source-backed
+  `docs/09`–`docs/16` specs and golden fixtures before the final retirement gate.
+- Phase D3 starts only after Emir reviews and approves D2. It proves that the six Berkay
+  correspondence files have been completely extracted, moves every genuinely unresolved item into
+  one current `FRAGEN-an-Berkay-04.md`, updates governance references and then deletes the retired
+  correspondence. Implementation remains paused through D3.
 - Row 4 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
   but the slice is not merged yet.
 - Row 4 has not added a new dashboard, portal or account switcher.
@@ -37,7 +44,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks M3/M4 spec closure and final M6 statements. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. A1–A3, F02's factor-independent refusal and exact F18 are green. A2/A3 capability evidence does not close the full fixtures. F02's factor-dependent value remains blocked by the Hu/Ho conflict. A4 is RED; A5–A7 remain pending. Blocks M2 implementation closure, D2 and UVI. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F02's CSV factor values/reference behaviour, rules data and factor-independent cost refusal are green, but its end-to-end statement remains open: derived-mass warning/provenance and § 7 Abs. 4 risk output are missing. Slice A capability seams, the self-billing capability and exact F18 are green, but capability evidence does not close the full fixtures. Blocks M2 implementation closure, D2 and UVI. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
@@ -54,7 +61,9 @@ engine contract; it does not create a second competing heating specification.
 
 - The complete Page, including inputs, units, formula order, rounding, edge cases, worked examples,
   output wording and out-of-scope sections.
-- Its matching `Antworten/` corrections and handoff decisions.
+- Its matching `Antworten/` corrections and handoff decisions while those source files still exist.
+  D1 and D2 must extract all of their settled content into the target docs and golden fixtures before
+  D3 retires them; worked examples become fixtures rather than long copied prose.
 - Every matching `Rechtsstand-Register` entry, including `Rechtsstand`, source, legal/convention
   status and `verify-before-production` flags.
 - `Anlagen/Non-Goals V1`; its section for the Page must remain out of scope.
@@ -67,8 +76,9 @@ engine contract; it does not create a second competing heating specification.
 
 - `Rechtsstand-Register.csv` controls values and production flags. `Antworten/` controls later
   method corrections. If they conflict, stop and resolve the register; do not choose silently.
-- Hu/Ho is currently blocked by such a conflict: Antwort 03 says `0.2016 / 0.1820`, while the
-  register says `0.201 / 0.181`.
+- F02's former Hu/Ho conflict is resolved by the authoritative CSV and confirmed by
+  `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b: Erdgas uses `0.201` Hu, `0.181` Ho and the documented
+  `0.903` conversion relation, with CSV status `geprüft` and Rechtsstand `07/2026`.
 - Page 03 says self-use reduces deductible AfA, not the AfA basis. This replaces stale wording in
   Page 06/Non-Goals.
 - The DWD annex contains both `0.40–1.80` and an old `0.50–1.80` test boundary. Its update note also
@@ -89,14 +99,99 @@ Current trace audit, 16.08.2026:
 
 - Page 01 has no current doc/test trace for `08-F02…F05`, `F07…F16`, `F18…F20` and `F23…F24`.
 - Page 01b now has a complete 34-ID data oracle and source-section trace, but a data table is not an
-  executable golden test. Current exact green cases include F02's factor-independent refusal,
-  `F03–F06`, `F16`, `F18` and `F28b`. A2/A3 capability contracts are green but do not count as full
-  fixture closure. A4 is RED. The A2–A7 rows assign every remaining case; `F02` stays value-blocked
-  for its factor-dependent result.
+  executable golden test. Current exact end-to-end cases include `F03–F06`, `F16`, `F18` and
+  `F28b`. F02's CSV factor values/reference behaviour, rules data and missing-cost refusal are
+  green components only; full F02 statement closure remains open for derived-mass
+  warning/provenance and § 7 Abs. 4 risk output. The green capability contracts do not count as
+  full fixture closure. The self-billing capability is implemented and verified, but remains only
+  supporting evidence. Slice A assigns every remaining Page 01b case.
 - Pages 02–08 have no complete transcription. Existing references to a few Page 02 fixtures from
   owner-residual work do not count as Page 02 coverage.
 - Page 06's routing and risk rules can be transcribed, but its missing clause-text/version catalogue
   needs a separate legal source before that part can be implemented.
+
+### Three-phase documentation and correspondence-retirement gate
+
+Source ownership stays explicit during all three phases:
+
+- repository code, `CLAUDE.md` and this plan control shipped architecture and current status;
+- `berkay-work/` controls legal and calculation rules, subject to the source precedence above;
+- `docs/00`–`docs/08` record dependencies on material assigned by the source registry to
+  `docs/09`–`docs/16`; they do not duplicate those detailed contracts.
+
+The correspondence-retirement scope is exactly:
+
+- `FEEDBACK-to-Berkay-01b.md`;
+- `FRAGEN-an-Berkay-02.md`;
+- `FRAGEN-an-Berkay-03.md`;
+- `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md`;
+- `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md`;
+- `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md`.
+
+Until D3 passes, these files remain source inputs and must not be deleted or edited merely to remove
+a conflict. Every section must be mapped to one target doc section, one golden fixture, an explicit
+superseded-history note, or the single unresolved-question file. Git preserves the retired
+correspondence history after deletion; the approved `docs/` transcription becomes the durable
+project knowledge.
+
+**Phase D1 — current.** Reconcile the existing documentation only. Do not change implementation
+source. Slice A coding remains paused. Work in this exact order:
+
+1. Align `docs/03` with the restored single Slice A and record the unresolved DWD uncertainty as a
+   dependency, without importing the future `docs/16` contract.
+2. Complete the Page 01 transcription in `docs/08` and the relevant parts of `docs/02`.
+3. Reconcile product promise and shipped status in `docs/00`.
+4. Separate shipped from future architecture in `docs/04`.
+5. Reconcile both `docs/01-tech-stack-and-decisions.md` and
+   `docs/01-tech-stack-explanations.md`.
+6. Reconcile `docs/06` with the shipped demo and documented limits.
+7. Put only settled cross-cutting claims in `docs/07`; defer detailed Page 04 rules to `docs/11`.
+8. Give `docs/05` an ordinary drift review only.
+
+Every D1 calculation-document change, especially `docs/03` and `docs/08`, must land with a source
+coverage table and golden fixtures. D1 contains no implementation. At the D1 exit, stop and inspect
+the documentation and fixture diffs, fixture coverage, unresolved legal questions, docs-to-code
+drift and the truth of this plan. Do not continue automatically; Emir reviews and approves D1
+before D2 starts.
+
+D1 also extracts every settled correspondence item owned by `docs/00`–`docs/08`. Its coverage tables
+must identify the originating correspondence file and section, the destination, and whether the item
+is current, superseded or still unresolved. Information assigned to `docs/09`–`docs/16` remains in
+the retirement ledger for D2 instead of being duplicated into an existing doc.
+
+**Phase D2 — only after D1 approval.** Create `docs/09`–`docs/16` as separate source-backed spec
+slices. The source registry above owns each Berkay Page-to-doc and fixture assignment; do not
+duplicate that registry here. Every slice includes its complete coverage table and golden fixtures,
+then stops for review with no implementation. Preserve this dependency order:
+
+1. `docs/09`;
+2. `docs/15`;
+3. `docs/12`, then `docs/16`;
+4. `docs/10` and `docs/11`, then final `docs/07` reconciliation;
+5. `docs/13`;
+6. `docs/14`, only after `docs/09`–`docs/11`.
+
+During D2, finish the correspondence-retirement ledger by extracting every remaining settled item
+into `docs/09`–`docs/16` and their golden fixtures. Do not delete the correspondence at the D2 exit.
+Stop for Emir's review and approval first.
+
+**Phase D3 — only after D2 approval.** Retire the correspondence without losing information:
+
+1. Prove that every section of all six files is mapped to an approved doc section, golden fixture,
+   superseded-history note or unresolved item.
+2. Create `FRAGEN-an-Berkay-04.md` only if genuine questions remain. It contains no settled history,
+   completed requests or implementation status.
+3. Verify the target docs preserve every rule, correction, source reference, supersession,
+   verification flag and unresolved risk. Preserve exact arithmetic in fixtures rather than copying
+   long worked examples into prose.
+4. Update `CLAUDE.md`, `PLAN.md` and `AGENTS.md` so they no longer require or link to the retired
+   correspondence and so the approved docs, original Pages, annexes and register define the new
+   source model.
+5. Verify that no live repository reference depends on any retiring path and that no unresolved item
+   is left only in Git history.
+6. Delete the six files together, inspect the complete deletion diff, and stop for Emir's approval.
+
+Implementation resumes only after D3 has passed and Emir has approved the retirement diff.
 
 ---
 
@@ -110,16 +205,13 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 1 | ✅ Done 13.08.2026 | Wire R1/R5/K9 and Ho/Hu into `heating-engine` | Heating uses the required half-up allocation path. |
 | 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Slice C. |
 | 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
-| A1 | ✅ Green | MDL gross rescaling | `01b-F28b` is executable and green: exact gross quotient, accepted one-cent source residual and owner reconciliation. |
-| A2 | ✅ Green `716f741` | Device and segmented readings | H5 typed device/span aggregation and H6 hand-off are green for `F01/F27`, `F15`, `F16`, `F17` and `F22`. Exact WE-03-only `F18` reproduces Berkay's authoritative cents. Capability evidence is not full F01/F15/F17/F22/F27 E2E closure. |
-| A3 | ✅ Green `89db9e0` | Plant/CO₂ applicability and source state | Green capability contracts cover `F07–F10` and `F23`: building type, fuel, connected state, proof-gated protection/exclusion, module/disclosure switches and non-blocking R8-value warnings. They are not full fixture E2E closure. |
-| A4 | RED spec ready after A3 | Self-billing inputs and plant aggregation | Implement normalized pure capability contracts for `F11–F14`, `F19`, `F20`, `F24`: H1 positions/disclosure carry, K8 overlap and coverage warning, oil stock consumption, H3 priority/fallback/single-block paths and the 50 % owner preview. These tests are not E2E closure. F02's cost refusal is green; its factor-dependent mass remains blocked. |
-| A5 | Pending after A4 | Remaining readiness and warning channels | Close `F21`, `F25`, `F26/F26b/F26c`: hard denominator stop, separate unsummed risk amounts, and the two WW-gap thresholds. F23's warning primitive belongs to A3 but still needs E2E projection before fixture closure. |
-| A6 | Pending after A5 | MDL net and readiness branches | Close `F28a`, `F29`, `F30`. F29 belongs to the net M2/M3 branch; the gross-rescaling seam is not a closure scaffold. |
-| A7 | Pending after A6 | Annual § 6a comparison | Close `F31`: heat adjusted with each year's DWD factor, WW raw, labelled missing-factor fallback, no empty graph, and complete disclosure/risk output. |
-| B | After A | Reinforce M3–M4 from Page 01 | Fully transcribe Page 01 into `docs/08` and required `docs/02` changes. Map every `08-Fxx` fixture. Revalidate the current persisted calculation and extraction scope; implement confirmed gaps that belong to M3/M4 and leave M6-only ledger/finalization work explicitly assigned to M6. |
-| C | After B | Reinforce M1 from Page 02 | Transcribe Page 02 into `docs/09`, add all `09-Fxx` fixtures and revalidate NK eligibility, allocation and rounding. This replaces the former separate Row 5. |
-| 4 | Paused until A–C | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
+| D1 | **Current** | Reconcile existing `docs/00`–`docs/08` | Follow the exact D1 order above. Documentation and golden fixtures only; no implementation source changes. Stop for Emir's review and approval. |
+| D2 | After D1 approval | Create source-backed `docs/09`–`docs/16` | Use separate spec slices, the source registry assignments, coverage tables and golden fixtures. Follow the dependency order above; no implementation before review. |
+| D3 | After D2 approval | Complete extraction and retire Berkay correspondence | Close the six-file coverage ledger, create only one current `FRAGEN-an-Berkay-04.md` if needed, update governance references, verify no dependent paths, delete the six files together and stop for Emir's approval. |
+| A | Paused for D1–D3 | Reinforce M2 from Page 01b | Resume the single Slice A after the documentation and correspondence-retirement gates. Integrate the complete Page 01b specification into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
+| B | After A | Reinforce M3–M4 from Page 01 | Revalidate the D1 Page 01 contract against the current persisted calculation and extraction scope; implement confirmed gaps that belong to M3/M4 and leave M6-only ledger/finalization work explicitly assigned to M6. |
+| C | After B | Reinforce M1 from Page 02 | Revalidate NK eligibility, allocation and rounding against the approved D2 `docs/09` contract and fixtures. This replaces the former separate Row 5. |
+| 4 | Paused until D1–D3 and A–C | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
 | 6 | Open | M6 bank, ledger and finalized statements | Complete Page 01 → `docs/08` first. Transcribe Page 08 → `docs/15` before bank matching. Add actual paid advances, BGH minimum #4, immutable snapshots, one landlord overview and isolated tenant documents. |
 | 7 | Open | Page 05 → `docs/12` Wächter set | Implement § 556 deadline, Eichfrist and UVI cadence through one reusable guard mechanism. |
 | 8 | Open | Statement copy and citations | Resolve the remaining reviewer findings on ligatures, spacing, copy and footer citations. |
@@ -128,8 +220,52 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 11 | Ready after transcription; values blocked | M7 tax export and AfA | Transcribe Page 03 → `docs/10` and Page 04 → `docs/11`. Build only the computation paths; flagged register values still block real output. |
 | 12 | Open | M8, M10 modules and mobile | Transcribe Page 06 → `docs/13` before the clause engine and Page 07 → `docs/14` before the investment cockpit. Then build documents, tickets, activation, investment, billing and native apps. |
 
-Slices A–C are a mandatory reconciliation gate. Do not continue Row 4 or start later feature work
-until all three are spec-closed and the full and demo gates pass. Rows 1–3 remain complete only for
+### Slice A — progress and closure
+
+Progress preserved through the current worktree:
+
+- The complete source trace and 34-ID data oracle are transcribed. Rows 1–3 remain green for their
+  bounded fixes.
+- `01b-F28b` gross rescaling is executable and green: exact gross quotient, accepted one-cent source
+  residual and owner reconciliation.
+- Device and segmented-reading capabilities are green at `716f741`: H5 typed device/span
+  aggregation and H6 hand-off cover `F01/F27`, `F15`, `F16`, `F17` and `F22`. Exact WE-03-only
+  `F18` reproduces Berkay's authoritative cents.
+- Plant/CO₂ applicability and source-state capabilities are green at `89db9e0` for `F07–F10` and
+  `F23`: building type, fuel, connected state, proof-gated protection/exclusion,
+  module/disclosure switches and non-blocking R8-value warnings.
+- The self-billing capability RED spec is committed at `a350f98`. Its implementation in
+  `self_billing.py` and `__init__.py` covers H1/H1a/H1b/H3/H4 capabilities for `F11–F14`, `F19`,
+  `F20` and `F24`. Main-tree verification passes the fast gate: formatting, lint, strict mypy,
+  engine purity, agent parity and 307 pure-package tests.
+- F02's authoritative CSV factor values/reference behaviour, rules data and missing-cost refusal
+  are green components. Its end-to-end statement warning/provenance and § 7 Abs. 4 risk output
+  remain open.
+
+These capability seams are not end-to-end Page 01b closure. Slice A closes only when:
+
+1. H0–H7 are integrated into executable end-to-end Page 01b fixtures, including every open
+   `01b-Fxx` obligation.
+2. One shared warning/readiness/provenance/risk result and channel covers every open obligation:
+   `F02` derived-mass warning/provenance/risk, `F12` fallback warning, `F17` estimate provenance,
+   `F20` disclosures, `F21` hard stop, `F23` plausibility projection, `F24` coverage warning, `F25`
+   separate unsummed risks, `F26/F26b/F26c` thresholds, and `F30/F31` risk/output. No isolated
+   warning primitive counts as fixture closure.
+3. The pure MDL net/gross/control-sum boundary is executable for `F28a`, `F28b`, `F29` and `F30`.
+   Slice A/M2 owns pure, branch-aware MDL validation/result behaviour: no second deduction in the
+   net branch, exact gross rescaling, the correct control-sum reference for each branch, `F29`'s
+   blocking result and `F30`'s risk result. Slice B/M3 later revalidates OCR confirmation,
+   adapter/API blocking and statement projection; Slice A proves the pure behaviour without pulling
+   those M3 integration obligations forward. Gross rescaling is not a scaffold for the net path.
+4. H8 annual comparison starts only after the DWD rule/import ownership and the conflicting
+   range/date inputs are reconciled. It covers `F31` without pulling UVI D2 into Slice A.
+5. Full and demo gates pass, the before/after PDF fingerprint is recorded, and statement review has
+   no unresolved Slice A findings.
+
+The D1–D3 documentation and correspondence-retirement gates precede the existing A–C implementation
+reconciliation gate. Do not continue Row 4 or start later feature work until all three phases are
+approved, all three slices are spec-closed and the full and demo gates pass. Rows 1–3 remain
+complete only for
 their named fixes; they do not count as full Page 01b coverage. Row 9 is no longer blocked by the
 co2online licence, but it is blocked by the `docs/16` transcription gate. A real § 6a output must
 still be checked later.
@@ -385,19 +521,20 @@ mobile app logs in and reads one real screen.
 
 ## 6. Documentation reconciliation queue
 
-These existing docs need focused updates. Update them only through the relevant spec slice, so the
-new source coverage and golden fixtures land together.
+Phase D1 owns the existing-doc reconciliation in the order below. Legal and calculation detail
+assigned to `docs/09`–`docs/16` stays there; existing docs record only the dependency and settled
+cross-cutting claim. Source coverage and golden fixtures land with every calculation-doc change.
 
 | Existing doc | Why it needs work |
 | --- | --- |
-| `docs/00-product-overview.md` | It advertises statements longer than 12 months, while Page 01 hard-blocks them. Its compliance claim must also distinguish the current demo from the still-incomplete final tenant document. |
-| `docs/01-tech-stack-explanations.md` | It still opens with an old TODO pass and unfinished abbreviation work. Clean it after the active architecture docs settle. |
-| `docs/02-data-model.md` | Page 01 is explicitly only partly transcribed. Pages 02–04, Page 08 and UVI add catalogue, ledger, export, matching and delivery data. Preserve Page 03's rule that self-use reduces deductible AfA, not its basis. Remove stale alternatives as models settle. |
-| `docs/03-nk-heating-engines.md` | Page 01b, Antworten 02/03, all 47 matching register rows and the DWD/UVI dependencies are reconciled. Preserve its blocked Hu/Ho value and superseded-rule record while the RED fixtures and confirmed implementation gaps are closed. |
-| `docs/04-web-app-structure.md` | It calls the completed Page 02 source a pending spec and includes future mobile/engine packages and optional UI work as if present. Separate shipped structure from future architecture and preserve M10 renter ownership. |
-| `docs/06-demo-scenarios.md` | The current M5 bootstrap/onboarding limits are aligned. Extend it later with the complete Page 01 landlord/tenant output flow and the related milestone personas. |
-| `docs/07-compliance.md` | Add the provenance, production-blocking flags, delivery and retention rules introduced by Pages 01, 04, 05, 06 and UVI. |
-| `docs/08-statement-document.md` | It contains selected Page 01 patches, not a proven full transcription. It still has open questions answered by Pages 01/02 and stale block-(b) `0,00` wording. Rebuild its structure around all three outputs and every `08-Fxx` fixture before M6. |
+| `docs/03-nk-heating-engines.md` | Align the existing Page 01b contract and fixtures with the restored single Slice A. Preserve the current F02 decisions and record the unresolved DWD/UVI dependency without duplicating `docs/16`. |
+| `docs/08-statement-document.md` + relevant `docs/02-data-model.md` sections | Complete the Page 01 transcription, source coverage and `08-Fxx` fixtures. Record dependencies on future catalogue, tax, bank and UVI specs instead of copying their contracts here. |
+| `docs/00-product-overview.md` | Reconcile the product promise with shipped status, the Page 01 period hard stop and the still-incomplete final tenant document. |
+| `docs/04-web-app-structure.md` | Separate shipped structure from future architecture and preserve M10 renter ownership. Future packages remain dependencies, not shipped components. |
+| Both `docs/01-tech-stack-and-decisions.md` and `docs/01-tech-stack-explanations.md` | Reconcile locked decisions, shipped architecture, explanations and stale TODOs after `docs/04`. |
+| `docs/06-demo-scenarios.md` | Reconcile the current demo, M5 bootstrap/onboarding limits and the D1 Page 01 output contract. |
+| `docs/07-compliance.md` | Include only settled cross-cutting claims during D1. Defer detailed Page 04 rules to `docs/11` and perform final reconciliation after the relevant D2 specs exist. |
+| `docs/05-design-system.md` | Ordinary drift review only; no missing Berkay calculation contract is assigned here. |
 
 Create these docs because no current file owns their complete contracts:
 
@@ -412,8 +549,8 @@ Create these docs because no current file owns their complete contracts:
 | `docs/15-bank-matching.md` | Deterministic signals, confidence outcomes and review rules from Page 08. |
 | `docs/16-uvi.md` | Complete UVI calculation, DWD import, cadence, delivery and fallback contract from the annexes and linked Pages. |
 
-`docs/01-tech-stack-and-decisions.md` and `docs/05` need ordinary drift review, but the current audit
-found no missing Berkay calculation contract that requires a new section there.
+The new-doc table is the output inventory, not a second source assignment: the Berkay source
+registry above remains authoritative. Create these only in D2 and in its dependency order.
 
 ---
 
@@ -421,7 +558,10 @@ found no missing Berkay calculation contract that requires a new section there.
 
 M0 is complete. M1–M4 are the current green, demoable floor: a persisted-data operating-cost and
 heating calculation view with CO₂ allocation and tenant isolation. They are not yet fully
-spec-closed. Slices A–C must reconcile them with Pages 01, 01b and 02 before feature work continues.
-The finalized tenant document still waits for M6.
+spec-closed. D1 is current and pauses implementation; D2 and D3 follow only after Emir's review at
+each gate. After all three documentation and correspondence-retirement gates are approved, Slices
+A–C retain their order and reconcile implementation
+with Pages 01b, 01 and 02 before feature work continues. The finalized tenant document still waits
+for M6.
 
 Protect that floor. Correctness comes before breadth. If work stops, stop at a green state.
