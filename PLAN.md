@@ -14,11 +14,80 @@ UI. Dates are communication events, not planning inputs.
 - The v4 migration is complete. The old TypeScript backend is gone. Mobile moved to M10.
 - Composite foreign-key isolation and M5a identity/RLS are complete.
 - Execution rows 1–3 are complete.
-- Berkay's pages 06–08 exist, so M6, M8 and M10 are no longer blocked on missing specs. Their
-  `verify-before-production` values remain blocked for real use.
+- Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
+- Only Page 01 and Page 01b are partly represented in current `docs/`. Pages 02–08 and the full UVI
+  annex still need transcription before their related implementation work.
 - Row 4 is current. Its secure bootstrap foundation is complete on
   `slice/m5-bootstrap-contexts`, but the slice is not merged yet.
 - Row 4 has not added a new dashboard, portal or account switcher.
+
+---
+
+## Berkay source registry
+
+Every Page is a calculation or deterministic legal/product-rule source. A milestone may not use a
+Page directly from `berkay-work/`. First transcribe it into the target `docs/` file and create its
+golden fixtures. Existing docs are not assumed correct merely because they already exist.
+
+| Source | Target | Fixtures | Current coverage and dependency |
+| --- | --- | --- | --- |
+| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks final M6 statements. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Substantial but partial/stale. H0 path selection, K13 comparison values and fixture traceability remain incomplete. Blocks remaining heating work, D2 and UVI. |
+| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks Row 5 and classifications used by M6, M7 and Page 07. |
+| Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
+| Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
+| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Missing. Blocks Row 7, M9 and the UVI due-date guard. |
+| Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Missing. Blocks M8. The source defines routing and risk rules, but not a complete clause-text catalogue. |
+| Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | Rename `KPI-F01…F14` to `14-F01…F14`, with an alias map | Missing. Blocks the M10 investment cockpit. |
+| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Missing. Blocks the bank-matching part of M6. |
+| UVI + DWD annexes | `docs/16-uvi.md` | Every annex fixture, including the DWD import set | Missing. Blocks Rows 9–10. |
+
+The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
+engine contract; it does not create a second competing heating specification.
+
+### Mandatory inputs for every transcription
+
+- The complete Page, including inputs, units, formula order, rounding, edge cases, worked examples,
+  output wording and out-of-scope sections.
+- Its matching `Antworten/` corrections and handoff decisions.
+- Every matching `Rechtsstand-Register` entry, including `Rechtsstand`, source, legal/convention
+  status and `verify-before-production` flags.
+- `Anlagen/Non-Goals V1`; its section for the Page must remain out of scope.
+- `Anlagen/README-for-Emir.md`; its arithmetic audit is evidence, not permission to remove source
+  flags or provenance.
+- For UVI: `Emir_Spec_UVI.md`, `DWD-Klimafaktoren-Import-Spec.md`, `LETZTER-STAND.md`, Page 01b and
+  Page 05 W4.
+
+### Source precedence and known conflicts
+
+- `Rechtsstand-Register.csv` controls values and production flags. `Antworten/` controls later
+  method corrections. If they conflict, stop and resolve the register; do not choose silently.
+- Hu/Ho is currently blocked by such a conflict: Antwort 03 says `0.2016 / 0.1820`, while the
+  register says `0.201 / 0.181`.
+- Page 03 says self-use reduces deductible AfA, not the AfA basis. This replaces stale wording in
+  Page 06/Non-Goals.
+- The DWD annex contains both `0.40–1.80` and an old `0.50–1.80` test boundary. Its update note also
+  disagrees on April versus May 2026. Resolve both during `docs/16` transcription.
+- The UVI annex's `RENTER` Membership role and largest-remainder wording conflict with the current
+  identity and allocation models. Reconcile them; do not copy them into code.
+- `Non-Goals V1` and `README-for-Emir.md` are dated inputs. They contain useful constraints, but
+  later Antworten and register corrections must be recorded in each target doc.
+
+### Transcription gate
+
+Each target doc must contain a coverage table mapping every source section and fixture ID to its
+doc section and golden test. It must also record conflicts, superseded decisions, dependencies and
+unresolved values. `spec-scribe` must mark that table complete before implementation begins. A
+missing, conflicting or unverified value stays explicit; it is never guessed.
+
+Current trace audit, 16.08.2026:
+
+- Page 01 has no current doc/test trace for `08-F02…F05`, `F07…F16`, `F18…F20` and `F23…F24`.
+- Page 01b has no current trace for `01b-F11`, `01b-F15` and `01b-F28b`.
+- Pages 02–08 have no complete transcription. Existing references to a few Page 02 fixtures from
+  owner-residual work do not count as Page 02 coverage.
+- Page 06's routing and risk rules can be transcribed, but its missing clause-text/version catalogue
+  needs a separate legal source before that part can be implemented.
 
 ---
 
@@ -32,17 +101,19 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 1 | ✅ Done 13.08.2026 | Wire R1/R5/K9 and Ho/Hu into `heating-engine` | Heating uses the required half-up allocation path. |
 | 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Row 5. |
 | 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
-| 4 | 🟡 In progress | M5 roles, portals, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner/renter portal contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
+| 4 | 🟡 In progress | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
 | 5 | Open | Page 02 → `docs/09` and BetrKV catalogue | Replace free-text cost types with a versioned umlagefähig catalogue. Transcribe the spec before changing NK rounding or allocation behaviour. |
-| 6 | Open | M6 bank, ledger and finalized statements | Add actual paid advances, BGH minimum #4, immutable snapshots, one landlord overview and isolated tenant documents. |
+| 6 | Open | M6 bank, ledger and finalized statements | Complete Page 01 → `docs/08` first. Transcribe Page 08 → `docs/15` before bank matching. Add actual paid advances, BGH minimum #4, immutable snapshots, one landlord overview and isolated tenant documents. |
 | 7 | Open | Page 05 → `docs/12` Wächter set | Implement § 556 deadline, Eichfrist and UVI cadence through one reusable guard mechanism. |
 | 8 | Open | Statement copy and citations | Resolve the remaining reviewer findings on ligatures, spacing, copy and footer citations. |
-| 9 | Ready | D2 Heizspiegel comparison value | Compare heating only. Use `mittel − ww_kwh_m2`; warm-water deduction is 24 kWh/(m²·a), except heat pump ≈8 as a labelled Lokara convention. Guard non-positive results. Use the labelled 250–500 fallback for missing >500 heat-pump and pellet classes. Do not extrapolate. |
-| 10 | Open | UVI | Monthly § 6a HeizkostenV information. Needs Row 4 tenant access, monthly readings and Row 9 comparison values. |
-| 11 | Ready with blocked values | M7 tax export and AfA | Computation paths are specced. Placeholder register values must be verified before any real tax-adviser or Finanzamt output. |
-| 12 | Open | M8 documents, M10 modules and mobile | Clause engine, tickets, activation, investment cockpit, billing and native apps. |
+| 9 | Ready after transcription | D2 Heizspiegel comparison value | Reconcile Page 01b and transcribe the UVI/DWD annexes → `docs/16`. Then implement the specified heating-only comparison, guards and labelled fallbacks without extrapolation. |
+| 10 | Open | UVI calculation and document | Implement the calculation and tenant document from `docs/16`. Needs monthly readings, Page 05 W4 and Row 9 comparison values. Scheduled delivery waits for M9; portal publication waits for M10 activation. |
+| 11 | Ready after transcription; values blocked | M7 tax export and AfA | Transcribe Page 03 → `docs/10` and Page 04 → `docs/11`. Build only the computation paths; flagged register values still block real output. |
+| 12 | Open | M8, M10 modules and mobile | Transcribe Page 06 → `docs/13` before the clause engine and Page 07 → `docs/14` before the investment cockpit. Then build documents, tickets, activation, investment, billing and native apps. |
 
-Row 9 is no longer blocked by the co2online licence. A real § 6a output must still be checked later.
+Before Row 5 or Row 6 implementation, finish the Page 01 coverage table in `docs/08`. Page 02 uses
+the statement model defined there. Row 9 is no longer blocked by the co2online licence, but it is
+blocked by the `docs/16` transcription gate. A real § 6a output must still be checked later.
 
 ### M7 value warning
 
@@ -52,7 +123,8 @@ The following remain `verify-before-production` placeholders:
 - all Anlage-V line numbers;
 - SKR03/SKR04 accounts;
 - DATEV EXTF parameters;
-- three BFH case numbers marked `ZITAT UNSICHER`.
+- three BFH case numbers marked `ZITAT UNSICHER`;
+- the Page 04 ten-day-rule BFH citation.
 
 The computation paths may be built. Nothing using these values may be sent to a real Steuerberater
 or Finanzamt until each value is confirmed.
@@ -61,9 +133,10 @@ or Finanzamt until each value is confirmed.
 
 ## 2. Hard rules
 
-1. **No calculation without its spec.** Transcribe Berkay's source into `docs/`, create the golden
-   fixture, then implement. Never invent a legal value. The authoritative register currently has
-   130 of 180 rows marked `verify-before-production`.
+1. **No calculation without complete transcription.** Follow the Berkay source registry and its
+   coverage-table gate. Transcribe first, create every golden fixture, then implement. Never invent
+   a legal value. The authoritative register currently has 130 of 180 rows marked
+   `verify-before-production`.
 2. **Keep the demo path green.** Every milestone re-verifies database → migration → seed → statement
    → PDF. Fix or revert any break before continuing.
 3. **Tag green milestone states.** Use `demo-green-<n>` only after the required gates pass.
@@ -176,8 +249,8 @@ This work added no new dashboard, portal or account switcher.
 
 ### Still open
 
-- Complete the existing owner portal with role-aware context and add the renter-facing context.
-- Keep context in `/a/{accountId}/…` and `/renter/{tenancyId}/…`.
+- Complete the existing owner portal with role-aware account context.
+- Keep owner context in `/a/{accountId}/…`.
 - Show a context switcher only when a Person has more than one context.
 - Enforce OWNER, EMPLOYEE and TAX_ADVISOR behaviour in app logic.
 - Restrict EMPLOYEE access to assigned buildings. No assignments means no visibility.
@@ -186,16 +259,20 @@ This work added no new dashboard, portal or account switcher.
 - Return a deliberate 403/404 for a foreign or unauthorized building.
 - Add an OpenAPI guard proving no route writes `renter.person_id`. Only M10 activation may write it.
 
-**Done when:** roles behave correctly; every nested building route verifies its URL context; renter
-context exposes no landlord data in app logic or RLS; multiple contexts switch by URL and are
-re-authorized per request; the pre-context checker stays green; no current API route writes
-`renter.person_id`.
+**Done when:** roles behave correctly; every nested building route verifies its URL context;
+multiple account contexts switch by URL and are re-authorized per request; the pre-context checker
+stays green; no current API route writes `renter.person_id`. Renter activation, renter URL context
+and renter portal authorization are M10 work.
 
 ---
 
 ## 5. Later milestones
 
 ### M6 — Bank, ledger and finalized statements
+
+**Spec gate:** finish Page 01 in `docs/08`. Finish Page 08 in `docs/15` before implementing bank
+matching. If bank matching is deferred, Page 08 does not block the remaining ledger and statement
+work.
 
 - Add Redis workers and webhooks.
 - Keep finAPI stubbed behind the bank adapter.
@@ -209,7 +286,8 @@ re-authorized per request; the pre-context checker stays green; no current API r
 - Finalization creates one immutable, reproducible snapshot with inputs, results, engine/rule
   versions, `Rechtsstand`, timestamps, hashes and archived documents.
 - Corrections create `vN+1`; old versions and referenced inputs remain intact.
-- Render one internal landlord overview and one separate document per eligible tenancy.
+- Render one internal landlord overview, one separate document per eligible tenancy and the
+  landlord-only vacancy schedule required by Page 01.
 - A tenancy with zero period-clipped usage days gets no tenant document or portal entry. The landlord
   overview receives the required footnote.
 - Never generate one all-renters PDF and crop or hide sections.
@@ -220,6 +298,10 @@ advances work; preview creates no archive; finalization is immutable and reprodu
 tenant documents are separated; zero-day tenancies are excluded and footnoted.
 
 ### M7 — Tax export and AfA
+
+**Spec gate:** transcribe Page 03 into `docs/10` and Page 04 into `docs/11`, including every fixture
+and every `verify-before-production` marker. Page 02 must already be transcribed where its cost
+classification feeds the export.
 
 - Pure `packages/export-engine` for Anlage V and DATEV EXTF.
 - DATEV output is byte-exact Windows-1252 with semicolons and CRLF.
@@ -232,6 +314,9 @@ immutably. Production use remains blocked until flagged values are verified.
 
 ### M8 — Document and letter engine
 
+**Spec gate:** transcribe Page 06 into `docs/13`, including its legal/convention labels, risk gates,
+non-goals and all `CLAUSES-Fxx` fixtures.
+
 - Versioned clause blocks and stored clause composition.
 - A legal change creates a new clause version and flags affected contracts.
 - Mieterhöhung, Kündigung, Mahnung and SEPA mandate.
@@ -241,6 +326,8 @@ immutably. Production use remains blocked until flagged values are verified.
 affected contract.
 
 ### M9 — Reminders, email and checklists
+
+**Spec gate:** transcribe Page 05 into `docs/12` before building any deadline or reminder rule.
 
 - Shared trigger/state-machine engine for § 556, arrears, move-in/out and UVI.
 - Stubbed email provider using Lokara's domain and the landlord as the From-name, with an immutable
@@ -253,6 +340,10 @@ affected contract.
 **Done when:** the § 556 deadline escalates correctly and delivery status is visible.
 
 ### M10 — Portals, modules and native apps
+
+**Spec gate:** transcribe Page 07 into `docs/14` before the investment cockpit. The calculation
+depends on the completed Page 02, Page 03 and Page 04 contracts. Renter activation remains governed
+by `docs/02` and the M5 no-write guard.
 
 - Renter activation, renter portal, tickets and tax-adviser guest access.
 - Investment pipeline and seven-KPI cockpit.
@@ -269,9 +360,44 @@ mobile app logs in and reads one real screen.
 
 ---
 
-## 6. Product floor
+## 6. Documentation reconciliation queue
 
-M0–M4 are the current green, demoable floor: a correct CO₂-compliant operating-cost and heating
-statement from persisted user data with tenant isolation.
+These existing docs need focused updates. Update them only through the relevant spec slice, so the
+new source coverage and golden fixtures land together.
+
+| Existing doc | Why it needs work |
+| --- | --- |
+| `docs/00-product-overview.md` | It advertises statements longer than 12 months, while Page 01 hard-blocks them. Its compliance claim must also distinguish the current demo from the still-incomplete final tenant document. |
+| `docs/01-tech-stack-explanations.md` | It still opens with an old TODO pass and unfinished abbreviation work. Clean it after the active architecture docs settle. |
+| `docs/02-data-model.md` | Page 01 is explicitly only partly transcribed. Pages 02–04, Page 08 and UVI add catalogue, ledger, export, matching and delivery data. Preserve Page 03's rule that self-use reduces deductible AfA, not its basis. Remove stale alternatives as models settle. |
+| `docs/03-nk-heating-engines.md` | Reconcile complete Page 01b, Antworten 02/03 and the now-present DWD spec. Close H0, K13 and fixture-traceability gaps; remove resolved open questions; separate superseded rules; apply register flags row by row. |
+| `docs/04-web-app-structure.md` | It calls the completed Page 02 source a pending spec and includes future mobile/engine packages and optional UI work as if present. Separate shipped structure from future architecture and preserve M10 renter ownership. |
+| `docs/06-demo-scenarios.md` | The current M5 bootstrap/onboarding limits are aligned. Extend it later with the complete Page 01 landlord/tenant output flow and the related milestone personas. |
+| `docs/07-compliance.md` | Add the provenance, production-blocking flags, delivery and retention rules introduced by Pages 01, 04, 05, 06 and UVI. |
+| `docs/08-statement-document.md` | It contains selected Page 01 patches, not a proven full transcription. It still has open questions answered by Pages 01/02 and stale block-(b) `0,00` wording. Rebuild its structure around all three outputs and every `08-Fxx` fixture before M6. |
+
+Create these docs because no current file owns their complete contracts:
+
+| New doc | Reason |
+| --- | --- |
+| `docs/09-betrkv-catalogue.md` | Versioned operating-cost classification and allocation rules from Page 02. |
+| `docs/10-afa.md` | AfA inputs, methods, guards, rounding and fixtures from Page 03. |
+| `docs/11-tax-export.md` | Anlage V and byte-exact DATEV rules from Page 04. |
+| `docs/12-guards-deadlines.md` | Reusable deadline/guard rules from Page 05. |
+| `docs/13-contract-clauses.md` | Versioned clause decisions and risk gates from Page 06. |
+| `docs/14-investment-kpis.md` | KPI definitions, financing assumptions and calculation order from Page 07. |
+| `docs/15-bank-matching.md` | Deterministic signals, confidence outcomes and review rules from Page 08. |
+| `docs/16-uvi.md` | Complete UVI calculation, DWD import, cadence, delivery and fallback contract from the annexes and linked Pages. |
+
+`docs/01-tech-stack-and-decisions.md` and `docs/05` need ordinary drift review, but the current audit
+found no missing Berkay calculation contract that requires a new section there.
+
+---
+
+## 7. Product floor
+
+M0–M4 are the current green, demoable floor: a persisted-data operating-cost and heating calculation
+view with CO₂ allocation and tenant isolation. It is not yet the finalized, legally complete tenant
+document; Page 01 transcription and M6 still close those gaps.
 
 Protect that floor. Correctness comes before breadth. If work stops, stop at a green state.
