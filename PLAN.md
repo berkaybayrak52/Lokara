@@ -21,11 +21,12 @@ before UI. Dates are communication events, not planning inputs.
 - Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
 - Page 01 is completely transcribed in `docs/08`/`docs/02` with a 24-ID data oracle and green
   consistency checks. Page 01b's transcription is complete but its confirmed implementation gaps
-  remain. Pages 02–08 and the full UVI annex still need D2 transcription before related work.
-- Phase D1 reconciliation is complete and **awaiting Emir's review and approval**. All implementation
-  remains paused until D1–D3 have been reviewed and approved.
-- Phase D2 starts only after Emir reviews and approves D1. It creates the source-backed
-  `docs/09`–`docs/16` specs and golden fixtures before the final retirement gate.
+  remain. Page 02 is transcribed in `docs/09` with an exact 32-ID data oracle and is awaiting Emir's
+  review. Pages 03–08 and the full UVI annex still need D2 transcription before related work.
+- Phase D1 reconciliation was approved by Emir on **17.08.2026**. All implementation remains paused
+  until D2–D3 have been reviewed and approved.
+- Phase D2 is in progress. Its first independent slice, `docs/09`, is complete and awaiting Emir's
+  review before the next D2 slice starts.
 - Phase D3 starts only after Emir reviews and approves D2. It proves that the six Berkay
   correspondence files have been completely extracted, moves every genuinely unresolved item into
   one current `FRAGEN-an-Berkay-04.md`, updates governance references and then deletes the retired
@@ -46,7 +47,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. This is specification closure, not application closure: Slice B revalidates M3/M4 and M6 still owns actual advances, Saldo, finalization and isolated tenant documents. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F02's CSV factor values/reference behaviour, rules data and factor-independent cost refusal are green, but its end-to-end statement remains open: derived-mass warning/provenance and § 7 Abs. 4 risk output are missing. Slice A capability seams, the self-billing capability and exact F18 are green, but capability evidence does not close the full fixtures. Blocks M2 implementation closure and dependent UVI implementation; it does not block D2 transcription. |
-| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
+| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Full D2 source trace and exact 32-ID data oracle transcribed; awaiting Emir approval. No production catalogue or gate was implemented. The current 180-row CSV has no Page 02-assigned rows, so `09-K01…K11` and the three unresolved classifications remain production-blocking. After approval, Slice C still owns M1 implementation closure and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Missing. Blocks the shared guard foundation, M9 and the UVI due-date guard. |
@@ -96,7 +97,7 @@ doc section and golden test. It must also record conflicts, superseded decisions
 unresolved values. `spec-scribe` must mark that table complete before implementation begins. A
 missing, conflicting or unverified value stays explicit; it is never guessed.
 
-Current trace status in the D1 working tree on 17.08.2026:
+Current trace status after the first D2 slice on 17.08.2026:
 
 - Page 01 has a complete source-section trace in `docs/08`, relevant normalized-model rules in
   `docs/02`, and a data-only oracle covering exactly `08-F01…F24`. Green coverage and arithmetic
@@ -108,8 +109,10 @@ Current trace status in the D1 working tree on 17.08.2026:
   warning/provenance and § 7 Abs. 4 risk output. The green capability contracts do not count as
   full fixture closure. The self-billing capability is implemented and verified, but remains only
   supporting evidence. Slice A assigns every remaining Page 01b case.
-- Pages 02–08 have no complete transcription. Existing references to a few Page 02 fixtures from
-  owner-residual work do not count as Page 02 coverage.
+- Page 02 now has a complete source-section trace, all 32 allocable and 11 non-allocable catalogue
+  identities, and a data-only oracle covering exactly `09-F01…F32`. Its green checks include the
+  Page 01 and Antwort 03 reconciliation. This does not claim current rules-store or NK behavior.
+- Pages 03–08 have no complete transcription.
 - Page 06's routing and risk rules can be transcribed, but its missing clause-text/version catalogue
   needs a separate legal source before that part can be implemented.
 
@@ -137,8 +140,8 @@ superseded-history note, or the single unresolved-question file. Git preserves t
 correspondence history after deletion; the approved `docs/` transcription becomes the durable
 project knowledge.
 
-**Phase D1 — awaiting Emir approval.** Reconcile the existing documentation only. Do not change
-implementation source. All implementation remains paused. The completed D1 followed this exact order:
+**Phase D1 — approved by Emir on 17.08.2026.** The completed reconciliation changed documentation
+and data-only fixtures, not implementation source, and followed this exact order:
 
 1. Align `docs/03` with the restored single Slice A and record the unresolved DWD uncertainty as a
    dependency, without importing the future `docs/16` contract.
@@ -223,8 +226,8 @@ not replace the complete documentation or reconciliation gates.
 
 | Stage | Status | Work | Required result |
 | --- | --- | --- | --- |
-| D1 | **Awaiting Emir approval** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. D1 stops here for Emir's review and approval. |
-| D2 | After D1 approval | Create source-backed `docs/09`–`docs/16` | Use separate spec slices, the source registry assignments, coverage tables and golden fixtures. Follow the dependency order above and stop for review; no implementation. |
+| D1 | **Approved 17.08.2026** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. |
+| D2 | **In progress — `docs/09` awaiting Emir approval** | Create source-backed `docs/09`–`docs/16` | `docs/09` and its exact 32-ID oracle are complete. Continue with `docs/15` only after review; use separate spec slices, coverage tables and golden fixtures, with no implementation. |
 | D3 | After D2 approval | Complete extraction and retire Berkay correspondence | Close the six-file coverage ledger, create only one current `FRAGEN-an-Berkay-04.md` if needed, update governance references, verify no dependent paths, delete the six files together and stop for Emir's approval. |
 | A | Paused for D1–D3 | Reconcile M2 with Page 01b | Integrate the approved Page 01b contract into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
 | B | After A | Reconcile M3–M4 with Page 01 | Revalidate the approved Page 01 contract against persisted calculation and extraction, close M3/M4 gaps and leave ledger/finalization work to M6. |
@@ -338,7 +341,7 @@ Built:
 
 The Expo mobile skeleton is not part of the completed foundation. It moved to M10.
 
-### M1 — Operating-cost engine 🟡 built and green; Page 02 reconciliation pending
+### M1 — Operating-cost engine 🟡 built and green; Page 02 spec awaiting approval
 
 - Pure `packages/nk-engine`.
 - Day-weighted allocation, vacancy handling and largest-remainder reconciliation.
@@ -589,8 +592,9 @@ registry above remains authoritative. Create these only in D2 and in its depende
 
 M0 is complete. M1–M4 are the current green, demoable floor: a persisted-data operating-cost and
 heating calculation view with CO₂ allocation and tenant isolation. They are not yet fully
-spec-closed. D1 is awaiting Emir's approval and implementation remains paused; D2 and D3 follow only
-after Emir's review at each gate. After all three documentation and correspondence-retirement gates are approved, Slices
+spec-closed. D1 is approved; D2's first `docs/09` slice awaits Emir's review and implementation
+remains paused. D2 and D3 continue only after Emir's review at each gate. After all three
+documentation and correspondence-retirement gates are approved, Slices
 A–C retain their order and reconcile implementation
 with Pages 01b, 01 and 02 before feature work continues. The finalized tenant document still waits
 for M6.
