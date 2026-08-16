@@ -155,9 +155,8 @@ class MeAccount(ApiModel):
 
 class MeResponse(ApiModel):
     person_id: str
+    email: str
     # Empty ⇒ no live membership yet (e.g. before the demo scenario is loaded).
-    # TODO(M5): list every account once a person-scoped RLS policy exists; today
-    # this can only see the token-claimed account's membership.
     accounts: list[MeAccount]
 
 

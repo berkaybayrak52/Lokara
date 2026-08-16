@@ -105,7 +105,7 @@ Each answers one question; the first bad answer is your problem.
    step 2 comes first.
 
 4. **`curl -s -X POST localhost:3001/auth/dev-token`** — does the auth path work?
-   Expect `{"accessToken":"eyJ…","expiresIn":…}` — camelCase, the API's wire convention, not the
+   Expect `{"accessToken":"eyJ…","expiresInSeconds":…}` — camelCase, the API's wire convention, not the
    `access_token` of the OAuth spec. This is the endpoint the web app's `/api/session` route proxies
    to mint the session cookie. `403 {"detail":"Dev tokens are disabled"}` means the API was started without
    `AUTH_DEV_TOKEN=true` — `.env.example` sets it, so the usual cause is a missing or stale `.env`

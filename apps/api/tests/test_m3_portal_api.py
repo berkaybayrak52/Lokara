@@ -8,6 +8,7 @@ Playwright Chromium (installed in CI, LOKARA_REQUIRE_PDF).
 """
 
 import os
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -26,9 +27,11 @@ from sqlalchemy.orm import Session
 
 NBSP = " "  # format_eur puts a non-breaking space before the € sign
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "packages" / "db"
+TEST_JWT_ISSUER = "https://lokara.test/auth/v1"
 
 ISO_ACCOUNT_ID = "acc_iso_m3"
 ISO_PERSON_ID = "per_iso_m3"
+UNMEMBERED_PERSON_ID = "per_unmembered_m3"
 
 
 @pytest.fixture(scope="module")
@@ -47,6 +50,7 @@ def client() -> Iterator[TestClient]:
     with Session(owner) as session, session.begin():
         seed_demo(session)
         session.merge(Person(id=ISO_PERSON_ID, email="iso-m3@lokara.example"))
+        session.merge(Person(id=UNMEMBERED_PERSON_ID, email="unmembered-m3@lokara.example"))
         session.merge(Account(id=ISO_ACCOUNT_ID, name="Isolationskonto M3"))
         session.merge(
             Membership(
@@ -56,37 +60,67 @@ def client() -> Iterator[TestClient]:
                 role=Role.OWNER,
             )
         )
+        session.merge(
+            Membership(
+                id="mem_demo_switch_m3",
+                person_id=DEMO_PERSON_ID,
+                account_id=ISO_ACCOUNT_ID,
+                role=Role.EMPLOYEE,
+            )
+        )
     owner.dispose()
     yield TestClient(create_app())
 
 
-def _token(person_id: str, account_id: str) -> dict[str, str]:
+def _token(person_id: str) -> dict[str, str]:
+    now = int(time.time())
     encoded = jwt.encode(
-        {"sub": person_id, "account_id": account_id},
+        {
+            "sub": person_id,
+            "iss": str(getattr(ApiSettings(), "supabase_jwt_issuer", TEST_JWT_ISSUER)),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + 3600,
+        },
         ApiSettings().supabase_jwt_secret,
         algorithm="HS256",
     )
     return {"Authorization": f"Bearer {encoded}"}
 
 
-DEMO = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+DEMO = _token(DEMO_PERSON_ID)
 
 
 class TestMe:
     def test_demo_owner_sees_their_relationship(self, client: TestClient) -> None:
-        response = client.get("/me", headers=_token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID))
+        response = client.get("/me", headers=_token(DEMO_PERSON_ID))
         assert response.status_code == 200
         body = response.json()
         assert body["personId"] == DEMO_PERSON_ID
+        assert body["email"] == "demo@lokara.example"
         assert body["accounts"] == [
-            {"id": DEMO_ACCOUNT_ID, "name": "Demo Konto", "role": "OWNER", "shape": "SOLO"}
+            {"id": DEMO_ACCOUNT_ID, "name": "Demo Konto", "role": "OWNER", "shape": "SOLO"},
+            {
+                "id": ISO_ACCOUNT_ID,
+                "name": "Isolationskonto M3",
+                "role": "EMPLOYEE",
+                "shape": "SOLO",
+            },
         ]
 
-    def test_unknown_person_gets_an_empty_list_not_an_error(self, client: TestClient) -> None:
-        """No membership yet ⇒ the dashboard offers "Demo-Szenario laden"."""
-        response = client.get("/me", headers=_token("per_nobody", DEMO_ACCOUNT_ID))
+    def test_known_person_without_memberships_gets_an_empty_list(self, client: TestClient) -> None:
+        """A local Person exists, so the dashboard may offer "Demo-Szenario laden"."""
+        response = client.get("/me", headers=_token(UNMEMBERED_PERSON_ID))
         assert response.status_code == 200
+        assert response.json()["personId"] == UNMEMBERED_PERSON_ID
+        assert response.json()["email"] == "unmembered-m3@lokara.example"
         assert response.json()["accounts"] == []
+
+    def test_unknown_subject_is_401(self, client: TestClient) -> None:
+        response = client.get("/me", headers=_token("per_unknown_m3"))
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Authenticated subject has no Person"
 
 
 class TestDemoLoad:
@@ -180,12 +214,12 @@ class TestDemoStatement:
 
 class TestPathReauthorization:
     """CLAUDE.md rule 3: the endpoint independently verifies the caller holds
-    the relationship named in the URL — the token's own account is irrelevant."""
+    the relationship named in the URL; the subject-only token names no account."""
 
     def test_member_of_another_account_cannot_enter_the_demo_portal(
         self, client: TestClient
     ) -> None:
-        headers = _token(ISO_PERSON_ID, ISO_ACCOUNT_ID)  # a perfectly valid session
+        headers = _token(ISO_PERSON_ID)  # a perfectly valid subject
         for path in (
             f"/a/{DEMO_ACCOUNT_ID}/summary",
             f"/a/{DEMO_ACCOUNT_ID}/statements/demo",
@@ -203,7 +237,7 @@ class TestPathReauthorization:
     def test_stranger_is_rejected(self, client: TestClient) -> None:
         response = client.get(
             f"/a/{DEMO_ACCOUNT_ID}/statements/demo",
-            headers=_token("per_stranger", DEMO_ACCOUNT_ID),
+            headers=_token("per_stranger"),
         )
         assert response.status_code == 403
 
@@ -212,6 +246,6 @@ class TestPathReauthorization:
         data), never a view of the demo account's building."""
         response = client.get(
             f"/a/{ISO_ACCOUNT_ID}/statements/demo",
-            headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID),
+            headers=_token(ISO_PERSON_ID),
         )
         assert response.status_code == 404

@@ -43,6 +43,7 @@ export type MeAccount = z.infer<typeof MeAccountSchema>;
 
 export const MeResponseSchema = z.object({
   personId: z.string(),
+  email: z.string(),
   accounts: z.array(MeAccountSchema),
 });
 export type MeResponse = z.infer<typeof MeResponseSchema>;

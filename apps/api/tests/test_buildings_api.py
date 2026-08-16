@@ -6,6 +6,7 @@ usual two isolation proofs (path re-authorization + RLS backstop).
 """
 
 import os
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "packages" / "db"
+TEST_JWT_ISSUER = "https://lokara.test/auth/v1"
 
 ISO_ACCOUNT_ID = "acc_iso_crud"
 ISO_PERSON_ID = "per_iso_crud"
@@ -57,16 +59,24 @@ def client() -> Iterator[TestClient]:
     yield TestClient(create_app())
 
 
-def _token(person_id: str, account_id: str) -> dict[str, str]:
+def _token(person_id: str) -> dict[str, str]:
+    now = int(time.time())
     encoded = jwt.encode(
-        {"sub": person_id, "account_id": account_id},
+        {
+            "sub": person_id,
+            "iss": str(getattr(ApiSettings(), "supabase_jwt_issuer", TEST_JWT_ISSUER)),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + 3600,
+        },
         ApiSettings().supabase_jwt_secret,
         algorithm="HS256",
     )
     return {"Authorization": f"Bearer {encoded}"}
 
 
-DEMO = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+DEMO = _token(DEMO_PERSON_ID)
 BASE = f"/a/{DEMO_ACCOUNT_ID}"
 
 
@@ -184,15 +194,13 @@ class TestIsolation:
     def test_foreign_member_cannot_write_into_the_demo_account(self, client: TestClient) -> None:
         response = client.post(
             f"{BASE}/buildings",
-            headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID),
+            headers=_token(ISO_PERSON_ID),
             json={"name": "Einbruch 1", "street": "E 1", "postalCode": "60000", "city": "F"},
         )
         assert response.status_code == 403
 
     def test_own_list_shows_no_foreign_buildings(self, client: TestClient) -> None:
-        listing = client.get(
-            f"/a/{ISO_ACCOUNT_ID}/buildings", headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID)
-        )
+        listing = client.get(f"/a/{ISO_ACCOUNT_ID}/buildings", headers=_token(ISO_PERSON_ID))
         assert listing.status_code == 200
         assert listing.json()["buildings"] == []
 
@@ -201,6 +209,6 @@ class TestIsolation:
         context, even with a guessed id."""
         response = client.get(
             f"/a/{ISO_ACCOUNT_ID}/units/unit_demo_a",
-            headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID),
+            headers=_token(ISO_PERSON_ID),
         )
         assert response.status_code == 404

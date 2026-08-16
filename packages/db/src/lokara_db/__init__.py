@@ -37,7 +37,12 @@ from .models import (
     TenancyParty,
     Unit,
 )
-from .session import account_scoped_session, create_db_engine
+from .session import (
+    BootstrapContext,
+    account_scoped_session,
+    bootstrap_contexts,
+    create_db_engine,
+)
 from .settings import DbSettings, sqlalchemy_url
 
 __version__ = "0.1.0"
@@ -48,6 +53,7 @@ __all__ = [
     "AccountShape",
     "AllocationKeyAssignment",
     "Base",
+    "BootstrapContext",
     "Building",
     "BuildingAssignment",
     "ConfirmedCostClassification",
@@ -76,6 +82,7 @@ __all__ = [
     "TenancyParty",
     "Unit",
     "account_scoped_session",
+    "bootstrap_contexts",
     "create_db_engine",
     "new_id",
     "sqlalchemy_url",
