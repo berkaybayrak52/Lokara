@@ -160,6 +160,54 @@ def _zero_block(split: _Split) -> _Block:
     )
 
 
+def _reconcile_all_area_blocks_to_single_allocation(
+    billable: Cents,
+    base_weights: list[Decimal],
+    split: _Split,
+    blocks: tuple[_Block, _Block, _Block, _Block],
+) -> tuple[_Block, _Block, _Block, _Block]:
+    """Make area-only renter totals follow one allocation of the full amount.
+
+    When every non-zero block uses the same m²-days key, allocating each block
+    separately can round a renter once per block. § 9a Abs. 2 instead fixes the
+    renter total from one allocation of the full billable amount. The final
+    non-zero block carries the cent reconciliation so every block still sums to
+    its disclosed pot and the owner remains the structural residual.
+    """
+    target = _allocate_to_parties(billable, base_weights, split)
+    current_totals = [
+        sum(int(block.renters[index]) for block in blocks)
+        for index in range(len(split.renter_indexes))
+    ]
+    deltas = [
+        int(expected) - current
+        for expected, current in zip(target.renters, current_totals, strict=True)
+    ]
+    if not any(deltas):
+        return blocks
+
+    reconcile_index = next(
+        (
+            index
+            for index in range(len(blocks) - 1, -1, -1)
+            if int(blocks[index].owner) + sum(int(value) for value in blocks[index].renters) != 0
+        ),
+        len(blocks) - 1,
+    )
+    reconciled = blocks[reconcile_index]
+    replacement = _Block(
+        renters=[
+            cents(int(value) + delta)
+            for value, delta in zip(reconciled.renters, deltas, strict=True)
+        ],
+        origins=reconciled.origins,
+        owner=cents(int(reconciled.owner) - sum(deltas)),
+    )
+    result = list(blocks)
+    result[reconcile_index] = replacement
+    return result[0], result[1], result[2], result[3]
+
+
 def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     _validate(heating_input)
     window_from, window_to = (
@@ -230,6 +278,14 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
         ww_base_pot, ww_cons_pot = _ZERO, _ZERO
         ww_base = _zero_block(split)
         ww_cons = _zero_block(split)
+
+    if heat_fallback and (heating_input.warm_water is None or ww_fallback):
+        heat_base, heat_cons, ww_base, ww_cons = _reconcile_all_area_blocks_to_single_allocation(
+            billable,
+            base_weights,
+            split,
+            (heat_base, heat_cons, ww_base, ww_cons),
+        )
 
     unit_days, unit_promille = _unit_totals(parties)
     lines = tuple(
@@ -421,6 +477,11 @@ def _validate(heating_input: HeatingInput) -> None:
         raise HeatingInputError("Billing period must be bounded (valid_to is required)")
     if not heating_input.units:
         raise HeatingInputError("At least one unit is required")
+    if heating_input.co2 is not None and heating_input.co2.co2_cost is None:
+        raise HeatingInputError(
+            "CO₂-Kosten des Lieferanten fehlen. Die Abrechnung wird nicht berechnet; "
+            "bitte die CO₂-Kosten beim Lieferanten anfordern."
+        )
     bounds = heating_input.rules.split_bounds
     share = heating_input.rules.consumption_share
     if not (bounds.min_consumption_share <= share <= bounds.max_consumption_share):
@@ -560,11 +621,13 @@ def _apply_co2(heating_input: HeatingInput) -> tuple[Co2Result | None, Cents]:
         return None, heating_input.total_cost
     table = heating_input.rules.co2_table
     rechtsstand = heating_input.rules.co2_rechtsstand
+    co2_cost = heating_input.co2.co2_cost
     assert table is not None and rechtsstand is not None  # _validate guarantees
+    assert co2_cost is not None  # _validate refuses a missing supplier amount
     heated_area_sqm = _heated_area_sqm(heating_input.units)
     co2_result = split_co2_cost(
         total_co2_kg=_resolve_co2_mass_kg(heating_input),
-        co2_cost=heating_input.co2.co2_cost,
+        co2_cost=co2_cost,
         heated_area_sqm=heated_area_sqm,
         table=table,
         rechtsstand=rechtsstand,

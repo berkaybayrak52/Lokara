@@ -87,23 +87,21 @@ Gegenbeispiel.** Dein „0 Rechenfehler" hält im Kern.
 
 ---
 
-## 4. Zwei Inkonsistenzen innerhalb deiner Unterlagen
+## 4. Zwei Inkonsistenzen innerhalb deiner Unterlagen — gelöst
 
-**4a — Emissionsfaktor Erdgas, zwei Werte.**
-Deine Nachricht: Hu **0,2016** / Ho **0,1820**.
-Das Rechtsstand-Register: **0,201 / 0,181**.
+**4a — Emissionsfaktor Erdgas, zwei Werte — gelöst.**
+Die frühere Nachricht nannte Hu **0,2016** / Ho **0,1820**.
+Das Rechtsstand-Register nennt **0,201 / 0,181**.
 
-Wir haben das **Register** genommen, weil bei uns die Regel gilt: das Register ist die
-strukturierte Quelle, die Prosa ist Kommentar. Welcher Wert soll maßgeblich sein? Dieselbe
-Frage für Heizöl und Flüssiggas.
+`Antwort-an-Emir_01b-Uebergabe.md` § 4a bestätigt: Das **Register** gilt. Lokara verwendet für
+Erdgas Hu **0,201**, Ho **0,181** und die dort dokumentierte Umrechnungsrelation **0,903**.
 
-**4b — Flag-Widerspruch.**
-Dein `README-for-Emir` führt den Erdgas-Emissionsfaktor unter den 8 Einträgen, die auf
-**`geprüft`** gesetzt wurden. Die Registerzeile steht weiterhin auf
-**`verify-before-production`**.
+**4b — Flag-Widerspruch — gelöst.**
+Der aktuelle CSV-Export und `Antwort-an-Emir_01b-Uebergabe.md` § 4b führen Erdgas, Heizöl und
+Flüssiggas als **`geprüft`**. Lokara übernimmt diesen Status mit Rechtsstand **07/2026**.
 
-Wir haben `verify-before-production` durchgereicht (konservativ). Einer der beiden Stände
-müsste angepasst werden.
+`geprüft` dokumentiert die Primärquellenprüfung; die Fallback-Nutzung bleibt als `Konvention`
+gekennzeichnet und ist keine Rechtsnorm.
 
 ---
 
@@ -128,7 +126,8 @@ darin, auch keine Tippfehler.
 
 **Jeder Wert behält seine Flags:** Rechtsnatur, Rechtsstand, Quell-URL sowie
 `verify-before-production` vs. `geprüft`. Nichts wird bei der Transkription zur Tatsache
-befördert. Bei uns liegen 137 von 180 Einträgen weiterhin auf `verify-before-production`.
+befördert. Im aktuellen CSV liegen 130 von 180 Einträgen weiterhin auf
+`verify-before-production`; 50 sind `geprüft`.
 
 ---
 

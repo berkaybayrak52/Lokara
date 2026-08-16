@@ -26,7 +26,16 @@ that same rounded value is printed.
 
 from decimal import Decimal
 
-from lokara_domain import Co2Step, Co2Table, Period, cents, period
+from lokara_domain import (
+    Co2Step,
+    Co2Table,
+    EmissionFactor,
+    EnergyReference,
+    Period,
+    cents,
+    co2_grams_from_energy,
+    period,
+)
 from lokara_heating_engine import landlord_share_percent_for_intensity
 from lokara_heating_engine.co2 import split_co2_cost
 from lokara_heating_engine.inputs import Co2Result
@@ -195,25 +204,17 @@ class TestShortBillingPeriodIsAnnualised:
 
 
 class TestBerkay01bF02TheFallbackReachesTheSameStep:
-    """E1 - the supplier stated nothing (§ 3 CO2KostAufG breach), K4 fires.
+    """E1 mass fallback uses the CSV factor; supplier cost is a separate input."""
 
-    28.000 kWh(Hu) x 0,201 = 5.628 kg - the same mass `01b-F01` reads off the
-    invoice, so **every downstream figure is identical to F01**. What differs is
-    the warning and the § 7 Abs. 4 risk flag.
+    def test_the_csv_hu_factor_reproduces_the_f02_mass_and_f01_step(self) -> None:
+        factor = EmissionFactor(Decimal("0.201"), EnergyReference.HU)
+        grams = co2_grams_from_energy(Decimal(28000), EnergyReference.HU, factor)
+        assert grams == 5_628_000
 
-    The mass side of the fallback is fixtured in
-    `packages/domain/tests/test_energy_reference.py`. The **cost** side of
-    Berkay's fallback (`co2Gramm/1e6 x co2PreisCentProTonne`) is deliberately
-    NOT transcribed as an engine path: it collides with `docs/03` -> "Where
-    `total_co2_kg` and `co2_cost` come from - § 3 CO2KostAufG, and never from
-    us", and Berkay himself flags it unsafe from 2026 (no single BEHG price).
-    Open item for the lead, recorded in `docs/03` § 7 no. 5.
-    """
-
-    def test_the_fallback_mass_selects_the_same_step_as_the_invoiced_mass(self) -> None:
-        fallback_kg = Decimal(28000) * Decimal("0.201")
-        assert fallback_kg == Decimal("5628.000")
-        result = _split("5628.000", 30_954)
+        # 30.954 ct is supplied here only to exercise downstream F02/F01 parity.
+        # The separate F02 refusal fixture forbids deriving it when the supplier omitted it.
+        result = _split(str(Decimal(grams) / Decimal(1000)), 30_954)
+        assert result.intensity_kg_per_sqm == Decimal("29.0")
         assert result.landlord_share_percent == 40
         assert int(result.landlord_amount) == 12_382
         assert GESAMTKOSTEN - int(result.landlord_amount) == 338_218

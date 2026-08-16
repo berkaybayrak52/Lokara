@@ -124,20 +124,19 @@ class TestCo2FallbackEmissionFactors:
 
     Spec: `docs/03` -> "Seite 01b … (4) Ho/Hu". Source: the Rechtsstand-Register
     rows "Emissionsfaktor Erdgas / Heizöl / Flüssiggas (K4)", imported as-is
-    (`CLAUDE.md` precedence rule 3), all `verify-before-production`, Rechtsnatur
-    `Konvention`, values from EBeV 2030 Anlage 2 Teil 4.
+    (`CLAUDE.md` precedence rule 3), all `geprüft`, Rechtsnatur `Konvention`,
+    Rechtsstand 07/2026, values from EBeV 2030 Anlage 2 Teil 4.
 
     ⚠️ **These are `nur Fallback`.** They apply only where the supplier has
     failed to state the mass under § 3 CO2KostAufG. The demo never reaches them
     (`docs/06` -> "The demo's energy reference").
 
-    ⚠️ **Open, not resolved here:** the lead's brief gives Erdgas Hu 0,2016 /
-    Ho 0,1820; the register gives 0,201 / 0,181. The register wins by precedence
-    rule 3 and the difference is recorded in `docs/03` § 7 no. 1.
+    F02 is resolved: the authoritative CSV gives Erdgas Hu 0,201 / Ho 0,181
+    plus conversion metadata 0,903. Antwort-an-Emir_01b-Uebergabe.md § 4a/4b
+    confirms that the register wins over the stale 0,2016 / 0,1820 answer.
 
-    Neither `EnergyReference` nor the rule set exists yet, so both are imported
-    inside the tests: a module-level import would take the whole file down with
-    a collection error and hide the coverage that is already green.
+    The values are imported inside the focused tests so the surrounding rules
+    remain independently collectable if this rule's implementation regresses.
     """
 
     @staticmethod
@@ -152,6 +151,7 @@ class TestCo2FallbackEmissionFactors:
         factors = self._factors().value  # type: ignore[attr-defined]
         assert factors["erdgas"][EnergyReference.HU].kg_co2_per_kwh == Decimal("0.201")
         assert factors["erdgas"][EnergyReference.HO].kg_co2_per_kwh == Decimal("0.181")
+        assert Decimal("0.201") * Decimal("0.903") == Decimal("0.181503")
 
     def test_heizoel_and_fluessiggas_exist_only_as_heizwert_values(self) -> None:
         """The register states no Brennwert counterpart for either. None is
@@ -173,7 +173,7 @@ class TestCo2FallbackEmissionFactors:
             for reference, factor in by_reference.items():
                 assert factor.reference is reference
 
-    def test_the_source_keeps_the_fallback_scope_and_the_flag(self) -> None:
+    def test_the_public_source_keeps_fallback_scope_without_a_production_block_marker(self) -> None:
         """A statement must never present these as the invoiced factor: they are
         a substitute for a supplier's breach of § 3 CO2KostAufG."""
         resolved = self._factors()
@@ -181,8 +181,7 @@ class TestCo2FallbackEmissionFactors:
         assert "EBeV 2030" in source
         assert "§ 3 CO2KostAufG" in source
         assert "Fallback" in source
-        assert source.count("—") == 1
-        assert source.endswith("— verify before production")
+        assert "verify before production" not in source
 
 
 class TestWarmWater:

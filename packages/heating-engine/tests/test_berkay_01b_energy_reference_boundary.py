@@ -3,19 +3,15 @@
 Spec: `docs/03-nk-heating-engines.md` -> "9.5 The Ho/Hu boundary" and § 1 (4) of
 the Seite-01b transcription. Design: Berkay's, adopted unchanged. Values: the
 Rechtsstand-Register rows *"Emissionsfaktor Erdgas (K4)"* and *"Emissionsfaktor
-Gasoel / Fluessiggas (K4)"* — `Konvention`, `verify-before-production`,
-**Rechtsstand 07/2026**, sourced to Anlage 2 Teil 4 EBeV 2030. They are fallback
-values, not law, and no output may present them as law.
+Gasoel / Fluessiggas (K4)"* — `Konvention`, `geprüft`, **Rechtsstand 07/2026**,
+sourced to Anlage 2 Teil 4 EBeV 2030. They are fallback values, not law, and no
+output may present them as law. For Erdgas the authoritative CSV records Hu
+`0,201`, Ho `0,181` and conversion metadata `0,903`; the later 01b handoff
+confirms that the CSV wins.
 
-**What is RED here and why.** `EnergyReference`, `EmissionFactor` and
-`EnergyReferenceMismatchError` exist in `packages/domain` and the factor pairs
-sit in `packages/rules-store`, but **no engine, adapter, API or PDF module
-imports any of them**, so no boundary refuses a mismatch today. The engine has
-no way to be told what its kWh mean. These fixtures fail on the input shape
-itself (`Co2Input` has no `emission_factor`, `HeatingInput` no
-`energy_reference`) — that is the point, exactly as
-`packages/domain/tests/test_residual_rounding.py` once failed on the missing
-primitive.
+**Executable contract.** The engine accepts a referenced K4 factor only when
+the input kWh carry the same reference. The rules-store metadata has a separate
+fixture so a stale production flag cannot hide behind green arithmetic.
 
 **Why it is worth a hard error.** German gas invoices bill **Brennwert (Ho)**
 kWh; § 3 Abs. 1 Nr. 3 CO2KostAufG demands the **heizwertbezogene** (Hu) factor.
@@ -36,11 +32,10 @@ supplier states them — the normal case and the demo case — no factor is read
 the Ho/Hu question does not arise. That path is pinned here too, because
 "harden the fallback" must not disturb it.
 
-**Not in this slice** (`docs/03` § 9.5): the CO₂ *cost* fallback (open
-discrepancy 5), and E1's warning + § 7 Abs. 4 risk flag for a derived mass —
-`HeatingResult` has no warning channel, so a derived figure is currently printed
-as if the supplier had stated it. Recorded there as a gap, deliberately not
-guessed at here.
+**Not in this slice** (`docs/03` § 9.5): a CO₂ *cost* fallback. It is forbidden:
+missing supplier cost hard-refuses and is never derived. E1's warning + § 7
+Abs. 4 risk flag for a derived mass remains an output-channel gap; it is
+recorded there, deliberately not guessed at here.
 """
 
 from decimal import Decimal

@@ -14,7 +14,7 @@ system: a mismatch is refused (`lokara_domain.co2_grams_from_energy`). See
 
 Values are the Rechtsstand-Register rows "Emissionsfaktor Erdgas / Heizöl /
 Flüssiggas (K4)", imported as-is (CLAUDE.md precedence rule 3) with their flags:
-Rechtsnatur **Konvention**, **verify before production**, register-Rechtsstand
+Rechtsnatur **Konvention**, **geprüft**, register-Rechtsstand
 07/2026. `valid_from` dates the underlying legal source (EBeV 2030, Anlage 2
 Teil 4, in force since 01.01.2023), which is what an as-of law-date lookup for a
 2025 billing period must resolve against.
@@ -24,11 +24,9 @@ Two register facts deliberately preserved rather than smoothed over:
 * The register states **no Brennwert (Ho) counterpart** for Heizöl or
   Flüssiggas. None is invented — an Ho quantity of either has no factor and is
   refused rather than converted.
-* The Erdgas pair is not exactly reciprocal (0,201 × 0,903 = 0,181503, not
-  0,181). Recorded as an open discrepancy in `docs/03` § 7 no. 2, not resolved
-  here; it is a further argument for the no-conversion design. The lead's brief
-  carries a third pair (Hu 0,2016 / Ho 0,1820) — open item no. 1, likewise not
-  decided here.
+* The authoritative Erdgas values are 0,201 Hu and 0,181 Ho. The register's
+  conversion metadata 0,903 is provenance, not an instruction to derive one
+  separately rounded factor from the other.
 """
 
 from datetime import date
@@ -84,13 +82,10 @@ CO2_FALLBACK_EMISSION_FACTORS: RuleSet[Co2FallbackEmissionFactors] = RuleSet(
     versions=(
         RuleVersion(
             valid_from=date(2023, 1, 1),
-            # The em dash appears exactly once and last: the renderer drops
-            # everything after it, so the internal marker never reaches a tenant.
             source=(
                 "Standardwerte EBeV 2030 Anlage 2 Teil 4 (Nr. 6 Erdgas, Nr. 3b Heizöl EL, "
                 "Nr. 5b Flüssiggas); keine Anwendungspflicht, nur Fallback bei fehlender "
-                "Lieferantenangabe nach § 3 CO2KostAufG (Konvention, keine Rechtsnorm) "
-                "— verify before production"
+                "Lieferantenangabe nach § 3 CO2KostAufG (Konvention, keine Rechtsnorm)"
             ),
             value=_FACTORS_EBEV_2030,
         ),

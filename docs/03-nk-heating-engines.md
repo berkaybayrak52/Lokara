@@ -2,15 +2,21 @@
 
 > **Source for the heating/CO₂ half of this file:**
 > `berkay-work/Spec-Seiten/01b · Heizkosten- & CO₂-Verteilung 3a95fd420731814e9e5be043028d4856.md`
-> and `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`; the correction to R4/E3 and
-> `01b-F05` is transcribed from
-> `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 6 (15.08.2026).
+> plus `Antwort-an-Emir_01b-Uebergabe.md`, `Antwort-an-Emir_02.md`,
+> `Antwort-an-Emir_03.md`, all 47 Page-01b rows of
+> `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` and their explanatory entries,
+> `Non-Goals V1`, `README-for-Emir.md`, `Emir_Spec_UVI.md`,
+> `DWD-Klimafaktoren-Import-Spec.md`, `LETZTER-STAND.md`, and the Heizspiegel 2025 CSV.
+> Source set reconciled for D1 on 17.08.2026. The correction to R4/E3 and `01b-F05` is from
+> Antwort 03 § 6.
 > Transcribed, not copied (`CLAUDE.md` → *"The calculation spec lives in `berkay-work/`"*, rule 2).
 > Agents edit `berkay-work/` only with Emir's explicit permission; ordinary findings go in a report.
-> Where this file and his page disagree on a number, formula or legal value, **his page wins**.
+> Structured values/flags follow the current CSV; later Antworten may supersede a method. If those
+> two sources disagree, the value is blocked and recorded below rather than selected silently.
 
-> These are the product. **Pure Python packages, no web-framework/DB/vendor imports.** Deterministic,
-> cent-exact, golden-tested (pytest). Built at M1 (NK) and M2 (heating/CO₂), before any UI.
+> These are the product. **Pure Python packages, no web-framework/DB/vendor imports.** Implemented
+> paths are deterministic, cent-exact and golden-tested with pytest. Full Page 01b fixture status is
+> recorded in § 0 below.
 >
 > The **document** these engines feed is specified separately in `docs/08-statement-document.md`.
 
@@ -71,15 +77,10 @@ overcharged; largest-remainder rounding sums to exactly €1,200.00. **This fixt
 - `DIRECT` cost to a single unit (no spread).
 - `PERSONS` key with a mid-period person-count change.
 - `CONSUMPTION` key from metered readings.
-- Interim statement (<12 months) and >12-month period (domain-depth differentiators).
-  ⚠️ **Neither fixture exists yet, and the >12-month half is now partly contradicted below.** The CO₂
-  split *refuses* a period longer than a year (§ 5 Abs. 1 S. 4 shortens the table only *downward*; see
-  "Why a period > 12 months is refused rather than scaled"). NK is unaffected and heating still
-  computes when `co2 is None`, so the refusal bites in exactly one place: a **Gewerbe** building with a
-  CO₂ split. § 556 Abs. 3 S. 1 BGB's 12-month cap is Wohnraum-only and CO2KostAufG **§ 8** governs
-  Nichtwohngebäude, so that combination is lawful and we currently reject it. Recorded as drift, not
-  resolved: closing it means either dropping >12 months as a differentiator, or specifying what the
-  Einstufung means over such a period — which needs a source we do not have.
+- Interim statement (<12 months). A Page 01 residential statement **hard-blocks beyond 12 months**
+  before an engine run or document and is not a product differentiator. The pure NK primitive does
+  not independently validate that document boundary; callers must not treat that as support. Any
+  future non-residential exception needs its own source-backed spec rather than weakening Page 01.
 
 ---
 
@@ -150,16 +151,19 @@ never a computation input.
 | Preis je Emissionszertifikat 2025 (= 1 t CO₂) | **55,00 €** | § 10 Abs. 2 BEHG — *"im Zeitraum vom 1. Januar 2025 bis zum 31. Dezember 2025: 55 Euro"* |
 | 2026 | **kein Festpreis** — Versteigerung im Preiskorridor 55,00 € bis 65,00 € | § 10 Abs. 2 BEHG |
 | Umsatzsteuer auf diesen Betrag | **+ 19 %** ⇒ **65,45 €/t** für 2025 | § 3 Abs. 3 CO2KostAufG — der Preisbestandteil ergibt sich *"durch Multiplikation der Brennstoffemissionen … mit dem … Preis der Emissionszertifikate … **zuzüglich einer auf diesen Betrag anfallenden Umsatzsteuer**"* |
-| Emissionsfaktor Erdgas (heizwertbezogen, H<sub>i</sub>) | **0,0558 t CO₂/GJ = 0,20088 kg CO₂/kWh** | Anlage 2 Teil 4 EBeV 2030 (in Kraft seit 01.01.2023) |
+| Emissionsfaktor Erdgas (heizwertbezogen, H<sub>i</sub>) | **0,0558 t CO₂/GJ = 0,20088 kg CO₂/kWh**; K4 stores the CSV value **0,201 kg CO₂/kWh (Hu)** | Anlage 2 Teil 4 EBeV 2030 (in Kraft seit 01.01.2023); Rechtsstand-Register `07/2026` |
 | Emissionsfaktor Gasöl zu Heizzwecken (Heizöl EL) | **0,074 t CO₂/GJ = 0,2664 kg CO₂/kWh** | as above |
 | Emissionsfaktor Flüssiggas | **0,0655 t CO₂/GJ = 0,2358 kg CO₂/kWh** | as above |
 
 - **The figure a renter sees on a heating invoice is the gross one.** § 3 Abs. 3 says *zuzüglich
   Umsatzsteuer* in so many words, so for 2025 the invoice rate is **65,45 €/t**, not 55,00 €/t. A
   fixture that implies the bare certificate price is understating the cost being split by 16 %.
-- Conversion: `t CO₂/GJ × 3,6 = kg CO₂/kWh` (1 kWh = 3,6 MJ). The invoice factor is **heizwertbezogen**
-  (H<sub>i</sub>) because § 3 Abs. 1 Nr. 3 says so; the brennwertbezogene figure (Erdgas 0,1820
-  kg CO₂/kWh<sub>Hs</sub>) belongs to energy certificates and must not be used here.
+- Conversion: `t CO₂/GJ × 3,6 = kg CO₂/kWh` (1 kWh = 3,6 MJ). The invoice factor is
+  **heizwertbezogen** (H<sub>i</sub>) because § 3 Abs. 1 Nr. 3 says so. For the K4 fallback, the
+  authoritative CSV additionally records **0,181 kg CO₂/kWh (Ho)** and `× 0,903`. The engine uses
+  the directly matching Hu or Ho factor and refuses a reference mismatch; it never silently
+  performs that conversion. These fallback values live in the versioned rules store, not engine
+  code.
 - Real supplier factors vary with gas quality (Erdgas H/L) around the EBeV standard value; a demo
   fixture within roughly ±1 % of it is plausible, one at half of it is not.
 
@@ -330,6 +334,178 @@ conventions above stand as conventions.
 > interface is **one € amount per Mietverhältnis**, which fills `heizkostenMessdienstCent` in the NK
 > engine — one cost block, never two, never a double deduction.
 
+## 0. Page 01b source-transcription and fixture gate — 17.08.2026
+
+This section is the trace gate. It does not make flagged values production-safe. `geprüft` means
+the primary text was read, not lawyer approval. A `verify-before-production` row remains visibly
+flagged even where the arithmetic path has a fixture.
+
+### Source-section coverage
+
+| Page 01b source section | Transcription home | Golden evidence |
+| --- | --- | --- |
+| § 1 purpose and MDL/self-billing interface | intro above; H0/H7 below | `berkay_01b_golden.py`; F01, F28a/b |
+| § 2 legal basis and K1–K14 | §§ 0.3, 1–7, 9 below; output-only duties in `docs/08` | rule-store tests plus fixture table below |
+| § 3.1 plant inputs | § 3 below | F07–F10, F13–F14, F20 |
+| § 3.2 invoices/operating costs | §§ 3–4 H1/H2 | F02, F19, F20, F24 |
+| § 3.3 meters/readings | §§ 3–4 H3/H5/H6 | F11–F18, F21–F22, F26–F27 |
+| § 3.4 rule tables | §§ 0.3, 1–7, 9.5 | F02–F06, F16, F19, F23, F31 |
+| § 3.5 MDL input | H0/H7 | F28a/b, F29–F30 |
+| § 4 R1–R7 and H0–H8 | §§ 4–5 and 9 | F01–F31, including suffix variants |
+| § 5 E1–E31 | § 6 below | fixture table below |
+| § 6 worked examples | fixture table below | `berkay_01b_golden.py` + focused pytest files |
+| § 7 owned/deferred/out of scope | § 0.4 below | scope assertions are documentation-only |
+
+### Fixture coverage — every ID and suffix variant
+
+Every row has a data oracle in
+`packages/heating-engine/tests/berkay_01b_golden.py`; completeness and allocation reconciliation
+are enforced by `test_berkay_01b_complete_coverage.py`. The feature test column identifies the
+closest executable test. **The data-only oracle is a transcription aid, not an executable golden
+test and not permission to change source.** `F28b` was intentionally RED; its H7 gross-rescaling
+seam is now implemented and the case is green.
+`F02` uses the authoritative Rechtsstand-Register CSV values: Erdgas **0,201 kg CO₂/kWh (Hu)**,
+**0,181 kg CO₂/kWh (Ho)**, conversion metadata **0,903**, status **`geprüft`**, Rechtsstand
+**07/2026**. `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms that the CSV replaces the stale
+`0,2016 / 0,1820` answer. Its independent supplier-cost boundary remains executable: a missing
+supplier euro amount must be refused without looking up, selecting or deriving any emission factor.
+
+Executable golden-test closure is therefore still open:
+
+- Exact current end-to-end green cases include `F03–F06`, `F16`, exact `F18` and `F28b`.
+- F02's CSV factor values/reference behaviour, rules data and factor-independent supplier-cost
+  refusal are green components. They do **not** close the F02 statement: derived-mass
+  warning/provenance and the § 7 Abs. 4 risk output remain unimplemented.
+- A2's device/segmented-reading capability contracts are green for
+  `F01/F15/F17/F22/F27`; A2 also re-exercises `F16` through the missing-interim-reading shape.
+  A3's applicability/warning capability contracts are green for `F07–F10/F23`. None of those
+  capability results is counted as full fixture E2E closure.
+- `F01` and `F26` have useful allocation-primitive coverage, but not their complete worked-example
+  pipeline.
+- No count in this section treats a capability contract or primitive test as full fixture closure.
+  The A2–A7 rows in `PLAN.md` assign every case that is not already exact and green.
+- `F02` retains a data oracle with the CSV pair and exact Hu/Ho arithmetic. Its focused executable
+  tests assert those components separately from the later hard refusal for missing supplier CO₂
+  cost; none is a substitute for the missing end-to-end warning/provenance and risk projection.
+
+| Fixture | Rule / result | Feature test |
+| --- | --- | --- |
+| `01b-F01` | full self-billing pipeline; four renter totals + owner reconcile to 338.218 ct | ✅ A2 device input contract plus allocation primitives; full pipeline still open |
+| `01b-F02` | missing supplier mass: K4 Hu `0,201` gives `5.628.000 g` for `28.000 kWh`; K4 Ho is `0,181`, conversion metadata `0,903`, status `geprüft`; missing supplier cost is refused without deriving cents | Component tests: `test_rule_data.py`, `test_energy_reference.py`, `test_berkay_01b_co2_stufen.py`, `test_berkay_01b_f02_cost_refusal.py`; **E2E statement open** for derived-mass warning/provenance and § 7 Abs. 4 risk output |
+| `01b-F03` | exact 12,0 boundary → 10 % | `test_berkay_01b_co2_stufen.py` |
+| `01b-F04` | exact 52,0 boundary → 95 % | `test_berkay_01b_co2_stufen.py` |
+| `01b-F05` | annualise/round/classify; corrected 12,0 → 10 % | `test_berkay_01b_co2_s3_rounding.py`, `test_berkay_01b_co2_stufen.py` |
+| `01b-F06` | 275-day annualisation before S. 3 rounding | `test_co2_short_period_annualisation.py`, `test_berkay_01b_co2_stufen.py` |
+| `01b-F07` | non-residential 50/50 | ✅ A3 plant/CO₂ applicability capability; not yet E2E closure |
+| `01b-F08` | protected building: landlord percentage halved, proof required | ✅ A3 protection/proof capability; not yet E2E closure |
+| `01b-F09` | proven full exclusion; disclosure still prints | ✅ A3 exclusion/proof capability; not yet E2E closure |
+| `01b-F10` | heat pump and biomass: CO₂ module and disclosure off | ✅ A3 energy-source capability; not yet E2E closure |
+| `01b-F11` | priority WW heat-meter path, 9.100 kWh | RED A4 measured-energy priority contract; not yet E2E closure |
+| `01b-F12` | 32 kWh/m² fallback plus warning | RED A4 fallback/warning contract plus existing primitives; not yet E2E closure |
+| `01b-F13` | non-connected plant, one heat block | RED A4 single-block contract plus existing primitive; not yet E2E closure |
+| `01b-F14` | 50/50 base/consumption choice and owner-impact preview | RED A4 block/preview contracts; not yet E2E closure |
+| `01b-F15` | heat-meter kWh weights instead of HKV units | ✅ A2 normalized weight capability; not yet E2E closure |
+| `01b-F16` | no interim reading: K3, owner vacancy segment | ✅ existing K3 golden plus A2 new-shape regression |
+| `01b-F17` | ≤25 % estimated, amount unchanged, provenance required | ✅ A2 estimate/provenance capability; not yet E2E closure |
+| `01b-F18` | only WE-03 readings missing: 58/194 = 29,90 %; all consumption blocks dissolve to area; Berkay's printed cents are authoritative | ✅ `test_berkay_01b_f18_area_fallback.py` |
+| `01b-F19` | oil stock/weighted cost; CO₂ on consumption; cost fallback refused | RED A4 stock/consumption contract; not yet E2E closure |
+| `01b-F20` | district heating pass-through, step model still applied; H1 aggregation and § 6a network disclosures are part of closure | RED A4 H1/disclosure-carry contract plus partial CO₂ primitive; not yet E2E closure |
+| `01b-F21` | zero denominator hard stop; no silent area fallback | `test_heating_golden.py` + complete oracle |
+| `01b-F22` | negative delta rejected; two device segments | ✅ A2 rejection/replacement capability; not yet E2E closure |
+| `01b-F23` | 5–70 plausibility band warns, never blocks; warning carries the R8 values `74,7` / `4,1` | ✅ A3 warning-channel capability; not yet E2E closure |
+| `01b-F24` | day-linear invoice overlap and non-dismissible coverage warning | RED A4 invoice-allocation contract; not yet E2E closure |
+| `01b-F25` | four risks shown separately, never auto-deducted or summed | complete oracle; readiness/output seam pending |
+| `01b-F26` | 5,13 % WW gap silent; 4.227 ct stays with owner | `test_berkay_01b_residual_wiring.py` + complete oracle |
+| `01b-F26b` | 11,54 % WW gap → non-blocking notice | complete suffix oracle; warning channel pending |
+| `01b-F26c` | 21,79 % WW gap → legal-risk warning | complete suffix oracle; warning channel pending |
+| `01b-F27` | device rounding/aggregation and two change readings | ✅ A2 device/span capability; not yet E2E closure |
+| `01b-F28a` | MDL net branch; no second CO₂ deduction | complete suffix oracle; H7 pending |
+| `01b-F28b` | MDL gross branch; exact rescale, 1 ct accepted, owner residual | ✅ `test_berkay_01b_complete_coverage.py`; H7 `rescale_mdl_gross_positions` |
+| `01b-F29` | OCR decimal shift: hard control-sum refusal in the MDL **net** branch | complete oracle; net-branch M3 seam pending; gross rescaling is not a substitute |
+| `01b-F30` | no CO₂ evidence: separate 3 % risks, no deduction | complete oracle; H7/readiness output pending |
+| `01b-F31` | annual graph: heat adjusted, WW raw; missing data has labelled fallbacks | complete structural oracle; H8/DWD/output pending |
+
+### Register inventory and flag preservation
+
+The authoritative CSV has **47 rows affecting Page 01b**: 20 `geprüft` and 27
+`verify-before-production`. Explanatory-entry flags that differ from the CSV do not override the
+CSV. The rows are grouped below without changing their individual status.
+
+| Status | Exact CSV rows |
+| --- | --- |
+| `geprüft` | BEHG CO₂-Preis 2025 · Emissionsfaktor Erdgas (K4) · UVI-Turnus · Emissionsfaktor Flüssiggas (K4) · Warmwasser-Pauschale ohne Messung · CO₂-Aufteilung Nichtwohngebäude · CO₂-Stufenmodell Wohngebäude · Denkmal-/Milieuschutz — vollständiger Ausschluss · CO₂-Pflichtangaben in der Abrechnung · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Emissionsfaktor Heizöl (K4) · § 9a-Schwelle für Schätzungen · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Nachrüstfrist fernablesbare Ausstattung · Denkmal-/Milieuschutz — Halbierung · Leerstand bleibt im Gesamtverteiler · Warmwasser-Ersatzgleichung · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Verbrauchsabhängiger Anteil — gesetzliche Bandbreite |
+| `verify-before-production` | Plausibilitätsband CO₂ (K6) · Abweichungsschwelle Warmwasserzähler · Vermutungswirkung Witterungsbereinigung · Gradtagszahltabelle VDI (K3) · Geräteeinheiten — Rundung (K11) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Warmwassertemperatur tw (K5) · Durchschnittsnutzer-Vergleichswerte (K13) · Rundungsweg (Seite 01 / docs/03 § 6) · BEHG CO₂-Preis 2026 · Geräteliste auf der Mieterausfertigung (K10) · Heizwert Heizöl (K7) · Rechnungsabgrenzung (K8) · Klimafaktoren DWD (K12) · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · MDL-Beträge werden nie nachgerechnet (K14) · Schätzung bei Geräteausfall · CO₂-Ausweispflicht des Brennstofflieferanten · Umlagefähige Betriebskosten der Heizanlage · Informationspflichten bei nicht verbrauchsbasierter Abrechnung · Nutzerwechsel im Abrechnungszeitraum · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6) |
+
+### Conflicts, superseded rules, dependencies and unresolved values
+
+1. **Resolved — Erdgas Hu/Ho.** The authoritative CSV selects `0,201 Hu / 0,181 Ho`, conversion
+   metadata `0,903`, status `geprüft`, Rechtsstand `07/2026`. The later
+   `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms that Antwort 03's
+   `0,2016 / 0,1820` and `verify-before-production` wording was stale and that the register wins.
+   The values remain `Konvention` fallback rules in `packages/rules-store`; `geprüft` means the
+   primary source was checked, not lawyer approval.
+2. **Superseded — R4/E3/F05.** Antwort 03 § 6 replaces raw lookup/truncated display with
+   annualise → one-decimal half-up → classify/print. R8 below is current.
+3. **Superseded — owner as party.** Antwort 02/03 makes one unconditional Liegenschafts-Residuum
+   across all four heating blocks. § 9.2 is current.
+4. **Superseded — CO₂ cost fallback.** Page H2 and old F02/F19 derive cost from a BEHG price;
+   Antwort 03 § 5 says the engine must refuse when the supplier did not state the euro amount.
+   Only supplier-stated cost is current. The F19 stock/mass oracle remains; its historical fallback
+   deduction is not an implementation oracle.
+5. **Superseded — F18 per-block R1 override.** An earlier implementation attempt replaced Berkay's
+   printed `108.090 / 74.932 / 43.121 / 101.117 / 10.958` table with a separately derived
+   per-block table. Emir withdrew that override on 16.08.2026. Berkay's table is authoritative.
+   The executable input is exactly the source case: only WE-03's relevant readings are missing,
+   so the affected area is `58 / 194 = 29,90 %`; do not make every unit unread.
+6. **Unresolved legal application — reduction cumulation.** Page F25 says cumulation of the three
+   3 % rights and the 15 % right is uncertain and forbids summing. The CSV entry
+   `Kürzungsrecht — CO₂-Anteil nicht ausgewiesen` says the three 3 % rights cumulate. Do not sum;
+   render each risk separately until the register is reconciled.
+7. **K12 dependency.** The DWD import sources disagree on an acceptance boundary and on one update
+   date. The exact file/import contract and resolution belong to `docs/16`; this file asserts only
+   the Page 01b H8 output dependency and does not select between the conflicting annex notes.
+8. **K13/D2 dependency.** Antworten 02/03 supersede the UVI annex's old Wärme+WW comparison method.
+   The corrected method, values, guards and source licence belong to `docs/16`, not H8. The current
+   CSV K13 row describes an annual-statement link and must not be presented as the UVI rule.
+9. **Pre-legal § 6a notice identity.** The BAnz 16.04.2021 B1 notice exists and supports the DWD
+   direction, but whether the GEG § 82 notice is the intended § 6a Abs. 3 S. 4 notice remains for
+   legal review. Keep the CSV row flagged.
+10. **H5/H7/H8 dependencies.** H5 needs device `bewertungsfaktor` and segmented readings; H7 needs
+   confirmed OCR fields and a pure MDL validation/rescaling seam; H8 needs versioned DWD factors and
+   the statement graph. These are confirmed gaps, not reasons to invent defaults.
+11. **Non-goals stay excluded.** No MDL recalculation from raw inputs, floor-heating reimbursement,
+    renovation ROI, device-installation/eich/K-value audit, renter evidence-inspection portal,
+    automatic reduction, or proprietary Lokara average-user dataset is introduced here.
+
+### D1 correspondence ledger
+
+This table is the D1 retirement trace for correspondence that affects Page 01b. It does not retire or
+edit any source file. A `D2` disposition means the content remains in the correspondence set until its
+assigned target document and fixture exist; it is not copied into this file.
+
+| Source section | D1 destination | Disposition |
+| --- | --- | --- |
+| `FEEDBACK-to-Berkay-01b.md` §§ 1–6 | §§ 0.3–0.4, 1–7 and 9 below | **Current**, except the earlier factor disagreement is superseded by the authoritative CSV pair `0,201` Hu / `0,181` Ho and `geprüft`; F19's corrected consumption basis, the F16/F26 reading and K3 remain current |
+| `FEEDBACK-to-Berkay-01b.md` § 7 | future `docs/09` | **Deferred to D2**: Page 02 catalogue and allocation rules |
+| `FEEDBACK-to-Berkay-01b.md` § 8 | future `docs/16` | **Deferred to D2**: DWD import, notice identity, K13 and UVI; the legal identity of the § 6a notice remains unresolved |
+| `FEEDBACK-to-Berkay-01b.md` § 9 | `docs/02` residual model; §§ 9.1–9.2 below; `docs/08` owner row | **Superseded question**: Antworten 02/03 fix one unconditional Liegenschafts-Residuum |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | §§ 0.3–0.4, 7 and 9 below | **Current**: F19 correction, F16/F26 confirmation and CSV precedence; § 4 confirms that Antwort 03's more precise factor pair and older flag do not control |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–8 | future `docs/16` | **Deferred to D2**: DWD/K12, § 6a notice and K13/D2. Conflicting range/date notes remain for that transcription |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 9–11 | this ledger and future `docs/16` | **Current routing/history**; no calculation value is introduced here |
+| `FRAGEN-an-Berkay-02.md` § 1 and `Antwort-an-Emir_02.md` § 1 | `docs/02` residual model; §§ 9.1–9.2 below; `docs/08` owner row | **Current resolution**: owner is a residual, not a party; it exists at `0,00 €` and may be negative |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4 and `Antwort-an-Emir_02.md` §§ 2–4 | future `docs/16` | **Deferred to D2**: heat-only D2, over-500 fallback and co2online/Heizspiegel source handling |
+| `FRAGEN-an-Berkay-02.md` § 5 and `Antwort-an-Emir_02.md` § 5 | §§ 0.3–0.4 | **Current source rule**: one authoritative CSV; `geprüft` means primary-source checked, not lawyer-approved |
+| `Antwort-an-Emir_02.md` § 6 | §§ 0.4 and 7; future `docs/16` for D2 arithmetic | **Current evidence**, split by ownership; no extra default is inferred |
+| `FRAGEN-an-Berkay-03.md` § 1 and `Antwort-an-Emir_03.md` § 1 | § 9.2 | **Current method correction**: residual destination is a fixed model rule; rounding direction remains flagged |
+| `FRAGEN-an-Berkay-03.md` § 2 and `Antwort-an-Emir_03.md` § 2 | `docs/08`, Page 01 oracle `08-F21` | **Current correction**: block (b) is `100.800` ct, not the Page's stale `0,00 [Seite 02 pending]` |
+| `FRAGEN-an-Berkay-03.md` § 3 and `Antwort-an-Emir_03.md` § 3 | future `docs/16` | **Deferred to D2**: D2 compares heat with heat; the older Wärme+WW wording is superseded |
+| `FRAGEN-an-Berkay-03.md` § 4 and `Antwort-an-Emir_03.md` § 4 | § 0.4 item 1 | **Superseded by the CSV**: `0,2016 / 0,1820` and `verify-before-production` do not replace the current structured values or flag |
+| `FRAGEN-an-Berkay-03.md` § 5 and `Antwort-an-Emir_03.md` § 5 | §§ 0.4, 7 and 9.5 | **Current resolution**: missing supplier CO₂ cost is refused; only the mass fallback survives |
+| `FRAGEN-an-Berkay-03.md` § 6 and `Antwort-an-Emir_03.md` § 6 | R8 and corrected `01b-F05` below | **Current resolution**: annualise, round to one decimal, classify, and print that same value |
+
+The annual DWD comparison and UVI method are therefore dependencies on `docs/16`, not partially
+specified features of `docs/03`. D1 preserves the existing 34-ID Page 01b oracle unchanged.
+
 ## 1. What changed on this branch, and why it must not be reverted
 
 Four rules moved. Each is recorded with its reason, because each replaces something that was
@@ -466,13 +642,24 @@ not stated the mass under § 3 CO2KostAufG. Where the supplier states it (the no
 case), no factor is read at all and the Ho/Hu question does not arise.
 
 **Values — taken from the Rechtsstand-Register, as-is (precedence rule 3), with flags intact.**
+For Erdgas, `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms the CSV values and status.
 
 | Fuel | kg CO₂/kWh | Bezug | Flag | Source |
 | --- | --- | --- | --- | --- |
-| Erdgas (K4) | **0,201** | Hu | `verify-before-production`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 6 |
-| Erdgas (K4) | **0,181** | Ho | `verify-before-production`, Konvention | same row, *"alternativ direkt 0,181 kg CO₂/kWh(Ho)"* |
-| Heizöl EL (K4) | **0,266** | Hu | `verify-before-production`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 3b |
-| Flüssiggas (K4) | **0,236** | Hu | `verify-before-production`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 5b (corrected 27.07.2026 from 0,234) |
+| Erdgas (K4) | **0,201** | Hu | `geprüft`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 6; Rechtsstand `07/2026` |
+| Erdgas (K4) | **0,181** | Ho | `geprüft`, Konvention | same row, `× 0,903` or *"alternativ direkt 0,181 kg CO₂/kWh(Ho)"*; Rechtsstand `07/2026` |
+| Heizöl EL (K4) | **0,266** | Hu | `geprüft`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 3b; Rechtsstand `07/2026` |
+| Flüssiggas (K4) | **0,236** | Hu | `geprüft`, Konvention | EBeV 2030 Anlage 2 Teil 4 Nr. 5b (corrected 27.07.2026 from 0,234); Rechtsstand `07/2026` |
+
+**Public provenance boundary.** `CO2_FALLBACK_EMISSION_FACTORS` is one shared rule for Erdgas,
+Heizöl and Flüssiggas. Its public `ResolvedRule.source` therefore contains only the common EBeV
+citation, fallback scope and `Konvention` classification. It must not expose the internal
+verification flag `geprüft`, the Register review date `07/2026`, or Erdgas-only conversion metadata
+`0,903`. `rechtsstand_entry()` appends only the rule version's effective-date stamp `01/2023`.
+Printing both `07/2026` and `01/2023` would conflate register verification with legal effectiveness.
+The CSV retains those internal metadata unchanged; removing them from the shared public label does
+not change the factor values, reference behaviour or source-of-truth precedence. Rechtsstand:
+EBeV 2030 in force `01/2023`; Register entry reviewed `07/2026`.
 
 ⚠️ **The register states no Ho counterpart for Heizöl or Flüssiggas.** None is invented here. Until
 one is sourced, an Ho quantity of oil or LPG has **no factor** and must be refused rather than
@@ -505,7 +692,7 @@ used for the step lookup is rounded to one decimal place (R8).
 | Group | Fields that reach the engine |
 | --- | --- |
 | Plant | `energietraeger` {erdgas, heizoel, fluessiggas, fernwaerme, waermepumpe, biomasse} · `verbundeneAnlage` · `gebaeudeTyp` {wohn, nichtwohn, gemischt} · `denkmalschutz` / `milieuschutz` / `ausschlussNachweis` (each requires a stored document) · `grundkostenAnteilProzent` 30–50, default 30 (K1) |
-| Invoices | `zeitraumVon/Bis` · `mengeKwh` **with its energy reference (Ho/Hu)** · `betragCent` · `co2Gramm` (nullable → K4 fallback) · `co2KostenCent` (nullable) · `energiemix`, `thgGprokWh`, `primaerenergiefaktor`, `steuernCent` (§ 6a Abs. 3 Nr. 1 disclosure) · `tankAnfangL` / `tankEndeL` (oil) |
+| Invoices | `zeitraumVon/Bis` · `mengeKwh` **with its energy reference (Ho/Hu)** · `betragCent` · `co2Gramm` (nullable → K4 fallback) · `co2KostenCent` (nullable only at the boundary; null → hard refusal) · `energiemix`, `thgGprokWh`, `primaerenergiefaktor`, `steuernCent` (§ 6a Abs. 3 Nr. 1 disclosure) · `tankAnfangL` / `tankEndeL` (oil) |
 | Operating costs | `betriebsstromCent`, `wartungCent`, `messungCent`, `ausstattungCent`, `sonstigeCent` |
 | Meters | `heizgeraet.typ` {hkv, waermezaehler, wwZaehler} · `nummer` · `raum` · **`bewertungsfaktor`** (K-Wert, 2 dp) · `ablesung.wertAlt/wertNeu` (1 dp) · `ablesung.datum/anlass` {jahres, zwischen, einzug, auszug} · `vWwM3` · `tw` (default 60 °C, K5) · `wohnung.wwM3` · `fernablesbar` |
 | Rules tables | `co2PreisCentProTonne` · `emissionsfaktor` **+ its Bezug** · `co2Stufentabelle` · `gradtagstabelle` (**Zehntelpromille, Σ 10 000**) · `klimafaktor` (PLZ, Periodenende) |
@@ -513,7 +700,61 @@ used for the step lookup is rounded to one decimal place (R8).
 ⚠️ **`bewertungsfaktor` does not exist in our data model.** H5 cannot be implemented without it; that
 is a `docs/02` change and its own slice.
 
-## 4. Formula (H1 … H8)
+### A3 plant/CO₂ boundary contract
+
+The engine boundary receives the plant state explicitly. It must not infer fuel, building type,
+connected-plant state or protection from the presence of CO₂ figures. `denkmalschutz` and
+`milieuschutz` are valid only with a stored protection-proof reference. A full § 9 Abs. 2 exclusion
+is valid only with its own stored exclusion-proof reference. A claimed protected/excluded branch
+without that proof is a blocking input error, not an unproven percentage change. If both a protected
+state and a proven full exclusion are present, the full exclusion wins and its proof reference is
+the applied one.
+
+The result carries the applied proof reference and the output switches that the document layer
+needs. `waermepumpe` and `biomasse` leave the whole CO₂ module off: no split, no intensity, no
+Pflichtausweis and no step indicator. `verbundeneAnlage` controls whether H3 separates warm water;
+it does not by itself turn the CO₂ module on or off.
+
+Executable capability contract, green in `89db9e0`:
+`packages/heating-engine/tests/test_berkay_01b_a3_plant_co2_state.py`. It proves the exact
+F07–F10 money branches and F23's warning shape. These are capability tests, not full Page-01b
+closure.
+
+### A4 normalized self-billing capability contract
+
+The next boundary is split into small pure capabilities before the full H1–H6 pipeline is wired:
+
+- H1 aggregates normalized cost positions. The baseline and district-heat examples each contain
+  three exact positions. Supplier-stated district-heat mix, THG, primary-energy factor and taxes
+  are carried unchanged for § 6a; the capability does not interpret them.
+- H1a allocates an invoice by inclusive overlap days, carries the exact coverage ratio and emits a
+  non-blocking but non-dismissible warning below 100 % coverage.
+- H1b values consumed oil from opening stock plus purchases minus closing stock. Heating value and
+  emissions factor arrive as resolved rule inputs. It computes no CO₂ cost: the missing-cost branch
+  is refused. Erdgas Hu/Ho is independently resolved by the authoritative CSV.
+- H3 prioritizes measured warm-water energy over the volume equation. With no measurement it uses
+  the area fallback and emits the F12 warning. A non-connected plant produces one heating block.
+- H4 forms complementary base/consumption pots for a configured 30–50 % base share. A custom share
+  also carries the exact before-save owner-burden preview required by F14.
+
+Executable RED contract:
+`packages/heating-engine/tests/test_berkay_01b_a4_plant_aggregation.py`. It covers exact capability
+outputs for F11–F14, F19, F20 and F24. It does not close their per-tenancy distribution, PDF
+projection or full self-billing fixtures.
+
+## 4. Formula (H0 … H8)
+
+**H0 — path selection.** This runs before all arithmetic:
+
+```
+abrechnungsart == MDL  → H7 only
+otherwise              → H1 … H6
+```
+
+The two paths converge on one `heizkostenMessdienstCent` per Mietverhältnis. They are not added
+together. `08-F01` is an MDL input and `01b-F01` is self-billing; comparing their source amounts is
+invalid even though `01b-F28a` proves that equivalent confirmed MDL net positions can converge on
+the F01 result.
 
 **H1 — Gesamtkosten der Anlage (§ 7 Abs. 2 HeizkostenV)**
 
@@ -529,12 +770,16 @@ gesamtCent = Σ rechnung.betragCent          (allocated per K8, see H1a)
 - **H1b — oil (K7).** `verbrauchtL = tankAnfangL + Σ zukaufL − tankEndeL`; cost basis is the weighted
   average price over `tankAnfangL + Σ zukaufL`. **CO₂ is computed on the consumed quantity, never on
   the purchased quantity** (`01b-F19`).
+  The historical wrong-path counter-example is **90.121 ct**, not 90.204 ct; Antwort 01b § 2
+  identifies 90.204 as a typo. It is not a current cost oracle because Antwort 03 § 5 now refuses
+  every missing supplier-cost fallback. The correct F19 stock, consumed-energy and mass oracle is
+  unchanged.
 
 **H2 — CO₂ split, deducted before everything else**
 
 ```
 co2Gramm = Σ rechnung.co2Gramm                      # fallback K4 only on § 3 breach
-co2Cent  = Σ rechnung.co2KostenCent                 # see the open collision in § 7 below
+co2Cent  = Σ rechnung.co2KostenCent                 # missing supplier cents → HARD REFUSAL
 spezifisch = (co2Gramm / 1e6) / gesamtflaecheM2                                [R2, R4]
 if nTage not in (365, 366): spezifisch ×= 365 / nTage        # annualise first (H2)
 spezifisch = round_half_up(spezifisch, 1 Nachkommastelle)       # then round (R8)
@@ -542,8 +787,8 @@ spezifisch = round_half_up(spezifisch, 1 Nachkommastelle)       # then round (R8
 gebaeudeTyp wohn|gemischt → vermieterAnteil = lookup10(spezifisch)   # Anlage CO2KostAufG
 gebaeudeTyp nichtwohn     → vermieterAnteil = 50                     # § 8 CO2KostAufG
 energietraeger ∈ {waermepumpe, biomasse} → CO₂ module OFF, Abzug = 0
-denkmalschutz || milieuschutz            → vermieterAnteil /= 2      # § 9 Abs. 1
-ausschlussNachweis                       → vermieterAnteil = 0       # § 9 Abs. 2
+denkmalschutz || milieuschutz            → require protection proof; Anteil /= 2  # § 9 Abs. 1, 3
+ausschlussNachweis                       → require exclusion proof; Anteil = 0    # § 9 Abs. 2, 3
 
 co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil / 100)         [R1, R6]
 umlagefaehigCent      = gesamtCent − co2AbzugVermieterCent
@@ -587,6 +832,39 @@ vacancy period cannot be separated from the following tenancy (`01b-F27`: ~54 un
 else's consumption would land on the incoming tenant). A segment without its own reading is
 apportioned by K3 instead (§ 9b Abs. 3).
 
+### A2 executable input/output contract — device and segmented readings
+
+**Rechtsstand 08/2026.** Source: Page 01b §§ 3.3, 4 H5/H6, E11–E14, E18 and E25; K10/K11
+remain `verify-before-production`. This contract introduces no new rate or legal value.
+
+The pure heating boundary must accept two frozen shapes:
+
+- `HeatingDevice(device_id, unit_id, room, measurement_unit, valuation_factor)`; and
+- `DeviceReadingSpan(device_id, allocation_kind, target_id, opening, closing,
+  previous_period_units)`, where `allocation_kind` is `PARTY`, `OWNER` or
+  `ANNUAL_UNSEGMENTED`. `target_id` is required only for a measured party/owner usage segment.
+
+`aggregate_device_reading_spans` returns, in stable input order, each device's one-decimal units,
+the party totals, the owner total, each unit total, any annual unsegmented unit total, and the
+estimated-device IDs with their stated basis. It also retains device number, room, readings and
+factor for K10 disclosure. It applies only H5/R7; it does not allocate money.
+
+The RED fixture `test_berkay_01b_a2_device_segments.py` fixes these branches:
+
+- `F27 → F01`: all device spans aggregate to Muster `4.100,0`, Schneider `2.520,0`, measured
+  August owner `0,0`, Weber `1.080,0`, Beispiel `3.050,0`; the plant denominator is `10.750,0`.
+- `F15`: heat-meter kWh use factor `1,00` and retain the `kWh` unit; they are not relabelled HKV.
+- `F16`: one annual WE-02 total without Auszug/Einzug spans is returned as
+  `ANNUAL_UNSEGMENTED = 3.600,0`; H6 must use the already-green K3 branch, never invent measured
+  party spans.
+- `F17`: the missing WE-03 device uses its stated prior-period `620,0` units, is flagged estimated,
+  and preserves the estimation basis; it is not silently treated as a measured zero.
+- `F22`: `closing < opening` is refused. Two valid replacement-device spans aggregate to
+  `420,0 + 1.040,0 = 1.460,0`; `abs(-1.460,0)` is forbidden.
+
+Every units allocation asserts `sum(party units) + owner units == unit/plant input total` just as
+every money allocation asserts renter shares plus owner residual equals the input pot.
+
 **H6 — Distribution to Mietverhältnisse**
 
 | Block | Key | Denominator | Tenant change |
@@ -616,13 +894,11 @@ Messdienst rounds every position, so ≤ 1 ct per position is normal); the refer
 `umlagefaehigCent` in the net branch and `mdl.gesamtkostenCent` in the gross branch. An OCR decimal
 shift is orders of magnitude larger and is still caught (`01b-F29`: 313,04 €).
 
-**H8 — § 6a Abs. 3 Nr. 5 comparison.** Both years are weather-adjusted, each with its **own** DWD
-Klimafaktor (K12); `KF > 1` (mild year) **raises** the adjusted value. **Only heat is adjusted; warm
-water passes through unadjusted** (§ 6a Abs. 3 S. 2–3). Missing KF → print the comparison
-**unadjusted with a note**, never substitute `1,00`. Output is a **graph** (§ 6a Abs. 3 S. 1 Nr. 5),
-not only a percentage. Import spec for the DWD file is referenced by his page but **is not in
-`berkay-work/`**. PLZ in the DWD file carry **no leading zero** — pad to five digits on import or the
-adjustment silently disappears for all of eastern Germany.
+**H8 — § 6a Abs. 3 Nr. 5 annual-statement comparison.** Page 01b requires a graphical prior-year
+comparison, with heat weather-adjusted and warm water left raw. A missing climate factor produces a
+labelled unadjusted comparison, never an implicit neutral factor. The exact DWD import, versioning,
+validation and UVI comparison contracts are deferred to `docs/16`, whose sources still contain
+conflicting notes. H8 and UVI must not be collapsed into one method.
 
 ## 5. Rounding rules (R1 … R8) — these are the engine's rounding contract
 
@@ -717,7 +993,7 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 
 | # | Case | Behaviour | Fixture |
 | --- | --- | --- | --- |
-| E1 | Supplier states no CO₂ mass/cost (§ 3 CO2KostAufG breach) | K4 fallback + **warning** + § 7 Abs. 4 risk flag | `01b-F02` |
+| E1 | Supplier states no CO₂ mass/cost (§ 3 CO2KostAufG breach) | **Mass:** K4 uses the matching CSV factor (`0,201` Hu / `0,181` Ho), with warning/provenance. **Cost:** later Antwort 03 § 5 requires refusal; never derive cents from a price. | `01b-F02` |
 | E2 | `spezifisch` exactly on a bound (12,00 / 52,00) | Left-closed → the **higher** step | `01b-F03`, `01b-F04` |
 | E3 | Rounds *up* to a bound but is below it | **Superseded by R8:** annualise, round to 1 dp, classify the rounded value, and print it with 1 dp (`11,999484… → 12,0 → 10 %`) | `01b-F05` (re-expected) |
 | E4 | Billing period ≠ 12 months | Annualise `× 365 / nTage`, **then round to 1 dp, then classify** | `01b-F06` + order fixture |
@@ -735,7 +1011,7 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 | E16 | Fernwärme | Supplier states cost + CO₂ → pass through, **but the step model still runs** | `01b-F20` |
 | E17 | No consumption data at all (denominator 0) | **Hard stop.** No silent area fallback | `01b-F21` |
 | E18 | Negative reading delta (meter swap/rollover) | Reading **rejected**; two segments must be summed. Never `abs()` | `01b-F22` |
-| E19 | `spezifisch` outside 5–70 kg/m²/a (K6) | Warning only, **never** a block — an efficient building must stay billable | `01b-F23` |
+| E19 | `spezifisch` outside 5–70 kg/m²/a (K6) | Warning only, **never** a block — an efficient building must stay billable. The warning carries the same R8 one-decimal value used for classification: F23 raw `74,742… / 4,123…` becomes **`74,7 / 4,1`**. The Page-01b prose's `74,74 / 4,12` predates R8 and is not a current output oracle. | `01b-F23` |
 | E20 | Invoice period overlaps the billing period | K8 linear day allocation + **non-dismissible** coverage warning | `01b-F24` |
 | E21 | Not remote-readable / no UVI / no CO₂ disclosure | Display the 15 % / 3 % / 3 % **risk amounts**. **Never auto-reduce** — the reduction is the tenant's right, not the landlord's calculation. Whether the three 3 % rights cumulate is `[UNSICHER]`: **do not implement summation** | `01b-F25` |
 | E22 | Σ unit WW meters ≠ measured central volume | `qWwKwh` from the **central** value; distribute by unit meters against the **central** denominator; the gap stays with the owner. Thresholds: ≤ 10 % silent (Verkehrsfehlergrenze), > 10 % Hinweis, > 20 % Warnung with the legal consequence | `01b-F26`, `F26b`, `F26c` |
@@ -747,40 +1023,37 @@ bei 0,00 €, auch ohne Leerstand, auch ohne Eigennutzung."* It is now settled, 
 | E29 | MDL statement with no CO₂ information at all | Pflichtausweis impossible → § 7 Abs. 4 risk per tenancy, shown before dispatch | `01b-F30` |
 | E30/E31 | § 6a Abs. 3 block incomplete / no preceding period | 3 % risk; and print a note rather than an empty graph | `01b-F31` |
 
-## 7. Open discrepancies — recorded, **not** resolved
+## 7. Open discrepancies and later resolutions — no silent choice
 
-These are for Berkay and the lead. None of them is decided in this transcription, and none of them has
-a fixture asserting a chosen answer.
+These are for Berkay and the lead. Unless an item explicitly names a later Antwort as its resolution,
+it remains undecided and no fixture asserts a chosen legal value.
 
-> **Routing note, 15.08.2026:** `Antwort-an-Emir_03.md` items 1–5 answer several entries in and around
-> this list (K9 wording, `08-F21`, D2, precise Erdgas factors, and the CO₂-cost fallback). They are
-> separate controlled slices. Row 3 transcribes **only item 6**: it does not change the authoritative
-> Rechtsstand CSV or Erdgas factors, does not implement D2, and keeps the CO₂-cost fallback refused.
+> **Historical routing note, 15.08.2026:** Row 3 originally transcribed only Antwort 03 item 6. The
+> full reconciliation in § 0 now records items 1–5 too. It still does not change the authoritative
+> CSV, implement D2, or turn the refused CO₂-cost fallback into an engine path.
 
-1. **Erdgas emission factor — two value pairs.** The lead's brief gives **Hu 0,2016 / Ho 0,1820**; the
-   Rechtsstand-Register row *"Emissionsfaktor Erdgas (K4)"* gives **Hu 0,201 / Ho 0,181** with
-   `× 0,903`. Both pairs are internally consistent; they differ by ~0,3 %. Precedence rule 3 says the
-   register is imported as-is, so **the register values are used** and the lead's numbers are recorded
-   here as the open item. Neither is treated as fact.
-2. **The register's own Ho/Hu pair is not exactly reciprocal.** `0,201 × 0,903 = 0,181503`, not
-   `0,181`. The register says *"beide Wege führen zum selben Ergebnis"*; they agree to about 0,3 %,
-   not exactly. On 28.000 kWh that is 5.068 kg (direct Ho) vs 5.082 kg (converted) — 14 kg. This is a
-   further argument for the no-conversion design, and a question for Berkay.
-3. **The register row contradicts itself on whether to convert.** The *Betrag* field says Ho-kWh must
-   be converted `× 0,903`; the *Rechtsgrundlage* field on the same row says the `3,2508 GJ/MWh` factor
-   *"betrifft die BEHG-Meldekette des Inverkehrbringers … nicht die Rechnungsausweisung nach § 3"*.
-   The adopted design (carry the reference, never convert) is consistent with the second half.
+1. **Resolved — Erdgas emission factor.** The current Rechtsstand-Register CSV is authoritative:
+   **Hu 0,201 / Ho 0,181**, conversion metadata **`0,903`**, status **`geprüft`**, Rechtsstand
+   **07/2026**. `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b confirms that Antwort 03's
+   `0,2016 / 0,1820` and old flag are superseded.
+2. **The register's Ho/Hu values are separately rounded.** `0,201 × 0,903 = 0,181503`, while the
+   direct Ho value is `0,181`. Both remain authoritative CSV metadata. The engine does not derive
+   one from the other: it selects the factor whose reference matches the input and refuses a
+   mismatch, avoiding a hidden or double conversion.
+3. **Conversion metadata is not an engine coercion rule.** The CSV records `× 0,903` and the direct
+   Ho alternative. Lokara stores both matching factors and preserves `0,903` as source metadata;
+   its adopted safety design carries the reference and never silently converts between Hu and Ho.
 4. **No Ho factor exists for Heizöl or Flüssiggas** in the register. Not invented; an Ho quantity of
    either is refused.
-5. **The CO₂ *cost* fallback is not transcribed as an engine path.** His H2 allows
+5. **The CO₂ *cost* fallback is refused.** Page H2 allows
    `co2Cent = co2Gramm/1e6 × co2PreisCentProTonne` when the supplier states no cost. That collides
    head-on with the rule already in this file (*"Where `total_co2_kg` and `co2_cost` come from — § 3
    CO2KostAufG, and never from us"*): a landlord billed a different figure than the national price
    would receive a statement contradicting the invoice he must pass through. Berkay flags the same
    fallback as **unsafe from 2026** (no single BEHG price: auction 55–65 €/t, sales phase 68 €,
-   make-up 70 €) and says it must ask the user or block. **Two rules disagree and neither was
-   pre-decided for this slice**, so the *mass* fallback (kWh × factor → gram) is specified and
-   fixtured, and the *cost* fallback is not. Lead's call.
+   make-up 70 €). Antwort 03 § 5 resolves the method conflict: ask the user for the supplier amount
+   or block. The engine must never derive the cost from a price. The mass fallback remains a
+   separate method and uses the resolved CSV factors from item 1.
 6. **`01b-F19`'s counter-example does not recompute.** The trap figure (CO₂ on purchased instead of
    consumed oil) is printed as `abzug 90.204 ct`, difference `492,40 €`. Recomputed:
    7.700 l × 10 kWh/l × 0,266 = 20.482 kg → 112.651 ct → 80 % = **90.121 ct**, difference **491,57 €**.
@@ -831,8 +1104,10 @@ Recorded so that an absent feature is a known absence rather than a silent one.
   building type at all.
 - **Denkmal-/Milieuschutz** (§ 9 Abs. 1/2 CO2KostAufG) — not modelled.
 - **Heat pump / biomass** → CO₂ module entirely off — not modelled.
-- **The whole MDL path (H7)** and **the UVI comparison (H8)** — nothing exists. `StubMeterGateway` is
-  a fixture, not the MDL path.
+- **The MDL path (H7)** — only the M2 gross-rescaling seam and its M3 control sum exist, in `mdl.py`
+  (`01b-F28b`). Ingest, the net branch (`01b-F28a`) and the readiness outputs of `01b-F29/F30` are
+  still missing. `StubMeterGateway` is a fixture, not the MDL path.
+- **The UVI comparison (H8)** — nothing exists.
 
 ## 9. Wiring R1/R5/K9 and Ho/Hu into the engine — the site-by-site decision
 
@@ -843,10 +1118,11 @@ Recorded so that an absent feature is a known absence rather than a silent one.
 > wired now — the table below is the map of what the code does, not a plan. K3 and H2 had already
 > landed and were not touched.
 >
-> Rechtsstand: the *methods* below are §§ 7/8/9/9b HeizkostenV and §§ 3/7 CO2KostAufG; the
-> **residual convention K9** and the **K4 emission factors** are `Konvention` /
-> `verify-before-production`, **Rechtsstand 07/2026** in the Rechtsstand-Register. No output may
-> present either as a norm.
+> Rechtsstand: the *methods* below are §§ 7/8/9/9b HeizkostenV and §§ 3/7 CO2KostAufG. The
+> **residual convention K9** is `Konvention` / `verify-before-production`. The Erdgas **K4 emission
+> factors** are `Konvention` / `geprüft`, **Rechtsstand 07/2026**, in the Rechtsstand-Register.
+> No output may present either convention as a norm; `geprüft` records a primary-source check, not
+> lawyer approval.
 >
 > ⚠️ **Amended 14.08.2026 — § 9.2 was replaced.** `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 answers the
 > two conventions § 9.2 used to carry, and answers them by **replacing the model**: the
@@ -874,6 +1150,14 @@ same operation, so they do not all get the same answer.
 | 9 | `engine.py:363` | umlagefähig → (Warmwasser, Heizung), § 9 | **half-up**, residual on the **heating** pot | complement pot | H3: `kostenWwCent = round_half_up(umlagefaehigCent × anteilWw)`, `kostenHzCent = umlagefaehigCent − kostenWwCent` — his own comment reads *"complement, so the sum is exact"*. |
 | 10 | `co2.py:166` | CO₂ cost → (Vermieteranteil, Mieteranteil) | **half-up**, residual on the **renter** side | **no owner bucket at all** — see 9.3 | R6 + H2: `co2AbzugVermieterCent = round_half_up(co2Cent × vermieterAnteil/100)`, then `umlagefaehigCent = gesamtCent − co2Abzug`. The rounded quantity is the *deduction*; the renter side is what is left of it. |
 | — | `nk-engine/engine.py:55` | an NK cost block → parties | **stays largest-remainder** | — | Out of scope by decision, not oversight: `CLAUDE.md` DoD 4 splits the rule per engine, and NK switches when Berkay's Seite 02 is transcribed into `docs/09`. The canonical €1.200 fixture is identical under both methods, so nothing is at risk in the meantime. **And the two are a package:** the residual model of § 9.2 *requires* half-up on the renter side (`docs/02`), so NK cannot take the Eigentümer line without also moving every NK figure — which is a transcription this repo does not have yet. |
+
+> **F18 output override, decided 16.08.2026.** The site table above remains the general R1/R5 map,
+> but it does not authorize replacing a named worked-example oracle. Emir withdrew the earlier
+> derived per-block override for `F18`; Berkay's printed totals
+> `108.090 / 74.932 / 43.121 / 101.117 / 10.958` are authoritative. The source does not state a
+> new general rounding formula for this exception, so none is invented here. The RED end-to-end
+> fixture fixes the exact input and output; any broader method change needs a separate confirmed
+> specification.
 
 **Six sites move money (#2, 3, 4, 6, 7, 8). Four provably do not (#1, 5, 9, 10)** — see 9.4. Both
 halves are stated so that a reviewer who sees four sites change with no fixture behind them knows
@@ -1059,7 +1343,7 @@ HeatingInput.energy_reference: EnergyReference | None = None   # the Bezug of to
 **Why the mismatch is worth a hard error, as one fixture pair.** Same building, same invoice of
 20.000 kWh, Erdgas, 100 m² beheizte Fläche:
 
-| Bezug | Factor (K4, register, `verify-before-production`) | Emissions | kg CO₂/m²/a | Stufe | Vermieteranteil |
+| Bezug | Factor (K4, register, `geprüft`) | Emissions | kg CO₂/m²/a | Stufe | Vermieteranteil |
 | --- | --- | --- | --- | --- | --- |
 | Hu | **0,201** kg CO₂/kWh | 4.020 kg | 40,2 | 37 – < 42 | **60 %** |
 | Ho | **0,181** kg CO₂/kWh | 3.620 kg | 36,2 | 32 – < 37 | **50 %** |
@@ -1069,10 +1353,10 @@ the Ho quantity by the Hu factor reads 40,2 where the truth is 36,2 — **a whol
 landlord**, on a document the tenant may rely on (§ 7 Abs. 3/Abs. 4 CO2KostAufG). Nothing in the
 intermediates looks wrong, which is why it must be refused rather than checked for.
 
-**Deliberately not in this slice**, so the absence is known rather than silent:
+**Deliberately not asserted as complete**, so the absence is known rather than silent:
 
-- the **CO₂ cost fallback** (`co2Cent` from a price) — two rules disagree and neither was decided;
-  § 7 open discrepancy 5 stands. Only the *mass* fallback is wired;
+- a **CO₂ cost fallback** (`co2Cent` from a price) — Antwort 03 § 5 now forbids it; missing supplier
+  cost must block after asking the user for the real amount;
 - E1's **warning + § 7 Abs. 4 risk flag** when the fallback ran, and any provenance field saying the
   printed Brennstoffemissionen were derived rather than stated. `HeatingResult` has no warning
   channel at all; that is a `docs/08` slice. **Until it exists, the fallback path prints a § 3

@@ -565,7 +565,7 @@ A unit is in exactly one state at any moment:
 | State       | Source                        | NK treatment        | Tax treatment                                             |
 | ----------- | ----------------------------- | ------------------- | --------------------------------------------------------- |
 | `RENTED`    | active `Tenancy`              | allocated to renter | income + deductible costs                                 |
-| `SELF_USED` | explicit `SelfUsePeriod` (m²) | falls on landlord   | private — not deductible, reduces AfA base                |
+| `SELF_USED` | explicit `SelfUsePeriod` (m²) | falls on landlord   | private — reduces deductible AfA, **not** the AfA basis   |
 | `VACANT`    | **derived** (neither above)   | falls on landlord   | costs stay deductible while rental intent is demonstrable |
 
 Only `SELF_USED` is stored; `RENTED` derives from tenancies; `VACANT` is the remainder — one source of
@@ -794,6 +794,53 @@ rows are shown struck through, never hidden — the audit trail is the feature.
   10-day rule around New Year. Driven by **payment date**.
 - They meet in **one** place: an NK statement's Nachzahlung/Guthaben becomes a **Payment in the
   Ledger** when actually paid. Statements feed the ledger; the ledger feeds tax.
+
+## Page 01 statement model — D1 contract
+
+> **Source:** `berkay-work/Spec-Seiten/01 · Die Abrechnung ….md` §§ 3–5 and D0–D12;
+> fixture trace `docs/08` → "Page 01 transcription and fixture gate". This is the normalized model
+> required by the spec, not a claim that every field is already present in SQLAlchemy.
+
+The durable model keeps calculation, audience projection and delivery separate:
+
+1. A normalized **statement calculation input** selects one account/building and one inclusive
+   billing period, validates that the period is no longer than 12 months, then carries the object,
+   covered tenancies, cost lines, meter/heating result and vacancy evidence into the engines.
+2. One immutable **calculation result** contains renter lines, the unconditional owner residual,
+   reference totals, warnings/provenance, rule versions and every applicable `Rechtsstand`.
+3. An **audience projection** selects `OWNER`, `TENANT(tenancy_id)` or `TAX` before rendering. A
+   missing or foreign tenancy fails; it never falls back to the owner view.
+4. Finalization archives distinct documents and hashes from that same result. It never stores one
+   all-renters PDF and later crops or masks it.
+
+### Required normalized fields
+
+| Shape | Required Page 01 data | Current ownership/status |
+| --- | --- | --- |
+| Calculation header | `account_id`, `building_id`, object address/area/unit count, inclusive period, creation date, register/rule versions | building/period basics exist; exact Page 01 input object is Slice B/M6 work |
+| Covered tenancy | `tenancy_id`, renter/addressee, current delivery address, unit, clipped usage dates/days, person and consumption inputs | temporal tenancy exists; delivery address and Page 01 projection remain incomplete |
+| Actual advances | paid cents for the covered period, distinct from the contractual Soll schedule | **M6 Payment Ledger**; current `Tenancy.advance_payment_cents` is not a lawful substitute |
+| Cost result line | cost total, key, numerator, denominator, measurement unit, rounded share, § 35a inputs/result, warning/provenance | calculation pieces exist; complete snapshot/output shape remains Slice B/M6 |
+| Heating/CO₂ result | complete `docs/03` result, path/provenance, device evidence, required CO₂ figures and readiness risks | partial M2/Page 01b implementation, tracked in `docs/03` |
+| Vacancy result | unit/date origin, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c), evidence metadata | residual shape specified above; full annex and Page 02/04 dependencies remain |
+| Projection | audience plus exactly one `tenancy_id` for tenant output | M6 finalization/rendering |
+
+### Page 01 invariants
+
+- `billing_period` shorter than 12 months is allowed; **longer than 12 months hard-blocks before an
+  engine run or document**. Leap years use their actual 366 days.
+- `actual_advance_cents` is never nullable at tenant-document finalization. A user-confirmed `0` is
+  valid and different from missing.
+- A covered tenancy with zero clipped usage days produces no tenant document or portal item and is
+  not converted into a vacancy event.
+- Overlapping tenancies in one unit hard-block. A mid-period change produces separate projections
+  with no names or amounts crossing between them.
+- The owner residual is computed from the result, not persisted as a second mutable total. Its
+  origin rows remain available for the Leerstandsaufstellung.
+- Block (b) of Page 01 `08-F21` is `100.800` cents after Antwort 03 § 2. The amount is an oracle;
+  its BetrKV classification belongs to future `docs/09`, and its Anlage-V mapping to `docs/11`.
+- Corrections create a new finalized version. Inputs and archived bytes referenced by an older
+  version cannot be destructively changed or deleted.
 
 ## Statement preview and finalization — live draft, immutable archive
 

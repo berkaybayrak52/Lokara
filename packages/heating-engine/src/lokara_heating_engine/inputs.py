@@ -79,7 +79,7 @@ class Co2Input:
     """
 
     total_co2_kg: Decimal | None
-    co2_cost: Cents
+    co2_cost: Cents | None
     # K4 fallback (`nur Fallback`, `Konvention` / verify-before-production,
     # Rechtsstand 07/2026). Carries its own Ho/Hu reference — that is what makes
     # a mismatch checkable at all instead of a comment next to a number.

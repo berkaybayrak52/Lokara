@@ -1,58 +1,66 @@
-# 07 — Compliance-by-design
+# 07 — Compliance by design
 
-> The Datenschutz page treats this as the **operating licence**, not a feature. It is not
-> retrofittable — bake it in from day 1. Full reasoning in `lokara-arch.md` §6.
+This D1 version contains settled cross-cutting rules only. Detailed Page 04 tax/DATEV encoding,
+archive classes and retention mappings belong to future `docs/11` and are not guessed here.
 
-## Terms
+## Isolation and data minimization
 
-- **AVV** — Auftragsverarbeitungsvertrag (GDPR Art. 28 data-processing agreement). Lokara is the
-  customer's processor; missing = hard sales blocker.
-- **DPIA / DSFA** (Art. 35) — data-protection impact assessment; likely mandatory here (scope +
-  financial data).
-- **TOM** — technical & organizational measures.
-- **GoBD / §147 AO** — German bookkeeping/retention rules → immutable archives + retention terms.
-- **BFSG** — accessibility law in force since 28.06.2025 → WCAG 2.1 AA is a real requirement.
+- `Account` is the paying-customer and isolation boundary. Domain rows carry `account_id`.
+- Every request verifies the relationship named in the URL and sets the Postgres RLS context. RLS is
+  a second enforcement layer, not a substitute for application authorization.
+- Foreign keys between account-scoped rows preserve the account boundary. Composite-FK and RLS gates
+  must not be weakened to make a feature pass.
+- Tenant output is selected by tenancy before rendering. It contains no other renter's name, amount
+  or hidden document data. The owner overview never shares the tenant delivery channel.
+- Exports and logs include only the personal data required for their purpose.
 
-## Non-negotiables to build in now
+## Immutability and evidence
 
-- **AVV per customer + a sub-processor register.** Every external processor needs an AVV and must be
-  listed: **Supabase, finAPI, email provider, AI/Vision, error logging.** A non-EU sub-processor
-  without safeguards = compliance break — this is exactly the Supabase EU-region decision (`docs/01` D1).
-- **EU/DE hosting, TLS in transit, encryption at rest, tenant isolation** (`accountId` scoping +
-  Postgres RLS is the isolation boundary).
-- **Retention vs deletion = "two-clocks" model:**
-  - **Uhr A** — renter _portal access_ ends after the §556 window (final NK statement + buffer).
-  - **Uhr B** — actual _deletion_, run separately **per data class**:
-    - tax-relevant Buchungsbelege (NK statements, bank statements, invoices) = **8 years**
-      (§147 AO — reduced 10→8 as of 01.01.2025);
-    - contract / deposit / handover ≈ **3 years**.
-  - Deadlines **configurable, legal minimum as a hard floor (extend-only)**.
-  - Art. 17 deletion request that collides with a retention duty → **restrict/block, don't delete**
-    (Art. 17(3)(b) + Art. 18); delete after the term. Ended tenancies → cold storage, not deletion.
-- **DPIA planned; TOMs documented; breach process (72h);** Art. 20 data export via an **authenticated,
-  expiring secure link** (not a mail attachment, Art. 32).
-- **Data minimization in exports** (e.g. unit label instead of renter name in DATEV Buchungstext).
+- Legally relevant corrections append a version; they do not overwrite finalized statements,
+  ledger entries, exports, meter evidence, IBAN history, email delivery or contracts.
+- A finalized statement snapshot keeps normalized inputs, engine/rule versions, every applicable
+  `Rechtsstand`, calculated results, content hashes and archived document hashes/keys.
+- Inputs referenced by a finalized record cannot be destructively removed. A correction appends or
+  supersedes while preserving reproduction of the older version.
+- Exact retention periods and tax-export archive rules are deferred to `docs/11`. Until that source
+  is approved, this file does not assert a one-size-fits-all deletion date.
 
-## "Tool, not advice" (product-wide)
+## External processors and adapters
 
-- Everything is **"rechtskonform / nach aktueller Rechtslage"**, **never "rechtssicher"** (liability
-  trap — a large share of statements are formally challengeable in court).
-- Consistent disclaimer on every legal/tax output: _"Lokara ist ein Werkzeug, keine Rechts- oder
-  Steuerberatung."_ Keep the StBerG/legal-advice line out of the product.
-- **The claim is about the tool, never about the artifact.** A per-document form — *"Dieses Dokument
-  wurde rechtskonform erstellt"* — attests that *this* statement is legally complete, which no
-  document may say while a BGH formal minimum is unrendered. The statement's exact rendered wording,
-  the constraint and the rejected alternatives: `docs/08` → *"The disclaimer states what Lokara is,
-  never that this Abrechnung is complete"*.
+- Bank, meter/MDL, Vision, email, storage and tax-export formats are normalized behind adapters.
+  Vendor types never enter calculation engines.
+- A real provider requires an approved processing basis, the necessary AVV/DPA, verified hosting and
+  sub-processor handling before real customer data is sent.
+- Supabase Frankfurt is the selected production target, not a shipped integration. Current local
+  Postgres/dev JWT operation must not be described as completed Supabase compliance.
 
-## Accessibility (BFSG / WCAG 2.1 AA)
+## Tool, not advice
 
-A compliance requirement, not just design — see `docs/05-design-system.md` for the per-screen
-checklist (contrast, focus states, scalable type, keyboard nav, reduced motion). Likely exempt as a
-micro-enterprise at launch, but the threshold will be crossed — build it in, don't retrofit.
+- Product and legal/tax output use `rechtskonform`, never `rechtssicher`.
+- The approved statement disclaimer describes Lokara, not the completeness of a particular artifact:
+  `Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, keine Rechts-
+  oder Steuerberatung.`
+- No product copy adds a StBerG warning or claims lawyer/tax-adviser approval.
+- `geprüft` in the Rechtsstand register means the primary source was checked. It does not mean
+  lawyer-approved. Every `verify-before-production` flag remains visible.
 
-## Immutability & versioning (system-wide, GoBD/§147 AO)
+## Statement and deadline boundary
 
-New version, never overwrite — for statements, ledger entries, exports, AfA records, UVI send-log,
-email delivery log, IBAN history, contract clause-sets, audit trails. Store hashes where legally
-relevant. This is rule #2 in `CLAUDE.md`.
+- Page 01's four formal minimums and exact output contract live in `docs/08`.
+- A residential operating-cost period longer than 12 months hard-blocks before calculation or
+  rendering. A shorter Rumpfperiode is allowed and day-exact.
+- After the § 556 deadline, only the landlord's Nachforderung is suppressed; a tenant Guthaben stays
+  payable. Detailed guard cadence/escalation belongs to `docs/12`.
+- The current demo PDF is an internal landlord calculation/QA view and must not be sent to a renter.
+
+## Accessibility
+
+WCAG 2.1 AA, visible focus, keyboard access, scalable text, 200% zoom and reduced-motion support are
+product requirements. The stricter statement verification/provenance tiers and measured token pairs
+live only in `docs/05-design-system.md`.
+
+## Deferred decisions
+
+The DPIA/DSFA decision, TOM set, breach process, data-class retention schedule, secure data-export
+workflow and detailed tax/archive duties require their own verified pre-production work. They are
+requirements to close, not claims that D1 or the current demo has completed them.

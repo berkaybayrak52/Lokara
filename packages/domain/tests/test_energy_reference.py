@@ -34,39 +34,20 @@ from lokara_domain import (
     co2_grams_from_energy,
 )
 
-# Values from the Rechtsstand-Register, imported as-is (CLAUDE.md precedence
-# rule 3), flags intact: all four are `verify-before-production`, Rechtsnatur
-# `Konvention`, source EBeV 2030 Anlage 2 Teil 4. The lead's brief carries a
-# different Erdgas pair (Hu 0,2016 / Ho 0,1820) - recorded as an open
-# discrepancy in `docs/03` § 7 and deliberately NOT resolved here.
+# Authoritative Rechtsstand-Register CSV values for F02, confirmed by
+# Antwort-an-Emir_01b-Uebergabe.md § 4a/4b. Rechtsstand 07/2026, status geprüft.
 ERDGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.201"), reference=EnergyReference.HU)
 ERDGAS_HO = EmissionFactor(kg_co2_per_kwh=Decimal("0.181"), reference=EnergyReference.HO)
+ERDGAS_HU_TO_HO = Decimal("0.903")
 HEIZOEL_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.266"), reference=EnergyReference.HU)
 FLUESSIGGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.236"), reference=EnergyReference.HU)
 
 
 class TestMatchingReferences:
-    def test_berkay_01b_f02_the_hu_fallback_of_the_reference_object(self) -> None:
-        """`01b-F02` / E1 - the supplier stated no CO₂ figures (§ 3 breach).
-
-        28.000 kWh declared **Hi/Hu** (his input field `rechnung.mengeKwh` is
-        Hi) x 0,201 kg/kWh = 5.628 kg, which is exactly the mass `01b-F01` gets
-        from the invoice. Every downstream figure of F02 is therefore identical
-        to F01; what differs is the warning and the § 7 Abs. 4 risk flag.
-
-        R4: the internal unit is the **integer gram**.
-        """
-        grams = co2_grams_from_energy(Decimal(28000), EnergyReference.HU, ERDGAS_HU)
-        assert grams == 5_628_000
-        assert isinstance(grams, int)
-
-    def test_the_same_invoice_read_as_brennwert_uses_the_ho_factor_directly(self) -> None:
-        """28.000 kWh(Ho) x 0,181 = 5.068 kg. No conversion happened on the way.
-
-        Against the wrong pairing - 28.000 Ho-kWh x the **Hu** factor - this is
-        5.628 kg vs 5.068 kg, i.e. 11,0 % too high. That is the defect, in one
-        line of arithmetic.
-        """
+    def test_berkay_01b_f02_uses_the_authoritative_csv_pair(self) -> None:
+        assert ERDGAS_HU.reference is EnergyReference.HU
+        assert ERDGAS_HO.reference is EnergyReference.HO
+        assert co2_grams_from_energy(Decimal(28000), EnergyReference.HU, ERDGAS_HU) == 5_628_000
         assert co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HO) == 5_068_000
 
     def test_heizoel_and_fluessiggas_carry_the_heizwert_reference(self) -> None:
@@ -117,17 +98,7 @@ class TestAReferenceMismatchIsAHardError:
             co2_grams_from_energy(Decimal(56000), EnergyReference.HO, HEIZOEL_HU)
 
 
-class TestTheRegisterPairIsNotExactlyReciprocal:
-    def test_the_two_erdgas_factors_agree_only_to_about_a_third_of_a_percent(self) -> None:
-        """Recorded, not resolved (`docs/03` § 7, open discrepancy 2).
-
-        The register says *"beide Wege fuehren zum selben Ergebnis"*, but
-        0,201 x 0,903 = 0,181503, not 0,181. On 28.000 kWh that is 5.082 kg via
-        the conversion against 5.068 kg direct - 14 kg apart. A further argument
-        for the no-conversion design, and a question for Berkay.
-        """
-        converted = ERDGAS_HU.kg_co2_per_kwh * Decimal("0.903")
-        assert converted == Decimal("0.181503")
-        assert converted != ERDGAS_HO.kg_co2_per_kwh
-        drift = (converted - ERDGAS_HO.kg_co2_per_kwh) / ERDGAS_HO.kg_co2_per_kwh
-        assert Decimal("0.002") < drift < Decimal("0.004")
+class TestTheRegisterConversionMetadata:
+    def test_the_csv_conversion_is_preserved_but_the_engine_uses_direct_factors(self) -> None:
+        assert ERDGAS_HU.kg_co2_per_kwh * ERDGAS_HU_TO_HO == Decimal("0.181503")
+        assert ERDGAS_HO.kg_co2_per_kwh == Decimal("0.181")

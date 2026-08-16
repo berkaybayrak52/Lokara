@@ -1,8 +1,40 @@
 # 06 — Demo scenarios (seed data for the pitch)
 
+## D1 current demo contract — 17.08.2026
+
+The runnable demo is the six-screen path in `DEMO-RUNBOOK.md`: dashboard, building, unit/tenancy,
+meters, canned receipt extraction, then the landlord statement calculation and PDF. It reads seeded
+Postgres rows through the FastAPI API; the NK and heating/CO₂ engines calculate the shown values.
+
+| Capability | Current status |
+| --- | --- |
+| Solo account, three units, tenancy/vacancy timeline | **Shipped demo** |
+| €1.200 NK area/day allocation and exact reconciliation | **Shipped demo** |
+| Heating/WW/CO₂ calculation, meter evidence and PDF | **Shipped demo**, subject to the Page 01b gaps in `docs/03` |
+| Cost entry, key reassignment and DIRECT | **Shipped**, but the demo runbook keeps the live path narrow |
+| Receipt extraction | **Shipped UI with a named canned stub**; no real provider integration |
+| Page 01 tenant statement | **Not shipped**: the PDF is an internal owner calculation/QA view |
+| Actual advances, Saldo, finalization and isolated tenant documents | **M6** |
+| Employee role enforcement, context switcher and production onboarding | **M5 remainder** |
+| Renter activation/portal, tax-adviser portal and mobile | **M10** |
+
+The Page 01 boundary is binding in the demo story: never call the current PDF a tenant document, and
+never claim periods over 12 months are supported. A shorter Rumpfperiode is valid; a longer-than-
+12-month period hard-blocks before calculation/rendering. `docs/08` contains the complete
+`08-F01`–`08-F24` contract and data oracle.
+
+### Bootstrap limits
+
+`POST /demo/load` and `/demo/reset` are local/demo-only and require `DEMO_SEED_ENABLED=true` plus the
+environment guard. They run against the fixed demo account. They do not implement production signup:
+the initial Person/Account/OWNER Membership must be created by `uv run lokara-seed-demo`, and a truly
+empty Person table cannot bootstrap through `/demo/load`. Real onboarding, account switching and
+role enforcement remain separate M5 work.
+
 > Goal: an investor sees the **common cases** work end-to-end, live. Edge cases are deferred.
 > These are **seeded fixtures** loadable with one click ("Demo-Szenario laden"). All money in cents;
-> all German names/addresses realistic. Keep them in `packages/db/seed/` and reuse the engine fixtures.
+> all German names/addresses realistic. Keep them in `packages/db/src/lokara_db/seed.py` and reuse
+> the engine fixtures.
 > **The seed must include an `OWNER` `Membership`** linking the demo Person to the demo Account — the
 > FastAPI `account_session` dependency authorizes on it, so without the membership every demo request
 > 403s. (The TS seed omitted this; the Python seed `uv run lokara-seed-demo` adds it.)
@@ -280,10 +312,9 @@ roles, three scopes, no duplicate accounts. Two accounts (A and B) are enough to
 | 3 | **M10** — Mieterportal (activation codes, tickets, UVI) |
 | 5 | **M10** — StB guest access |
 
-⚠️ **None of these are buildable before the 27.08 pitch** (M3 is still finishing). Until then the
-honest framing is: *show the model, not fake screens* — the schema, the role table above, and the
-persona-4 story, backed by the isolation test. Empty or fabricated dashboards would undercut the
-correctness argument that is the pitch's strongest asset.
+⚠️ **These persona flows are not shipped.** The current demo has one seeded owner context; it does
+not provide the multi-persona switcher, renter portal or tax-adviser portal. The rows above are the
+future identity model, not clickable-demo instructions.
 
 ## Seeding rules (when these get built)
 

@@ -38,9 +38,10 @@ rules-store for `AS_OF`. No hand-written stamps.
 
 import re
 
-from lokara_pdf import statement_html
+from lokara_pdf import rechtsstand_entry, statement_html
 from lokara_pdf.demo import AS_OF, build_demo_statement
 from lokara_rules_store import (
+    CO2_FALLBACK_EMISSION_FACTORS,
     CO2_SPLIT_TABLE,
     DEGREE_DAY_TABLE,
     HEATING_SPLIT_BOUNDS,
@@ -106,6 +107,45 @@ def test_the_degree_day_stamp_is_labelled_as_a_convention() -> None:
 
     assert f"{DEGREE_DAY_LABEL} {_stamp(degree_days.rechtsstand)}" in footer
     assert INTERNAL_MARKER not in _plain(html), "developer marker leaked onto the statement"
+
+
+def test_shared_co2_fallback_public_provenance_is_clean() -> None:
+    """K4 is shared by three fuels: its public label carries only common
+    provenance and the EBeV effective date, never register-review metadata or
+    Erdgas-only conversion provenance. The CSV remains the internal source of
+    truth for those fields (`docs/03` public provenance boundary)."""
+    resolved = get_rule(CO2_FALLBACK_EMISSION_FACTORS, AS_OF)
+    entry = rechtsstand_entry(resolved)
+    public_surfaces = {
+        "ResolvedRule.source": resolved.source,
+        "rechtsstand_entry": entry,
+    }
+    forbidden = (
+        "geprüft",
+        "verify before production",
+        "Register-Rechtsstand",
+        "07/2026",
+        "0,903",
+        "0.903",
+    )
+
+    actual = {
+        "leaks": {
+            name: tuple(token for token in forbidden if token in text)
+            for name, text in public_surfaces.items()
+        },
+        "resolved_rechtsstand": resolved.rechtsstand,
+        "entry_dates": tuple(re.findall(r"\b\d{2}/\d{4}\b", entry)),
+    }
+    expected = {
+        "leaks": {
+            "ResolvedRule.source": (),
+            "rechtsstand_entry": (),
+        },
+        "resolved_rechtsstand": "Rechtsstand 01/2023",
+        "entry_dates": ("01/2023",),
+    }
+    assert actual == expected
 
 
 def test_no_bare_rechtsstand_remains_in_the_footer() -> None:

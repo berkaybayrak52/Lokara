@@ -1,69 +1,45 @@
-# LEAD-HANDOFF.md — permanent guide for the main session
+# LEAD-HANDOFF.md — next main session
 
-This file defines how the main conversation reviews and closes work. It is tracked and durable.
-It is not a session log, backlog, legal specification or status report. Update this file in place
-only when a lasting review practice changes. Git keeps its history; never create dated copies.
+Read `CLAUDE.md`, `AGENTS.md`, `PLAN.md`, then `docs/03-nk-heating-engines.md` § 0.
+Verify this handoff with `git status` and `git log` before acting.
 
-## 1. Where truth lives
+## Repository state — 17.08.2026
 
-| Question | Source |
-| --- | --- |
-| What rules override everything? | `CLAUDE.md` |
-| What is built and what comes next? | `PLAN.md` → execution order |
-| How do agents, lanes, worktrees and gates operate? | `AGENTS.md` |
-| What is the architecture? | `lokara-arch.md` |
-| What is the calculation source? | `berkay-work/` → `docs/` → engines |
-| What does a specific feature require? | The matching file under `docs/` |
-| What happened in the latest session? | `LAST_OUTPUT.md` |
+- Branch: `slice/reconcile-page01b-v2`.
+- Baseline before the current checkpoint:
+  `a350f98 test(heating): define Page 01b A4 plant aggregation`.
+- The checkpoint includes the A4 self-billing source, F02 CSV reconciliation, supporting docs and
+  fixtures, the restored single Slice A and the D1–D3 documentation gate.
+- Nothing was merged or pushed.
+- No `berkay-work/` or rules-store numeric value changed.
 
-`LAST_OUTPUT.md` is only Emir's short summary window. It never overrides Git or tracked docs.
-Use `scripts/check_handoff.sh` only to confirm that it names the current HEAD.
+## Slice A status
 
-## 2. What the main session owns
+Green on the current branch:
 
-- Emir controls scope, priorities and whether work is merged or pushed.
-- The main session reads agent reports, verifies them, decides what ships and writes
-  `LAST_OUTPUT.md`.
-- Agents do not decide what to build next, mark milestones complete, merge, push or write the
-  session summary.
-- Preserve existing user changes. Separate unrelated edits before committing or merging.
-- Ask Emir only when a missing choice would materially change the result or expand the scope.
+- A1/H7 gross MDL rescaling: `9f7d744`.
+- Corrected A2 RED spec: `ca07f3b`.
+- A2 implementation, F02 missing-cost refusal and exact Berkay F18 totals: `716f741`.
+- A3 RED spec: `e20d792`.
+- A3 plant/CO₂ implementation: `89db9e0`.
+- A4 RED spec: `a350f98`; self-billing implementation included in the current checkpoint.
+- Main-tree fast gate: formatting, lint, strict mypy, engine purity and agent parity green; 307
+  pure-package tests passed.
 
-## 3. Review standard
+Slice A is not finished. The implemented seams are supporting capability evidence, not full
+Page-01b end-to-end fixture closure. The exact remaining closure conditions are in `PLAN.md`.
+Implementation is paused while D1–D3 reconcile the docs and retire the extracted correspondence.
 
-- Re-derive counts, survey results, arithmetic and every claim that says "verified".
-- Check the code and command output, not the plan or an agent's confidence.
-- A correct conclusion with the wrong mechanism is still wrong.
-- Verify accusations and destructive Git advice with `git log`, `git show`, `git status` and the
-  exact diff before acting.
-- Treat a new tool as unverified until it runs locally and produces a known, non-empty result.
-- Label every convention invented by Lokara as ours. Never present it as Berkay's rule or law.
-- Preserve legal flags and provenance. `geprüft` does not mean lawyer-approved.
+## Source decisions that must stay
 
-## 4. Reviewing agent work
+- F18 uses Berkay's table: renters `108090/74932/43121/101117`, owner `10958`.
+- The earlier derived F18 R1 table is superseded.
+- F02 missing supplier CO₂ cost is a hard refusal.
+- F02 uses the authoritative CSV values: Erdgas Hu `0.201`, Ho `0.181`, conversion provenance
+  `0.903`, status `geprüft`, Rechtsstand `07/2026`. The later 01b handoff confirms that the CSV wins
+  over Antwort 03's stale pair. Focused F02 and public-provenance verification is green: 64 passed;
+  statement re-review has no remaining blocker or high finding.
+- A4 oil logic uses consumed stock, not purchases, and does not invent CO₂ cost.
 
-- Worktree edits do not sync back. Inspect the worktree status, copy the exact files, then rerun
-  gates in the main tree.
-- Never run `scripts/verify_demo_path.sh` from an agent worktree. The database and Docker stack are
-  shared resources.
-- Read-only reviewers report findings; they never fix them.
-- Implementers never write their own tests. Missing fixtures go back to `spec-scribe`.
-- Keep `.claude` and `.codex` aligned. `check_agent_parity.py` is the authority.
-- Do not widen a write lane to make an agent finish. A refusal can be the correct result.
-
-## 5. Before merging
-
-- Confirm the slice was cut from `main` and contains only the intended work.
-- Inspect staged and unstaged changes separately. Preserve unrelated local edits.
-- Run `scripts/gate.sh full`; use the demo gate when the milestone or output requires it.
-- Record the PDF fingerprint before and after any slice that claims the document changed or stayed
-  unchanged.
-- Merge only green work. Do not push unless Emir asks.
-
-## 6. Closing a session
-
-- Overwrite `LAST_OUTPUT.md` using the short format in `CLAUDE.md`.
-- Put temporary status in `LAST_OUTPUT.md`, execution status in `PLAN.md`, legal questions in the
-  relevant `FRAGEN-an-Berkay-*.md`, specifications in `docs/`, and history in Git.
-- Keep this file free of completed threads, old commit hashes, housekeeping lists and session
-  stories. Add only guidance that should still be useful in a future conversation.
+Do not resume Slice A, start Slice B, resume M5, merge or push before D1–D3 are approved. After
+that, Slice A must close green before later implementation work.
