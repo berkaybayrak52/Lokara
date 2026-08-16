@@ -8,6 +8,13 @@ Depends only on lokara-domain.
 
 from .co2 import landlord_share_percent_for_intensity, split_co2_cost
 from .degree_days import degree_day_weight, segment_degree_day_weights
+from .device_readings import (
+    DeviceReadingAggregation,
+    DeviceReadingLine,
+    DeviceReadingSpan,
+    HeatingDevice,
+    aggregate_device_reading_spans,
+)
 from .engine import calculate_heating_statement
 from .inputs import (
     Co2Input,
@@ -30,6 +37,10 @@ __version__ = "0.1.0"
 __all__ = [
     "Co2Input",
     "Co2Result",
+    "DeviceReadingAggregation",
+    "DeviceReadingLine",
+    "DeviceReadingSpan",
+    "HeatingDevice",
     "HeatingInput",
     "HeatingInputError",
     "HeatingLine",
@@ -41,6 +52,7 @@ __all__ = [
     "OwnerResidualOrigin",
     "WarmWaterInput",
     "WarmWaterSeparation",
+    "aggregate_device_reading_spans",
     "calculate_heating_statement",
     "degree_day_weight",
     "landlord_share_percent_for_intensity",
