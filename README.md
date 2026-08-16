@@ -157,6 +157,8 @@ session. It is not an input for agent work and never overrides Git or the tracke
      page-break rules (*break at the seams, never inside a statement*); and the labelled
      `Rechtsstand` form — `§ 7 Abs. 1 HeizkostenV 03/1989 · …` — that supersedes a bare stamp.
      It also keeps its open questions and gaps explicit, so they are not silently invented.
+   - `09-betrkv-catalogue.md` — Page 02's versioned operating-cost catalogue, allocability gate,
+     allocation-key precedence, non-allocable routing, 14 edge cases and exact 32-fixture trace.
 
 ## The one-paragraph version
 
