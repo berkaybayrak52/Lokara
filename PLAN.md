@@ -14,11 +14,13 @@ UI. Dates are communication events, not planning inputs.
   verified against all Berkay specifications.
 - The v4 migration is complete. The old TypeScript backend is gone. Mobile moved to M10.
 - Composite foreign-key isolation and M5a identity/RLS are complete.
-- Execution rows 1–3 are complete for their bounded fixes. Full Page 01b reconciliation is still
-  required before M2 is spec-closed.
+- Execution rows 1–3 are complete for their bounded fixes. The Page 01b source transcription is
+  complete; its executable-golden-test gate, confirmed implementation gaps and final verification
+  still block M2 spec closure.
 - Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
-- Only Page 01 and Page 01b are partly represented in current `docs/`. Pages 02–08 and the full UVI
-  annex still need transcription before their related implementation work.
+- Page 01 is partly represented in current `docs/`. Page 01b's transcription is complete but its
+  confirmed implementation gaps remain. Pages 02–08 and the full UVI annex still need transcription
+  before their related implementation work.
 - The M1–M4 reconciliation gate is current and must finish before new feature work continues.
 - Row 4 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
   but the slice is not merged yet.
@@ -35,7 +37,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks M3/M4 spec closure and final M6 statements. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Substantial but partial/stale. H0 path selection, K13 comparison values and fixture traceability remain incomplete. Blocks M2 spec closure, remaining heating work, D2 and UVI. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F28b is green — its H7 gross-rescaling seam is implemented; 27 cases still need executable tests before their source changes. F02's factor-dependent value is blocked by the Hu/Ho conflict. Blocks M2 implementation closure, D2 and UVI. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
@@ -86,7 +88,10 @@ missing, conflicting or unverified value stays explicit; it is never guessed.
 Current trace audit, 16.08.2026:
 
 - Page 01 has no current doc/test trace for `08-F02…F05`, `F07…F16`, `F18…F20` and `F23…F24`.
-- Page 01b has no current trace for `01b-F11`, `01b-F15` and `01b-F28b`.
+- Page 01b now has a complete 34-ID data oracle and source-section trace, but a data table is not an
+  executable golden test. Current exact executable cases are `F03–F06`, `F16` and `F28b`.
+  `F01`, `F07–F15`, `F17–F27` including `F26b/c`, `F28a`, and `F29–F31` still need executable
+  goldens before their implementation changes. `F02` stays value-blocked by the Hu/Ho conflict.
 - Pages 02–08 have no complete transcription. Existing references to a few Page 02 fixtures from
   owner-residual work do not count as Page 02 coverage.
 - Page 06's routing and risk rules can be transcribed, but its missing clause-text/version catalogue
@@ -104,7 +109,7 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 1 | ✅ Done 13.08.2026 | Wire R1/R5/K9 and Ho/Hu into `heating-engine` | Heating uses the required half-up allocation path. |
 | 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Slice C. |
 | 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
-| A | Current | Reinforce M2 from Page 01b | Fully reconcile Page 01b, Antworten and register entries in `docs/03`/`docs/08`. Add every missing golden fixture. Revalidate M2 and Rows 1–3, then fix only confirmed differences. |
+| A | Current — fixture gate | Reinforce M2 from Page 01b | Source transcription and the 34-ID data oracle are in place. `01b-F28b`/H7 is implemented and green. Before any later source change, promote that case's data oracle to an executable golden; 27 cases remain. Keep factor-dependent `01b-F02` blocked until the Hu/Ho CSV conflict is resolved. Then revalidate M2 and Rows 1–3. |
 | B | After A | Reinforce M3–M4 from Page 01 | Fully transcribe Page 01 into `docs/08` and required `docs/02` changes. Map every `08-Fxx` fixture. Revalidate the current persisted calculation and extraction scope; implement confirmed gaps that belong to M3/M4 and leave M6-only ledger/finalization work explicitly assigned to M6. |
 | C | After B | Reinforce M1 from Page 02 | Transcribe Page 02 into `docs/09`, add all `09-Fxx` fixtures and revalidate NK eligibility, allocation and rounding. This replaces the former separate Row 5. |
 | 4 | Paused until A–C | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
@@ -182,7 +187,7 @@ The Expo mobile skeleton is not part of the completed foundation. It moved to M1
 **Spec-closed when:** the original gates still pass after complete Page 02 transcription, every
 `09-Fxx` fixture exists and all confirmed differences are resolved.
 
-### M2 — Heating and CO₂ engine 🟡 built and green; Page 01b reconciliation pending
+### M2 — Heating and CO₂ engine 🟡 Page 01b transcribed; implementation reconciliation pending
 
 - Pure `packages/heating-engine`.
 - HeizkostenV §§ 7/8, § 9 and § 9a.
@@ -242,9 +247,9 @@ Slice B, without bypassing review or tenant-document isolation.
 
 ---
 
-## 4. M5 remainder — current work
+## 4. M5 remainder — paused until Slices A–C close
 
-### Completed on `slice/m5-bootstrap-contexts`
+### Prepared on the unmerged `slice/m5-bootstrap-contexts`
 
 - JWT auth carries only the verified Person subject.
 - Expiry, issuer, exact audience and authenticated role are validated.
@@ -381,7 +386,7 @@ new source coverage and golden fixtures land together.
 | `docs/00-product-overview.md` | It advertises statements longer than 12 months, while Page 01 hard-blocks them. Its compliance claim must also distinguish the current demo from the still-incomplete final tenant document. |
 | `docs/01-tech-stack-explanations.md` | It still opens with an old TODO pass and unfinished abbreviation work. Clean it after the active architecture docs settle. |
 | `docs/02-data-model.md` | Page 01 is explicitly only partly transcribed. Pages 02–04, Page 08 and UVI add catalogue, ledger, export, matching and delivery data. Preserve Page 03's rule that self-use reduces deductible AfA, not its basis. Remove stale alternatives as models settle. |
-| `docs/03-nk-heating-engines.md` | Reconcile complete Page 01b, Antworten 02/03 and the now-present DWD spec. Close H0, K13 and fixture-traceability gaps; remove resolved open questions; separate superseded rules; apply register flags row by row. |
+| `docs/03-nk-heating-engines.md` | Page 01b, Antworten 02/03, all 47 matching register rows and the DWD/UVI dependencies are reconciled. Preserve its blocked Hu/Ho value and superseded-rule record while the RED fixtures and confirmed implementation gaps are closed. |
 | `docs/04-web-app-structure.md` | It calls the completed Page 02 source a pending spec and includes future mobile/engine packages and optional UI work as if present. Separate shipped structure from future architecture and preserve M10 renter ownership. |
 | `docs/06-demo-scenarios.md` | The current M5 bootstrap/onboarding limits are aligned. Extend it later with the complete Page 01 landlord/tenant output flow and the related milestone personas. |
 | `docs/07-compliance.md` | Add the provenance, production-blocking flags, delivery and retention rules introduced by Pages 01, 04, 05, 06 and UVI. |

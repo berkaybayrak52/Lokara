@@ -26,6 +26,7 @@ that same rounded value is printed.
 
 from decimal import Decimal
 
+import pytest
 from lokara_domain import Co2Step, Co2Table, Period, cents, period
 from lokara_heating_engine import landlord_share_percent_for_intensity
 from lokara_heating_engine.co2 import split_co2_cost
@@ -195,25 +196,7 @@ class TestShortBillingPeriodIsAnnualised:
 
 
 class TestBerkay01bF02TheFallbackReachesTheSameStep:
-    """E1 - the supplier stated nothing (§ 3 CO2KostAufG breach), K4 fires.
+    """E1 is value-blocked; only the generic reference mismatch remains testable."""
 
-    28.000 kWh(Hu) x 0,201 = 5.628 kg - the same mass `01b-F01` reads off the
-    invoice, so **every downstream figure is identical to F01**. What differs is
-    the warning and the § 7 Abs. 4 risk flag.
-
-    The mass side of the fallback is fixtured in
-    `packages/domain/tests/test_energy_reference.py`. The **cost** side of
-    Berkay's fallback (`co2Gramm/1e6 x co2PreisCentProTonne`) is deliberately
-    NOT transcribed as an engine path: it collides with `docs/03` -> "Where
-    `total_co2_kg` and `co2_cost` come from - § 3 CO2KostAufG, and never from
-    us", and Berkay himself flags it unsafe from 2026 (no single BEHG price).
-    Open item for the lead, recorded in `docs/03` § 7 no. 5.
-    """
-
-    def test_the_fallback_mass_selects_the_same_step_as_the_invoiced_mass(self) -> None:
-        fallback_kg = Decimal(28000) * Decimal("0.201")
-        assert fallback_kg == Decimal("5628.000")
-        result = _split("5628.000", 30_954)
-        assert result.landlord_share_percent == 40
-        assert int(result.landlord_amount) == 12_382
-        assert GESAMTKOSTEN - int(result.landlord_amount) == 338_218
+    def test_the_factor_dependent_fallback_has_no_oracle_until_the_csv_is_reconciled(self) -> None:
+        pytest.skip("01b-F02 has no legal-value oracle until the Hu/Ho CSV conflict is resolved")

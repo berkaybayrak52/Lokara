@@ -1,109 +1,109 @@
 # LEAD-HANDOFF.md — next main session
 
-This file gets a new main agent aligned quickly. It contains the permanent lead rules and the current
-continuation point. Verify current facts against Git before acting.
+This file aligns the next main agent with the current work. Verify every current-state claim against
+Git before acting.
 
 ## 1. Read in this order
 
 1. `CLAUDE.md` — binding rules and communication style.
-2. `AGENTS.md` — agents, lanes, branches and gates.
-3. `git status --short --branch` and `git log -5 --oneline` — actual repository state.
-4. `PLAN.md` — current state and execution order.
-5. `LAST_OUTPUT.md` — short summary of the latest completed session.
-6. For remaining M5 work: `docs/02-data-model.md` and `docs/04-web-app-structure.md`.
+2. `AGENTS.md` — lanes, branches and gates.
+3. `git status --short --branch` and `git log -5 --oneline`.
+4. `PLAN.md` — current execution order.
+5. `docs/03-nk-heating-engines.md` § 0 — Page 01b trace, conflicts and gaps.
+6. `docs/08-statement-document.md` — Page 01b output projection.
+7. `LAST_OUTPUT.md` — short session summary.
 
-Source order:
+For calculations, the source order is `berkay-work/` → `docs/` → code. The authoritative structured
+legal source is `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`.
 
-| Question | Source |
-| --- | --- |
-| Binding rules | `CLAUDE.md` |
-| Current work | `PLAN.md` |
-| Agent workflow | `AGENTS.md` |
-| Architecture | `lokara-arch.md` |
-| Calculation rules | `berkay-work/` → `docs/` → code |
-| Feature contract | Matching file under `docs/` |
-| Latest short summary | `LAST_OUTPUT.md` |
+## 2. Repository state — 16.08.2026
 
-## 2. Current repository state — 16.08.2026
-
-- Branch: `slice/m5-bootstrap-contexts`.
-- `1c71a2d` contains the secure M5 bootstrap implementation.
-- `b8a63d5` contains the Row 4 status and mandatory communication rules.
-- The slice has not been merged or pushed.
-- Uncommitted documentation cleanup currently affects `CLAUDE.md`, `PLAN.md`,
-  `DEMO-RUNBOOK.md` and this file.
-- The last implementation verification was green: full gate, non-destructive demo path and boundary
-  audit. The statement PDF fingerprint did not change.
+- Current branch: `slice/reconcile-page01b`, cut from `main`.
+- Current HEAD: `891cb7a docs: require early milestone reconciliation`.
+- The same approved roadmap change was first committed as `d371cc3` on the paused
+  `slice/m5-bootstrap-contexts` branch.
+- Slice A spec work is uncommitted.
+- Modified: `PLAN.md`, `docs/03-nk-heating-engines.md`, `docs/08-statement-document.md`,
+  `packages/domain/tests/test_energy_reference.py`, and
+  `packages/heating-engine/tests/test_berkay_01b_co2_stufen.py`.
+- New: `packages/heating-engine/tests/berkay_01b_golden.py` and
+  `packages/heating-engine/tests/test_berkay_01b_complete_coverage.py`.
+- No implementation source, rules-store file or `berkay-work/` file changed.
 - Do not commit, merge or push until Emir asks.
 
-## 3. Where M5 stands
+## 3. Current work — Slice A
 
-### Complete — secure bootstrap foundation
+Goal: reinforce M2 against the complete Page 01b source before any later feature work.
 
-- JWT auth carries only the verified Person subject.
-- Expiry, issuer, exact audience and authenticated role are validated.
-- Account context is loaded from the database, never trusted from the token.
-- Migration `0006` adds the single bounded `app_bootstrap_contexts(text)` read.
-- `GET /me` returns every live account Membership context.
-- `/demo/summary` and the token-scoped account session are retired.
-- The demo summary uses `/a/{accountId}/summary`.
-- `scripts/check_pre_context_reads.py` enforces the function, role, policies, privileges and API call
-  sites.
-- No new dashboard, portal or account switcher was added.
+### Complete in the uncommitted spec phase
 
-### Remaining M5 work
+- Every Page 01b source section is traced into `docs/03` and `docs/08`.
+- All 34 fixture IDs are recorded, including `F26b`, `F26c`, `F28a` and `F28b`.
+- All 47 matching register rows are inventoried: 20 `geprüft`, 27
+  `verify-before-production`.
+- Superseded rules, dependencies and confirmed implementation gaps are explicit.
+- The old factor-dependent F02 assertions no longer silently select one disputed Erdgas factor.
+- `F28b/H7` is an executable red contract for the missing MDL gross-rescaling seam.
 
-1. Enforce Membership roles in the API:
-   - OWNER has full account access;
-   - EMPLOYEE sees only assigned buildings;
-   - EMPLOYEE with no assignments sees nothing;
-   - TAX_ADVISOR is read-only.
-2. Validate every nested `/a/{accountId}/buildings/{buildingId}/…` route before doing work.
-3. Return a deliberate 403/404 for unauthorized or foreign buildings.
-4. Make the existing owner portal role-aware.
-5. Add the visible account switcher when `/me` returns more than one context.
-6. Add the OpenAPI guard proving no current route writes `renter.person_id`.
+### Honest fixture status
 
-Do not build renter activation or the renter portal in this M5 continuation. M10 owns activation,
-the `renter.person_id` write and renter-portal context. M6 owns separate finalized tenant documents.
-If `PLAN.md` uses the broader phrase "renter-facing context" under M5, follow the narrower ownership
-defined in `docs/02`: M5 adds only the no-write guard; M10 builds the actual renter context.
+- The 34-ID data oracle is specification data. It is not executable golden closure.
+- Executable current cases: `F03–F06` and `F16`.
+- Executable red case: `F28b`.
+- `F01`, `F07–F15`, `F17–F27` including `F26b/c`, `F28a`, and `F29–F31` still need
+  executable golden tests before their source changes: 27 cases.
+- `F01` and `F26` currently have only primitive-level evidence.
 
-The next implementation should start with role enforcement and nested-building authorization. The
-visible switcher follows after those boundaries are green.
+### Hard blocker
 
-## 4. How to work with Emir
+Hu/Ho must not be guessed:
 
-- Answer only what he asks.
-- Lead with the result. Use short, simple sentences.
+- current CSV and the 13.08 handoff: `0.201 / 0.181`, marked `geprüft`;
+- later Antwort 03: `0.2016 / 0.1820`, requests a CSV update and
+  `verify-before-production`;
+- that CSV update is absent.
+
+Therefore `F02` has no approved factor-dependent value. Keep it blocked until Berkay supplies a
+reconciled register row or Emir gives explicit source-resolution authority.
+
+## 4. Verification already run
+
+- Focused non-red tests: 246 passed, 3 intentionally skipped.
+- Ruff lint and format: green.
+- Engine purity: 31 files clean.
+- `git diff --check`: green.
+- Expected red run: 11 passed, 1 failed because
+  `rescale_mdl_gross_positions` does not exist. There was no import or collection error.
+
+The full and demo gates have not run for Slice A. They belong at green closure, not at this
+intentional red boundary.
+
+## 5. Exact continuation
+
+1. Review the uncommitted spec/test diff. Do not weaken or replace its expected values.
+2. Commit the red specification only when Emir authorizes the commit.
+3. Use `engine-implementer` for `F28b/H7`; it owns implementation and cannot edit tests.
+4. Re-run the focused test and engine package tests.
+5. Before each later implementation seam, use `spec-scribe` to promote its data oracle into an
+   executable red golden test. Do not let an implementer create its own test.
+6. Leave `F02` blocked until Hu/Ho is resolved.
+7. Slice A is done only when every Page 01b fixture has executable coverage, confirmed gaps are
+   implemented, Rows 1–3 remain correct, and full/demo gates plus required statement review pass.
+
+Do not start Slice B, resume M5 or merge this branch before Slice A closes green.
+
+## 6. Paused work
+
+The secure M5 bootstrap foundation remains on `slice/m5-bootstrap-contexts`. Role enforcement,
+nested-building authorization, the account switcher and the `renter.person_id` negative guard remain
+unfinished. Do not carry that implementation into this slice.
+
+## 7. Working style
+
+- Answer only what Emir asks.
+- Be short, simple and exact.
 - Stop at the requested stage.
-- Verify claims before stating them.
-- Ask only when a missing decision materially changes scope or risk.
-- Do not add advice, next steps or work unless requested.
-
-## 5. Lead responsibilities
-
-- Emir controls scope, priorities, agents, commits, merges and pushes.
-- Preserve unrelated user changes.
-- Inspect staged and unstaged changes separately.
-- Verify agent reports against code, Git and command output.
-- Reviewers report findings; they never fix them.
-- Implementers do not write their own tests.
-- Worktree changes do not sync back automatically.
-- Never run `scripts/verify_demo_path.sh` from an agent worktree.
-- Keep `.claude` and `.codex` aligned through `scripts/check_agent_parity.py`.
-- Preserve legal flags and provenance. `geprüft` does not mean lawyer-approved.
-
-## 6. Before merge
-
-- Confirm the slice contains only intended work.
-- Run `scripts/gate.sh full`.
-- Run the demo gate when the milestone or output requires it.
-- Record the PDF fingerprint for any claimed document change or non-change.
-- Merge only green work. Push only when Emir asks.
-
-## 7. Close the session
-
-- Overwrite `LAST_OUTPUT.md` using the format in `CLAUDE.md`.
-- Put execution status in `PLAN.md` and durable feature rules in `docs/`.
-- Keep raw logs, prompts and agent reports out of the handoff.
+- Verify claims against Git and command output.
+- Preserve legal flags and source conflicts.
+- Never run DB-backed demo gates from an agent worktree.
+- Update `PLAN.md` for durable status and overwrite `LAST_OUTPUT.md` at session close.

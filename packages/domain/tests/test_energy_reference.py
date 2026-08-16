@@ -34,40 +34,18 @@ from lokara_domain import (
     co2_grams_from_energy,
 )
 
-# Values from the Rechtsstand-Register, imported as-is (CLAUDE.md precedence
-# rule 3), flags intact: all four are `verify-before-production`, Rechtsnatur
-# `Konvention`, source EBeV 2030 Anlage 2 Teil 4. The lead's brief carries a
-# different Erdgas pair (Hu 0,2016 / Ho 0,1820) - recorded as an open
-# discrepancy in `docs/03` § 7 and deliberately NOT resolved here.
-ERDGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.201"), reference=EnergyReference.HU)
-ERDGAS_HO = EmissionFactor(kg_co2_per_kwh=Decimal("0.181"), reference=EnergyReference.HO)
+# Synthetic values prove only the reference-type boundary.  The current CSV and
+# Antwort 03 disagree on both Erdgas factors, so this test must not select either
+# legal pair (`docs/03` § 0.4).  Oil/LPG are separate, non-conflicting rows.
+SYNTHETIC_ERDGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.2"), reference=EnergyReference.HU)
+SYNTHETIC_ERDGAS_HO = EmissionFactor(kg_co2_per_kwh=Decimal("0.18"), reference=EnergyReference.HO)
 HEIZOEL_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.266"), reference=EnergyReference.HU)
 FLUESSIGGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.236"), reference=EnergyReference.HU)
 
 
 class TestMatchingReferences:
-    def test_berkay_01b_f02_the_hu_fallback_of_the_reference_object(self) -> None:
-        """`01b-F02` / E1 - the supplier stated no CO₂ figures (§ 3 breach).
-
-        28.000 kWh declared **Hi/Hu** (his input field `rechnung.mengeKwh` is
-        Hi) x 0,201 kg/kWh = 5.628 kg, which is exactly the mass `01b-F01` gets
-        from the invoice. Every downstream figure of F02 is therefore identical
-        to F01; what differs is the warning and the § 7 Abs. 4 risk flag.
-
-        R4: the internal unit is the **integer gram**.
-        """
-        grams = co2_grams_from_energy(Decimal(28000), EnergyReference.HU, ERDGAS_HU)
-        assert grams == 5_628_000
-        assert isinstance(grams, int)
-
-    def test_the_same_invoice_read_as_brennwert_uses_the_ho_factor_directly(self) -> None:
-        """28.000 kWh(Ho) x 0,181 = 5.068 kg. No conversion happened on the way.
-
-        Against the wrong pairing - 28.000 Ho-kWh x the **Hu** factor - this is
-        5.628 kg vs 5.068 kg, i.e. 11,0 % too high. That is the defect, in one
-        line of arithmetic.
-        """
-        assert co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HO) == 5_068_000
+    def test_berkay_01b_f02_is_blocked_until_the_csv_factor_conflict_is_resolved(self) -> None:
+        pytest.skip("01b-F02 has no legal-value oracle until the Hu/Ho CSV conflict is resolved")
 
     def test_heizoel_and_fluessiggas_carry_the_heizwert_reference(self) -> None:
         """Both register rows are Hu (EBeV Anlage 2 Teil 4 Nr. 3b / 5b) and the
@@ -95,11 +73,11 @@ class TestAReferenceMismatchIsAHardError:
         """The exact silent-failure case: an Erdgas invoice (Ho) met by the
         EBeV Hu factor. It must not compute a number at all."""
         with pytest.raises(EnergyReferenceMismatchError):
-            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HU)
+            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, SYNTHETIC_ERDGAS_HU)
 
     def test_heizwert_kwh_against_a_brennwert_factor_is_refused(self) -> None:
         with pytest.raises(EnergyReferenceMismatchError):
-            co2_grams_from_energy(Decimal(28000), EnergyReference.HU, ERDGAS_HO)
+            co2_grams_from_energy(Decimal(28000), EnergyReference.HU, SYNTHETIC_ERDGAS_HO)
 
     def test_the_error_does_not_coerce_a_value_on_the_way_out(self) -> None:
         """There is no conversion path, so there is nothing to fall back to.
@@ -107,7 +85,7 @@ class TestAReferenceMismatchIsAHardError:
         this design removed.
         """
         with pytest.raises(EnergyReferenceMismatchError) as raised:
-            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, ERDGAS_HU)
+            co2_grams_from_energy(Decimal(28000), EnergyReference.HO, SYNTHETIC_ERDGAS_HU)
         assert "0.903" not in str(raised.value)
 
     def test_an_ho_quantity_of_oil_has_no_factor_and_is_refused(self) -> None:
@@ -118,16 +96,5 @@ class TestAReferenceMismatchIsAHardError:
 
 
 class TestTheRegisterPairIsNotExactlyReciprocal:
-    def test_the_two_erdgas_factors_agree_only_to_about_a_third_of_a_percent(self) -> None:
-        """Recorded, not resolved (`docs/03` § 7, open discrepancy 2).
-
-        The register says *"beide Wege fuehren zum selben Ergebnis"*, but
-        0,201 x 0,903 = 0,181503, not 0,181. On 28.000 kWh that is 5.082 kg via
-        the conversion against 5.068 kg direct - 14 kg apart. A further argument
-        for the no-conversion design, and a question for Berkay.
-        """
-        converted = ERDGAS_HU.kg_co2_per_kwh * Decimal("0.903")
-        assert converted == Decimal("0.181503")
-        assert converted != ERDGAS_HO.kg_co2_per_kwh
-        drift = (converted - ERDGAS_HO.kg_co2_per_kwh) / ERDGAS_HO.kg_co2_per_kwh
-        assert Decimal("0.002") < drift < Decimal("0.004")
+    def test_the_pair_is_not_an_engine_oracle_while_its_sources_conflict(self) -> None:
+        pytest.skip("the current CSV pair is recorded in docs, not selected as an engine oracle")
