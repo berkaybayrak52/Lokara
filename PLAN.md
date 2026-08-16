@@ -10,15 +10,18 @@ UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
-- M0–M4 are built and green on the v4 Python stack.
+- M0 is complete. M1–M4 are built and green under their original scope, but are not yet fully
+  verified against all Berkay specifications.
 - The v4 migration is complete. The old TypeScript backend is gone. Mobile moved to M10.
 - Composite foreign-key isolation and M5a identity/RLS are complete.
-- Execution rows 1–3 are complete.
+- Execution rows 1–3 are complete for their bounded fixes. Full Page 01b reconciliation is still
+  required before M2 is spec-closed.
 - Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
 - Only Page 01 and Page 01b are partly represented in current `docs/`. Pages 02–08 and the full UVI
   annex still need transcription before their related implementation work.
-- Row 4 is current. Its secure bootstrap foundation is complete on
-  `slice/m5-bootstrap-contexts`, but the slice is not merged yet.
+- The M1–M4 reconciliation gate is current and must finish before new feature work continues.
+- Row 4 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
+  but the slice is not merged yet.
 - Row 4 has not added a new dashboard, portal or account switcher.
 
 ---
@@ -31,9 +34,9 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
-| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks final M6 statements. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Substantial but partial/stale. H0 path selection, K13 comparison values and fixture traceability remain incomplete. Blocks remaining heating work, D2 and UVI. |
-| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks Row 5 and classifications used by M6, M7 and Page 07. |
+| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks M3/M4 spec closure and final M6 statements. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Substantial but partial/stale. H0 path selection, K13 comparison values and fixture traceability remain incomplete. Blocks M2 spec closure, remaining heating work, D2 and UVI. |
+| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Missing. Blocks Row 7, M9 and the UVI due-date guard. |
@@ -99,10 +102,12 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | # | Status | Work | Required result |
 | --- | --- | --- | --- |
 | 1 | ✅ Done 13.08.2026 | Wire R1/R5/K9 and Ho/Hu into `heating-engine` | Heating uses the required half-up allocation path. |
-| 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Row 5. |
+| 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Slice C. |
 | 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
-| 4 | 🟡 In progress | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
-| 5 | Open | Page 02 → `docs/09` and BetrKV catalogue | Replace free-text cost types with a versioned umlagefähig catalogue. Transcribe the spec before changing NK rounding or allocation behaviour. |
+| A | Current | Reinforce M2 from Page 01b | Fully reconcile Page 01b, Antworten and register entries in `docs/03`/`docs/08`. Add every missing golden fixture. Revalidate M2 and Rows 1–3, then fix only confirmed differences. |
+| B | After A | Reinforce M3–M4 from Page 01 | Fully transcribe Page 01 into `docs/08` and required `docs/02` changes. Map every `08-Fxx` fixture. Revalidate the current persisted calculation and extraction scope; implement confirmed gaps that belong to M3/M4 and leave M6-only ledger/finalization work explicitly assigned to M6. |
+| C | After B | Reinforce M1 from Page 02 | Transcribe Page 02 into `docs/09`, add all `09-Fxx` fixtures and revalidate NK eligibility, allocation and rounding. This replaces the former separate Row 5. |
+| 4 | Paused until A–C | M5 roles, URL context and switcher | Secure bootstrap is complete on the slice. Still needed: role enforcement, owner account contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. Renter activation and portal context remain M10. |
 | 6 | Open | M6 bank, ledger and finalized statements | Complete Page 01 → `docs/08` first. Transcribe Page 08 → `docs/15` before bank matching. Add actual paid advances, BGH minimum #4, immutable snapshots, one landlord overview and isolated tenant documents. |
 | 7 | Open | Page 05 → `docs/12` Wächter set | Implement § 556 deadline, Eichfrist and UVI cadence through one reusable guard mechanism. |
 | 8 | Open | Statement copy and citations | Resolve the remaining reviewer findings on ligatures, spacing, copy and footer citations. |
@@ -111,9 +116,11 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 11 | Ready after transcription; values blocked | M7 tax export and AfA | Transcribe Page 03 → `docs/10` and Page 04 → `docs/11`. Build only the computation paths; flagged register values still block real output. |
 | 12 | Open | M8, M10 modules and mobile | Transcribe Page 06 → `docs/13` before the clause engine and Page 07 → `docs/14` before the investment cockpit. Then build documents, tickets, activation, investment, billing and native apps. |
 
-Before Row 5 or Row 6 implementation, finish the Page 01 coverage table in `docs/08`. Page 02 uses
-the statement model defined there. Row 9 is no longer blocked by the co2online licence, but it is
-blocked by the `docs/16` transcription gate. A real § 6a output must still be checked later.
+Slices A–C are a mandatory reconciliation gate. Do not continue Row 4 or start later feature work
+until all three are spec-closed and the full and demo gates pass. Rows 1–3 remain complete only for
+their named fixes; they do not count as full Page 01b coverage. Row 9 is no longer blocked by the
+co2online licence, but it is blocked by the `docs/16` transcription gate. A real § 6a output must
+still be checked later.
 
 ### M7 value warning
 
@@ -147,7 +154,7 @@ or Finanzamt until each value is confirmed.
 
 ---
 
-## 3. Completed foundation
+## 3. Built foundation and reconciliation status
 
 ### M0 — Foundations and scaffolding ✅
 
@@ -164,7 +171,7 @@ Built:
 
 The Expo mobile skeleton is not part of the completed foundation. It moved to M10.
 
-### M1 — Operating-cost engine ✅
+### M1 — Operating-cost engine 🟡 built and green; Page 02 reconciliation pending
 
 - Pure `packages/nk-engine`.
 - Day-weighted allocation, vacancy handling and largest-remainder reconciliation.
@@ -172,9 +179,10 @@ The Expo mobile skeleton is not part of the completed foundation. It moved to M1
 - Per-period `AllocationKeyAssignment`; changing a key does not delete entered data.
 - Canonical €1,200 golden fixture passes exactly.
 
-**Done when:** golden tests pass, totals reconcile to the cent and recalculation destroys no data.
+**Spec-closed when:** the original gates still pass after complete Page 02 transcription, every
+`09-Fxx` fixture exists and all confirmed differences are resolved.
 
-### M2 — Heating and CO₂ engine ✅
+### M2 — Heating and CO₂ engine 🟡 built and green; Page 01b reconciliation pending
 
 - Pure `packages/heating-engine`.
 - HeizkostenV §§ 7/8, § 9 and § 9a.
@@ -182,10 +190,10 @@ The Expo mobile skeleton is not part of the completed foundation. It moved to M1
 - CO₂ 10-step landlord/renter split.
 - Versioned ratios, tables and `Rechtsstand`.
 
-**Done when:** heating and CO₂ fixtures pass and the statement prints the correct split with
-`Rechtsstand`.
+**Spec-closed when:** complete Page 01b coverage exists, every `01b-Fxx` fixture is traced, Rows 1–3
+remain correct and the statement prints the verified split with `Rechtsstand`.
 
-### M3 — Web vertical slice and PDF ✅
+### M3 — Web vertical slice and PDF 🟡 built and green; Page 01 reconciliation pending
 
 Built:
 
@@ -198,10 +206,10 @@ Built:
 - autosave so leaving a flow does not lose entered data;
 - statement inputs from persisted rows, not fixture constants.
 
-**Done when:** a logged-in user can produce the correct seeded NK/heating PDF without manual database
-changes.
+**Spec-closed when:** the original demo remains green after complete Page 01 transcription and all
+`08-Fxx` statement fixtures pass.
 
-### M4 — Document extraction demo ✅
+### M4 — Document extraction demo 🟡 built and green; Page 01 reconciliation pending
 
 - Shared upload → prefill → confirm flow.
 - Stub Vision adapter with canned invoices.
@@ -210,8 +218,11 @@ changes.
 
 Not included:
 
-- automatic allocation-key choice, which needs the Row 5 BetrKV catalogue;
+- automatic allocation-key choice, which needs the Slice C BetrKV catalogue;
 - Beleg persistence, file hash and object storage.
+
+**Spec-closed when:** its confirmed extraction path still feeds the Page 01 statement model after
+Slice B, without bypassing review or tenant-document isolation.
 
 ### FK isolation slice ✅
 
@@ -396,8 +407,9 @@ found no missing Berkay calculation contract that requires a new section there.
 
 ## 7. Product floor
 
-M0–M4 are the current green, demoable floor: a persisted-data operating-cost and heating calculation
-view with CO₂ allocation and tenant isolation. It is not yet the finalized, legally complete tenant
-document; Page 01 transcription and M6 still close those gaps.
+M0 is complete. M1–M4 are the current green, demoable floor: a persisted-data operating-cost and
+heating calculation view with CO₂ allocation and tenant isolation. They are not yet fully
+spec-closed. Slices A–C must reconcile them with Pages 01, 01b and 02 before feature work continues.
+The finalized tenant document still waits for M6.
 
 Protect that floor. Correctness comes before breadth. If work stops, stop at a green state.
