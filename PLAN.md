@@ -37,7 +37,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Partial. Selected blocks exist, but the source requires three outputs and answers questions still open in `docs/08`. Blocks M3/M4 spec closure and final M6 statements. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. F28b is green. F02's factor-dependent value remains blocked by the Hu/Ho conflict, while its missing-supplier-cost refusal is RED without choosing a factor. F18 and the A2 device contracts are RED. The A2–A7 rows below assign every case not already exact and green. Blocks M2 implementation closure, D2 and UVI. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and 34-ID data oracle transcribed; this is not yet executable golden-test closure. A1–A3, F02's factor-independent refusal and exact F18 are green. A2/A3 capability evidence does not close the full fixtures. F02's factor-dependent value remains blocked by the Hu/Ho conflict. A4 is RED; A5–A7 remain pending. Blocks M2 implementation closure, D2 and UVI. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Missing. Blocks M1 spec closure, Slice C and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Missing. Blocks M7 AfA and Page 07 tax KPIs. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Missing. Blocks M7 export and Page 07 tax KPIs. |
@@ -89,10 +89,10 @@ Current trace audit, 16.08.2026:
 
 - Page 01 has no current doc/test trace for `08-F02…F05`, `F07…F16`, `F18…F20` and `F23…F24`.
 - Page 01b now has a complete 34-ID data oracle and source-section trace, but a data table is not an
-  executable golden test. Current exact green cases are `F03–F06`, `F16` and `F28b`. RED hand-offs
-  now exist for the factor-independent `F02` cost refusal, exact `F18`, and A2 device spans. A RED
-  capability contract or primitive test does not count as full fixture closure. The A2–A7 rows
-  assign every remaining case; `F02` stays value-blocked for its factor-dependent result.
+  executable golden test. Current exact green cases include F02's factor-independent refusal,
+  `F03–F06`, `F16`, `F18` and `F28b`. A2/A3 capability contracts are green but do not count as full
+  fixture closure. A4 is RED. The A2–A7 rows assign every remaining case; `F02` stays value-blocked
+  for its factor-dependent result.
 - Pages 02–08 have no complete transcription. Existing references to a few Page 02 fixtures from
   owner-residual work do not count as Page 02 coverage.
 - Page 06's routing and risk rules can be transcribed, but its missing clause-text/version catalogue
@@ -111,9 +111,9 @@ heating claim by 3%. Missing consumption-based billing can reduce it by 15%.
 | 2 | ✅ Done 15.08.2026 | Eigentümer residual | One residual line per property and cost type: total minus renter shares. It always exists and is never a party or occupancy share. NK stays on largest remainder until Slice C. |
 | 3 | ✅ Done 15.08.2026 | CO₂ rounding under § 5 Abs. 1 S. 3 | Annualise, round half-up to one decimal, then classify. Print the same one-decimal value in both PDF locations. |
 | A1 | ✅ Green | MDL gross rescaling | `01b-F28b` is executable and green: exact gross quotient, accepted one-cent source residual and owner reconciliation. |
-| A2 | RED spec ready | Device and segmented readings | Implement H5's typed device/span model, one-decimal factor aggregation and H6 hand-off. RED: `F01/F27`, `F15`, `F17`, `F22`; `F16` is a new-shape regression over its existing green K3 golden. Exact WE-03-only `F18` is RED and must reproduce Berkay's authoritative cents. |
-| A3 | RED spec ready after A2 | Plant/CO₂ applicability and source state | Implement the RED capability contracts for `F07–F10` and `F23`: building type, fuel, connected state, proof-gated protection/exclusion, module/disclosure switches and non-blocking R8-value warnings. |
-| A4 | Pending after A3 | Self-billing inputs and plant aggregation | Close `F02`, `F11–F14`, `F19`, `F20`, `F24`. F02 cost refusal is RED now; its factor-dependent mass remains blocked. F20 closes only when H1 aggregates all positions and the § 6a network disclosures exist. |
+| A2 | ✅ Green `716f741` | Device and segmented readings | H5 typed device/span aggregation and H6 hand-off are green for `F01/F27`, `F15`, `F16`, `F17` and `F22`. Exact WE-03-only `F18` reproduces Berkay's authoritative cents. Capability evidence is not full F01/F15/F17/F22/F27 E2E closure. |
+| A3 | ✅ Green `89db9e0` | Plant/CO₂ applicability and source state | Green capability contracts cover `F07–F10` and `F23`: building type, fuel, connected state, proof-gated protection/exclusion, module/disclosure switches and non-blocking R8-value warnings. They are not full fixture E2E closure. |
+| A4 | RED spec ready after A3 | Self-billing inputs and plant aggregation | Implement normalized pure capability contracts for `F11–F14`, `F19`, `F20`, `F24`: H1 positions/disclosure carry, K8 overlap and coverage warning, oil stock consumption, H3 priority/fallback/single-block paths and the 50 % owner preview. These tests are not E2E closure. F02's cost refusal is green; its factor-dependent mass remains blocked. |
 | A5 | Pending after A4 | Remaining readiness and warning channels | Close `F21`, `F25`, `F26/F26b/F26c`: hard denominator stop, separate unsummed risk amounts, and the two WW-gap thresholds. F23's warning primitive belongs to A3 but still needs E2E projection before fixture closure. |
 | A6 | Pending after A5 | MDL net and readiness branches | Close `F28a`, `F29`, `F30`. F29 belongs to the net M2/M3 branch; the gross-rescaling seam is not a closure scaffold. |
 | A7 | Pending after A6 | Annual § 6a comparison | Close `F31`: heat adjusted with each year's DWD factor, WW raw, labelled missing-factor fallback, no empty graph, and complete disclosure/risk output. |

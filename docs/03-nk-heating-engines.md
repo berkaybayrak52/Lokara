@@ -371,11 +371,12 @@ looking up, selecting or deriving any emission factor.
 
 Executable golden-test closure is therefore still open:
 
-- Exact current green cases: `F03–F06`, `F16` and `F28b`.
-- Current RED hand-offs are the factor-independent `F02` supplier-cost refusal, the exact
-  WE-03-only `F18` area fallback, and A2's device/segmented-reading contracts for
-  `F01/F15/F17/F22/F27`. A2 also re-exercises `F16` through the missing-interim-reading shape;
-  that does not replace its existing green degree-day golden.
+- Exact current green cases include `F02`'s factor-independent supplier-cost refusal,
+  `F03–F06`, `F16`, exact `F18` and `F28b`. F02's factor-dependent mass value remains blocked.
+- A2's device/segmented-reading capability contracts are green for
+  `F01/F15/F17/F22/F27`; A2 also re-exercises `F16` through the missing-interim-reading shape.
+  A3's applicability/warning capability contracts are green for `F07–F10/F23`. None of those
+  capability results is counted as full fixture E2E closure.
 - `F01` and `F26` have useful allocation-primitive coverage, but not their complete worked-example
   pipeline.
 - No count in this section treats a capability contract or primitive test as full fixture closure.
@@ -386,35 +387,35 @@ Executable golden-test closure is therefore still open:
 
 | Fixture | Rule / result | Feature test |
 | --- | --- | --- |
-| `01b-F01` | full self-billing pipeline; four renter totals + owner reconcile to 338.218 ct | `test_berkay_01b_residual_wiring.py`, `test_heating_golden.py` |
-| `01b-F02` | missing supplier data; mass fallback value **blocked by Hu/Ho conflict**; cost fallback refused without consulting a factor | RED `test_berkay_01b_f02_cost_refusal.py`; value oracle remains blocked |
+| `01b-F01` | full self-billing pipeline; four renter totals + owner reconcile to 338.218 ct | ✅ A2 device input contract plus allocation primitives; full pipeline still open |
+| `01b-F02` | missing supplier data; mass fallback value **blocked by Hu/Ho conflict**; cost fallback refused without consulting a factor | ✅ `test_berkay_01b_f02_cost_refusal.py`; value oracle remains blocked |
 | `01b-F03` | exact 12,0 boundary → 10 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F04` | exact 52,0 boundary → 95 % | `test_berkay_01b_co2_stufen.py` |
 | `01b-F05` | annualise/round/classify; corrected 12,0 → 10 % | `test_berkay_01b_co2_s3_rounding.py`, `test_berkay_01b_co2_stufen.py` |
 | `01b-F06` | 275-day annualisation before S. 3 rounding | `test_co2_short_period_annualisation.py`, `test_berkay_01b_co2_stufen.py` |
-| `01b-F07` | non-residential 50/50 | RED A3 plant/CO₂ applicability contract; not yet E2E closure |
-| `01b-F08` | protected building: landlord percentage halved, proof required | RED A3 protection/proof contract; not yet E2E closure |
-| `01b-F09` | proven full exclusion; disclosure still prints | RED A3 exclusion/proof contract; not yet E2E closure |
-| `01b-F10` | heat pump and biomass: CO₂ module and disclosure off | RED A3 energy-source contract; not yet E2E closure |
-| `01b-F11` | priority WW heat-meter path, 9.100 kWh | complete oracle; measured-energy WW seam pending |
-| `01b-F12` | 32 kWh/m² fallback plus warning | `test_heating_golden.py`, `test_heating_disclosure.py` + complete oracle |
-| `01b-F13` | non-connected plant, one heat block | `test_heating_golden.py` + complete oracle |
-| `01b-F14` | 50/50 base/consumption choice and owner-impact preview | complete oracle; preview seam pending |
-| `01b-F15` | heat-meter kWh weights instead of HKV units | `test_heat_consumption_unit.py` + complete oracle |
-| `01b-F16` | no interim reading: K3, owner vacancy segment | `test_berkay_01b_degree_days.py` + complete oracle |
-| `01b-F17` | ≤25 % estimated, amount unchanged, provenance required | `test_heating_golden.py`, `test_heating_disclosure.py` + complete oracle |
-| `01b-F18` | only WE-03 readings missing: 58/194 = 29,90 %; all consumption blocks dissolve to area; Berkay's printed cents are authoritative | RED `test_berkay_01b_f18_area_fallback.py` |
-| `01b-F19` | oil stock/weighted cost; CO₂ on consumption; cost fallback refused | complete oracle; oil-input seam pending |
-| `01b-F20` | district heating pass-through, step model still applied; H1 aggregation and § 6a network disclosures are part of closure | partial CO₂ primitive only; H1/disclosure seams pending |
+| `01b-F07` | non-residential 50/50 | ✅ A3 plant/CO₂ applicability capability; not yet E2E closure |
+| `01b-F08` | protected building: landlord percentage halved, proof required | ✅ A3 protection/proof capability; not yet E2E closure |
+| `01b-F09` | proven full exclusion; disclosure still prints | ✅ A3 exclusion/proof capability; not yet E2E closure |
+| `01b-F10` | heat pump and biomass: CO₂ module and disclosure off | ✅ A3 energy-source capability; not yet E2E closure |
+| `01b-F11` | priority WW heat-meter path, 9.100 kWh | RED A4 measured-energy priority contract; not yet E2E closure |
+| `01b-F12` | 32 kWh/m² fallback plus warning | RED A4 fallback/warning contract plus existing primitives; not yet E2E closure |
+| `01b-F13` | non-connected plant, one heat block | RED A4 single-block contract plus existing primitive; not yet E2E closure |
+| `01b-F14` | 50/50 base/consumption choice and owner-impact preview | RED A4 block/preview contracts; not yet E2E closure |
+| `01b-F15` | heat-meter kWh weights instead of HKV units | ✅ A2 normalized weight capability; not yet E2E closure |
+| `01b-F16` | no interim reading: K3, owner vacancy segment | ✅ existing K3 golden plus A2 new-shape regression |
+| `01b-F17` | ≤25 % estimated, amount unchanged, provenance required | ✅ A2 estimate/provenance capability; not yet E2E closure |
+| `01b-F18` | only WE-03 readings missing: 58/194 = 29,90 %; all consumption blocks dissolve to area; Berkay's printed cents are authoritative | ✅ `test_berkay_01b_f18_area_fallback.py` |
+| `01b-F19` | oil stock/weighted cost; CO₂ on consumption; cost fallback refused | RED A4 stock/consumption contract; not yet E2E closure |
+| `01b-F20` | district heating pass-through, step model still applied; H1 aggregation and § 6a network disclosures are part of closure | RED A4 H1/disclosure-carry contract plus partial CO₂ primitive; not yet E2E closure |
 | `01b-F21` | zero denominator hard stop; no silent area fallback | `test_heating_golden.py` + complete oracle |
-| `01b-F22` | negative delta rejected; two device segments | complete oracle; device aggregation seam pending |
-| `01b-F23` | 5–70 plausibility band warns, never blocks; warning carries the R8 values `74,7` / `4,1` | RED A3 warning-channel contract; not yet E2E closure |
-| `01b-F24` | day-linear invoice overlap and non-dismissible coverage warning | complete oracle; invoice aggregation seam pending |
+| `01b-F22` | negative delta rejected; two device segments | ✅ A2 rejection/replacement capability; not yet E2E closure |
+| `01b-F23` | 5–70 plausibility band warns, never blocks; warning carries the R8 values `74,7` / `4,1` | ✅ A3 warning-channel capability; not yet E2E closure |
+| `01b-F24` | day-linear invoice overlap and non-dismissible coverage warning | RED A4 invoice-allocation contract; not yet E2E closure |
 | `01b-F25` | four risks shown separately, never auto-deducted or summed | complete oracle; readiness/output seam pending |
 | `01b-F26` | 5,13 % WW gap silent; 4.227 ct stays with owner | `test_berkay_01b_residual_wiring.py` + complete oracle |
 | `01b-F26b` | 11,54 % WW gap → non-blocking notice | complete suffix oracle; warning channel pending |
 | `01b-F26c` | 21,79 % WW gap → legal-risk warning | complete suffix oracle; warning channel pending |
-| `01b-F27` | device rounding/aggregation and two change readings | complete oracle; `bewertungsfaktor`/device seam pending |
+| `01b-F27` | device rounding/aggregation and two change readings | ✅ A2 device/span capability; not yet E2E closure |
 | `01b-F28a` | MDL net branch; no second CO₂ deduction | complete suffix oracle; H7 pending |
 | `01b-F28b` | MDL gross branch; exact rescale, 1 ct accepted, owner residual | ✅ `test_berkay_01b_complete_coverage.py`; H7 `rescale_mdl_gross_positions` |
 | `01b-F29` | OCR decimal shift: hard control-sum refusal in the MDL **net** branch | complete oracle; net-branch M3 seam pending; gross rescaling is not a substitute |
@@ -675,10 +676,32 @@ needs. `waermepumpe` and `biomasse` leave the whole CO₂ module off: no split, 
 Pflichtausweis and no step indicator. `verbundeneAnlage` controls whether H3 separates warm water;
 it does not by itself turn the CO₂ module on or off.
 
-Executable RED contract:
+Executable capability contract, green in `89db9e0`:
 `packages/heating-engine/tests/test_berkay_01b_a3_plant_co2_state.py`. It proves the exact
 F07–F10 money branches and F23's warning shape. These are capability tests, not full Page-01b
 closure.
+
+### A4 normalized self-billing capability contract
+
+The next boundary is split into small pure capabilities before the full H1–H6 pipeline is wired:
+
+- H1 aggregates normalized cost positions. The baseline and district-heat examples each contain
+  three exact positions. Supplier-stated district-heat mix, THG, primary-energy factor and taxes
+  are carried unchanged for § 6a; the capability does not interpret them.
+- H1a allocates an invoice by inclusive overlap days, carries the exact coverage ratio and emits a
+  non-blocking but non-dismissible warning below 100 % coverage.
+- H1b values consumed oil from opening stock plus purchases minus closing stock. Heating value and
+  emissions factor arrive as resolved rule inputs. It computes no CO₂ cost: the missing-cost branch
+  is refused, and the Hu/Ho conflict remains untouched.
+- H3 prioritizes measured warm-water energy over the volume equation. With no measurement it uses
+  the area fallback and emits the F12 warning. A non-connected plant produces one heating block.
+- H4 forms complementary base/consumption pots for a configured 30–50 % base share. A custom share
+  also carries the exact before-save owner-burden preview required by F14.
+
+Executable RED contract:
+`packages/heating-engine/tests/test_berkay_01b_a4_plant_aggregation.py`. It covers exact capability
+outputs for F11–F14, F19, F20 and F24. It does not close their per-tenancy distribution, PDF
+projection or full self-billing fixtures.
 
 ## 4. Formula (H0 … H8)
 
@@ -708,6 +731,10 @@ gesamtCent = Σ rechnung.betragCent          (allocated per K8, see H1a)
 - **H1b — oil (K7).** `verbrauchtL = tankAnfangL + Σ zukaufL − tankEndeL`; cost basis is the weighted
   average price over `tankAnfangL + Σ zukaufL`. **CO₂ is computed on the consumed quantity, never on
   the purchased quantity** (`01b-F19`).
+  The historical wrong-path counter-example is **90.121 ct**, not 90.204 ct; Antwort 01b § 2
+  identifies 90.204 as a typo. It is not a current cost oracle because Antwort 03 § 5 now refuses
+  every missing supplier-cost fallback. The correct F19 stock, consumed-energy and mass oracle is
+  unchanged.
 
 **H2 — CO₂ split, deducted before everything else**
 
