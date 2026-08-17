@@ -144,7 +144,7 @@ session. It is not an input for agent work and never overrides Git or the tracke
      ledger contract, with shipped/spec/future status kept explicit
    - `03-nk-heating-engines.md` — the crown-jewel engine specs + the €1,200 golden fixture
    - `04-web-app-structure.md` — monorepo layout, routes, M3 pages
-   - `05-design-system.md` — brand tokens (colors, Montserrat/Manrope) + WCAG/BFSG
+   - `05-design-system.md` — canonical brand, component, accessibility and interaction contract
    - `06-demo-scenarios.md` — seeded example cases for the investor demo
    - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
    - `08-statement-document.md` — **the largest spec here (~2,000 lines):** what a legally complete
