@@ -145,7 +145,7 @@ session. It is not an input for agent work and never overrides Git or the tracke
    - `03-nk-heating-engines.md` — canonical NK and Page 01b heating/CO₂ engine contract, fixtures,
      legal flags, shipped capabilities and end-to-end gaps
    - `04-web-app-structure.md` — canonical app/API structure, route and delivery-status contract
-   - `05-design-system.md` — brand tokens (colors, Montserrat/Manrope) + WCAG/BFSG
+   - `05-design-system.md` — canonical brand, component, accessibility and interaction contract
    - `06-demo-scenarios.md` — seeded example cases for the investor demo
    - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
    - `08-statement-document.md` — **the largest spec here (~2,000 lines):** what a legally complete
