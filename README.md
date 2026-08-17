@@ -142,7 +142,8 @@ session. It is not an input for agent work and never overrides Git or the tracke
    - `01-tech-stack-and-decisions.md` — locked defaults for every flagged decision (ADR-style)
    - `02-data-model.md` — canonical detailed identity, isolation, temporal property, statement and
      ledger contract, with shipped/spec/future status kept explicit
-   - `03-nk-heating-engines.md` — the crown-jewel engine specs + the €1,200 golden fixture
+   - `03-nk-heating-engines.md` — canonical NK and Page 01b heating/CO₂ engine contract, fixtures,
+     legal flags, shipped capabilities and end-to-end gaps
    - `04-web-app-structure.md` — monorepo layout, routes, M3 pages
    - `05-design-system.md` — brand tokens (colors, Montserrat/Manrope) + WCAG/BFSG
    - `06-demo-scenarios.md` — seeded example cases for the investor demo
