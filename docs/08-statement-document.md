@@ -1,1621 +1,480 @@
-# 08 — The Abrechnung document (formal content)
+# 08 — Statement document contract
 
-> **Status: living document specification.** The current landlord overview implements the heating
-> disclosure blocks specified below. The remaining formal gaps are named explicitly: the rendered
-> allocation equation and derived numerator, plus the M6 advances/Saldo and independently rendered
-> tenant documents. Build from this file, not from a pasted spec.
->
-> ⚠️ **Not legal advice.** The requirements below are the well-established formal minimums; confirm the
-> specifics with a Fachanwalt/Steuerberater before shipping to real tenants (`docs/07`).
+This is Lokara's canonical, living specification for the Page 01 statement and the document-side
+projection of Page 01b. It separates the approved output contract from what the current landlord PDF
+actually ships. Superseded arguments, closed defect narratives and slice chronology remain available
+with `git show 7b08f2b:docs/08-statement-document.md`; they are not part of the active contract.
 
----
+The authoritative Page 01 source is
+`berkay-work/Spec-Seiten/01 · Die Abrechnung 3a95fd420731816c9048ed7a517c3e9e.md`, read with the
+26 matching rows in `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` and the later method
+corrections mapped in Appendix C. Structured values and flags follow the CSV. A later Antwort may
+correct a method, but it does not silently replace a CSV value or verification flag.
 
-## Why this file exists
+## Reading guide, ownership and status
 
-`docs/03` specifies the **math** in depth; nothing specified the **document**. So the first PDF renders
-the engine's output faithfully and is still not an Abrechnung a landlord could send. The math is the
-hard part and it's correct — what's missing is document completeness, not new calculation.
+Statuses describe repository delivery, not legal certainty. `geprüft` means the primary source was
+checked, not lawyer approval. `verify-before-production` remains a production block even when the
+related arithmetic or rendering capability is green.
 
-## Page 01 transcription and fixture gate — D1, 17.08.2026
+| Status | Meaning |
+| --- | --- |
+| **Shipped** | Present on `main` in current source and covered by the repository gates. |
+| **Capability shipped** | A bounded behavior is implemented, but the complete tenant-statement workflow is not closed. |
+| **Specified** | Approved implementation contract; data-only oracles validate transcription, not production behavior. |
+| **Future** | Ownership is known, but the final contract or implementation is not shipped. |
 
-This is the current statement contract. Source:
-`berkay-work/Spec-Seiten/01 · Die Abrechnung 3a95fd420731816c9048ed7a517c3e9e.md`, the 26 Page-01
-rows in `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`, and the later method corrections
-mapped below. Structured values and flags follow the CSV. A later Antwort may correct a method but
-does not silently replace a CSV value or flag.
+Ownership is split deliberately:
 
-This section specifies the complete Page 01 output. It does **not** claim that the current PDF has
-implemented it. Today the demo PDF is the internal landlord calculation/QA view. M6 still owns actual
-paid advances, Saldo, immutable finalization and separately rendered tenant documents.
+- this file owns document audiences, content, copy, disclosure carriers, pagination and the Page 01
+  fixture/source trace;
+- [`docs/02-data-model.md`](02-data-model.md) owns the durable statement, ledger and finalization
+  model;
+- [`docs/03-nk-heating-engines.md`](03-nk-heating-engines.md) owns calculation rules, Page 01b
+  arithmetic and its current implementation gaps;
+- [`docs/05-design-system.md`](05-design-system.md) owns accessibility thresholds; this file assigns
+  statement carriers to those tiers;
+- [`docs/07-compliance.md`](07-compliance.md) owns cross-cutting compliance and claim strength.
+
+## 1. Delivery status at a glance
+
+### Shipped landlord overview
+
+The current PDF is the internal **Vermieter-Gesamtübersicht**, a live building-wide calculation and
+QA view. It is not a tenant document and must not be sent to a renter.
+
+The current render includes:
+
+- operating-cost and heating money tables from engine results;
+- one `Anteile je Partei` summary with one final `Eigentümeranteil` row;
+- NK reference totals and heating Blocks A, B and C;
+- the §§ 7/8 ratio, § 9 separation, § 9b change-of-user disclosure and § 9a branches;
+- CO₂ split, classification basis and labelled `Rechtsstand` entries;
+- tagged-PDF structure, German document language, title and searchable text required by the demo gate.
+
+These are **Shipped** capabilities. They do not turn the landlord overview into a complete
+Mieter-Einzelabrechnung.
+
+### Specified Page 01 and M6 output
+
+The complete Page 01 contract and exact `08-F01…F24` data-only oracle are **Specified and approved**.
+M6 still owns actual paid advances, Saldo, immutable finalization, one isolated tenant document per
+eligible tenancy, document archives and delivery-safe output.
+
+### Future dependencies
+
+Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to future
+`docs/11`; reusable deadline orchestration to future `docs/12`; bank matching to `docs/15`; and
+UVI/DWD rules to future `docs/16`. This file records their boundaries and does not duplicate or
+invent their contracts.
+
+## 2. Page 01 source coverage and output contract
 
 ### Source-section coverage
 
 | Page 01 source | Transcription home | Golden evidence |
 | --- | --- | --- |
-| § 1 purpose and the three-document projection | this section; "Two documents from one calculation" below | `08-F01`, F06, F17, F21 |
-| § 2 legal basis and conventions | this section; formal minimums, disclaimer, owner row and legal-copy sections below | CSV inventory and fixture table below |
-| § 3.1 object/period inputs | `docs/02` Page 01 statement model; this section | F01, F14–F15, F18–F20 |
-| § 3.2 tenancy inputs | `docs/02` Page 01 statement model; tenant projection below | F01–F05, F10, F16–F19 |
-| § 3.3 cost-line inputs | `docs/02` Page 01 statement model; reference totals below | F01, F05, F08, F11–F12 |
-| § 3.4 heating/CO₂ inputs | `docs/03`; Page 01b output reconciliation below | F05, F07–F09, F24 |
-| § 3.5 vacancy inputs | `docs/02` residual/origin model; owner row and annex below | F01, F06, F21–F23 |
-| D0 fictional occupancy | `docs/02` residual model; owner row below | F01, F21–F23 |
-| D1 audience selection | three-document rule below | F06, F17, F21 |
-| D2 fixed tenant section order | Page 01 output contract below | F02–F05, F07, F09, F18–F19 |
-| D3 cost line and reference totals | formal minimums and reference-total sections below | F01, F08, F11–F14, F16, F20 |
-| D4 party subtotal | `Ihr Anteil gesamt` below | F01–F05, F08, F10, F12, F16, F18–F19, F24 |
-| D5 actual advances and Saldo | formal minimum #4 below; M6 ledger dependency | F01–F04, F08, F10, F12, F14, F16, F18–F19, F24 |
-| D6 heating verification | heating disclosure and device-evidence sections below | F07–F08, F24 |
-| D7 CO₂ box | Page 01b output reconciliation and CO₂ sections below | F09, F24 |
-| D8 § 35a block | Page 01 output contract below | F01–F05, F24 |
-| D9 legal notices/deadline result | Page 01 output contract below; detailed guard cadence waits for `docs/12` | F14, F18–F19 |
-| D10 footer/disclaimer/page breaks | disclaimer and pagination sections below | all rendered cases |
-| D11 owner overview | owner row and reconciliation sections below | F01, F06, F08, F12, F17, F21–F24 |
-| D12 vacancy annex | owner residual/origin and annex sections below | F21–F23 |
-| § 5 E1–E21 | Page 01 output contract and fixture table below | F05, F08, F10–F23; E15/E16/E20/E21 remain guards/dependencies as stated below |
-| § 6 F01–F24 | fixture table below | `berkay_01_golden.py` and `test_berkay_01_complete_coverage.py` |
-| § 7 ownership/out of scope | dependencies below | documentation-only scope assertions |
+| § 1 purpose and three projections | § 3 and § 8 below | `08-F01`, F06, F17, F21 |
+| § 2 legal basis and conventions | §§ 4–7; Appendices B/C | register inventory and fixture table |
+| § 3.1 object/period inputs | `docs/02`; this section | F01, F14–F15, F18–F20 |
+| § 3.2 tenancy inputs | `docs/02`; § 8 | F01–F05, F10, F16–F19 |
+| § 3.3 cost-line inputs | § 5 | F01, F05, F08, F11–F12 |
+| § 3.4 heating/CO₂ inputs | `docs/03`; § 6 | F05, F07–F09, F24 |
+| § 3.5 vacancy inputs | `docs/02`; Eigentümer row and annex below | F01, F06, F21–F23 |
+| D0 fictional occupancy | `docs/02`; Eigentümer row | F01, F21–F23 |
+| D1 audience selection | § 3 | F06, F17, F21 |
+| D2 fixed tenant order | output contract below | F02–F05, F07, F09, F18–F19 |
+| D3 cost line/reference totals | §§ 4–5 | F01, F08, F11–F14, F16, F20 |
+| D4 party subtotal | `Ihr Anteil gesamt` | F01–F05, F08, F10, F12, F16, F18–F19, F24 |
+| D5 actual advances/Saldo | § 4 and § 8 | F01–F04, F08, F10, F12, F14, F16, F18–F19, F24 |
+| D6 heating verification | § 6 | F07–F08, F24 |
+| D7 CO₂ box | § 6 | F09, F24 |
+| D8 § 35a block | output contract below | F01–F05, F24 |
+| D9 deadline result | output contract below; cadence waits for `docs/12` | F14, F18–F19 |
+| D10 footer/disclaimer/page breaks | §§ 5 and 7 | all rendered cases |
+| D11 owner overview | Eigentümer row | F01, F06, F08, F12, F17, F21–F24 |
+| D12 vacancy annex | Eigentümer row and annex | F21–F23 |
+| § 5 E1–E21 | active contract below | F05, F08, F10–F23; E15/E16/E20/E21 retain stated dependencies |
+| § 6 F01–F24 | Appendix A | `berkay_01_golden.py`, `test_berkay_01_complete_coverage.py` |
+| § 7 ownership/out of scope | §§ 1 and 9 | documentation-only scope checks |
 
 ### Page 01 output contract
 
-- **One calculation, three projections.** `TENANT` produces exactly one
-  Mieter-Einzelabrechnung; `OWNER` produces the internal Vermieter-Gesamtübersicht; `TAX` produces
-  the Leerstandsaufstellung. Selection happens before rendering. A missing/foreign `tenancy_id`
-  fails and never falls back to an owner view.
-- **The tenant section order is fixed:** Anschreiben; object/period header; cost table; party
-  subtotal; heating evidence when applicable; CO₂ box when applicable; actual advances and Saldo;
-  § 35a only when non-zero; payment/credit handling; legal notices; disclaimer and `Rechtsstand`.
-- **Every cost line receives engine output, never recalculated document math.** It shows cost total,
-  applied key, the tenant numerator, object-level denominator with unit, and the rounded share. A
-  credit stays a separate negative line. A zero consumption denominator gives every renter `0` and
-  leaves the full cost with the owner; it is never silently changed to an area key.
-- **Saldo uses actual payments:** `saldo = party subtotal − geleistete Vorauszahlungen`. Missing
-  actual advances hard-blocks a tenant document; confirmed zero is valid. Positive, negative and zero
-  branches render as Nachzahlung, Guthaben and ausgeglichen. The current scalar Soll advance is not
-  a substitute; M6 supplies the temporal contract and payment ledger.
-- **The § 556 deadline blocks only a late Nachforderung.** The arithmetic remains visible as
-  `Rechnerischer Saldo`; a late Guthaben remains payable. A landlord assertion that delay was not
-  their responsibility needs an explicit reason. Cadence, reminders and escalation belong to
-  `docs/12`, not this output spec.
-- **Period validation is a hard boundary.** A shorter Rumpfperiode is allowed and stays day-exact. A
-  billing period longer than 12 months is rejected before an engine run or document render. Leap
-  years use 366 actual days; there is no document-layer special calculation.
-- **One tenancy change yields separate documents.** Each uses only its clipped dates, actual advances
-  and result, and names no other renter. Zero clipped usage days yields no tenant document and no
-  portal item; that is not itself a vacancy event.
-- **The owner overview always reconciles.** It contains all covered tenancy columns plus one
-  unconditional Eigentümer residual per cost type, including `0,00 €` or a negative amount. It is
-  internal, watermarked, and never shares a PDF or delivery channel with a tenant document.
-- **The vacancy annex keeps origin.** Block (a) itemises vacancy by unit and cost type, block (b)
-  carries non-allocable costs, and block (c) carries no economic item. Antwort 03 § 2 corrects
-  `08-F21` block (b) to `100.800` ct (Verwaltung `42.000`, Hauswart `30.000`, Rauchwarnmelder
-  `16.800`, Ziergarten `12.000`); the Page's old `0,00 [Seite 02 pending]` is superseded. Detailed
-  BetrKV classification waits for `docs/09`, and Anlage-V line mapping waits for `docs/11`.
-- **Heating and CO₂ are projections of `docs/03`.** MDL pass-through and self-billing are distinct
-  inputs. `08-F01` and `08-F24` must never be compared as two expected results of one path. The
-  heating evidence, mandatory CO₂ inputs/results and Page 01b readiness risks follow the next section.
-- **§ 35a is line-wise.** Calculate each eligible line once, half-up to cents, then add; omit the
-  whole section at zero. The CSV distinguishes the renter's statutory § 35a entitlement from
-  Lokara's flagged convention of always printing a separate statement block.
-- **Copy and pagination are binding.** Never use `rechtssicher`; use the approved tool/not-advice
-  disclaimer. Do not split subtotal from Saldo, split a cost row, or place another renter's data on a
-  tenant copy.
+- **One calculation, three projections.** `OWNER` produces the internal
+  Vermieter-Gesamtübersicht, `TENANT(tenancy_id)` one Mieter-Einzelabrechnung, and `TAX` the
+  Leerstandsaufstellung. Selection happens before rendering. A missing or foreign tenancy fails and
+  never falls back to an owner view.
+- **Fixed tenant order.** Anschreiben; object/period; costs; party subtotal; heating evidence and CO₂
+  where applicable; actual advances and Saldo; § 35a only when non-zero; payment/credit handling;
+  notices; disclaimer; `Rechtsstand`.
+- **No document-layer money math.** Every cost line receives engine output: total, applied key,
+  numerator, denominator with unit, and rounded share. Credits stay separate negative lines. A zero
+  consumption denominator gives renters `0` and leaves the cost with the owner; it never silently
+  changes to an area key.
+- **Saldo uses actual payments.** `saldo = party subtotal − geleistete Vorauszahlungen`. Missing
+  actual advances hard-block a tenant document; confirmed zero is valid. The current contractual
+  Soll scalar is not a substitute.
+- **Deadline behavior.** A late landlord `Nachforderung` is suppressed while the arithmetic remains
+  visible as `Rechnerischer Saldo`; a renter `Guthaben` remains payable. A landlord exception needs
+  an explicit reason. Cadence and escalation belong to `docs/12`.
+- **Period boundary.** A shorter Rumpfperiode is day-exact. More than 12 months hard-blocks before an
+  engine run or render. Leap years keep their actual days.
+- **Tenancy changes create separate documents.** Each uses only its own clipped dates, actual
+  advances and result. Zero clipped usage days produces no tenant document or portal item and is not
+  itself vacancy.
+- **The owner view reconciles.** It contains every covered tenancy and one unconditional owner
+  residual per cost type, including `0,00 €` and negative values. It never shares a tenant delivery
+  channel.
+- **The vacancy annex keeps origin.** Block (a) itemises vacancy by unit and cost type; block (b)
+  carries non-allocable costs; block (c) carries the rounding difference and no economic item.
+- **Heating and CO₂ project `docs/03`.** MDL pass-through and self-billing are different inputs.
+  `08-F01` and `08-F24` are different paths, not competing expected results.
+- **§ 35a is line-wise.** Round each eligible line half-up to cents, then add; omit the block at zero.
+- **Copy and pagination are binding.** Never use `rechtssicher`, never split an indivisible
+  statement, and never place another renter's data on a tenant copy.
 
 ### Inputs and immutable result shape
 
-All money is integer cents, dates are inclusive and day-granular, and areas are fixed-point decimal
-m². The normalized statement input must carry:
+Money is integer cents, dates are inclusive/day-granular, and areas are fixed-point decimal m². The
+normalized statement input carries object/period identity, rule/register versions, addressee and
+delivery data, clipped tenancy facts, actual advances, cost results, the complete applicable
+heating/CO₂ result, vacancy origins, warnings and provenance.
 
-- object identity/address, total area/unit count, period, rule/register version and creation date;
-- one covered tenancy's addressee, current delivery address, unit, clipped usage period, people,
-  consumption, actual advances, optional heating path and payment details;
-- each cost line's total, applied key, numerator, denominator, units, engine share, optional § 35a
-  labor amount and warning/provenance;
-- the complete `docs/03` heating/CO₂ result where applicable;
-- derived vacancy periods, fictional-occupancy mode and evidence metadata.
+`docs/02` owns persistence. Preview is live. Finalization stores immutable normalized inputs,
+results, engine/rule versions, every applicable `Rechtsstand`, timestamps, hashes and separately
+archived documents. A finalized version is never rebuilt from current mutable rows.
 
-`docs/02` owns the durable model: draft preview is live; finalization stores an immutable versioned
-snapshot with normalized inputs, engine/rule versions, every `Rechtsstand`, results, hashes and
-separate archived documents. No finalized document is rebuilt from current mutable rows.
+## 3. Audience split and privacy boundary
 
-### Fixture coverage — exactly `08-F01` through `08-F24`
+### Two documents from one calculation
 
-Every row has a data-only oracle in `packages/domain/tests/berkay_01_golden.py`. Completeness and
-arithmetic consistency are green checks in `test_berkay_01_complete_coverage.py`. These are
-transcription oracles, not claims that the current application implements every branch.
+| Document | Audience | Contents | Delivery status |
+| --- | --- | --- | --- |
+| **Vermieter-Gesamtübersicht** | landlord/internal | all parties and the full reconciliation | **Shipped** live preview |
+| **Mieter-Einzelabrechnung** | exactly one covered tenancy | only that tenancy's share, advances, Saldo and notices | **Specified**, M6 |
+| **Leerstandsaufstellung** | landlord/tax evidence | origin-preserving vacancy/non-allocable/rounding blocks | **Specified**, M6/tax handoff |
 
-| Fixture | Current rule/result |
-| --- | --- |
-| `08-F01` | MDL reference run: `1.072.600` total, `1.055.069` allocated, `17.531` owner residual; party totals, advances, Saldi and § 35a all reconcile |
-| `08-F02` | positive Saldo: `288.577 − 288.000 = 577` Nachzahlung |
-| `08-F03` | negative Saldo: `116.007 − 120.000 = −3.993` Guthaben |
-| `08-F04` | zero Saldo: `288.577 − 288.577 = 0`, no payment block |
-| `08-F05` | heat-pump/no-labor branch: heating share `93.876`, total `293.453`, no CO₂ or § 35a section |
-| `08-F06` | internal owner overview reconciles F01 and prints the Eigentümer column, including zeros |
-| `08-F07` | MDL heating evidence is passed through; device delta is shown, not recomputed into money |
-| `08-F08` | one-tenancy area fallback gives `40.034`; mixed-path overhang `9.034` is a hard warning, never hidden balancing |
-| `08-F09` | CO₂ box: `30.954 = 12.382 + 18.572`; four tenant CO₂ shares sum to `18.572` |
-| `08-F10` | NULL actual advances hard-block; confirmed `0` produces a `288.577` Nachzahlung |
-| `08-F11` | separate gross/credit rounding gives `10.943 − 882 = 10.061`; net-first `10.060` is forbidden |
-| `08-F12` | zero consumption denominator leaves `126.000` with owner and flips Erika to `−24.871` Guthaben |
-| `08-F13` | 31-day overlap over-allocates `2.294` m²-days and hard-blocks |
-| `08-F14` | 275-day period: `12.412 / 53.350` area-days, share `22.800`, Saldo `1.800` |
-| `08-F15` | 455-day period hard-blocks as longer than 12 months |
-| `08-F16` | two isolated tenant documents: `245.571/15.571` and `116.007/−3.993`; no cross-leakage |
-| `08-F17` | zero clipped usage days: no tenant document, no portal item, not vacancy |
-| `08-F18` | late positive `577` becomes `Rechnerischer Saldo`; no payment request |
-| `08-F19` | late negative `−3.993` stays payable as Guthaben |
-| `08-F20` | leap year uses 366 days/`71.004` area-days; printed examples remain cent-exact |
-| `08-F21` | vacancy block (a) `17.531`; counterfactual separate computation `17.536`; corrected block (b) `100.800`; block (c) `0` for the one-unit example |
-| `08-F22` | fictional occupancy moves `1.858` waste cost to owner and keeps `62.000` reconciled |
-| `08-F23` | whole-year vacancy stays in denominators: owner gets `37.381` property tax and `20.667` waste |
-| `08-F24` | self-billing path: `338.218` allocable heating, `1.076.002` allocated total, `20.816` owner residual and independent Saldi/CO₂ checks |
+The server constructs each projection from the selected result before rendering. It never renders an
+all-renters PDF and crops, covers or hides rows afterward; hidden PDF structure is still a disclosure.
 
-### Register inventory and flags
+#### Preview versus finalization (M6)
 
-The authoritative CSV has **26 rows affecting Page 01**: **11 `geprüft`** and
-**15 `verify-before-production`**. The latter stay visibly flagged even when their arithmetic is
-fixtured. `geprüft` means the primary source was checked, not lawyer approval.
+- Preview reads current inputs, recalculates and creates no archive.
+- Finalization creates an immutable account/building/period/version snapshot with inputs, outputs,
+  rule versions, `Rechtsstand`, party lines, timestamps and hashes.
+- It archives one owner overview and one independently rendered tenant document for every eligible
+  tenancy with more than zero clipped usage days.
+- Corrections append `vN+1`, retain/supersede `vN`, and preserve referenced inputs and bytes.
 
-| Status | Exact CSV rows |
-| --- | --- |
-| `geprüft` | CO₂-Stufenmodell Wohngebäude · CO₂-Pflichtangaben in der Abrechnung · § 35a-Ausweis für den Mieter · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Abrechnungsfrist Betriebskosten · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Leerstand bleibt im Gesamtverteiler · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Einwendungsfrist des Mieters · Belegeinsicht — elektronische Bereitstellung zulässig (Wohnraum) |
-| `verify-before-production` | Fiktivbelegung bei Leerstand · Gradtagszahltabelle VDI (K3) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Rundungsweg · Geräteliste auf der Mieterausfertigung (K10) · Zahlungsfrist bei Nachzahlung · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · § 35a-Block auf der Betriebskostenabrechnung · Wording Leerstandsaufstellung · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung |
+## 4. The four formal minimum requirements
 
-K9 contains two different claims: the half-up rounding direction remains a flagged convention, while
-Antwort 03 § 1 fixes the residual destination as a model rule. This does not edit the CSV; it records
-the later method correction until the structured row is split in a future export.
-
-### D1 correspondence ledger and deferred ownership
-
-| Source section | Destination | Disposition |
+| # | Requirement | Current landlord render |
 | --- | --- | --- |
-| `FRAGEN-an-Berkay-02.md` § 1; `Antwort-an-Emir_02.md` §§ 1.1–1.4 | `docs/02` residual model; owner row/annex below; `docs/03` § 9.2 | **Current resolution**: one unconditional Liegenschafts-Residuum, never a party or quota |
-| `FRAGEN-an-Berkay-02.md` §§ 2–4; `Antwort-an-Emir_02.md` §§ 2–4 | future `docs/16` | **Deferred to D2**: heat-only D2, over-500 fallback and comparison-source handling |
-| `FRAGEN-an-Berkay-02.md` § 5; `Antwort-an-Emir_02.md` § 5 | `docs/03` register inventory | **Current source rule**, no Page 01 document value added |
-| `Antwort-an-Emir_02.md` § 6 | fixture oracles here and in `docs/03`; D2 arithmetic in future `docs/16` | **Current evidence**, routed by owner |
-| `FRAGEN-an-Berkay-03.md` § 1; `Antwort-an-Emir_03.md` § 1 | `docs/03` § 9.2 and K9 note above | **Current method correction** |
-| `FRAGEN-an-Berkay-03.md` § 2; `Antwort-an-Emir_03.md` § 2 | `08-F21` oracle and annex below | **Current correction**: block (b) is `100.800` ct; `0,00 [Seite 02 pending]` is superseded |
-| `FRAGEN-an-Berkay-03.md` § 3; `Antwort-an-Emir_03.md` § 3 | future `docs/16` | **Deferred to D2**; older Wärme+WW wording is superseded |
-| `FRAGEN-an-Berkay-03.md` §§ 4–6; `Antwort-an-Emir_03.md` §§ 4–6 | `docs/03` F02/R8; Page 01b projection below | **Current/superseded as mapped in `docs/03`**; no second statement rule |
-| `FEEDBACK-to-Berkay-01b.md` §§ 1–6, 9; `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | `docs/03`; Page 01b projection below | **Current or superseded** exactly as `docs/03`'s D1 ledger records |
-| `FEEDBACK-to-Berkay-01b.md` §§ 7–8; `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–11 | future `docs/09` and `docs/16` | **Deferred to D2**; DWD/UVI details and unresolved notice identity are not duplicated here |
+| 1 | **Zusammenstellung der Gesamtkosten** per cost type | ✅ rendered |
+| 2 | **Angabe und Erläuterung des Verteilerschlüssels** | ✅ rendered |
+| 3 | **Berechnung des Anteils des Mieters** | ◐ figures, key, numerator and denominator render; the operator and numerator derivation are missing |
+| 4 | **Abzug der geleisteten Vorauszahlungen → Saldo** | ❌ absent; blocked on M6 actual payments |
 
-Page 01 out-of-scope ownership remains explicit: the BetrKV catalogue belongs to `docs/09`, tax and
-Anlage-V mappings to `docs/11`, reusable deadline/guard orchestration to `docs/12`, bank matching to
-`docs/15`, and UVI/DWD to `docs/16`. D1 creates none of those documents.
-
-## Page 01b output reconciliation — 16.08.2026
-
-This section is the document-side projection of the complete Page 01b transcription in `docs/03`
-§ 0. It does not move money. It resolves which engine facts must reach the statement and prevents
-the annual statement, the UVI, and the landlord overview from being conflated.
-
-| Page 01b output | Required statement behaviour | Fixture trace |
-| --- | --- | --- |
-| Four heating pots and their keys | Show §§ 7/8/9 split, applied ratio, every denominator and party Bemessung | F01, F11–F18 |
-| Eigentümer residual | Landlord overview: one unconditional row across all four blocks, no quote/percentage, `0,00 €` and negative values allowed. Tenant copy: do not expose another party's row. | F01, F13–F18, F26, F28a/b |
-| CO₂ Pflichtausweis | Show tenant CO₂ cost share, landlord deduction, one-decimal annualised/classified intensity, unchanged Anlage band and reproducible mass/area/cost operands. No CO₂ block for heat pump/biomass. | F03–F10, F20 |
-| R8 display | Print the exact one-decimal value used for classification, trailing zero included (`12,0`); never restore `11,99` or shortened bands. | corrected F05, F06 |
-| Supplier fallback provenance | A derived mass must be labelled and warned. F02 uses the authoritative CSV values `0,201` Hu / `0,181` Ho, conversion metadata `0,903`, status `geprüft`, Rechtsstand `07/2026`. No derived cost is permitted after Antwort 03 § 5. | F02 |
-| Device evidence | Print device number, room, old/new reading, factor and one-decimal units when the self-billing path used them; label § 9a estimates and their basis. | F17, F22, F27 |
-| Readiness and reduction risks | Show 15 % and each 3 % risk separately; never auto-deduct and never print a combined amount while the cumulation sources conflict. A hard-stop run produces no statement. | F21, F23–F25, F29–F31 |
-| WW central/unit difference | Leave unmetered consumption in the owner residual; show the 10 % notice and 20 % warning branches without blocking. | F26/F26b/F26c |
-| MDL path | Confirm every extracted field. Net branch never deducts CO₂ twice. Gross branch uses exact proportional rescaling and records accepted source residuals; control-sum excess blocks rendering. | F28a/b, F29–F30 |
-| § 6a Abs. 3 annual information | Render source/THG/primary-energy, taxes/charges, equipment/readout/billing fees, consumer contact, dispute notice, average-user information, and a **graphical** prior-year comparison. If not consumption-based, only Nr. 2/3 apply. | F31 |
-| Annual prior-year graph | Adjust heat in both years with each year's own DWD 12-month factor; leave WW raw. Missing factor → raw comparison labelled unadjusted; missing prior period → note, no empty graph. DWD source line is mandatory. | F31 |
-
-The annual average-user item may use the electronic-statement link described by the current K13
-CSV row. The UVI has a different no-omission duty and its later D2 heat-only/Heizspiegel method is
-owned by `docs/16`; it must not be copied into this annual-statement section. The BAnz notice's
-identity under § 6a Abs. 3 S. 4 remains explicitly pre-legal. The Hu/Ho values are resolved by the
-authoritative CSV as recorded in `docs/03` § 0.4.
-
-The older short-period passage later in this file that shortens the Anlage band is retained only as
-superseded history. Current output is H2/R8: annualise, round to one decimal, classify against the
-unshortened table, and print that same value and band.
-
-## The four formal minimum requirements
-
-Settled BGH case law: a Betriebskostenabrechnung must contain all four.
-
-| # | Requirement | Current render |
-| --- | --- | --- |
-| 1 | **Zusammenstellung der Gesamtkosten** (per cost type) | ✅ |
-| 2 | **Angabe + Erläuterung des Verteilerschlüssels** | ✅ — e.g. "Wohnfläche (m²·Tage)" |
-| 3 | **Berechnung des Anteils des Mieters** | ◐ in both tables — the keys, party Bemessungen, Gesamtbemessungen/denominators and euro results render; the equation joining them and each numerator's derivation from its factors remain missing |
-| 4 | **Abzug der geleisteten Vorauszahlungen** → **Saldo** | ❌ **absent by decision** — blocked on the M6 Payment Ledger, not on rendering ([why](#4-is-blocked-on-the-m6-ledger-by-decision)) |
-
-Markers: **✅** rendered · **◐** partly rendered — what is and is not on the page is named exactly,
-never left to the reader · **❌** absent.
+Markers describe the current PDF only. The approved Page 01 specification contains all four.
 
 ### #3 is partly closed, and this is which part
 
-The share the engine computes is `Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung`. Checked
-against the rendered PDF (`packages/pdf/output/nk-heating-statement-demo.pdf`), **all four figures of
-that equation are now printed**:
-
-- **Gesamtkosten** of the cost — on the cost header row (that is minimum #1);
-- **Bemessung** of the party — e.g. `5.430` on Wohnung B's line;
-- **Gesamtbemessung** of that cost's key, with its unit — `36.500 m²·Tage`, added by the
-  reference-totals slice below;
-- **Anteil** in euro; plus the **Umlageschlüssel** label (minimum #2).
-
-Two things are missing, and #3 is a *Berechnung* — something the tenant re-performs — until both are
-there:
-
-1. **The operator is nowhere on the page.** Nothing states that those four figures stand in the
-   relation `Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung`. A reader who does not already know
-   the formula reads four unrelated numbers.
-2. **The numerator is not derived.** `5.430` is printed as a bare Bemessung. That it is
-   `30 m² × 181 Tage` appears nowhere — neither the `30 m²` nor the `181 Tage` is next to it. The
-   tenant can re-use the figure but cannot check it, so a wrong area or a wrong move-out date is
-   invisible in the document.
-
-### The heating disclosures are present; the shared equation gap remains
-
-The first PDF state recorded here was ❌. That historical finding is now closed. The current heating
-section renders all four Umlageschlüssel, each party's Bemessung, every Gesamtbemessung/denominator,
-the §§ 7/8 applied ratio and bounds, § 9 separation, the § 9b degree-day/period disclosure, and the
-§ 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen. The result carries those values; the template does not
-recalculate them.
-
-Heating is therefore ◐ for the same two document-level reasons as Betriebskosten: the page still
-does not print `Anteil = Kostenblock × Bemessung ÷ Gesamtbemessung`, and a displayed numerator such
-as `5.430 m²·Tage` is not yet expanded to `30 m² × 181 Tage`. Those two gaps, plus M6's advances and
-Saldo, are the remaining formal-minimum work at the top of this file.
-
-**#4 is the point of the document for the tenant:** advances paid − share owed = **Nachzahlung oder
-Guthaben**. The data model already anticipates it (`docs/02`: the statement's Nachzahlung/Guthaben
-becomes a `Payment` in the Ledger); it is simply not on the page.
+The page prints `Gesamtkosten`, the applied key, party `Bemessung`, `Gesamtbemessung` with unit and
+the euro share. It still must print the relationship
+`Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung` and derive a numerator such as
+`5.430 m²·Tage = 30 m² × 181 Tage`. Both gaps apply to NK and heating.
 
 ### #4 is blocked on the M6 ledger, by decision
 
-> **Rechtsstand 08/2026** (recorded 03.08.2026). No legal value enters `packages/rules-store` from
-> this section — it records what may **not** be computed, and why. Standard caveat of this file
-> applies (`docs/07`).
+Minimum #4 deducts **geleistete** Ist advances. `advance_payment_cents × months` is contractual Soll,
+fails for arrears, changes and partial periods, and is forbidden. The current bank stub does not
+separate rent from advances and no accepted payment allocation exists. M6 must supply actual
+allocations, temporal Soll periods, receivables and the immutable ledger handoff before the document
+may use `Saldo`, `Nachzahlung`, `Guthaben`, `zu zahlen`, `offener Betrag` or `fällig` as a result.
 
-> **DECISION (settled, 03.08).** Minimum #4 stays **❌ by decision, not by oversight**. It is blocked
-> on the **M6 Payment Ledger**, not on rendering, and the contractual-figure shortcut
-> (`advance_payment_cents × months`) is **explicitly rejected**. Nothing renders a Saldo before M6.
+## 5. Shared rendered-document rules
 
-**The shortcut computes the wrong quantity.** `advance_payment_cents × months` is the **agreed**
-(Soll) figure. § 556 Abs. 3 BGB and the BGH minimum above require the deduction of the **geleisteten**
-(Ist) Vorauszahlungen — what the renter actually paid. The two diverge exactly where the document
-matters most: a renter in arrears receives a statement **understating their Nachzahlung**. That is a
-wrong document, not a rounding difference, and it is wrong in the landlord's favour on its face while
-being against his interest in substance — settled case law treats Sollvorschüsse silently entered in
-place of the Istvorauszahlungen as costing the landlord the unpaid advances once the § 556 Abs. 3
-Abrechnungsfrist has run.
+### The disclaimer states what Lokara is, never that this Abrechnung is complete
 
-**The Ist figure is not derivable from anything in the tree today.**
+Fixed footer copy, tier 2:
 
-- **There is no `Payment` table.** `docs/02` puts the whole Payment Ledger at **M6**.
-- The `BankGateway` is a **stub** (`packages/adapters/src/lokara_adapters/bank.py`) carrying **one
-  January transaction per renter**, with rent and NK **fused into a single amount** (`117000` =
-  950,00 € Miete + 220,00 € NK) and the split recorded nowhere. Even a real AIS feed gives a
-  transaction, not an allocation; the ledger is what turns one into the other.
-
-**The demo hides both problems — this is the thing that will tempt someone.** All three seeded
-tenancies begin and end on **month boundaries** and none has an advance change, so `monthly × months`
-happens to be exact for 2025 (2.640,00 / 900,00 / 1.320,00 €) and the shortcut would look right on
-the pitch PDF. It is right by coincidence of the fixture. A **mid-month move-out** has no defined
-answer under that formula at all — and the legal question was never "how many months" but "what was
-received".
-
-**Second dependency, same milestone.** Even the Soll side is not currently expressible over time:
-`Tenancy.advance_payment_cents` is a scalar, though § 560 Abs. 4 BGB lets either party adjust the
-advance after every statement — recorded as a named defect in `docs/02` → *"DEFECT:
-`Tenancy.advance_payment_cents` is a scalar on a temporal row"*, with the temporal
-`AdvancePaymentPeriod` that replaces it also owned by M6.
-
-The ledger design is **not** re-derived here; `docs/02` → "Payment Ledger" already sketches it. What
-this section fixes is only that the gap is deliberate and what would close it.
-
-## The disclaimer states what Lokara is, never that this Abrechnung is complete
-
-> **Rechtsstand 08/2026** (transcribed 06.08.2026, lead's ruling of the same day). A
-> **document-copy rule**: it introduces nothing into `packages/rules-store`, resolves no dated rule
-> and moves no euro. What it discharges is `CLAUDE.md` → *"Tool, not advice"* and `docs/07` →
-> *"Tool, not advice (product-wide)"* — **our own rule, not a BGH minimum**. Standard caveat of this
-> file applies (`docs/07`).
-
-**The defect.** `packages/pdf/src/lokara_pdf/statement.py` (`DISCLAIMER`) renders, in the `footer`:
-
-```
-Dieses Dokument wurde rechtskonform erstellt; es stellt keine Rechts- oder Steuerberatung dar.
-```
-
-The first half is a **per-document warranty**. *Dieses Dokument* + *wurde … erstellt* attests that
-**this** Abrechnung was produced in conformity with the law. The table at the head of this file says
-it was not: **#4 — Abzug der geleisteten Vorauszahlungen — is ❌**, by decision, until the M6 ledger;
-and before *"`Ihr Anteil gesamt`"* below, the addressee's own total was on no page at all. A
-statement that warrants its own completeness while a formal minimum is missing is wrong **about
-itself**, in the one sentence a reader would quote back.
-
-What `CLAUDE.md` asks for points the other way: *"Every legal/tax output carries a consistent
-'rechtskonform, keine Rechts- oder Steuerberatung' disclaimer"* — a **positioning claim about the
-product**. `docs/07` already writes it as one: *"Lokara ist ein Werkzeug, keine Rechts- oder
-Steuerberatung."* The rendered string had drifted from `docs/07`, and that drift is exactly what
-turned a claim about the tool into an attestation about the artifact.
-
-**The constraint, and it is the whole ruling:** the sentence must not assert that this Abrechnung is
-legally complete.
-
-### The chosen string
-
-```
+```text
 Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, keine Rechts- oder Steuerberatung.
 ```
 
-One sentence, one line, no internal line break; `DISCLAIMER` keeps its name, its place in the
-`footer` and its **tier 2** classification (see *"Which text on the statement is legally required"*).
+The subject is Lokara. The sentence is not an attestation that this artifact is complete. Never use
+`rechtssicher`, a StBerG warning, an `ohne Gewähr` disclaimer or a lawyer/tax-adviser approval claim.
 
-- **The subject is `Lokara`.** Every word after it says what the *tool* is for. There is no
-  demonstrative pointing at this artifact and no perfect passive about how this page came to be, so
-  there is nothing left that can be read as an attestation about this Abrechnung.
-- **Both halves `CLAUDE.md` names survive.** `rechtskonform` is the positioning word (`docs/07`:
-  *"rechtskonform / nach aktueller Rechtslage"*, **never** *"rechtssicher"*); `keine Rechts- oder
-  Steuerberatung` is `docs/07`'s wording verbatim. `docs/05` identifies this carrier's content as
-  *"rechtskonform, keine Rechts- oder Steuerberatung"* — dropping either half would leave that
-  description describing a page that no longer says it.
-- **It names this document's own subject matter.** `Betriebs- und Heizkostenabrechnung` is the `<h1>`
-  of the page. The register stays provenance, not hedging: a landlord can send it.
-- **The StBerG line stays out** (`CLAUDE.md`, `docs/07`). It is correctly absent today and nothing
-  here adds it.
+### `Ihr Anteil gesamt` — the per-party total, and why it is never a Saldo
 
-### Alternatives, and why each was rejected
+`Anteil gesamt = Betriebskosten-Anteil + Heizungs-Anteil` after each engine's cent rounding. It moves
+no euro and adds no new rounding rule.
 
-| Rejected | Why |
-| --- | --- |
-| The current sentence | It is the defect. |
-| `docs/07`'s sentence verbatim — *"Lokara ist ein Werkzeug, keine Rechts- oder Steuerberatung."* | The closest candidate, and honest. It drops `rechtskonform`, which `CLAUDE.md`'s cross-cutting rule names and `docs/05` uses to identify this carrier. The chosen string **is** this sentence with the positioning half restored — not a different one. |
-| *"Erstellt mit Lokara — rechtskonforme Betriebs- und Heizkostenabrechnung nach aktueller Rechtslage. Lokara ist ein Werkzeug, keine Rechts- oder Steuerberatung."* | Two sentences, and the first re-creates the defect: a noun phrase apposed to *"Erstellt mit Lokara"* reads as *this* document being the rechtskonforme Abrechnung. The footer already prints `Erstellt mit Lokara.` beside the `Rechtsstand` stamps (item 6). |
-| Anything containing `rechtssicher` | Forbidden outright by `docs/07` — the liability trap. |
-| *"Diese Abrechnung wurde nach aktueller Rechtslage erstellt."* | The same per-document attestation, softened. Same class of error, harder to spot. |
-| *"Für die Richtigkeit wird keine Gewähr übernommen"* / *"ohne Gewähr"* | Defensive register, and it disclaims the wrong thing. The arithmetic reconciles to the cent and *is* the product; a sentence casting doubt on the figures invites a renter to distrust what is correct and a landlord not to send the document. |
-| Naming the missing minimum inside the disclaimer (*"… Vorauszahlungen sind nicht berücksichtigt"*) | Right fact, wrong carrier. It is a statement about the **calculation**, so it renders where the calculation is — beneath the per-party totals, tier 1 (*"`Ihr Anteil gesamt`"* below). The footer is tier-2 provenance; completeness content there lands under the one heading a reader skips. |
+#### The label is `Anteil`. `Saldo` is forbidden, and so is everything that implies one
 
-**The same form survives outside this document.** `apps/web/src/app/styleguide/page.tsx` shows
-*"Rechtskonform erstellt — keine Rechts- oder Steuerberatung."* as sample disclaimer copy. That file
-is `app-implementer`'s lane; it is named here so the ruling reaches it instead of being rediscovered
-later. `scripts/assert_statement_pdf.py` asserts no disclaimer string at all, so nothing under
-`scripts/` moves with this.
+Until actual advances render, the block uses `Anteil`, never `Saldo`, `Nachzahlung`, `Guthaben`,
+`zu zahlen`, `offener Betrag` or `fällig`.
 
-Gate: `packages/pdf/tests/test_statement_template.py` — the new string is pinned, the existing
-`keine Rechts- oder Steuerberatung` assertion is untouched, and the attestation form is asserted
-**absent from the rendered page**, so it cannot come back through a later edit.
+#### The one sentence that has to accompany it
 
-## `Ihr Anteil gesamt` — the per-party total, and why it is never a Saldo
-
-> **Rechtsstand 08/2026** (transcribed 06.08.2026, lead's ruling of the same day). A
-> **document-copy rule**: it introduces nothing into `packages/rules-store`, resolves no dated rule
-> and **computes nothing new** — the figure is the sum of two integer-cent amounts the engines
-> already produced and the page already prints. The legal purpose is BGH formal minimum **#3**
-> (*Berechnung des Anteils des Mieters*); the reason it is **not** #4 is the whole of the labelling
-> ruling below. Standard caveat of this file applies (`docs/07`).
-
-**The defect** (`statement-reviewer`, verified 06.08.2026 against the rendered HTML of the demo
-composition). **No per-party grand total exists anywhere on the document.** The strings `6.203,97`,
-`1.674,05`, `1.462,58`, `2.002,32` and `11.342,92` each occur **0** times. Wohnung A's renter reads
-`600,00 €` in one table and `5.603,97 €` in another — in practice on a different sheet — and is
-never told one number about themselves. Two disconnected tables, no bottom line.
-
-**The figure.** `Anteil gesamt = Betriebskosten-Anteil + Heizungs-Anteil`, per party. Both addends
-are already computed, already rounded by the engines and already printed. Nothing is re-derived, no
-new rounding rule is needed and no euro moves anywhere else on the page.
-
-### The label is `Anteil`. `Saldo` is forbidden, and so is everything that implies one
-
-> **Lead's ruling, 06.08.2026, binding:** *"`Ihr Anteil gesamt: 6.203,97 €` — the sum of two figures
-> already on the page. **Do not label it Saldo and do not imply a balance**; without
-> Vorauszahlungen there isn't one, and a mislabelled figure is the same class of error as the false
-> identity we just fixed."*
-
-The false identity referred to is `= 5,95 m³` for `12 × 181 ÷ 365` (*"The rounding is disclosed —
-`rd.`"*), and the parallel is exact: a **label that asserts more than the arithmetic supports**.
-BGH minimum #4 is *advances paid − share owed = Nachzahlung oder Guthaben*. This document renders
-**only the middle term**. Every word below asserts the first and third as well:
-
-| Forbidden here | What it asserts that this page cannot |
-| --- | --- |
-| `Saldo` | that two sides were netted. Only one side exists. |
-| `Nachzahlung` / `Guthaben` | the *sign* of a balance — i.e. that the deduction happened and came out one way |
-| `zu zahlen` / `offener Betrag` / `fällig` | that the printed figure is what the renter still owes. It is what their share *is*; what they owe is that minus what they have already paid, which is not derivable here (*"#4 is blocked on the M6 ledger, by decision"*). |
-
-`Anteil` is what the figure actually is, it is the word the two money tables already use for exactly
-this quantity (`Anteil` is the NK table's own column header), and it makes no claim about payment.
-
-**The one sentence that has to accompany it** — the fact would otherwise be inferred wrongly by
-every reader who has ever received a utility statement:
-
-```
+```text
 Der Anteil gesamt ist die Summe der in derselben Zeile ausgewiesenen Anteile; geleistete
 Vorauszahlungen sind darin nicht berücksichtigt.
 ```
 
-- **`geleistete`** is § 556 Abs. 3 BGB's own word and the one this file already insists on for the
-  *Ist* figure. It says which quantity is missing, not merely that something is.
-- The sentence states **no** right, **no** deadline and **no** payment instruction. All three would
-  be claims this document has not transcribed (payment details are still on the *"Also missing"*
-  list).
-- The word `Saldo` does not appear in it. Naming the absent thing by the forbidden name would put
-  the term on the page in the one place a reader scans for it.
+#### Where it renders, and why there
 
-### Where it renders, and why there
+It is the last body block after heating disclosures, CO₂ and § 9a notes, immediately before the
+footer. Both addends have then appeared, and nothing is inserted between the heating money table and
+Block A. M6 extends this location with actual advances and Saldo; `Anteil gesamt` remains the first
+line and the explanatory sentence is removed when it becomes false.
 
-**Last block of the statement body, after the heating section's disclosure blocks and the `.co2`
-block and the § 9a `.note`s, immediately before the `footer`.** In `statement_html`, between
-`{_heating_section(data)}` and `<footer>`.
+#### Which parties get a row, and which label
 
-1. **It is the only position where both addends are already on the page.** A total placed after the
-   Betriebskosten table would sum a figure the reader has not met yet.
-2. **4b forbids the obvious alternative.** *"Nothing may be inserted between the heating money table
-   and Block A"* — the money table and the disclosure that justifies it stay adjacent, so the
-   summary cannot slot in directly under the heating table.
-3. **It is where the Saldo goes at M6.** German statements put the bottom line last, and the
-   succession below replaces this block in place. A figure that later moves to a different part of
-   the page teaches the reader's eye the wrong place twice.
+The owner overview has one row per renter-side party in stable money-table order and one final
+`Eigentümeranteil` row. The tenant document uses the second-person `Ihr Anteil gesamt` for its single
+addressee. The owner overview uses the neutral column header `Anteil gesamt`.
 
-The document has **no addressee block** today (*"Also missing from the tenant document"*), which is
-also why the second-person form is not what renders — see the next section.
-
-### Which parties get a row, and which label
-
-**Every party gets a row, including the landlord's, under the same column header.**
-
-> **Amended 14.08.2026 — the landlord's row is one `Eigentümeranteil` row, rendered last.** See
-> *"Die Eigentümerzeile"* § 3a below: the reasoning of this section is untouched and is in fact why
-> the collapse works (the rows must remain the addends of the Σ row, and they do), but the label is
-> no longer `Wohnung B — Leerstand ab 01.07.2025 → Vermieter` and the figure is no longer that
-> unit's party share. On the demo it reads **1.464,85 €** (181,48 € NK + 1.283,37 € heating). Read
-> the four bullets below with that substitution; do not restore the per-unit label here.
-
-- **Omitting it would make the Σ row false.** The four rows are the addends of `11.342,92 €`; drop
-  one and the column no longer sums to the printed figure — the precise defect the heating footer
-  section exists to fix, re-created one table later.
-- **The vacancy share is a real figure with a real bearer.** The landlord carries the Leerstand
-  share; it is neither zero nor nothing, and a blank or a `—` in a money column reads as zero.
-- **It gets no second, softer label.** Two labels for one arithmetic is the drift the heating-footer
-  section warns about, and the thing that would have been wrong about the landlord's row is the word
-  **`Ihr`** — which is not used on this document at all.
-
-**And that is the ruling on the second person.** The lead's `Ihr Anteil gesamt` is the correct form
-where the document has **one** addressee — the *Mieter-Einzelabrechnung* of *"Two documents from one
-calculation"*, which shows that renter's row and no other. Today's render is the
-**Vermieter-Gesamtübersicht**: four parties, no addressee block, and one of the parties is the
-landlord reading it. `Ihr` there addresses a reader the page does not have, and addresses the
-landlord as though they were the tenant. So:
-
-| Document | Rendered form |
-| --- | --- |
-| Vermieter-Gesamtübersicht (today) | column header `Anteil gesamt`, one row per party |
-| Mieter-Einzelabrechnung (later) | `Ihr Anteil gesamt: 6.203,97 €` — one party, one addressee |
-
-Same word, same figure, same token — only the person changes with the audience. Recorded so the
-Einzelabrechnung does not invent a third spelling.
-
-### The arithmetic, verified against the current figures
-
-Both engines on the demo composition (`build_demo_statement()`), integer cents. **Re-read off the
-rendered page 14.08.2026**, after two re-bases that this table had not caught up with: K3 (VDI 2067,
-13.08.2026) re-split the unit-B pair, and *"Die Eigentümerzeile"* (14.08.2026) turned the third row
-into the residual `Eigentümeranteil`, which renders **last**. Neither moved a Σ: the column totals
-and `11.342,92 €` are the same figures this table always carried.
+#### Required rendered text
 
 | Partei | Betriebskosten | Heiz- und Warmwasserkosten | Anteil gesamt |
-| --- | --- | --- | --- |
+| --- | ---: | ---: | ---: |
 | Wohnung A — Anna Beispiel | 600,00 € | 5.603,97 € | **6.203,97 €** |
-| Wohnung B — Bernd Muster (Auszug 30.06.2025) | 178,52 € | 1.493,26 € | **1.671,78 €** |
+| Wohnung B — Bernd Muster | 178,52 € | 1.493,26 € | **1.671,78 €** |
 | Wohnung C — Clara Vorlage | 240,00 € | 1.762,32 € | **2.002,32 €** |
 | Eigentümeranteil | 181,48 € | 1.283,37 € | **1.464,85 €** |
 | **Summe der Anteile** | **1.200,00 €** | **10.142,92 €** | **11.342,92 €** |
 
-`620_397 + 167_178 + 200_232 + 146_485 = 1_134_292` cents = `120_000 + 1_014_292` — the NK total plus
-the heating shares, which are the Gesamtkosten **less the CO₂-Vermieteranteil**:
-`1.030.000 − 15.708 = 1.014.292`. The Eigentümer row's heating figure is the Liegenschafts-Residuum;
-its Betriebskosten figure is still the sum of `nk-engine`'s per-unit landlord parties (§ 3a).
+Each column reconciles over the rendered rows. The heating sum excludes the separately deducted
+157,08 € CO₂ landlord share. Without heating, that column is absent and the block still renders.
 
-- **`11.342,92 €` is deliberately not `11.500,00 €`.** The 157,08 € the landlord bears under § 7
-  Abs. 1 CO2KostAufG is in no party's Anteil, because it is deducted before the renter-facing split.
-  The heating footer already prints that difference, named and cited; this block does not repeat it.
-- **`Summe` is licensed here**, unlike in the heating `tfoot`: the rows printed above the Σ row
-  really are its addends. That is the same test the footer section applies, coming out the other way
-  — the wordings differ because the facts differ.
-- **Invariant, asserted over rendered text:** each column's printed party figures sum exactly to that
-  column's printed Σ, and the `Anteil gesamt` column's Σ equals the sum of the other two columns' Σ.
-  The same invariant every allocation test in this repo carries.
-- Money stays integer cents end to end; the display is `format_eur` (German grouping, NBSP before €).
+#### Carrier, tier and page breaks
 
-### Required rendered text
+`.party-total` is tier 1. It may break between rows, never inside a row; its title stays with the
+first following row and it uses `orphans: 2; widows: 2`.
 
-German UI copy (`CLAUDE.md`). Heading, headers and the Σ label are fixed copy; the money-column
-headers name the sections the figures come from — `Betriebskosten` is the NK section's own `<h2>`
-and the heating header is `StatementData.heating_cost_label`, the heating section's `<h2>`. A
-summary column that renames its source section makes the reader hunt for it.
+### Die Eigentümerzeile — always printed, never a Quote
 
-```
-Anteile je Partei
+The owner amount is one Liegenschafts residual, not a party, occupancy share or separately weighted
+quota. The engine/model contract lives in `docs/02` and `docs/03`; this section owns presentation.
 
-Partei                                            Betriebskosten   Heiz- und Warmwasserkosten   Anteil gesamt
-Wohnung A — Anna Beispiel                               600,00 €                   5.603,97 €      6.203,97 €
-Wohnung B — Bernd Muster (Auszug 30.06.2025)            178,52 €                   1.493,26 €      1.671,78 €
-Wohnung C — Clara Vorlage                               240,00 €                   1.762,32 €      2.002,32 €
-Eigentümeranteil                                        181,48 €                   1.283,37 €      1.464,85 €
-Summe der Anteile                                     1.200,00 €                  10.142,92 €     11.342,92 €
+The numbered headings below are compatibility anchors. Existing code and test references to
+`docs/08` → "Die Eigentümerzeile" §§ 1–6 resolve within this section; § 3a remains the party-total
+specialization of § 3.
 
-Der Anteil gesamt ist die Summe der in derselben Zeile ausgewiesenen Anteile; geleistete
-Vorauszahlungen sind darin nicht berücksichtigt.
-```
+#### 1 — The row renders unconditionally, including at 0,00 €
 
-- **Row order is the order the parties appear in the money tables** (first appearance over the NK
-  lines, then the heating lines). A reader reads down two tables and down this one; a different
-  order makes them search.
-- **The block always renders — one code path, no branch.** Without a heating section that column is
-  absent and `Anteil gesamt` equals the Betriebskosten column by construction, printed rather than
-  asserted in words — the heating footer's rule, applied one table later. A party's total across
-  *cost types* is not on the page even when heating is absent, so the block still earns its place.
-- **The heading uses the existing `.disclosure-title` class**, so it inherits the *"a heading never
-  ends a page alone"* rule rather than introducing a second heading idiom.
-- **Party labels are the ones the money tables print** (`_party`), so one party is one string across
-  three tables.
+It renders last even at `0,00 €` and may be negative. A missing row is not a zero. It belongs to the
+owner overview and vacancy/tax projection, never a tenant document.
 
-### At M6 this becomes an input to the Saldo — it is not a placeholder to delete
+#### 2 — No Quote, ever. What goes in the Bemessung column
 
-`Ihr Anteil gesamt` is **the correct bottom line for a document that does not deduct prepayments**,
-not a stand-in for one. When the M6 Payment Ledger supplies the *geleistete* Vorauszahlungen
-(*"#4 is blocked on the M6 ledger, by decision"* — the `advance × months` shortcut stays rejected),
-the block gains two rows in the same place and the same table:
+- with vacancy/self-use, show aggregated fictional occupancy in the column's unit;
+- when fully let, leave the cell empty, not `0` or `—`;
+- never print `%`, `‰`, `Quote` or `x von y` on the owner residual row.
 
-```
-Anteil gesamt                     6.203,97 €
-− geleistete Vorauszahlungen      2.640,00 €
-= Nachzahlung                     3.563,97 €
-```
+The Bemessung explains origin; it does not derive the amount. The residual wins over a separately
+rounded vacancy calculation.
 
-- **`Anteil gesamt` survives as the first line of that arithmetic.** It is the *share owed* term of
-  BGH #4 and it does not change when the other two terms arrive. The accompanying sentence
-  (*"geleistete Vorauszahlungen sind darin nicht berücksichtigt"*) is what is dropped then — it
-  becomes false the moment the row above it exists.
-- **`Saldo`, `Nachzahlung` and `Guthaben` become available exactly then**, and not one milestone
-  earlier: what licenses the word is the deduction being on the page, not the figure being
-  convenient.
-- The figures in that sketch are illustrative — `2.640,00 €` is the *Soll* figure of the demo
-  tenancy, which is precisely the number M6 must **not** use. The wording and arithmetic of that
-  block are still an open question at the foot of this file.
+#### 3 — The heating table: one Eigentümer row across all four blocks
 
-### Carrier, tier and page breaks
+One final `Eigentümeranteil` row carries heating base, heating consumption, warm-water base,
+warm-water consumption and total. Block B uses the same aggregated label. Block C decomposes a
+single unit and therefore retains per-segment landlord labels. Liegenschaft-level tables aggregate;
+single-unit timelines preserve origin.
 
-- Carrier: **`.party-total`**, one element, one class — added to *"Which text on the statement is
-  legally required"* below as **tier 1**. A reader recomputes it from two figures on the page, which
-  is the whole test in `docs/05` → *"Assigning a carrier to a tier"*. Surface **Paper**, like the
-  three disclosure blocks; a fourth tinted slab is ornament (`docs/05` → *Restraint over reduction*).
-- Page breaks: **4b applies unchanged.** The block grows with the number of parties, so it must
-  **not** declare `break-inside: avoid`, and it carries `orphans: 2; widows: 2`; its `tr`s and its
-  `thead` are covered by the existing element-level rules.
+#### 3a — The party-totals block gets one Eigentümer row, not two
 
-Gate: `packages/pdf/tests/test_statement_party_totals.py` — the copy, the per-party arithmetic read
-back off the page, the two reconciliations, the forbidden vocabulary (page-wide, so it cannot be
-introduced elsewhere either), and the landlord row. Plus the two carrier-list rows in
-`test_statement_legal_typography.py` and `test_statement_pagination.py`.
+The final owner summary row adds all NK owner-side amounts and the heating residual. The current NK
+money table still itemises landlord-side occupancy per unit because production NK remains on its
+pre-Page-02 method. The summary must not call its NK part a residual until Slice C implements
+`docs/09`.
 
-## Die Eigentümerzeile — always printed, never a Quote
+#### 4 — Required rendered text (Gesamtübersicht)
 
-> **Source:** `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1.3 (Fragen 1–3) and § 1.4, 14.08.2026; primary
-> rule text `berkay-work/Spec-Seiten/01 · Die Abrechnung ….md` → **D0**, **D12**, **`08-F21`**
-> (line 757) and edge cases **E3**, **E17**, **E19**. The figures behind it are his `09-F06`–`09-F09`
-> and `09-F19` on Seite 02, which his answer cites under the older IDs `08-F06` / `08-F21` /
-> `08-F22`; both numberings are named everywhere so they can be matched later.
->
-> **Model:** `docs/02` → *"The Eigentümeranteil is a residual line, not a party"*. **Engine wiring:**
-> `docs/03` § 9.2. This section is only what the **document** does with it.
->
-> **Scope:** the **heating** table in this slice. The Betriebskosten table keeps its per-unit
-> landlord row until Seite 02 lands in `docs/09` — see *"The one asymmetry this slice leaves"* below.
-
-### 1 — The row renders unconditionally, including at 0,00 €
-
-§ 1.3 Frage 1, verbatim: *"Existiert die Eigentümerzeile immer? → **Ja.** Auch bei 0,00 €, auch ohne
-Leerstand, auch ohne Eigennutzung."*
-
-- **One code path, no branch.** Same rule the heating footer and the party-totals block already
-  follow: a reader must see that the residual is `0,00 €`, not have to notice a missing line. A
-  suppressed zero row and an omitted row are indistinguishable on paper, and only one of them is
-  honest.
-- **`0,00 €` is a real value with a reason.** His `09-F19` prints the Eigentümer column at `0` for
-  **Wasserversorgung**, **Entwässerung** and **Heizkosten** while carrying `3174` for Grundsteuer.
-  Those three are consumption-keyed: the denominator is the sum of *actually measured* consumption
-  and the empty unit consumed nothing, so the residual is genuinely zero (D0: *"Consumption
-  denominators are untouched — a vacant unit consumes nothing."*). Zero there means **zero**, not
-  *absent* and not *not applicable*.
-- **Negative is lawful and expected.** On a fully-let building the line is the pure line-wise
-  rounding difference, and `round_half_up` biases renter shares upward, so **−0,01 €** is the
-  ordinary result. It renders as `-0,01 €` via `format_eur` like any other amount. Nobody may
-  "fix" it to zero: doing so would break the control sum, which is the one thing this row exists to
-  keep true.
-- **On which document.** The Eigentümerzeile belongs to the **Vermieter-Gesamtübersicht** and to the
-  **Leerstandsaufstellung**. It does **not** go on the Mieter-Einzelabrechnung — Seite 01 **E17**:
-  Leerstand gets *"**No** tenant document, **no** mention on any tenant copy"*. The object-level
-  Gesamtbemessung the tenant copy prints is unaffected and still contains the Fiktivbelegung; the
-  tenant recomputes only its own share from it, which still works.
-
-### 2 — No Quote, ever. What goes in the Bemessung column
-
-§ 1.3 Frage 2, blockquote: *"Druckt in der Eigentümerzeile **keine** Quote/Prozentzahl. Eine
-gedruckte Quote würde eine Verteilungsbasis suggerieren, die es nicht gibt — der Betrag ist ein
-Rest, keine Quote."*
-
-| Situation | Bemessung column | Amount |
-| --- | --- | --- |
-| Vacancy and/or self-use in the period | the **Fiktivbelegung (D0)** of the empty units — m²·Tage / Personen-Tage / HKV-Einheiten, in the same Maßeinheit and the same de-scaled form as the renter rows | the residual |
-| Fully let, nothing self-used | **empty** — no `0`, no `—`, no dash that could read as a Bemessung of zero | the residual (the pure Rundungsdifferenz) |
-
-- **Never a percentage, in any column, on this row.** Not `%`, not `‰`, not `x von y`, not the word
-  `Quote`. **Scope: the row, not the page** — corrected 14.08.2026, because an earlier draft of this
-  bullet said *page-wide* and that is wrong: Block C prints `585,0 ‰ von 1.000 ‰` legitimately under
-  § 9b Abs. 2, and a page-wide ban would forbid a required disclosure. The assertion is instead
-  applied to **every** Eigentümer row wherever one renders — the heating money table, the
-  party-totals block and the Leerstandsaufstellung — so it cannot be reintroduced in another block
-  later, which is the property the `Saldo` vocabulary ban gets from being page-wide.
-- **The Bemessung is disclosure, not derivation.** Even where the Fiktivbelegung is printed, the
-  amount is *not* `Bemessung × Quote` and must never be recomputed from the printed Bemessung. The
-  two figures sit in one row and are related only through the denominator.
-- **`09-F07` is the proof, and it is numeric.** Müllbeseitigung 62000 ct by Personen-Tage, denominator
-  `nPersTage = 2.006 + 2 × 31 = 2.068` (the 62 being the empty unit's Fiktivbelegung). Renter shares
-  round to `32829 / 12712 / 3658 / 10943`, Σ `60142`, residual **1858**. The *separately computed*
-  vacancy share is `62000 × 62 / 2068 = 1858,80 → 1859`. His comment: *"Gerechnet wird 1858.
-  Residuum gewinnt."* Printing a Quote next to 1858 would show a base that produces 1859.
-
-### 3 — The heating table: one Eigentümer row across all four blocks
-
-§ 1.3 Frage 3: *"der Rest geht in das Liegenschafts-Residuum, in **allen vier Blöcken in dieselbe
-Zeile**."*
-
-- One row, positioned **last** in the money table, after all Mietverhältnis rows. Last, because it is
-  the reconciling line: the reader adds the rows above and the last one closes the column.
-- It carries a figure in **each** of the four money columns (Grundkosten Heizung, Verbrauch Heizung,
-  Grundkosten Warmwasser, Verbrauch Warmwasser) and in `Anteil gesamt` — any of them may be `0,00 €`
-  or negative.
-- **This replaces the per-unit landlord row in the heating table.** *"Which parties get a row, and
-  which label"* above still governs the **Betriebskosten** table; for the heating table the row
-  `Wohnung B — Leerstand ab 01.07.2025 → Vermieter` is superseded by a single `Eigentümeranteil` row.
-  The reasoning of that section is untouched and is in fact why this works: the four rows must remain
-  the addends of the Σ row, and they do — the Eigentümer row is one of the addends.
-- **Block B (Bemessungsgrundlagen) gets the same one row, under the same label.** Block B is a
-  Liegenschafts-level table whose column must sum to the printed **Gesamtbemessung** — 36.500 m²·Tage
-  includes the vacancy's 5.520, and dropping that row would leave the column short of the very
-  denominator printed at the foot of it. So Block B carries an `Eigentümeranteil` row with the
-  aggregated Fiktivbelegung, one-for-one with the money table. `statement.py` already states the
-  reason: *"the same label names a party in the money table, in Block B and in Block C, so a reader
-  can follow one row across all three."*
-- **Block C (Nutzerwechsel) keeps the per-segment landlord label instead**, and that is not an
-  inconsistency: Block C is the only **per-unit** block on the page. It decomposes one unit's
-  timeline, so its rows must identify *segments of that unit* — `Wohnung B — Leerstand ab
-  01.07.2025 → Vermieter: 416,7 ‰ von 1.000 ‰`, not the Liegenschaft's residual line. § 9b Abs. 3
-  disclosure is about Bemessung, not about money: a unit used by a renter until 30.06. and standing
-  empty afterwards still owes the reader both Zeitanteile, and they must still sum to that unit's
-  `von 1.000 ‰`. The segment loses only its **money row**. That is what `OwnerResidual.origins`
-  carries the Bemessungen for.
-
-  *Rule of thumb, so the next block does not have to re-litigate it:* a table whose column sums to a
-  **Liegenschafts**-total (the money table, Block B, the party-totals block) shows **one**
-  `Eigentümeranteil` row; a table that decomposes a **single unit** (Block C, and the
-  Leerstandsaufstellung's (a) rows) keeps the **per-unit / per-segment** label.
-
-### 3a — The party-totals block gets **one** Eigentümer row, not two
-
-`Anteile je Partei` sums each party across both engines, so the NK asymmetry below would otherwise
-surface there as **two** landlord rows for one owner: `Wohnung B — Leerstand … → Vermieter` carrying
-the NK share, and `Eigentümeranteil` carrying the heating residual. Ruling, 14.08.2026:
-
-**One row, labelled `Eigentümeranteil`, rendered last, carrying the sum of every landlord-side amount
-from both engines** — the NK landlord parties' shares (summed over units) in the Betriebskosten
-column, the Liegenschafts-Residuum in the heating column.
-
-- It is § 1.4's *"Aggregation im Display, Herkunft in den Daten"* applied to the block whose entire
-  job is aggregation.
-- **It survives more than one vacant unit.** Keeping the per-unit NK landlord rows here would print
-  two, three, four rows for one owner in a table that exists to give each party *one* number.
-- **Nothing is hidden by it.** The Betriebskosten table above still itemises the NK landlord share
-  per unit; this block never was the itemisation.
-- **It does not misdescribe its own NK part.** The block's label is `Anteil gesamt`, a sum, and its
-  accompanying sentence is the existing one. The *"Restbetrag"* sentence of § 4 belongs to the
-  heating table's row and is not repeated here — until `docs/09` lands, the NK part of this row is
-  still a sum of separately-computed quotas, and no copy on the page may call it a residual.
-- When `docs/09` lands and NK switches, the NK part becomes a residual too and **nothing about this
-  block changes** — which is the test of whether the interim shape was chosen well.
-
-Row order is unchanged (*"the order the parties appear in the money tables"*), with the Eigentümer
-row appended last regardless, because it is the reconciling line rather than a party.
-
-### 4 — Required rendered text (Gesamtübersicht)
-
-German UI copy. Label and sentence are fixed copy; the label is `Eigentümeranteil` — Berkay's own
-word in `08-F21` (*"Eigentümeranteil gesamt (= Gesamtübersicht)"*), so one word means one thing
-across statement and annex.
-
-```
-Partei                                            Grundkosten Hz   Verbrauch Hz   …   Anteil gesamt
-Wohnung A — Anna Beispiel                             …              …                    …
-Wohnung B — Bernd Muster (Auszug 30.06.2025)          …              …                    …
-Wohnung C — Clara Vorlage                             …              …                    …
-Eigentümeranteil                                      99,01 €       159,16 €              368,18 €
-Summe                                                 …              …                    …
-
-(Figures from the 2.910,00 € fixture in `test_berkay_01b_residual_wiring.py`, not from the demo
-building — the demo's own residual does not move in this slice and is unchanged at 1.283,37 €.
-The old per-unit landlord party was 345,14 / 554,74 / 115,05 / 268,44 = 1.283,37 €, byte-identical
-to today's `owner_residual`, which is why no golden in the suite moved with the re-labelling.)
-
+```text
 Der Eigentümeranteil ist der Restbetrag: umlagefähige Heiz- und Warmwasserkosten abzüglich der
 Summe der Mieteranteile. Er enthält den auf Leerstand und Eigennutzung entfallenden Anteil sowie
 die zeilenweise Rundungsdifferenz. Er wird nicht aus einer Quote berechnet.
 ```
 
-For the demo this wording is arithmetic, not editorial: **10.142,92 € umlagefähige Heiz- und
-Warmwasserkosten − 8.859,55 € Mieteranteile = 1.283,37 € Eigentümeranteil**. Starting from the
-**10.300,00 € Gesamtkosten** would incorrectly include the separately deducted 157,08 €
-CO₂-Vermieteranteil in the residual a second time.
+#### 5 — The Leerstandsaufstellung (D12): (a) / (b) / (c)
 
-- **The last sentence is required copy wherever the row renders.** Without it a reader who tries to
-  reconstruct the row from a Bemessung finds no quota and concludes the page is wrong.
-- Where a Fiktivbelegung exists, the Bemessung cells of that row carry it, formatted exactly like the
-  renter rows (same de-scaling, same `rd.` marker rules as *"Display rounding of a fractional
-  Bemessung"*).
-- **Forbidden on this row, asserted:** `%`, `‰`, `Quote`, `Anteil in Prozent`, and any `x von y`
-  construction.
+| Block | Meaning | Granularity |
+| --- | --- | --- |
+| (a) | vacancy amount for Werbungskosten evidence | per empty unit and cost type |
+| (b) | non-allocable costs | per cost position; reference value corrected to **100.800 ct** |
+| (c) | `owner residual − Σ(a)` rounding difference | no unit; no economic item |
 
-### 5 — The Leerstandsaufstellung (D12): (a) / (b) / (c)
+The reference case prints `(a) 17.531`, `(b) 100.800`, `(c) 0`, total `118.331` ct. A separate
+counterfactual vacancy calculation gives `17.536`; it does not replace the residual. Required
+convention copy:
 
-The annex is the reason the result must keep per-unit origin at all. His `08-F21`, reference object,
-WE-02 vacant 01.08.–31.08.2025, 31 days, 74 m², fiktive Belegung 2 Personen:
-
-```
-(a) Leerstandsanteil = Werbungskosten § 9 EStG          175,31
-(b) nicht umlagefähige Kosten                         1.008,00
-(c) Rundungsdifferenz                                     0,00
-Eigentümeranteil gesamt                                1.183,31
-```
-
-| Block | What it is | Granularity | Status here |
-| --- | --- | --- | --- |
-| **(a)** | Leerstandsanteil → Werbungskosten § 9 EStG, Anlage V | **per empty unit and per Kostenart** | in scope — `OwnerResidual.origins` |
-| **(b)** | nicht umlagefähige Kosten → a different Anlage-V line | per cost position | **value corrected by Antwort 03 § 2:** **1.008,00 €** for the reference object. Detailed classification is still owned by Page 02 / `docs/09`; Anlage-V mapping is owned by `docs/11` |
-| **(c)** | Rundungsdifferenz — no economic item | belongs to **no** unit | in scope — `OwnerResidual.rounding_difference` |
-
-**Why (a) and the printed residual differ, and why (c) is 0,00 in his example.** (a) is each empty
-unit's share *computed for the annex*; the printed Eigentümeranteil is the *residual*. They are the
-same quantity reached two ways and they drift by line-wise rounding:
-
-```
-computed separately   15.065 (m²-keyed) + 612 (WE-keyed) + 1.859 (Personen-keyed) = 17.536
-as a residual                                                                      = 17.531
-                                                                        block (c) =     −5
-```
-
-*"Computed separately the annex does not tie to the statement — exactly what an auditor notices."*
-In `08-F21` itself `(c)` prints `0,00`, and that is **not** a contradiction: with exactly **one**
-empty unit the per-Kostenart residual column already *is* that unit's (a) figure, so nothing is left
-over, and the 17.536 is a counterfactual he never prints. `(c)` becomes non-zero as soon as (a) is
-itemised across **more than one** empty unit — which is precisely the case § 1.4 says must still be
-itemised for Anlage V. Definition used here, and the one that makes both readings true:
-
-```
-(c) = Eigentümeranteil (Residuum) − Σ (a)
-```
-
-Recorded as `docs/03` § 7 item 12, because his § 1.3 prose describes the 5 ct as *"als Block (c)
-offen ausgewiesen"* while his own rendering shows `(c) 0,00`. Not silently smoothed over.
-
-**Wording constraint on the annex — `[KONVENTION]`.** Seite 01 line 103: *"The Leerstandsaufstellung
-as a document. **No statute prescribes it.** What is mandatory is the taxpayer's burden of proof
-(§ 90 AO). Never market it as ‚gesetzlich vorgeschrieben' — correct wording: ‚erfüllt Ihre
-Nachweispflicht gegenüber dem Finanzamt'."* His own footer, to be used as-is:
-
-```
+```text
 Hinweis: Der Abzug als Werbungskosten setzt eine fortbestehende Einkünfteerzielungsabsicht voraus
 (§§ 9, 21 EStG; BFH IX R 68/10). Die Feststellungslast liegt bei Ihnen (§ 90 AO). Diese Aufstellung
 dient dem Nachweis gegenüber dem Finanzamt; sie ist keine gesetzlich vorgeschriebene Form.
 ```
 
-### 6 — The result-shape contract
+#### 6 — The result-shape contract
 
-The document cannot aggregate what the engine did not carry, and it cannot itemise what the engine
-collapsed. So the collapse happens **in the display**, and the result keeps the origin — § 1.4,
-*"Aggregation im Display, Herkunft in den Daten."* Additions to `packages/heating-engine/inputs.py`,
-following that module's two existing rules (every disclosure field required; `None` means *not
-applied*, never *not carried*):
+`HeatingResult.lines` contains renter-side lines. Required `owner_residual` contains the four money
+blocks, total, origin tuple, rounding difference and optional aggregated Bemessungen. It is never
+`None` and carries no quota field. Reconciliation is structural:
 
-```python
-@dataclass(frozen=True)
-class OwnerResidualOrigin:
-    """Block (a): one empty/self-used unit's own share of each block, computed
-    for the Leerstandsaufstellung — its own `round_half_up`, NOT a slice of the
-    residual. Never printed on the Gesamtübersicht."""
-
-    unit_id: str
-    heating_base: Cents
-    heating_consumption: Cents
-    ww_base: Cents
-    ww_consumption: Cents
-    total: Cents
-    # The Bemessungen Block C still has to disclose for the vacancy segment,
-    # in the same shapes and with the same `None` semantics as `HeatingLine`.
-    days: int
-    unit_total_days: int
-    base_weight_sqm_days_x100: Decimal
-    heat_consumption_weight: Decimal | None
-    ww_consumption_weight_m3: Decimal | None
-    degree_day_promille: Decimal
-    unit_degree_day_promille_total: Decimal
-
-
-@dataclass(frozen=True)
-class OwnerResidual:
-    """The one Eigentümerzeile per Liegenschaft (Seite 01 D12). Carries no
-    quota — by shape, not by discipline: there is no percentage field, so a
-    renderer cannot print one."""
-
-    heating_base: Cents
-    heating_consumption: Cents
-    ww_base: Cents
-    ww_consumption: Cents
-    total: Cents
-    # (a) — one entry per empty/self-used unit, in the engine's unit order.
-    # Empty tuple in a fully-let building; the row still renders.
-    origins: tuple[OwnerResidualOrigin, ...]
-    # (c) = total - Σ origins.total. Belongs to no unit.
-    rounding_difference: Cents
-    # The Fiktivbelegung (D0) printed in the Bemessung column, aggregated over
-    # `origins`. `None` — not 0 — when there is no vacancy and no self-use: the
-    # column then stays empty, and `None` is what makes "empty" unprintable as
-    # a zero.
-    base_weight_sqm_days_x100: Decimal | None
-    heat_consumption_weight: Decimal | None
-    ww_consumption_weight_m3: Decimal | None
+```text
+Σ renter lines + owner residual + CO₂ landlord deduction = total cost
 ```
 
-And on the result itself:
+#### The one asymmetry this slice leaves, deliberately
 
-```python
-@dataclass(frozen=True)
-class HeatingResult:
-    lines: tuple[HeatingLine, ...]     # Mietverhältnisse ONLY — every line has a tenancy_id
-    owner_residual: OwnerResidual      # required, never None — the row always exists
-    ...
-```
+Heating ships one residual. The NK money table still contains per-unit landlord-side lines until the
+reviewed Page 02 production method changes renter rounding and the owner result together. Display
+aggregation must not pretend those current NK lines were calculated as a residual.
 
-- **`lines` loses the landlord rows.** `tenancy_id is None` no longer occurs. That is what makes
-  *"never computed separately"* structural: there is no party slot an owner share could be written
-  into.
-- **`owner_residual` is not optional.** An `OwnerResidual | None` would re-create the branch
-  § 1.3 Frage 1 removes, and the first renderer to write `if result.owner_residual:` would silently
-  drop a `0,00 €` row.
-- **Reconciliation moves with it:** `Σ lines.total + owner_residual.total (+ CO₂-Vermieteranteil)
-  == total_cost`, asserted in the engine as it is today.
+### Reference totals (Gesamtbemessung) — one per allocation key
 
-### The one asymmetry this slice leaves, deliberately
+Print the denominator the engine actually used, beside each applied key:
 
-After this slice the **heating** table has one `Eigentümeranteil` row and the **Betriebskosten**
-table still has a per-unit `Wohnung B — Leerstand … → Vermieter` row. That is a dated decision, not
-an oversight:
-
-- The model is cross-engine and binding (`docs/02`), but it **requires** `round_half_up` on the
-  renter side, and `nk-engine` is largest-remainder. Aggregating NK's landlord rows in the display
-  while the amounts behind them are still separately-computed quotas would print a row labelled
-  *residual* that is not one — worse than the asymmetry.
-- Switching NK's renter rounding **moves every NK figure** and belongs to the Seite 02 → `docs/09`
-  transcription. Doing it here would be implementing a calculation from an untranscribed spec, which
-  `CLAUDE.md` forbids outright.
-- When `docs/09` lands, this section applies unchanged to the Betriebskosten table and the
-  party-totals block collapses to one `Eigentümeranteil` row for the whole document.
-
-### Gates
-
-- `packages/heating-engine/tests/test_berkay_02_eigentuemer_residuum.py` — the engine-level fixtures
-  (fully-let, the 0,00 € case, residual-wins, the control sum, multiple vacant units collapsing with
-  their origins retrievable, and the absence of any quota).
-- `packages/domain/tests/test_owner_residual_model.py` — the primitive and Berkay's own arithmetic
-  oracles (`09-F07` A, `09-F08`, `09-F19`, the `08-F21` 17.536/17.531 decomposition).
-- PDF: the `Eigentümeranteil` row, its copy, the forbidden-percentage assertion page-wide, and the
-  column reconciliation read back off the page — an addition to
-  `packages/pdf/tests/test_statement_party_totals.py` and the heating-table test, owned by the PDF
-  slice that renders it.
-
-## Two documents from one calculation ⚠️
-
-The first render shows **every party's name and share to everyone**. That is right for the landlord and
-**wrong — and a DSGVO problem — for the tenant**.
-
-| Document | Audience | Contents |
+| Key | Printed Gesamtbemessung | Unit/de-scale |
 | --- | --- | --- |
-| **Vermieter-Gesamtübersicht** | landlord (internal) | all parties, full reconciliation — *what the first render already is* |
-| **Mieter-Einzelabrechnung** | one tenant (the envelope) | **only that tenant's** share, their advances, their balance. **No other tenant's name or amount.** |
+| `AREA` | Σ `area_sqm_x100 × days` | m²·Tage, ÷100 |
+| `PERSONS` | Σ `people × days` | Personen·Tage |
+| `UNITS` | Σ `1 × days` | Einheiten·Tage |
+| `MEA` | Σ `mea_x10000 × days` | MEA·Tage, ÷10000 |
+| `CONSUMPTION` | Σ period-resolved values | carried `MeasurementUnit`; no day weighting |
+| `DIRECT` tenancy | none | single party; denominator 1 is noise |
+| `DIRECT` unit | Σ segment days | Tage |
 
-Both derive from the same engine result — this is a rendering split, not a second calculation.
-The split is enforced **before rendering on the server**: one tenant document is constructed from
-only that covered tenancy's selected result/data. Never render an all-renters PDF and crop, cover or
-hide the other rows; that leaves personal data in the document structure and makes one missed CSS
-rule a disclosure incident.
+De-scale the sum once. `36.500 m²·Tage` must never render as `3.650.000`. A tenant copy shows its own
+Bemessung and the object-level Gesamtbemessung; it never needs another renter's value.
 
-### Preview versus finalization (M6)
+#### Rounding
 
-- **Preview** is a live recomputation of current inputs and creates no archive. Today that preview is
-  the landlord's building-wide calculation/QA overview and must not be sent to a tenant.
-- **Finalization** creates one immutable, versioned snapshot for account/building/period containing
-  normalized inputs, engine/rule versions and `Rechtsstand`, results and party lines, `created_at`,
-  content hashes, and archived document bytes or immutable storage keys with their hashes.
-- The finalized snapshot archives one **Vermieter-Gesamtübersicht** and one independently rendered
-  **Mieter-Einzelabrechnung for each eligible covered tenancy with >0 period-clipped usage days**.
-  Per Berkay Seite 01 **E8 / `08-F17`**, a tenancy clipped to 0 usage days gets no document and no
-  tenant-portal visibility; the landlord overview carries the required footnote. It is **not treated
-  as vacancy**. A sendable tenant statement waits for M6 because it must include actual paid advances
-  and the resulting Saldo.
-- A correction creates `vN+1`, retains and supersedes `vN`, and never overwrites archived bytes.
-  Inputs referenced by a finalized version cannot be destructively deleted; their corrections append
-  or supersede so every version remains reproducible.
+Fixed-point denominators de-scale exactly. Fractional displayed Bemessungen follow the rule under
+`Display rounding of a fractional Bemessung` below.
 
-## Also missing from the tenant document
+### `MeasurementUnit` travels with the value — the plumbing decision (slice 5)
 
-- **Addressee block + date** — the statement is addressed to one tenant (name, address).
-- ~~**Reference totals so the share is verifiable**~~ — specified below ("Reference totals
-  (Gesamtbemessung)"), one per allocation key with its own unit, and **rendered** since `b404173`.
-  It makes the share *checkable against a denominator*; it does not by itself close BGH #3 (see the
-  ◐ note above).
-- **Heating consumption values** — meter start/end readings (HeizkostenV gives the tenant a right to
-  check); wire from `Zähler` data, not fixtures.
-- **§556 deadline context** — the 12-month Abrechnungsfrist, and the tenant's Einwendungsfrist.
-- **Payment details** — IBAN/reference for a Nachzahlung, or how a Guthaben is settled.
-- **Multiple cost types** — the engine handles n; the demo seeds one. See below.
+The value and its unit travel together through meter/domain input, engine result and statement. A
+side-channel display-unit mapping is forbidden because it can disagree with the number. The table
+restores the stable rule numbers used by code and tests without reviving the implementation diary:
 
-## Reference totals (Gesamtbemessung) — one per allocation key
-
-> **Rechtsstand 08/2026** (transcribed 03.08.2026). This is a **document-layout rule**, not a legal
-> value: it introduces nothing into `packages/rules-store` and reads no dated rule. Every figure it
-> prints is already in the engine result. The legal *purpose* is BGH formal minimum **#2/#3** above —
-> settled case law, cited here exactly as loosely as the table above cites it; confirm with a
-> Fachanwalt before real tenants (`docs/07`).
-
-**Why.** Minimum #3 is *"Berechnung des Anteils des Mieters"* — a **calculation**, not a result. The
-tenant sees `€600.00` and their own `18.250 m²·Tage`; without the **denominator** those two numbers
-prove nothing. `600 = 1200 × 18.250 / 36.500` is only checkable once `36.500` is on the page. The
-share alone is unverifiable, which is precisely the formal defect that makes statements
-challengeable.
-
-**This section does not close #3** — it supplies the denominator and nothing else. The page still
-states no operator, and it still prints the numerator (`18.250`) without the `50 m² × 365 Tage` it
-comes from; see *"#3 is half closed, and this is which half"* above. What would close #3 is a rendered
-per-party calculation that names the operation **and** derives the Bemessung from its factors. A
-future slice owns that; it is deliberately not designed here.
-
-**What the row is.** For each cost on the statement, the **sum of the allocation weights of all
-parties of that cost**, de-scaled to the human figure, printed with its unit next to that cost's
-Umlageschlüssel. It is the denominator the engine actually divided by — not a stock building figure.
-
-**One per allocation key, and they are not interchangeable.** The keys have different denominators
-*and* different units. A statement with two keys prints two reference totals. A single figure is
-correct only while a statement carries exactly one key, which is a property of today's demo, not of
-the product.
-
-Derived from `packages/nk-engine/src/lokara_nk_engine/engine.py` (`_segment_parties`,
-`_persons_parties`, `_consumption_parties`, `_direct_parties`) and the unit spellings already in
-`_ALLOCATION_KEY_LABELS` / `_WEIGHT_DISPLAY_DIVISORS` in `packages/pdf/src/lokara_pdf/statement.py`:
-
-| Key | Engine weight per party | Reference total | Unit | De-scale ÷ |
-| --- | --- | --- | --- | --- |
-| `AREA` | `area_sqm_x100 × Tage` | Σ weights ÷ 100 | **m²·Tage** | 100 |
-| `PERSONS` | `Personen × Tage` | Σ weights | **Personen·Tage** | 1 |
-| `UNITS` | `1 × Tage` | Σ weights | **Einheiten·Tage** | 1 |
-| `MEA` | `mea_x10000 × Tage` | Σ weights ÷ 10000 | **MEA·Tage** | 10000 |
-| `CONSUMPTION` | the metered value (already period-resolved upstream — **no day weighting**) | Σ weights | the key's own `MeasurementUnit`, compact spelling — `kWh` / `m³` / `HKV-Einheiten` ([how it gets there](#measurementunit-travels-with-the-value--the-plumbing-decision-slice-5)) | 1 |
-| `DIRECT` → a tenancy | `1` (single party) | **none** | — | — |
-| `DIRECT` → a unit | `1 × Tage` per segment | Σ weights | **Tage** | 1 |
-
-Two notes on `DIRECT`, because "DIRECT allocates nothing proportionally" is only half true:
-
-- `direct_tenancy_id` → exactly one party, weight `1`. A denominator of `1` is noise; print **no**
-  reference total. Proposed copy: *"Direktzuordnung — vollständig dieser Partei zugeordnet"*.
-- `direct_unit_id` → the engine **does** day-split within that unit (renter vs. vacancy/Eigennutzung,
-  `_segment_parties(..., key_value=1)`). That split has a denominator: the unit's **Tage** in the
-  billing window. Print it.
-
-### Required rendered text
-
-German UI copy (CLAUDE.md), on the cost's header row, appended after the Umlageschlüssel:
-
-```
-Umlageschlüssel: Wohnfläche (m²·Tage) · Gesamtbemessung: 36.500 m²·Tage
-Umlageschlüssel: Personenzahl (Personen·Tage) · Gesamtbemessung: 1.638 Personen·Tage
-Umlageschlüssel: Einheiten (Einheiten·Tage) · Gesamtbemessung: 1.095 Einheiten·Tage
-```
-
-The token is **`Gesamtbemessung`**, matching the existing `Bemessung` column header — it is the
-column's total, and it is day-weighted, so it is *not* the bare `Gesamtfläche` in m². 100 m² is not
-the number `600,00 €` was computed from; `36.500 m²·Tage` is. (The earlier gap note said
-"Gesamtfläche / Gesamteinheiten / Gesamtverbrauch"; that named the *idea*. Bare m² would not make the
-share verifiable, so the label carries the day-weighted unit. `Gesamtverbrauch` survives unchanged
-for `CONSUMPTION`, which is genuinely not day-weighted.)
-
-Formatting: `format_number_de` (German grouping), the figure and its unit separated by a space
-(normal or non-breaking — both render identically and `assert_statement_pdf.py` flattens whitespace).
-
-### Rounding
-
-Divide the **sum** by the de-scale divisor; never round per line and then sum. Divisors are 100 /
-10000 over integer weights, so the division is exact and no rounding rule is needed. The invariant —
-the same one every allocation test asserts for money — is that the printed Gesamtbemessung equals the
-sum of the printed Bemessung values of that cost's lines, exactly.
-
-### ⚠️ De-scaling (carried over from `docs/03`)
-
-The AREA figure is **`36.500`**, never **`3.650.000`**; a line is **`18.250`**, never **`1.825.000`**.
-`docs/03` states outright that *tests comparing integers stay green through this bug* — which is why
-the assertion lives over **rendered text** (`packages/pdf/tests/`, and `scripts/assert_statement_pdf.py`
-over the PDF), not over engine values. The scaled form is asserted **absent** as a canary, not merely
-the de-scaled form present.
-
-### Both documents
-
-The Mieter-Einzelabrechnung shows **the tenant's own** Bemessung plus the Gesamtbemessung — that pair
-is the whole point, and it leaks nothing about other tenants. The Vermieter-Gesamtübersicht keeps it
-as the column total it already visually implies.
-
-### The gap this was blocked on — closed by slice 5
-
-**Was:** the *unit* of a `CONSUMPTION` reference total was not derivable from the engine result.
-`ConsumptionValue` (`nk-engine/inputs.py`) carried `unit_id`, `tenancy_id`, `value` — no unit of
-measure — and `_ALLOCATION_KEY_LABELS` spelled `CONSUMPTION` as bare `"Verbrauch"` with no unit.
-`MeasurementUnit` (`domain/meter.py`: `KWH`, `CUBIC_METRE`, `HKV_UNITS`) was the right type, but
-nothing carried it from the meter into the statement and it had no German display spelling anywhere.
-No `CONSUMPTION` reference total was specified and none was fixture-tested, because a guessed unit on
-a Verbrauchsabrechnung is a defect that reaches a tenant.
-
-**Now:** the unit is carried on `ConsumptionValue` and surfaced on `NkResult`, and the German
-spellings are fixed. See *["`MeasurementUnit` travels with the value — the plumbing decision (slice
-5)"](#measurementunit-travels-with-the-value--the-plumbing-decision-slice-5)* below, which also
-records **why the resolution written here first — "the caller passes the display unit into
-`StatementData` per cost" — was refined rather than implemented as written.**
-
-## `MeasurementUnit` travels with the value — the plumbing decision (slice 5)
-
-> **Rechtsstand 08/2026** (transcribed 06.08.2026, lead's decision of the same day). This is a
-> **carrying/contract decision, not a calculation** — the same standing as the *"Heating table
-> footer"* section: it introduces **nothing** into `packages/rules-store`, resolves **no** dated rule,
-> and moves **no euro**. Every figure it lets onto the page is one the engine already divided by; all
-> it adds is the unit that figure was always in. The legal purpose is BGH formal minimum **#2/#3** — a
-> denominator a renter is meant to check has to be a *quantity*, and a quantity has a unit. The German
-> display copy below is this file's ruling, per the lead's instruction of 06.08.2026. Standard caveat
-> of this file applies (`docs/07`).
-
-**The defect this closes, in one line:** a value travelled from the meter to the statement **without
-its unit**, so the document could print the denominator only by guessing what it meant — and withheld
-it instead (*"The withheld cell is a sentence, not a blank"*).
-
-### 1 — The unit travels with the value, on the dataclass that carries the value
-
-| Where | Field | Type |
-| --- | --- | --- |
-| `packages/heating-engine/.../inputs.py` → `HeatingUnit` | `heat_consumption_unit` | `MeasurementUnit \| None = None` |
-| `packages/heating-engine/.../inputs.py` → `HeatingResult` | `heat_consumption_unit` | `MeasurementUnit \| None` (**required**, no default) |
-| `packages/nk-engine/.../inputs.py` → `ConsumptionValue` | `measurement_unit` | `MeasurementUnit \| None = None` |
-| `packages/nk-engine/.../inputs.py` → `NkResult` | `consumption_unit` | `MeasurementUnit \| None` (**required**, no default) |
-
-**Why on the value's own dataclass, and not beside it.** The defect being closed *is* a value that
-travelled without its unit. A side channel — a per-cost `dict[str, MeasurementUnit]` handed to
-`StatementData` by the caller — reintroduces exactly that failure mode one layer up: the value and its
-unit then arrive by two routes, and two routes can disagree. The disagreement is silent, survives
-every integer-comparing test, and surfaces as a *wrong unit* on a Verbrauchsabrechnung, which is worse
-than the withheld cell it replaced. Carrying the unit on the row that carries the number makes the
-pair inseparable by construction.
-
-> ⚠️ **This refines an earlier sentence of this file.** The *"Gap — not invented here"* note above
-> proposed: *"the caller (which resolves meters) passes the display unit into `StatementData` per
-> cost."* That resolution is **superseded**: the unit is carried on the **engine input** and
-> *surfaced* on the **engine result**, so the renderer **reads** the unit off the result rather than
-> being **told** it by a second party. Two reasons, both already rules of this file: the disclosure
-> figures come from the engine result and never from something passed alongside it (the drift rule at
-> the head of *"Heizkostenabrechnung — the heating table's disclosure"*), and a statement may not
-> state a unit the engine did not divide in. Recorded as a refinement, with its reason, so the change
-> of direction is visible rather than quietly applied.
-
-**`MeasurementUnit` lives in `packages/domain`** (`lokara_domain.meter`), which both engines already
-import; nothing about this crosses a purity boundary (`scripts/check_engine_purity.py` forbids an
-engine importing `rules-store`, not `domain`).
-
-**The input default is `None`, and that is a deliberate exception** to the carried-intermediates
-rule *"every new field is required — no default value"*. That rule exists because a default lets a
-caller silently omit a legally required disclosure figure. Here the omission is **not** silent: by
-rule 3 below an absent unit propagates to the printed sentence *"ohne Maßeinheit — nicht
-ausgewiesen"* plus its explaining paragraph. A default that lands the renter on an honest disclosure
-is a different thing from a default that lands them on a blank. On the **result** the field keeps the
-contract's rule and carries no default.
-
-### 2 — One key, one unit; a mixed key is an input error
-
-**All parties supplying a value for the same consumption key must agree on the unit.** Two or more
-distinct units on one key → `HeatingInputError` / `NkInputError`. Never a silent pick, never a
-majority vote, never "the first one wins".
-
-**Why it is an error and not a display problem.** The Gesamtbemessung is a **sum**. `600 kWh + 250
-HKV-Einheiten` is a number that means nothing, and BGH formal minimum #3 requires the denominator to
-be *checkable* — a denominator that cannot lawfully be summed fails it before it is ever printed. A
-statement that picked one of the two units would state a false unit for some parties' Bemessung and a
-false total for all of them.
-
-**And it is a real configuration, not a hypothetical.** `MeterKind.HEAT` covers **both** a building
-Wärmemengenzähler counting kWh **and** flat Heizkostenverteiler counting dimensionless Einheiten —
-`packages/domain/src/lokara_domain/meter.py` says exactly that, and `CANONICAL_UNITS` deliberately
-gives `HEAT` no default unit for that reason. A building that swapped some flats' allocators for
-heat-meters mid-modernisation produces this input.
-
-Resolution, in the order the engine applies it:
-
-| Heating — `HeatingResult.heat_consumption_unit` | |
+| Existing compatibility anchor | Binding rule |
 | --- | --- |
-| two or more distinct `heat_consumption_unit` values among `HeatingInput.units` | raise `HeatingInputError` (in `_validate`, i.e. **before** any branch runs — validation that depends on which branch ran can be skipped by an unrelated data problem) |
-| `heat_fallback_to_area` is `True` (§ 9a Abs. 2) | `None` — see rule 4 |
-| every unit that supplied a `heat_consumption` value carries a unit, and at least one unit carries one | that unit |
-| otherwise | `None` — see rule 3 |
+| `MeasurementUnit` rule 1 | The unit travels on the dataclass that carries the value, through input, engine result and statement. |
+| `MeasurementUnit` rule 2 | One summable key has one unit; mixed declared units are an input error, never a display choice. |
+| `MeasurementUnit` rule 3 | A missing contributing unit propagates to `None`; the renderer keeps the explicit withholding branch. |
+| `MeasurementUnit` rule 4 | Under § 9a Abs. 2, `None` means no consumption Bemessung was applied; render the area key and denominator instead of the withholding copy. |
+| `MeasurementUnit` rule 5 | A genuinely missing unit withholds the unit-free denominator; it never prints a bare plausible number. |
+| `MeasurementUnit` rule 6 | Compact and long German spellings follow "Which spelling goes where" below. |
+| `MeasurementUnit` rule 7 | The demo uses flat values `600/250/150` HKV units, total `1.000`; the building meter's `20.000 kWh` is the § 9 energy denominator, not that Bemessung. |
 
-| NK — `NkResult.consumption_unit` | |
-| --- | --- |
-| two or more distinct non-`None` `measurement_unit` values in `NkInput.consumptions` | raise `NkInputError` |
-| any row of `consumptions` carries no unit | `None` |
-| exactly one distinct unit and no row missing it | that unit |
-| `consumptions` is empty | `None` |
+This carrying decision moves no euro.
 
-- **The two rules differ in one place, on purpose.** In heating, a unit with `heat_consumption=None`
-  contributes **no measured value**: § 9a estimates it from the measured units, so the estimate is by
-  construction in *their* unit and that row need not declare one. NK has no estimation branch — every
-  `ConsumptionValue` row is a supplied value — so every row must carry the unit. The *mixing* check,
-  by contrast, runs over **declarations** in both engines, including a heating unit with no reading:
-  a declared kWh device in a building of HKV allocators makes next period's denominator unsummable
-  and would label this period's estimate with the wrong unit.
-- **`NkResult.consumption_unit` is one field because `NkInput.consumptions` is one flat tuple**,
-  shared by every `CONSUMPTION` cost on the statement — "one key" is literally true today. **Named,
-  not designed:** when a second, independently-metered consumption key becomes expressible, this
-  field becomes a mapping keyed by that key's identity, and the reference-totals rule *"one per
-  allocation key, and they are not interchangeable"* is what it has to satisfy.
+#### Which spelling goes where
 
-### 3 — Absence propagates, and the withholding branch survives
-
-**If any contributing value lacks a unit, the resolved unit for that key is `None`, and the renderer
-withholds exactly as it does today.** The existing copy — the cell `ohne Maßeinheit — nicht
-ausgewiesen` and the explaining paragraph beneath the column table — stays **byte-identical**, keeps
-its place, and keeps a golden fixture that exercises it.
-
-> **Lead, 06.08.2026:** *"The placeholder copy is good and should not simply vanish. If a building
-> genuinely has no Maßeinheit recorded, the honest disclosure still has to appear — slice 5 removes
-> the cause, not the branch."*
-
-That is the whole shape of this slice: the demo building stops reaching the branch because it now
-records its Maßeinheit (rule 6), and a building that records none still gets the sentence rather than
-a blank, a dash or a zero. The fixture for the branch therefore moves off the demo composition onto a
-deliberately unit-less one; it is not deleted, and none of its assertions is weakened.
-
-### 4 — Under § 9a Abs. 2 the resolved unit is `None`, and that is *not* the withholding branch
-
-When `heat_fallback_to_area` is `True`, no consumption Bemessung was applied at all: the pot went on
-the area key. `HeatingLine.heat_consumption_weight` is already `None` in that branch for exactly that
-reason, and `heat_consumption_unit` follows it — **`None` means "not applied", never "not carried"**,
-the contract's own rule. A unit stated there would be the unit of a Bemessung that determined no euro.
-
-The two `None`s never collide on the page, because the renderer branches on `heat_fallback_to_area`
-**first**: that row then states `Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` and the
-`36.500 m²·Tage` printed two rows above, and nothing is withheld (*"The `Verbrauch Heizung` row under
-§ 9a Abs. 2"*). The withheld sentence and the § 9a row must stay distinguishable — they have
-different causes, and one of them is a legal fact about the allocation.
-
-### 5 — The open sub-question is answered: withhold
-
-The gap note below (*"The unit of the heating-consumption Bemessung"*) left one sub-question open for
-the lead: whether the withholding rule extends to a **unit-free figure** (`Gesamtbemessung 1.000`, no
-unit), which states nothing false but invites an assumption. **Answered 06.08.2026: withhold.**
-
-With rules 1–3 the unit is known whenever it exists, so the question now arises **only** where the
-Maßeinheit genuinely is not recorded — and there the conservative reading the note already named is
-the right one, for the reason it already gave: a bare `1.000` in a column headed *Gesamtbemessung*,
-between two rows reading `36.500 m²·Tage` and `40 m³`, invites the renter to assume a unit, and the
-two candidate units differ by three orders of magnitude in what they mean. The sub-question is
-**closed**, not deferred.
-
-### 6 — Which spelling goes where
-
-Two forms of every unit, and they are not interchangeable.
-
-| `MeasurementUnit` | Compact (a numeric cell) | Long (names the device) |
+| Unit | Compact numeric form | Long heating-key form |
 | --- | --- | --- |
 | `KWH` | `kWh` | `Erfasster Wärmeverbrauch in kWh am Wärmemengenzähler` |
 | `HKV_UNITS` | `HKV-Einheiten` | `Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers` |
-| `CUBIC_METRE` | `m³` | — not reachable on the heating column, see below |
+| `CUBIC_METRE` | `m³` | no heating form; rejected for `MeterKind.HEAT` |
 
-**The Bemessung cells use the compact form**, because they are numeric cells: `1.000 HKV-Einheiten`
-sits in a column beside `36.500 m²·Tage` and `40 m³`, and the long form wraps a figure column into
-prose. **The long form appears exactly once, in the `Verbrauch Heizung` Umlageschlüssel cell** —
-naming the device is what BGH minimum #2 means by *Angabe **und Erläuterung** des Verteilerschlüssels*.
-`Erfasster Wärmeverbrauch` alone says *what* was measured; `… in Einheiten eines
-Heizkostenverteilers` says *by what*, and that is the difference between a renter who can check the
-key and one who cannot.
+NK names the unit but not a device. Warm water remains m³ by the typed § 9 path.
 
-Exact rendered German, settled here:
+### Heating table footer — the figure is the Gesamtkosten, not the column's sum
 
-| Cell | Unit known | Unit not recorded (unchanged) |
-| --- | --- | --- |
-| Block B, `Verbrauch Heizung` **Umlageschlüssel** | `Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers` (`HKV_UNITS`) · `Erfasster Wärmeverbrauch in kWh am Wärmemengenzähler` (`KWH`) | `Erfasster Wärmeverbrauch` |
-| … with a Nutzerwechsel | the same, then ` (Nutzerwechsel: Gradtagszahlen)` | `Erfasster Wärmeverbrauch (Nutzerwechsel: Gradtagszahlen)` |
-| Block B, `Verbrauch Heizung` **Gesamtbemessung** | `1.000 HKV-Einheiten` | `ohne Maßeinheit — nicht ausgewiesen` |
-| Block B, party table **column header** | `Verbrauch Heizung` | column absent |
-| Block B, party **Bemessung** cell | `600 HKV-Einheiten` · `146,25 HKV-Einheiten` | cell absent |
-| NK cost header **Umlageschlüssel** (`CONSUMPTION`) | `Verbrauch (m³)` · `Verbrauch (kWh)` · `Verbrauch (HKV-Einheiten)` | `Verbrauch` |
-| NK cost header **Gesamtbemessung** | `Gesamtbemessung: 40 m³` | no reference total printed |
+#### Required rendered text (heating footer)
 
-- **No parentheses in the long form**, so it composes with the `(Nutzerwechsel: Gradtagszahlen)`
-  parenthetical without producing a second bracket or a nested one. That constraint is what picked
-  *"in kWh am Wärmemengenzähler"* over *"(kWh, Wärmemengenzähler)"*.
-- **The party Bemessung cells repeat the unit**, exactly as the `Verbrauch Warmwasser` column already
-  does (`20 m³`, `rd. 5,95 m³`). One idiom, two columns; a figure column whose unit appears only in
-  its footer is a column a renter has to reconstruct.
-- **The withheld branch keeps the bare key label.** Naming a device in the Umlageschlüssel cell while
-  the cell beside it says *ohne Maßeinheit* would be the page contradicting itself in one row.
-- **`CUBIC_METRE` gets no long form and no heating spelling.** A m³ device is not a heat meter:
-  `MeterCreate._unit_matches_kind` (`apps/api/.../schemas.py`) already rejects `HEAT` + `CUBIC_METRE`,
-  so the combination cannot reach an engine. Inventing a third spelling for a rejected configuration
-  is inventing copy for a case that does not exist.
-- **The NK label names no device**, and that is deliberate: outside the heating column the
-  `MeasurementUnit` does **not** determine the device — `m³` is a Kalt- *or* a Warmwasserzähler — so
-  a device name there would be a fact the data does not carry. In the heating column the pair
-  (`MeterKind.HEAT`, unit) *does* determine it, which is precisely the point `docs/02` →
-  *"Meters: `MeterKind` and `MeasurementUnit` are independent axes"* makes.
-- **Scope: this table is the statement document's copy.** The meter screen's `unit_symbol`
-  (`apps/api/.../routers/meters.py`, `UNIT_SYMBOLS`) spells `HKV_UNITS` as bare `Einheiten` beside a
-  device whose type is on the same screen; that is a different surface with a different context and
-  is **not** harmonised by this table.
-- **Warm water is unaffected, and is derived rather than guessed.** `ww_consumption_m3` /
-  `volume_m3` fix m³ by type, `CANONICAL_UNITS` maps `WARM_WATER → CUBIC_METRE`, and § 9's formula is
-  defined per m³. The `Erfasster Warmwasserverbrauch (m³)` copy does not change.
+With CO₂:
 
-### 7 — The demo values this is worked against
-
-Verified 06.08.2026 against `packages/adapters/src/lokara_adapters/meter.py` → `_SPEC`, which is the
-demo building's register values:
-
-| Meter | Unit | Opening → closing | Verbrauch |
-| --- | --- | --- | --- |
-| `met_heat_a` | `HKV_UNITS` | 1200 → 1800 | **600** |
-| `met_heat_b` | `HKV_UNITS` | 3400 → 3650 | **250** |
-| `met_heat_c` | `HKV_UNITS` | 880 → 1030 | **150** |
-| `met_heat_main` | `KWH` | 148500 → 168500 | 20.000 (the § 9 denominator, not a Bemessung) |
-
-- Flat heat allocators, `MeasurementUnit.HKV_UNITS`: **600 / 250 / 150**, Σ **1.000** → the cell reads
-  **`Gesamtbemessung: 1.000 HKV-Einheiten`**, and after the Nutzerwechsel split the party column reads
-  `600` · `146,25` · `103,75` · `150` HKV-Einheiten, Σ `1.000`.
-- Flat warm water, `CUBIC_METRE`: 20 / 12 / 8, Σ **40 m³** — unchanged, already on the page.
-- **The demo's Σ 1.000 could not have been kWh anyway.** The building's own meter reads 20.000 kWh
-  over the same period; three flats whose devices counted kWh would sum to roughly that, not to
-  1.000. The fixture was HKV-Einheiten all along — it simply could not say so.
-
-⚠️ **Flagged, not resolved here:** `docs/06` → *"Scenario 2 — the fuel, the emissions and the CO₂
-price"* describes the demo building as having *"one Wärmemengenzähler per unit, one shared
-warm-water meter"*. Both halves disagree with `_SPEC` (the flats carry **Heizkostenverteiler**, and
-each flat has its **own** warm-water meter beside the building one), and `DEMO-RUNBOOK.md` →
-*"Screen 4 — Zähler"* agrees with `_SPEC`, not with `docs/06`: *"the building's **Wärmemengenzähler**
-(20.000 kWh) and one flat's **Heizkostenverteiler** (600 Einheiten)"*. The device type is a fixture
-fact, not a legal one, and the code, the runbook and the arithmetic above all point one way — but per
-`CLAUDE.md` the contradiction is **reported to the lead, not silently rewritten** in either
-direction.
-
-### 8 — What this section does not do
-
-- **It does not print Zählerstände.** Start/end readings remain the separate, unspecified gap below;
-  the engine still takes a resolved consumption value and knows of no reading at all.
-- **It does not touch the § 9 energy denominator.** `total_energy_kwh` is kWh by type and by statute
-  and was never part of this gap.
-- **It moves no euro.** Every Bemessung it lets onto the page is a weight the engine already
-  allocated by; the party totals, the pots and the canonical €1.200 allocation are byte-identical.
-
-## Heating table footer — the figure is the Gesamtkosten, not the column's sum
-
-> **Rechtsstand 08/2026** (transcribed 03.08.2026). A **document-copy rule**: it introduces nothing
-> into `packages/rules-store` and reads no dated rule. The one legal value involved — the CO₂ split —
-> is resolved by the heating engine from the store and already carries its own `Rechtsstand` on the
-> page. The statutory reference in the copy below was checked against the consolidated text of the
-> CO2KostAufG as of 08/2026; standard caveat of this file applies (`docs/07`).
-
-**The defect.** The heating `tfoot` currently reads *"Summe Heiz- und Warmwasserkosten (inkl.
-CO₂-Vermieteranteil, stimmt centgenau mit den Gesamtkosten überein)" — 10.300,00 €*. The sentence is
-literally true: 10.300,00 € **is** the Gesamtkosten. But it sits under a column of four amounts that
-sum to **10.142,92 €** (5.603,97 + 1.493,26 + 1.762,32 + 1.283,37 — three Mietverhältnisse and, since
-14.08.2026, the `Eigentümeranteil` in place of the landlord party). The 157,08 € difference is the
-CO₂-Vermieteranteil, which is deducted **before** the renter-facing split (§ 7 Abs. 1 CO2KostAufG) and
-is **not a row in the table**. So the column visibly does not add up while the footer appears to assert
-that it does. (Figures re-based 05.08.2026 with the CO₂ fixture — see *"The worked example"* below;
-the defect and the wording that fixes it are unchanged.)
-
-Two things make it worse than a loose phrase:
-
-- The word **`Summe`** is itself part of the claim. A `tfoot` labelled *Summe* under a column of
-  amounts means "these amounts, added up". Here it is not that.
-- The Betriebskosten footer uses the **identical parenthetical** for a row where the claim is true.
-  Same wording, two meanings, one page — a reader who verifies the first will trust the second.
-
-### Required rendered text (heating footer)
-
-German UI copy (CLAUDE.md), in the heating table's `tfoot` label cell. Two lines in **one** cell; the
-footer's amount column carries **exactly one figure**, the Gesamtkosten.
-
-With a CO₂ split (`heating.co2` present):
-
-```
+```text
 Gesamtkosten Heizung und Warmwasser (inkl. CO₂-Vermieteranteil)          10.300,00 €
 Summe der oben ausgewiesenen Anteile: 10.142,92 €. Die Differenz von 157,08 € ist der
 CO₂-Vermieteranteil; er wird vor der Umlage abgezogen (§ 7 Abs. 1 CO2KostAufG).
 ```
 
-Without a CO₂ split (`heating.co2 is None` — the two figures are then equal by construction):
+Without CO₂, both printed figures are equal and no difference sentence renders. The footer says
+`Gesamtkosten`, not `Summe`, because the CO₂ landlord deduction is not a party row. The NK footer
+keeps `Summe Betriebskosten (stimmt centgenau mit den Gesamtkosten überein)` while that claim remains
+true.
 
-```
-Gesamtkosten Heizung und Warmwasser                                      10.300,00 €
-Summe der oben ausgewiesenen Anteile: 10.300,00 €.
-```
+## 6. Heizkostenabrechnung — the heating table's disclosure
 
-Rules the copy encodes:
+The renderer uses engine **results**, never parallel inputs, for every disclosed operand. It does not
+recalculate ratios, pots, Bemessungen, CO₂ classification or legal branches.
 
-- **State what the figure is, never that a column sums to it.** `Gesamtkosten`, not `Summe`.
-- **The reconciliation is printed as figures, in both branches** — sum of the shares, and (when there
-  is one) the difference, named and cited. No branch asserts an equality in words; the reader adds two
-  printed numbers. One code path, so the no-CO₂ case cannot drift back into a claim.
-- The label is **fixed copy**, not derived from `StatementData.heating_cost_label` — that field
-  spells the heading *"Heiz- und Warmwasserkosten"*, which would render as
-  *"Gesamtkosten Heiz- und Warmwasserkosten"*.
-- Both euro figures come from the engine result (Σ `HeatingLine.total`, `Co2Result.landlord_amount`),
-  formatted with `format_eur`. Nothing here is a new calculation.
+The numbered headings in this section are compatibility anchors: existing references to heating
+items 1–6 mean the matching headings below. References to 4a/4b retain their current carrier and
+pagination meaning.
 
-Gate: `packages/pdf/tests/test_statement_heating_footer.py` — asserts the claim per section (present
-on the Betriebskosten footer, absent from the heating one), the copy above with both figures derived
-from the engine, and the arithmetic that motivates it: the **rendered** party amounts sum to strictly
-less than the footer figure, by exactly the CO₂-Vermieteranteil. A future change that drops the CO₂
-deduction — making the column add up and the old wording true again — surfaces there rather than
-silently.
+### The worked example
 
-### The Betriebskosten footer keeps its current wording ⚠️
+Demo period 01.01.–31.12.2025: 100 m²; total cost 10.300,00 €; 20.000 kWh gas; 40 m³ warm water;
+heat-device values 600/250/150 HKV units; warm-water values 20/12/8 m³; 4.000 kg CO₂; CO₂ cost
+261,80 €.
 
-*"Summe Betriebskosten (stimmt centgenau mit den Gesamtkosten überein)"* stays **exactly as it is**.
-There the claim holds: the indented party rows sum to the printed figure to the cent, and that
-reconciliation is the engine's core invariant (`docs/03` → Rounding). Do **not** "harmonise" the two
-footers back into identical wording — the wordings differ because the facts differ. (The cost-header
-rows in that table sit in the same column but are group totals, not addends; the addends are the
-indented lines.)
-
-If a pre-split deduction is ever introduced on the Betriebskosten side, the same rule applies there
-and the claim comes out.
-
-### The eventual fix is a row, not a wording — and it is not this slice
-
-The better long-term answer is that the CO₂-Vermieteranteil becomes a **visible row in the heating
-table** (a landlord-side party line), so the column literally adds up to the Gesamtkosten and no
-explanatory sentence is needed. That belongs with the heating table's full treatment — the open
-question *"Heating: how consumption values and the CO₂ split are presented to the tenant"* below. It is
-recorded here so the reword is understood as an interim honest state, and it is **not** specified or
-designed in this section.
-
-## Heizkostenabrechnung — the heating table's disclosure
-
-> **Rechtsstand 08/2026** (transcribed 03.08.2026). This section introduces **no legal value** into
-> `packages/rules-store` and computes nothing new: every figure it specifies is carried by the
-> engine result. The historical intermediates that once were discarded are named below.
-> The statutory references — §§ 7, 8, 9, 9a, 9b HeizkostenV and § 7 CO2KostAufG — were checked against
-> the consolidated texts as of 08/2026. Standard caveat of this file applies (`docs/07`): confirm with
-> a Fachanwalt before real tenants.
-
-**What this section is for.** The first render made the Betriebskostenabrechnung legible but left the
-Heizkostenabrechnung without its keys and bases. That historical defect is closed: the current page
-shows two cost pots, four money columns, three different denominators and the applied apportionment
-rules. The document-level operator and derived-numerator gap named at the top still applies to both
-tables.
-
-### Historical implementation seam — closed: `HeatingResult` supplies the disclosure figures
-
-The 03.08.2026 review found that `HeatingResult` could not supply the values below. The
-carried-intermediates slice closed that seam: the current frozen result carries these values and the
-statement renders them. This table remains as the provenance for why each carrier belongs on the
-engine result rather than being recomputed in the template:
-
-| Originally discarded | Where computed | Needed for |
-| --- | --- | --- |
-| `q_ww` (warm-water energy) and the § 9 formula inputs applied | `_separate_warm_water` | § 9 disclosure |
-| `ww_pot` / `heating_pot` | `_separate_warm_water` | § 9 disclosure |
-| `heat_base_pot` / `heat_cons_pot`, `ww_base_pot` / `ww_cons_pot` | `calculate_heating_statement` | §§ 7/8 disclosure |
-| `rules.consumption_share` (the ratio actually applied) + the bounds | input, never echoed | §§ 7/8 disclosure |
-| `_Party.base_weight` | `_build_parties` | per-party Bemessung (Fläche·Tage) |
-| the consumption weights from `_consumption_weights` | local list | per-party Bemessung (Verbrauch) |
-| `_Party.degree_day_promille` and its per-unit total | `_build_parties` | the 583,3/416,7 ‰ |
-| `_Party.days` | `_build_parties` | day-apportionment of WW/base at a Nutzerwechsel |
-| `total_co2_kg`, `co2_cost`, `heated_area_sqm`, the selected step's band | `_apply_co2` / `co2.py` | § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen |
-
-Field-by-field, that table is resolved in **"The carried-intermediates contract (slice 3)"** below —
-names, types, demo values, and which statute makes each one required rather than merely useful.
-
-**Current consequence:** the renderer reads these values from the engine result and shows the key,
-Bemessung, denominator, §§ 7–9 split, degree-day disclosure and CO₂ Berechnungsgrundlagen. The seam
-still matters: future document work must not bypass it by recalculating from inputs.
-
-**A rule the template must not break to get around it:** the disclosure figures come from the **engine
-result**, never from the engine *input* passed alongside it. Two sources drift; the page would then
-state a ratio that was not the one applied. This is the same rule the heating footer already follows
-("Both euro figures come from the engine result … Nothing here is a new calculation").
-
-### The worked example (the demo building, 01.01.–31.12.2025)
-
-Every figure below is the real output of the two engines on the demo inputs. It is the source for the
-golden fixtures of the slices below.
-
-> **⚠️ Re-based 05.08.2026 — the CO₂ figures of the demo were wrong on their face.** `2.000 kg` and
-> `300,00 €` implied **150 €/t** (2025: 55,00 € + USt = 65,45 €/t) and, against the demo's own
-> 20.000 kWh, **0,1 kg CO₂/kWh** — about half of Erdgas. The corrected fixture, its fuel and the
-> statutory figures it was checked against: `docs/06` → *"Scenario 2 — the fuel, the emissions and the
-> CO₂ price"* and `docs/03` → *"Where `total_co2_kg` and `co2_cost` come from"*. Because the
-> CO₂-Vermieteranteil is deducted **before** the renter-facing split, every heating euro below moved;
-> the **585/415 ‰ ratio, every Bemessung and the canonical €1.200 NK example did not**.
-
-Building: A 50 m², B 30 m², C 20 m²; Bernd Muster leaves B on 30.06.2025 (B vacant Jul–Dec).
-Gesamtkosten Heizung + Warmwasser **10.300,00 €**; Gesamtenergie **20.000 kWh** Erdgas; Warmwasser
-**40 m³** gemessen; Wärmeverbrauch A/B/C **600 / 250 / 150** (Anzeige der Erfassungsgeräte);
-Warmwasserverbrauch A/B/C **20 / 12 / 8 m³**; CO₂ **4.000 kg**, CO₂-Kosten **261,80 €**.
-
-| Stage | Figures |
+| Stage | Current result |
 | --- | --- |
-| CO₂ (§ 7 CO2KostAufG) | Intensität 4.000 kg ÷ 100 m² = **40 kg CO₂/m²/a** → Vermieteranteil **60 %** = **157,08 €**, Mieteranteil **104,72 €** |
-| umlagefähig nach Abzug | **10.142,92 €** |
-| § 9 Trennung | Q(WW) = 2,5 × 40 × (60 − 10) = **5.000 kWh** von 20.000 kWh → Warmwasser **2.535,73 €**, Heizung **7.607,19 €** |
-| §§ 7/8 bei 30/70 | Heizung: Grund **2.282,16 €** / Verbrauch **5.325,03 €** · Warmwasser: Grund **760,72 €** / Verbrauch **1.775,01 €** |
-| Grundkosten-Bemessung | A 18.250 · B-Mieter 5.430 · B-Vermieter 5.520 · C 7.300 · **Σ 36.500 m²·Tage** |
-| Wärmeverbrauchs-Bemessung | A 600 · B-Mieter 146,25 · B-Vermieter 103,75 · C 150 · **Σ 1.000 HKV-Einheiten** (die Maßeinheit wird seit Slice 5 mitgeführt) |
-| Warmwasser-Bemessung | A 20 · B-Mieter 5,950684… · B-Vermieter 6,049315… · C 8 · **Σ 40 m³** |
-| Gradtagszahlen B | 01.01.–30.06. **583,3 ‰ von 1.000 ‰** · 01.07.–31.12. **416,7 ‰ von 1.000 ‰** |
-| Tage B (Grund + WW) | **181 von 365** bzw. **184 von 365** |
+| CO₂ | 40,0 kg CO₂/m²/Jahr; landlord 60 % = 157,08 €; renter side 104,72 € |
+| billable after deduction | 10.142,92 € |
+| § 9 separation | Q(WW) 5.000 of 20.000 kWh; WW 2.535,73 €; heating 7.607,19 € |
+| 30/70 split | heating 2.282,16/5.325,03 €; WW 760,72/1.775,01 € |
+| area denominator | 18.250 / 5.430 / 5.520 / 7.300 = 36.500 m²·Tage |
+| heat denominator | 600 / 146,25 / 103,75 / 150 = 1.000 HKV-Einheiten |
+| WW denominator | 20 / 5,950684… / 6,049315… / 8 = 40 m³ |
+| unit-B degree days | 583,3 / 416,7 ‰ of 1.000 ‰ |
 
-Party totals: 5.603,97 / 1.493,26 / 1.283,37 / 1.762,32 € — Σ 10.142,92 €, plus the 157,08 €
-CO₂-Vermieteranteil = 10.300,00 €.
-
-Unit B's heating-consumption cells — the figures `DEMO-RUNBOOK.md` and `docs/06` point at — are
-**776,52 € / 554,74 €**, exactly 583,3 : 416,7 — re-based by K3 (VDI 2067, `docs/03`) on
-13.08.2026. The pot did not move: 77.652 + 55.474 = 133.126, as before.
+Unit B's heating-consumption amounts are 776,52/554,74 €. The pot remains 1.331,26 €.
 
 ### 1 — Umlageschlüssel and Gesamtbemessung per money column
 
-The heating table's four money columns **do not share a denominator**, and that is the whole reason the
-NK solution (one label appended to the cost header row) does not transfer:
-
-| Money column | Umlageschlüssel | Gesamtbemessung (demo) |
+| Money column | Applied key | Gesamtbemessung |
 | --- | --- | --- |
-| Grundkosten Heizung | Wohnfläche (m²·Tage) — § 7 Abs. 1 HeizkostenV | 36.500 m²·Tage |
-| Verbrauch Heizung | Erfasster Wärmeverbrauch in Einheiten eines Heizkostenverteilers (Nutzerwechsel: Gradtagszahlen) | 1.000 HKV-Einheiten — **withheld** where a building records no Maßeinheit, see *"The withheld cell is a sentence, not a blank"* below |
-| Grundkosten Warmwasser | Wohnfläche (m²·Tage) — § 8 Abs. 1 HeizkostenV | 36.500 m²·Tage |
-| Verbrauch Warmwasser | Erfasster Warmwasserverbrauch (m³) | 40 m³ |
+| Grundkosten Heizung | Wohnfläche — § 7 Abs. 1 HeizkostenV | 36.500 m²·Tage |
+| Verbrauch Heizung | recorded heat unit; Nutzerwechsel uses degree days | 1.000 HKV-Einheiten |
+| Grundkosten Warmwasser | Wohnfläche — § 8 Abs. 1 HeizkostenV | 36.500 m²·Tage |
+| Verbrauch Warmwasser | recorded m³ | 40 m³ |
 
 **All four rows render. The withholding is of one cell, never of a row.**
 
-> **Rechtsstand 08/2026** (transcribed 05.08.2026, after `statement-reviewer` finding **F1**). A
-> **document-copy rule**: it introduces nothing into `packages/rules-store`, resolves no rule and
-> computes nothing. The statutory references are the ones the table above already carries.
-
-The first render of Block B dropped the whole `Verbrauch Heizung` row, and the consequence was worse
-than the gap it was avoiding: the **largest pot on the page** — 5.325,03 €, **52 %** of the umlagefähige
-Kosten — then had **no Umlageschlüssel named anywhere**, in a block titled *Bemessungsgrundlagen*. Four
-money columns, three rows. A renter comparing the two cannot tell whether the column was forgotten or
-allocated by a key nobody wrote down.
-
-What was not derivable when this was written is the **unit** of the heating-consumption Bemessung (kWh
-at a Wärmemengenzähler, dimensionless HKV-Einheiten at a Heizkostenverteiler). That blocked **one
-cell**: the Gesamtbemessung. It never blocked the Umlageschlüssel, which is a name, not a figure, and
-which is BGH formal minimum **#2** in its own right.
-
-**Slice 5 carries the unit** (*"`MeasurementUnit` travels with the value"* above), so on a building
-that records its Maßeinheit the cell now prints its figure. The withholding branch **stays** for a
-building that records none, with its copy unchanged — the cause is removed, not the branch.
-
 #### The withheld cell is a sentence, not a blank
 
-**When this branch renders (updated 06.08.2026):** only where the Maßeinheit of the heat-recording
-devices is **genuinely not recorded** — i.e. `HeatingResult.heat_consumption_unit is None` while
-`heat_fallback_to_area` is `False`. Slice 5 removed the *cause* on any building that records its
-devices (*"`MeasurementUnit` travels with the value"*), and deliberately kept the *branch*: an
-unrecorded unit is an honest disclosure, not a blank. Every word below is unchanged.
+When `heat_consumption_unit is None` and area fallback is false:
 
-The cell prints, verbatim:
-
-```
+```text
 ohne Maßeinheit — nicht ausgewiesen
 ```
 
-and directly beneath the column table, once, whenever that row rendered in this form:
-
-```
+```text
 Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit der
 Erfassungsgeräte (kWh oder Einheiten eines Heizkostenverteilers) liegt dieser Abrechnung nicht vor.
 Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten verteilt.
 ```
 
-Every word of the cell is carrying something:
-
-- **It contains no digit and no dash used as a figure.** `—`, `0`, `–` or an empty cell all read as
-  *zero* in a numeric column, and a zero denominator is not merely wrong, it is unreadable — it would
-  make the renter's own share look undefined.
-- **`nicht ausgewiesen`** is an act of the landlord's, in the same register § 7 Abs. 3 CO2KostAufG uses
-  for *ausweisen*. It says *this was not stated*, which is true, rather than *there is none*, which is
-  false: the denominator exists and the engine divided by it.
-- **`ohne Maßeinheit`** is the reason, in two words, and it is the only reason that makes a figure
-  unprintable rather than merely absent. Without it the cell is exactly the *"omission a renter would
-  take for an error"*.
-- **The second sentence of the note is not optional.** Without it a renter can read the withheld
-  denominator as a withheld *method* and conclude the column was not consumption-allocated at all —
-  which would be a § 7 Abs. 1 HeizkostenV defect rather than a display gap.
-- The note says **nothing** about who should have supplied the unit and asserts **no** right of
-  inspection. Both would be claims this document has not transcribed.
-
-**Rejected: printing the unit-free figure `1.000`.** A bare `1.000` in a column headed
-*Gesamtbemessung*, between two rows reading `36.500 m²·Tage` and `40 m³`, invites the renter to assume
-a unit, and the two candidate units differ by three orders of magnitude in what they mean. The
-withholding stays; only its wording is fixed here. **This was the open sub-question for the lead, and
-it is answered — withhold** (06.08.2026, *"`MeasurementUnit` travels with the value"* → rule 5). With
-the unit now carried, the branch is reached only where no Maßeinheit is recorded at all, and there
-this reasoning is the whole of it.
+No digit, zero, dash or unit-free denominator substitutes for the missing unit.
 
 #### The `Verbrauch Heizung` row under § 9a Abs. 2 — it states Wohnfläche, not Wärmeverbrauch
 
-`heat_fallback_to_area` means the consumption key **was replaced**: more than 25 % of the area had no
-reading and § 9a Abs. 2 HeizkostenV put that pot on the area key. Then the applied Umlageschlüssel of
-the `Verbrauch Heizung` column **is Wohnfläche (m²·Tage)**, its denominator is the `36.500 m²·Tage`
-already printed two rows above, and there is no measurement-unit problem at all — the withholding
-reason has evaporated with the key it applied to.
-
-| `heat_fallback_to_area` | Umlageschlüssel cell | Gesamtbemessung cell |
-| --- | --- | --- |
-| `False` | `Erfasster Wärmeverbrauch` (+ `(Nutzerwechsel: Gradtagszahlen)`, see below) | `ohne Maßeinheit — nicht ausgewiesen` |
-| `True` | `Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` | `36.500 m²·Tage` |
-
-- The citation in the fallback branch is **§ 9a Abs. 2**, not § 7 Abs. 1: § 7 Abs. 1 is why there is a
-  consumption pot at all, § 9a Abs. 2 is why *this* pot was distributed by area. Naming § 7 Abs. 1
-  there would send a renter to a paragraph that does not contain the rule that decided their share.
-- The same rule applies to the **`Verbrauch Warmwasser`** row under `ww_fallback_to_area`, which 4a
-  already put on `Wohnfläche (m²·Tage)`: it carries the same **`— § 9a Abs. 2 HeizkostenV`** citation,
-  for the same reason. The `.note` at the foot of the section says the same thing in prose; the row is
-  where a renter looks for the key of *their* column, and the two must agree.
-- **`(Nutzerwechsel: Gradtagszahlen)` renders only when a Nutzerwechsel happened** — i.e. exactly when
-  Block C renders its ‰ lines. On a building with one party per unit the parenthetical names a method
-  that was not applied, which is the rule this whole section is built on.
-
-**The two Wohnfläche rows carry their citations.** `— § 7 Abs. 1 HeizkostenV` on *Grundkosten Heizung*,
-`— § 8 Abs. 1 HeizkostenV` on *Grundkosten Warmwasser*, exactly as the table above assigns them. The
-first render dropped both. They are separate paragraphs for separate pots (see item 2), and a renter
-who wants to check *why* their base costs go by area has nowhere else on the page to look —
-`Rechtsstand: § 7 Abs. 1 HeizkostenV 03/1989` in the footer dates a rule, it does not attach it to a
-column. **`Verbrauch Warmwasser` carries no citation** in the measured branch, because the table above
-assigns it none; § 8 Abs. 1 governs that split too, but transcribing a citation the spec did not write
-is inventing law, and the place to fix it is this table, not the renderer.
-
-**Decision: two disclosure blocks beneath the table, not more columns.** Four Umlageschlüssel + four
-Gesamtbemessungen + up to three per-party Bemessung values cannot go into a table that already carries
-six money columns on A4 portrait: at three extra columns the amounts start wrapping, and `docs/05`
-("Restraint over reduction … reduce ornament, never clarity") does not license a nine-column grid at
-8 pt. The money table stays as it is. Directly beneath it, in this order:
-
-1. **Block A — "Aufteilung der Gesamtkosten"** — how 10.300,00 € became the four pots (§§ 7, 8, 9 and
-   the CO₂ deduction). This is the *vertical* half of the calculation and it is the part that is
-   currently invisible.
-2. **Block B — "Bemessungsgrundlagen"** — a second, narrow table: one row per column stating its
-   Umlageschlüssel + Gesamtbemessung, then one row per party with its Bemessung values. This is the
-   *horizontal* half — the analogue of the NK table's `18.250`.
-3. **Block C** — the Nutzerwechsel/Gradtagszahlen note (only when a unit has more than one party).
-4. Then the existing CO₂ block and the existing § 9a notes, unchanged in position.
+When the consumption key fell back, print
+`Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` and `36.500 m²·Tage`. The same rule applies to the
+warm-water consumption column. No consumption Bemessung renders for a pot allocated by area.
 
 #### Required rendered text — Block A
 
-German UI copy (CLAUDE.md). Amounts via `format_eur`, other figures via `format_number_de`.
+Block A, `Aufteilung der Gesamtkosten`, prints:
 
-```
-Aufteilung der Gesamtkosten (HeizkostenV)
+1. total cost, optional CO₂ landlord deduction and billable cost;
+2. the applied § 9 measured or area-fallback formula and resulting WW/heating pots;
+3. applied base/consumption percentages and permitted bounds;
+4. the four euro pots.
 
+The CO₂ line exists only when a split exists. Without central warm water, there is no § 9 paragraph
+or WW line. Percentages and operands come from the result.
+
+Demo copy and figures:
+
+```text
 Gesamtkosten Heizung und Warmwasser                                  10.300,00 €
 − CO₂-Vermieteranteil (§ 7 Abs. 1 CO2KostAufG)                          157,08 €
 = umlagefähige Kosten                                                10.142,92 €
@@ -1624,926 +483,308 @@ Gesamtkosten Heizung und Warmwasser                                  10.300,00 �
 Q(WW) = 2,5 kWh/(m³·K) × 40 m³ × (60 °C − 10 °C) = 5.000 kWh von 20.000 kWh Gesamtenergie
 → Warmwasser 2.535,73 € · Heizung 7.607,19 €
 
-§§ 7, 8 HeizkostenV — Grund- und Verbrauchskosten: angewendet 30 % Grundkosten / 70 % Verbrauch
-(zulässiger Rahmen: 50 % bis 70 % Verbrauchskosten, § 7 Abs. 1 HeizkostenV)
-Heizung:     Grundkosten 2.282,16 € · Verbrauchskosten 5.325,03 €
-Warmwasser:  Grundkosten   760,72 € · Verbrauchskosten 1.775,01 €
+§§ 7, 8 HeizkostenV — angewendet 30 % Grundkosten / 70 % Verbrauch
+Heizung: Grundkosten 2.282,16 € · Verbrauchskosten 5.325,03 €
+Warmwasser: Grundkosten 760,72 € · Verbrauchskosten 1.775,01 €
 ```
-
-Rules the copy encodes:
-
-- **The CO₂ line is a deduction, not a share.** It repeats what the footer already says, in the place
-  where the arithmetic happens. It renders **only** when `heating.co2` is present; without it the block
-  opens directly at `umlagefähige Kosten = Gesamtkosten`.
-- **The § 9 line prints the formula it applied, with its operands** — see item 3 below for the fallback
-  branch, which prints a *different* formula and must never print this one.
-- **`angewendet 30 % / 70 %` and the bound are two different facts** and are printed as two: what was
-  used, and what the law permits. A statement that prints only "70 %" tells the tenant nothing about
-  whether that was lawful; a statement that prints only the bound hides what was applied.
-- Percentages are derived from the resolved rule value (`consumption_share`, `split_bounds`), never
-  written as literals in the template.
 
 #### Required rendered text — Block B
 
-The demo building, which records its Maßeinheit (slice 5):
-
-```
-Bemessungsgrundlagen
-
-Spalte                    Umlageschlüssel                              Gesamtbemessung
-Grundkosten Heizung       Wohnfläche (m²·Tage) — § 7 Abs. 1 Heizkos…   36.500 m²·Tage
-Verbrauch Heizung         Erfasster Wärmeverbrauch in Einheiten        1.000 HKV-Einheiten
-                          eines Heizkostenverteilers
-                          (Nutzerwechsel: Gradtagszahlen)
-Grundkosten Warmwasser    Wohnfläche (m²·Tage) — § 8 Abs. 1 Heizkos…   36.500 m²·Tage
-Verbrauch Warmwasser      Erfasster Warmwasserverbrauch (m³)           40 m³
-
-Partei                             Fläche·Tage  Verbrauch Heizung  Verbrauch Warmwasser
-Wohnung A — Anna Beispiel               18.250   600 HKV-Einheiten                20 m³
-Wohnung B — Bernd Muster (Ausz…)         5.430   146,25 HKV-Einh…           rd. 5,95 m³
-Wohnung B — Leerstand ab 01.07.…         5.520   103,75 HKV-Einh…           rd. 6,05 m³
-Wohnung C — Clara Vorlage                7.300   150 HKV-Einheiten                 8 m³
-Gesamtbemessung                         36.500  1.000 HKV-Einheiten               40 m³
-
-Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, sodass eine
-Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
-```
-
-A building that records **no** Maßeinheit — the branch slice 5 kept (*"The withheld cell is a
-sentence, not a blank"*). Only the two heat cells differ; the `Verbrauch Heizung` Bemessung column is
-absent from the party table, and the note sits between the two tables:
-
-```
-Verbrauch Heizung         Erfasster Wärmeverbrauch                     ohne Maßeinheit —
-                          (Nutzerwechsel: Gradtagszahlen)              nicht ausgewiesen
-
-Für den erfassten Wärmeverbrauch wird keine Gesamtbemessung ausgewiesen: Die Maßeinheit der
-Erfassungsgeräte (kWh oder Einheiten eines Heizkostenverteilers) liegt dieser Abrechnung nicht vor.
-Der Verbrauchsanteil wurde gleichwohl nach den erfassten Werten verteilt.
-```
-
-(The `§ 7 Abs. 1 Heizkos…` above is this file's column width, not an ellipsis on the page — the row
-prints the citation in full.)
-
-- The token stays **`Bemessung` / `Gesamtbemessung`**, matching the NK table — same concept, same word.
-- The de-scaling rule of the reference-totals section applies unchanged: `36.500`, never `3.650.000`;
-  the **sum** is de-scaled once, never per line.
-- **Invariant, asserted over rendered text:** each Bemessung column's printed values sum exactly to the
-  printed Gesamtbemessung of that column. Same invariant as the NK reference totals.
-- **The `Verbrauch Heizung` row is always in the column table.** Its Gesamtbemessung cell and its
-  party-table Bemessung column are present when the Maßeinheit is recorded (slice 5) and withheld
-  together when it is not — the row itself states the key that was applied (BGH #2) in either case.
-  See *"All four rows render"* above for the copy and *"The `Verbrauch Heizung` row under § 9a Abs. 2"*
-  for the branch where the consumption key was replaced and nothing is withheld at all.
-- **The party table's Bemessung columns follow the same order**: `Fläche·Tage` (the denominator of
-  both Grundkosten columns), then `Verbrauch Heizung`, then `Verbrauch Warmwasser`. Each column is
-  present exactly when its Gesamtbemessung is.
-- **Row order is the money table's column order** — Grundkosten Heizung, Verbrauch Heizung, Grundkosten
-  Warmwasser, Verbrauch Warmwasser. A renter reads across the money table and down this one; a
-  different order makes them search.
+Block B, `Bemessungsgrundlagen`, has the four key/denominator rows followed by party Bemessungen.
+Each displayed column sums to its displayed Gesamtbemessung. Column and row order follow the money
+table. The withholding branch removes the heat Bemessung column, not its key row.
 
 #### Display rounding of a fractional Bemessung (new — the NK weights were all integral)
 
-`5,950684931506849…` is a real Bemessung (12 m³ × 181/365). The NK section never needed a rule because
-every NK weight is an integer. The rule:
-
-1. Display with **at most 2 decimals**, trailing zeros suppressed (`20`, not `20,00`; `5,95`).
-2. Round the values of a column with **largest remainder** across that column's parties, so the printed
-   values sum exactly to the printed Gesamtbemessung — the same idiom the engine uses for cents
-   (`docs/03` → Rounding), ties by stable party order. Rounding each value independently breaks the
-   invariant above on a document that is supposed to add up.
-3. Where a value was **derived** rather than measured (an apportionment at a Nutzerwechsel), the
-   derivation is printed in Block C. The 2-decimal figure is the readable one; the derivation shows
-   the operands, so the tenant can reproduce it.
-4. A rounded figure is marked **`rd.`** and the rounding is disclosed **once**, in one place. Rules
-   below.
+Display at most two decimals and suppress trailing zeroes. Use largest remainder across the displayed
+column so printed party values sum to the printed denominator. Derived rounded values carry `rd.`;
+exact values do not.
 
 #### The rounding is disclosed — `rd.`, one sentence, and an operator that is the operation
 
-> **Rechtsstand 08/2026** (transcribed 05.08.2026, after `statement-reviewer` finding **F2**). A
-> **document-copy rule**: nothing enters `packages/rules-store`, no rule is resolved, no figure moves.
-> The legal purpose is BGH minimum **#3** — a *Berechnung* the renter re-performs — and the copy
-> ruling is this file's, per the lead's instruction of 05.08.2026.
-
-**The three defects, and the one the lead already ruled on.** Block C printed
-`12 m³ × 181 von 365 Tagen = 5,95 m³`.
-
-1. `12 × 181 ÷ 365 = 5,9506849…`, so **`=` states a false identity**. **Lead's ruling (05.08.2026):**
-   keep reusing Block B's rounded figure — *two different figures for one quantity is worse than one
-   rounded figure*. What comes out is the **assertion of equality**, not the figure.
-2. **The rounding was disclosed nowhere**, and the arithmetic makes that expensive. The printed
-   Verbrauchskosten Warmwasser ÷ the printed Gesamtbemessung 40 m³ gives a price per m³ that
-   reproduces Wohnung A and Wohnung C **exactly** and misses **both Nutzerwechsel parties by ~3 ct**.
-   The renter checking the uncontested line succeeds; the renter checking the contested line fails.
-   That is the worst possible distribution of that error and it is *why* the disclosure is mandatory
-   rather than tidy.
-3. `× 181 von 365 Tagen` **is not multiplication by a number.** Read literally it says `12 × 181 =
-   2.172`.
-
-**Ruling 1 — the operator is `= rd.`, not `≈`.**
-
-```
-Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
+```text
+Wohnung B — Bernd Muster: 12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
 ```
 
-- **`rd.`** is the conventional German abbreviation for *rund* and is what a renter already meets on
-  bank, utility and insurance statements. It is a **word**, in the document's own language, and needs
-  no notation to be known.
-- **`= rd. X` is not a false identity.** `rd.` qualifies the figure, so the sentence reads *"ergibt
-  gerundet 5,95 m³"* — which is true. Removing `=` entirely would also remove the statement that the
-  left side *produces* the right side, and that statement is exactly what BGH #3 asks for.
-- **`≈` is rejected.** It is a glyph, not a word: it presumes mathematical notation the reader is not
-  required to know, it has no spoken German form on a legal document, and U+2248 is one more code
-  point that has to survive PDF font subsetting. Every other glyph this document fixes (`−`, `·`, `→`)
-  is typographic; none carries meaning a word could carry.
-- **`rd.` marks the value, not the line.** It renders **only where the printed value differs from the
-  exact one**. Wohnung A's `20 m³` is exact and prints bare; `rd. 20 m³` would state a rounding that
-  did not happen — the same discipline as *`None` means not applied*. This is the rule that makes the
-  marker informative: `rd.` on every figure is decoration, `rd.` on the two derived ones is a fact.
-- It applies **wherever a rounded Bemessung is printed** — Block C's derivation lines *and* Block B's
-  party table. It is a property of the figure, so it travels with the figure.
+Use `= rd.`, not a false exact equality and not `≈`. Directly below Block B:
 
-**Ruling 2 — one disclosure sentence, in Block B, directly beneath the party table:**
-
-```
+```text
 Gerundete Bemessungen sind mit rd. gekennzeichnet; gerechnet wird mit dem exakten Wert, sodass eine
 Nachrechnung aus dem angezeigten Wert um wenige Cent abweichen kann.
 ```
 
-- **One sentence, one place.** Not one per block: a caveat repeated per block is a caveat nobody
-  reads, and it invites the two copies to drift.
-- **Why Block B and not Block C.** The rounded figures *originate* in Block B — it is the Bemessung
-  table, and `warm_water_display_weights` is computed once there and re-read by Block C. Block C is
-  conditional (it renders only at a Nutzerwechsel) while a raw meter reading can be fractional without
-  any Nutzerwechsel at all, so a sentence living in Block C would be missing exactly when it is still
-  needed.
-- **Directly beneath the table it qualifies**, not two paragraphs away. The reviewer's note on the VDI
-  caveat sitting away from the ‰ lines it qualifies is the mistake being avoided; adjacency is part of
-  the rule, not layout preference.
-- **It renders whenever Block B prints a Bemessung column at all** — one code path, no branch. It
-  states the *display convention*, which is true whether or not a given figure needed it; `rd.` is
-  what marks the instance. A conditional caveat is a branch that can be wrong about itself.
-- **The last clause is the point.** *"…sodass eine Nachrechnung aus dem angezeigten Wert um wenige Cent
-  abweichen kann"* is what defect 2 above costs the renter, said out loud, before they discover it on
-  the one line they are most likely to contest.
-
-**Ruling 3 — `× (N von M Tagen)`, parenthesised.**
-
-The document's single share idiom is `A von B` — `583,3 ‰ von 1.000 ‰`, `5.000 kWh von 20.000 kWh`,
-`365 von 365 Tagen`. The defect is not the idiom, it is **operator binding**: `×` binds to `181`
-instead of to the share. Parentheses fix precisely that and teach the renter nothing new:
-
-```
-12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
-```
-
-- Rejected: `12 m³ × 181/365 Tage` (the unit dangles off a fraction and the "von" idiom is abandoned in
-  one place only) and `12 m³ × 181 ÷ 365 Tage` (two operators where one share is meant, and `÷` is a
-  glyph again).
-- **The same fix applies to § 9's area-fallback line in Block A**, which has the identical defect:
-  `32 kWh je m² Wohnfläche und Jahr × 100 m² × (365 von 365 Tagen) = 3.200 kWh von 20.000 kWh`. That
-  result is exact, so it carries **no `rd.`** — which is the marker doing its job in the one branch
-  where a reader could otherwise not tell.
-- `583,3 ‰ von 1.000 ‰` and `5.000 kWh von 20.000 kWh Gesamtenergie` are **not** parenthesised and must
-  not be: no `×` precedes them, so nothing binds wrongly, and bracketing them would imply an operator
-  that is not there.
-
 ### 2 — §§ 7/8 HeizkostenV: the applied ratio, stated
 
-- **The ratio is a resolved rule value, not a constant.** `HeatingRules.consumption_share` is supplied
-  per building; `packages/rules-store` supplies only the **bounds** (`hkvo.heating-split-bounds`,
-  source *§ 7 Abs. 1 HeizkostenV*, `Rechtsstand 03/1989`, min 0,5 / max 0,7) and a
-  `DEFAULT_CONSUMPTION_SHARE` of 0,7. The engine rejects any share outside the bounds
-  (`HeatingInputError`). The page prints the **applied** share and the **bounds**, both from the result.
-- §§ 7 and 8 are cited separately because they are separate rules: § 7 governs the heating cost split,
-  § 8 the warm-water cost split. The engine applies the *same* share to both pots
-  (`distribute_cents(ww_pot, [1 - share, share])`), which is the common configuration — **not** a legal
-  identity. If a building ever configures them differently, the disclosure prints two ratios and the
-  input grows a second field; that is out of scope here and is named so it is not assumed away.
-- `docs/03` phrases the range as "configurable 30/70 … 50/50" (base/consumption); the store phrases it
-  as consumption share ∈ [0,5; 0,7]. Same rule, two spellings — **no contradiction**, and the page uses
-  the store's direction ("Verbrauchskosten") with both numbers printed.
+Print what was applied and the permitted range. The current model applies one consumption share to
+both pots; that is a product shape, not a legal identity. Different configured shares require a
+future input shape and two printed ratios.
 
 ### 3 — § 9 HeizkostenV: warm-water separation
 
-Two branches, and they print **different** text. Which one ran is not currently recoverable from the
-result — the engine must carry it.
+Measured branch:
 
-**Measured volume** (`WarmWaterInput.volume_m3` is not None) — the demo case:
-
-```
+```text
 Q(WW) = 2,5 kWh/(m³·K) × 40 m³ × (60 °C − 10 °C) = 5.000 kWh von 20.000 kWh Gesamtenergie
 ```
 
-Operands from `WarmWaterFormula` (`hkvo.warm-water-formula`, source *§ 9 Abs. 2 HeizkostenV*,
-`Rechtsstand 01/2009`): `factor_kwh_per_m3_kelvin` 2,5 · `hot_temp_c` 60 · `cold_temp_c` 10.
+Area fallback:
 
-**Unmeasured volume** — § 9 Abs. 2 area fallback:
-
-```
+```text
 Warmwasserverbrauch nicht gemessen — Ersatzwert nach § 9 Abs. 2 HeizkostenV:
 32 kWh je m² Wohnfläche und Jahr × 100 m² × (365 von 365 Tagen) = 3.200 kWh von 20.000 kWh
 ```
 
-- The parentheses around the day share, and the absence of `rd.` on an exact result, are the rule of
-  *"The rounding is disclosed"* above; this line is one of the two places it applies.
-- The fallback is **legally weaker than a measurement and must read as one** — the words
-  *"nicht gemessen"* and *"Ersatzwert"* carry that; the tenant is entitled to know the number was not
-  measured. The measured branch must never render the word Ersatzwert and vice versa.
-- The pro-rating (`× days / 365`) is printed because the engine performs it; a 12-month period prints
-  `365 von 365 Tagen`, which is honest rather than noise — it shows the tenant the factor exists.
-- Both branches print the resulting **euro** pots, because that is what the tenant can check against the
-  money table.
+The branch that ran and its exact operands are carried on the result. `nicht gemessen` and
+`Ersatzwert` never appear on the measured branch.
 
 ### 4 — Degree-day apportionment at a Nutzerwechsel (Block C)
 
-Rendered only for a unit with more than one party in the period. Demo:
+#### The method's statutory basis (§ 9b HeizkostenV) is a prerequisite, not an assumption.
 
-```
-Nutzerwechsel Wohnung B — Aufteilung des erfassten Verbrauchs
+The rule source separates law from convention:
 
-Wohnung B wurde im Abrechnungszeitraum von mehreren Parteien genutzt. Der für die Einheit
-erfasste Wärmeverbrauch wurde nach monatlichen Gradtagszahlen auf die Nutzungszeiträume
-aufgeteilt: 01.01.–30.06.2025 583,3 ‰ von 1.000 ‰ · 01.07.–31.12.2025 416,7 ‰ von 1.000 ‰.
-Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:
-12 m³ × 181 von 365 Tagen = 5,95 m³ · 12 m³ × 184 von 365 Tagen = 6,05 m³.
-
-Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gesetzliche
-Vorgabe (Rechtsstand 01/1981).
+```text
+§ 9b Abs. 2 und Abs. 3 HeizkostenV; Gradtagszahlen nach anerkannter Promilletabelle
+(VDI-Konvention, keine Rechtsnorm) — verify before production
 ```
 
-- **`583,3 ‰ von 1.000 ‰` — never a bare `583,3 ‰`.** The promille of a segment is a fraction of the
-  *heating year*; over a partial billing period the parties' promille sum to **less than 1.000**, and a
-  bare figure would then read as wrong. Printing own/total is the same Bemessung/Gesamtbemessung shape
-  the rest of the document uses, and it degrades correctly (`120 ‰ von 300 ‰`).
-- **The caveat sentence is mandatory and is the point of this item.** `rules/degree_days.py` marks the
-  table *"anerkannte Gradtagszahlen-Promilletabelle (VDI) — verify before production"*. A disclosure
-  that presents a convention as law is worse than no disclosure: it invites a tenant to check a
-  statute that does not contain the number. The convention caveat renders **wherever a ‰ figure
-  renders**, not only in the footer.
-- The copy states **no fact the data does not carry**. In particular it must not say "no interim
-  reading exists" — `HeatingUnit` carries one consumption value per unit and cannot express an interim
-  reading at all, so the engine does not know whether one was taken.
-- **The method's statutory basis (§ 9b HeizkostenV) is a prerequisite, not an assumption.** § 9b Abs. 2
-  is what permits apportioning an unread period by Gradtagszahlen, and Abs. 3 is what puts Grund- and
-  Warmwasserkosten on Zeitanteile — exactly what `engine.py` does. **Decided 04.08.2026 (lead):** the
-  store's `source` is extended to name § 9b, and the copy may therefore cite it. Exact new value of
-  `DEGREE_DAY_TABLE`'s single `RuleVersion.source` (`packages/rules-store`, slice 3):
-
-  ```
-  § 9b Abs. 2 und Abs. 3 HeizkostenV; Gradtagszahlen nach anerkannter Promilletabelle
-  (VDI-Konvention, keine Rechtsnorm) — verify before production
-  ```
-
-  (one line, no newline; pinned by `packages/rules-store/tests/test_rule_data.py`). Three things this
-  string is careful about, and none of them is optional:
-  - **The statute and the table are separated by the semicolon.** § 9b is law; the promille numbers are
-    not. A source reading *"§ 9b HeizkostenV"* alone would present the VDI table as statutory.
-  - **`valid_from` and the `Rechtsstand` stamp do not move.** `Rechtsstand 01/1981` dates the *promille
-    table*. We have **not** verified when § 9b entered the HeizkostenV, so the pair
-    *"§ 9b HeizkostenV 01/1981"* must never be printed as a Rechtsstand — which is exactly why item 6
-    keeps the degree-day footer label as the template's own fixed copy (VDI qualifier, no paragraph).
-    Resolving it needs the BGBl. history of the HeizkostenV; until then, no in-force date is asserted.
-  - **The `— verify before production` marker stays**, last, after the only em dash in the string, so
-    the existing "everything after the em dash is internal and never renders" rule keeps working.
-- The internal marker `— verify before production` is a developer note and **never renders**. Asserted
-  absent from the PDF.
-
-### 4a — The rendered form (slice 4): carriers, order, and where the copy outran the data
-
-> **Rechtsstand 08/2026** (transcribed 04.08.2026). Introduces **no legal value** into
-> `packages/rules-store`, resolves no rule and computes nothing. It fixes *where* items 1–4 render and
-> closes the places where the drafted copy above names a fact the **engine result does not carry** —
-> the copy, the figures and the legal basis stay exactly as items 1–4 state them. Written before the
-> template change; golden fixtures `packages/pdf/tests/test_statement_heating_disclosure.py`, red on
-> purpose, plus the three carrier rows this section adds to
-> `packages/pdf/tests/test_statement_legal_typography.py`.
-
-**Carriers, and their tier.** Each block is one element with one class, so the disclosure is
-addressable by a gate and by the stylesheet:
-
-| Block | Carrier | Surface | Tier |
-| --- | --- | --- | --- |
-| A — *Aufteilung der Gesamtkosten* | `.cost-split` | Paper | **1** |
-| B — *Bemessungsgrundlagen* | `.basis-table` | Paper | **1** |
-| C — *Nutzerwechsel* | `.party-change` | Paper | **1** |
-
-All three are **tier 1**: a reader recomputes their own share from them, which is the whole test in
-`docs/05` → *"Assigning a carrier to a tier"*. The thresholds are not repeated here — `docs/05` owns
-them — and the three rows are added to *"Which text on the statement is legally required"* below, so
-the partition guard covers them rather than a new class sliding past it. **Paper, not the `.co2`
-block's Mint:** three tinted slabs stacked under the money table is ornament, not clarity
-(`docs/05` → *Restraint over reduction*), and Paper carries the higher-contrast pairs of the two.
-
-**Order is the numbered list above** (A, B, C, then the existing `.co2` block, then the existing
-`.note`s) and is asserted as document order, not merely as presence.
-
-**Glyphs are part of the copy.** `−` is U+2212 MINUS SIGN (an operator, not a hyphen), the separator
-is `·` U+00B7, the result arrow `→` U+2192. Transcribed here because a hyphen in
-`− CO₂-Vermieteranteil` turns a deduction into a dash.
-
-#### Four places where the drafted copy names something the result cannot supply
-
-Each names what renders **instead** and what would restore the drafted form. None of them is a change
-of substance: no figure moves and no citation changes.
-
-1. **Block C identifies each segment by party label, not by date range.** Item 4 prints
-   `01.01.–30.06.2025 583,3 ‰ von 1.000 ‰`; the date range needs a per-party `Period` and `HeatingLine`
-   carries `days` / `unit_total_days` and no dates at all. Taking the dates from the engine *input*
-   alongside the result is exactly the drift this section forbids at its head. What renders is the
-   **party label the money table already prints**, beside that party's own `583,3 ‰ von 1.000 ‰` — and
-   the day derivation keeps item 4's operands exactly (`12 m³ × 181 von 365 Tagen = 5,95 m³`), one
-   line per party instead of one `·`-joined sentence. **Restores the dates:** `HeatingLine` carrying
-   its segment `Period` (an engine slice). Not invented here.
-   For the same reason the heading carries **no unit name**: there is no unit label anywhere —
-   `StatementData.party_labels` is keyed per *party*, and `unit-b` is an internal id that never
-   reaches a renter. The heading is `Nutzerwechsel — Aufteilung des erfassten Verbrauchs`, one block
-   per affected unit, and the parties named inside it are what identify the unit. **Closes it:** a
-   `unit_labels` mapping on `StatementData`, supplied by the caller that already supplies the party
-   labels.
-2. **Block C's convention caveat renders without a `Rechtsstand` stamp.** Item 4's draft ends
-   `(Rechtsstand 01/1981)`. Item 6 leaves the raw `Rechtsstand MM/JJJJ` form in exactly **one** place
-   (the CO₂ block), the footer already carries the labelled degree-day stamp, and no degree-day stamp
-   reaches `HeatingResult` at all — the template would have to hardcode the date or re-resolve the
-   rule, and both are the drift rule again. The **mandatory** sentence therefore renders as
-   *"Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gesetzliche
-   Vorgabe."* The caveat is kept — it is the point of item 4 — and only the duplicated stamp is
-   dropped.
-3. **No ‰ figure renders when § 9a Abs. 2 replaced the consumption key.** With
-   `heat_fallback_to_area` the degree-day apportionment determined **no euro on the page**, so
-   printing it would disclose a method that was not applied — item 4's own rule ("states no fact the
-   data does not carry") and the contract's `None`-means-not-applied rule. The day apportionment of
-   Grund- und Warmwasserkosten still renders: `base_weight_sqm_days_x100` is day-weighted in every
-   branch.
-4. **Block A without central warm water prints no § 9 paragraph and no Warmwasser line.**
-   `warm_water_separation is None` means nothing was separated, and `ww_base_pot` / `ww_cons_pot` are
-   `0` by construction — a printed `Warmwasser: Grundkosten 0,00 €` would state a warm-water split
-   that does not exist. The two Heizung lines render unchanged.
+The internal flag never renders. The VDI table remains `verify-before-production`.
 
 #### Block C — the rendered form
 
-Item 4 owns the copy, the figures and the legal basis; this is the same block with corrections 1–3
-applied, spelled out so the seam leaves no design decision open. One block per unit with more than
-one party. Demo:
+For each unit with more than one party, show party-labelled `N von M ‰` lines where degree days were
+applied, day-derived base/WW lines, and the adjacent convention caveat. Under heat area fallback no
+promille line renders because degree days moved no euro. Without central warm water, show only the
+day fraction.
 
-```
+```text
 Nutzerwechsel — Aufteilung des erfassten Verbrauchs
 
-Diese Einheit wurde im Abrechnungszeitraum von mehreren Parteien genutzt. Der für die Einheit
-erfasste Wärmeverbrauch wurde nach monatlichen Gradtagszahlen auf die Nutzungszeiträume aufgeteilt:
 Wohnung B — Bernd Muster (Auszug 30.06.2025): 583,3 ‰ von 1.000 ‰
 Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 416,7 ‰ von 1.000 ‰
-Grundkosten und Warmwasserverbrauch werden nach Tagen aufgeteilt:
 Wohnung B — Bernd Muster (Auszug 30.06.2025): 12 m³ × (181 von 365 Tagen) = rd. 5,95 m³
 Wohnung B — Leerstand ab 01.07.2025 → Vermieter: 12 m³ × (184 von 365 Tagen) = rd. 6,05 m³
 
 Gradtagszahlen sind eine anerkannte Konvention (VDI-Promilletabelle), keine gesetzliche Vorgabe.
 ```
 
-The parenthesised day share and the `rd.` marker are the ruling in *"The rounding is disclosed —
-`rd.`, one sentence, and an operator that is the operation"* above; the disclosure **sentence** does
-not repeat here — it lives once, under Block B's party table.
+The current result lacks segment dates and a unit display label, so Block C uses the stable party
+labels it carries. It **states no fact the data does not carry**. Adding dates requires `HeatingLine`
+to carry its `Period`; adding a unit heading requires a caller-supplied unit-label mapping.
 
-Three parts, each rendered only when it was applied:
+### 4a — The rendered form (slice 4): carriers, order, and where the copy outran the data
 
-| Part | Renders when | Otherwise |
-| --- | --- | --- |
-| the Gradtagszahlen sentence + one `‰ von ‰` line per party | `heat_consumption_weight` is not `None` | absent — correction 3 |
-| the Tage sentence + one derivation line per party | always (the base Bemessung is day-weighted in every branch) | — |
-| the convention caveat | wherever a `‰` figure renders | absent with the ‰ lines |
-
-Without central warm water (or with `ww_fallback_to_area`) the Tage sentence reads
-*"Grundkosten werden nach Tagen aufgeteilt:"* and each derivation line is the day fraction alone —
-`Wohnung B — Bernd Muster (Auszug 30.06.2025): 181 von 365 Tagen`. The m³ operands are the withheld
-Bemessung of a column that was not applied, and printing them would be the false disclosure the
-contract's `None` rule exists to prevent.
+**Carriers, and their tier.** `.cost-split`, `.basis-table` and `.party-change` are separate tier-1
+elements in this order immediately after the heating money table. Then come CO₂ and § 9a notes.
+Glyphs are fixed copy: `−` minus, `·` separator, `→` result.
 
 #### Two branch forms the items above leave open
 
-- **Block A without a CO₂ split.** The `−` line is dropped; the `Gesamtkosten` line **and** the
-  `= umlagefähige Kosten` line both stay, with equal figures. Item 1 says the block then "opens
-  directly at `umlagefähige Kosten = Gesamtkosten`" — this is that identity, *printed*, for the same
-  reason the heating footer prints both of its figures in both branches: one code path, the reader
-  adds the printed numbers, and no branch asserts an equality in words. A reader sees that no
-  deduction was made instead of having to notice a missing line.
-- **Block B when a column fell back to the area key (§ 9a Abs. 2).** `ww_fallback_to_area` ⇒
-  `ww_consumption_weight_m3` is `None` on every line, so the `Verbrauch Warmwasser` row states
-  **`Wohnfläche (m²·Tage) — § 9a Abs. 2 HeizkostenV` / `36.500 m²·Tage`** — the key that *was* applied,
-  with the paragraph that replaced the original one — and no m³ Bemessung is printed anywhere in the
-  block. The `Verbrauch Heizung` row is unaffected by that fallback and states its own key and its own
-  Gesamtbemessung. (Superseded in two respects, both later: the `Verbrauch Heizung` **row** renders —
-  *"All four rows render"* under item 1 — and its Gesamtbemessung is withheld only where no Maßeinheit
-  is recorded, since slice 5 carries the unit. Where both absences do occur at once they must still not
-  be read as one: a § 9a fallback is a citation-carrying figure, an unrecorded unit is the sentence
-  `ohne Maßeinheit — nicht ausgewiesen`.)
-
-#### Not in this slice, deliberately
-
-Item 5's **short-period** wording (`… im Abrechnungszeitraum (181 von 365 Tagen)` and the
-`anteilig gekürzt` band) — item 5 assigns it a rendering slice of its own, the demo period is a full
-calendar year and nothing on the demo path exercises it. What *is* in this slice from item 5 is the
-full-year `Berechnungsgrundlagen:` line appended to the existing `.co2` block.
+- Without CO₂, both the total and `= umlagefähige Kosten` lines remain with equal figures; the
+  missing deduction is visible without an equality claim in prose.
+- When either consumption pot falls back under § 9a Abs. 2, its Block B row shows the area key,
+  citation and area denominator, and no consumption Bemessung for that pot.
 
 ### 4b — Pagination: which blocks may break, and what may never be separated
 
-> **Rechtsstand 08/2026** (transcribed 05.08.2026, after `statement-reviewer` finding **I1**, promoted
-> by the lead). A **layout rule**: nothing enters `packages/rules-store`, no rule is resolved, no
-> figure moves. The legal purpose is BGH minimum **#3** — the calculation and the figure it justifies
-> have to be readable together. Thresholds and inks stay in `docs/05`; this section fixes only which
-> element may be split by a page break.
+Break at seams, never inside a statement:
 
-**The defect.** The rendered demo is **3 pages and roughly 40 % blank**: page 1 ends at ~78 % height,
-page 2 at ~57 %, page 3 at ~48 %. Cause: `break-inside: avoid` on `.cost-split` and `.party-change`.
-Each block refuses to split, does not fit the remaining space, and takes a fresh page — pushing itself
-down and leaving the space above it empty.
+| Element | Rule |
+| --- | --- |
+| `.cost-split`, `.basis-table`, `.party-change`, `.party-total` | no `break-inside: avoid`; they may exceed a page |
+| `tr` | `break-inside: avoid` |
+| `thead`, `.disclosure-title` | stay with the first following row |
+| `.apportionment li` | never split |
+| disclosure carriers | `orphans: 2; widows: 2` |
 
-**The consequence is legal, not cosmetic.** BGH minimum #3 ends up on a **different sheet of paper**
-from the numbers it justifies: a renter reads their share in the money table on page 1 and must turn
-the page to find the basis it was computed from. A statement whose *Berechnung* is not next to its
-result is the formal defect this whole section exists to close, reintroduced by a stylesheet
-declaration.
-
-**And it is backwards.** `.basis-table` — the carrier of minimums #2 **and** #3, and the only block
-containing *two* tables where the second's column meanings are defined by the first — was the one
-carrier **without** `break-inside: avoid`. It was not triggered on this fixture. It will be as soon as
-a real building has eight parties.
-
-#### The rule
-
-| Element | Declaration | Why |
-| --- | --- | --- |
-| `.cost-split`, `.basis-table`, `.party-change`, `.party-total` | **must not declare `break-inside: avoid`** | These blocks grow with the number of parties. A block that may not split cannot be laid out at all beyond one page, and long before that it strands the page above it. Breaking a disclosure block across pages is *normal*; stranding it is the defect. |
-| every `tr` | `break-inside: avoid` | A party's label and their Bemessung are one statement. Split across a page boundary, a renter reads a figure with no name or a name with no figure. |
-| every `thead` | `break-after: avoid` | A column header separated from its first row leaves a page of unlabelled numbers — and in `.basis-table` the *first* table is what gives the second's `Fläche·Tage` / `Verbrauch Warmwasser` columns their meaning. |
-| `.disclosure-title` (Blocks A, B, C) | `break-after: avoid` | A heading alone at the foot of a page is the "justification separated from its figures" defect at its smallest scale, and the cheapest one to prevent. |
-| `.apportionment li` | `break-inside: avoid` | One derivation line — `… × (181 von 365 Tagen) = rd. 5,95 m³` — is one statement and is never legible in halves. |
-| the disclosure carriers | `orphans: 2; widows: 2` | A single stranded line of running prose carries no verification content and reads as an error. |
-
-The shape of the rule is *"break at the seams, never inside a statement"*. `break-inside: avoid` is
-correct on the **smallest** element that is one indivisible claim (a row, a list item) and wrong on
-every container above it.
+Nothing is inserted between the money table and Block A. Page-count/fill-ratio goldens are forbidden;
+they encode the fixture rather than the layout rule.
 
 #### What is pinned, and what honestly cannot be
 
-Pinned in `packages/pdf/tests/test_statement_pagination.py`, over the template's own stylesheet — the
-same idiom as `test_statement_legal_typography.py`, and for the same reason: rendering the PDF and
-measuring boxes would be testing Chromium, and a page-count golden over one demo fixture is deleted
-the first time a real building has eight units.
+Template tests pin the declarations above. They do not pin a page count, fill ratio or a universal
+claim that a money table and every disclosure fit on one sheet; those properties depend on party
+count. Visual review checks the rendered result without turning one demo size into a layout rule.
 
-**Not pinned, deliberately — say so rather than fake it:**
+### 5 — § 7 Abs. 3 CO2KostAufG: current rule
 
-- **"The money table and its disclosure are on the same sheet."** This is the property the defect
-  actually violates, and it is **not expressible**: it depends on the party count, and for a building
-  with enough parties it is simply false — the money table alone will exceed a page. It cannot be a
-  test, so it is a *design constraint* on any future change: nothing may be inserted between the
-  heating money table and Block A.
-- **A page-count or fill-ratio assertion on the demo PDF.** Brittle by construction (it encodes the
-  fixture's size, not a rule) and it would go red for a *correct* reason — an extra unit — which is
-  how a gate gets deleted instead of fixed.
-- **Whether the corrected stylesheet actually produces a denser document.** That is a rendering
-  outcome, verified by looking at `packages/pdf/output/nk-heating-statement-demo.pdf` after the
-  change, not by a golden.
+Current H2/R8 behavior is binding: annualise the period intensity, round to one decimal, classify
+that rounded value against the **unshortened** Anlage table, and print the same one-decimal value and
+band. Never restore the superseded shortened-band method.
 
-### 5 — § 7 Abs. 3 CO2KostAufG: what already works, and the remainder only
-
-> ⚠️ **SUPERSEDED by H2 (Berkay 01b, 13.08.2026) — read `docs/03` §(3) before implementing any of
-> the short-period CO₂ wording below.** Everything in this section that shortens the Anlage table by
-> a period factor (`band_max_exclusive = step.max_intensity_exclusive × period_factor`, "bounds …
-> already shortened", and the copy `Werte der Anlage anteilig gekürzt (§ 5 Abs. 1 Satz 4
-> CO2KostAufG)`) states the **old** rule. H2 replaces it: **annualise the intensity**
-> (`spezifisch × 365 / nTage`) and look it up against the **unshortened** table with **unscaled**
-> Anlage bounds. Both methods select the same Stufe; only the disclosed figure differs, and H2's is
-> the one that prints. The field is `Co2Result.annualisation_factor` — `period_factor` no longer
-> exists, and it was renamed rather than kept because an inverted meaning behind an old name is how
-> a renderer silently prints the wrong band. The § 5 Abs. 1 S. 4 reading below was carefully argued
-> and is left in place as the record of what it replaced; **do not "restore" it.**
->
-> **Amended 15.08.2026 by**
-> `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` **§ 6:** after H2 annualises the
-> intensity, § 5 Abs. 1 S. 3 CO2KostAufG rounds it to one decimal and the rounded value is both
-> classified and printed. Official norm:
-> `https://www.gesetze-im-internet.de/co2kostaufg/__5.html`. R4/E3/`01b-F05` are superseded.
-
-§ 7 Abs. 3 CO2KostAufG requires the landlord to show, **in the Heizkostenabrechnung**, the tenant's CO₂
-share, the building's **Einstufung**, and the **Berechnungsgrundlagen** of that Einstufung.
-
-**Already discharged by the existing `co2_block`** (`statement.py` → `.co2`) — do not respec, do not
-re-render:
-
-- the tenant's and the landlord's amounts (104,72 € / 157,08 €) and that the landlord's is deducted
-  before allocation;
-- the landlord percentage (60 %);
-- the intensity (40,0 kg CO₂/m²/Jahr, fixed one-decimal display);
-- the citation *CO2KostAufG* with `Rechtsstand 01/2023`.
-
-**The remainder** — the Berechnungsgrundlagen, i.e. the two inputs the intensity was computed from and
-the band it selected. Appended to the existing block, same surface, no new block:
-
-```
-Berechnungsgrundlagen: CO₂-Emissionen des Gebäudes 4.000 kg · beheizte Fläche 100 m²
-→ 40,0 kg CO₂/m²/Jahr · Einstufung: 37 bis unter 42 kg CO₂/m²/Jahr · CO₂-Kosten 261,80 €
-```
-
-**The intensity is the one fixed-precision exception to the generic number formatter.** The summary
-and the Berechnungsgrundlagen must use the same one-decimal display helper and retain the trailing
-zero: `12,0`, never `12`; `40,0`, never `40`. This is the printed value Berkay requires in § 6,
-not a reformatting of an unrounded value in the PDF layer. The renderer reads the already rounded
-`Co2Result.intensity_kg_per_sqm` and performs no classification arithmetic.
-
-- **The Einstufung is printed as its intensity band, not as a step number.** `Co2Step` carries
-  `max_intensity_exclusive` and `landlord_share_percent` and **no ordinal**; the band is derivable
-  (previous step's bound → this step's bound), a step number would be invented. If the Anlage's own
-  numbering is wanted on the page it is transcribed into `packages/rules-store` first — **not** counted
-  off the tuple index.
-- **Closed/current:** `total_co2_kg`, `co2_cost` and `heated_area_sqm` reach `Co2Result` and render in
-  the Berechnungsgrundlagen. They stay on the result for the same drift reason as everything else
-  here; the template must not recover them from a second input source.
-
-**`kg CO₂/m²/Jahr` is a false label on any period shorter than a year.** `docs/03` §*"The Stufenmodell
-is a per-year table"* follows § 5 Abs. 1 S. 4 CO2KostAufG literally: the **Anlage table is shortened**
-by the period factor and the emission figure is **not** extrapolated. So
-`Co2Result.intensity_kg_per_sqm` is the emission **of the Abrechnungszeitraum** per m², and for an
-interim period both the unit above (`statement.py`, the `co2` block) and the Einstufung band in the
-Berechnungsgrundlagen line above print a per-year claim for a per-period number — the tenant reads
-*19,5 kg CO₂/m²/Jahr · Einstufung: 17 bis unter 22* where the applied Einstufung was *37 bis unter 42*.
-Required form once a short period can reach the PDF:
-
-```
-Emissionsintensität 19,5 kg CO₂/m² im Abrechnungszeitraum (181 von 365 Tagen)
-Einstufung: 18,3 bis unter 20,8 kg CO₂/m² — Werte der Anlage anteilig gekürzt (§ 5 Abs. 1 Satz 4 CO2KostAufG)
-```
-
-- **Nothing on the demo path changes.** Its period is the full calendar year 2025, factor exactly 1;
-  the label, the band and every figure `scripts/assert_statement_pdf.py` pins stay as they are. The
-  full-year wording above this bullet is the one that renders, and it is correct — this is the
-  short-period branch only.
-- The renderer must **not** recompute the factor from the period: the engine carries it
-  (`Co2Result.period_factor`, per `docs/03`), the same way the ratio and the Rechtsstand are carried.
-  A second implementation of a legal rule in the template layer is how the two drift apart.
-- Scope: a rendering slice of its own, after the engine carries the factor. Listed here so the defect
-  is on the record and not rediscovered from a tenant's complaint.
+The CO₂ block prints renter and landlord amounts, landlord percentage, total emissions, heated area,
+CO₂ cost, the one-decimal annualised intensity and its band. Heat pump/biomass paths render no CO₂
+block. The template performs no classification arithmetic.
 
 ### 6 — M2: every `Rechtsstand` names its statute
 
-**Presentation only. Nothing in `packages/rules-store` changes and no resolution changes.**
+Required footer form:
 
-The footer prints `Rechtsstand 03/1989 · Rechtsstand 01/2009 · Rechtsstand 01/1981 · Rechtsstand
-01/2023` — four bare dates. `HeizkostenV` appears nowhere on the page. `Rechtsstand 01/1981` is the
-Gradtagszahl table and no reader could know that; worse, an unlabelled 1981 date next to three others
-reads as *law from 1981*, which is exactly what the degree-day table is not.
-
-Required form — label **·** stamp, one per resolved rule, in resolution order:
-
-```
+```text
 Rechtsstand: § 7 Abs. 1 HeizkostenV 03/1989 · § 9 Abs. 2 HeizkostenV 01/2009 ·
-Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 01/1981 ·
+Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 12/1983 ·
 § 5 Abs. 1 i. V. m. Anlage CO2KostAufG 01/2023 · Erstellt mit Lokara.
 ```
 
-- The three statutory labels are **verbatim `ResolvedRule.source`** from the store — they already read
-  `§ 7 Abs. 1 HeizkostenV`, `§ 9 Abs. 2 HeizkostenV`, `§ 5 Abs. 1 i. V. m. Anlage CO2KostAufG`. Nothing
-  is invented; the label was simply thrown away by the caller.
-- The degree-day `source` is *"Anerkannte Gradtagszahlen-Promilletabelle (VDI) — verify before
-  production"*. The part after the em dash is an internal marker: **it never renders**, and the
-  qualifier *(VDI-Konvention, keine Rechtsnorm)* renders in its place. The label is fixed copy in the
-  template layer, listed here so it is not re-derived elsewhere.
-- Mechanically: `StatementData.rechtsstaende` becomes label+stamp pairs instead of bare stamps, and the
-  caller (`demo.py`, later the API) builds them from the `ResolvedRule`s it already holds. No engine
-  change, no rules change — which is why this ships on its own.
-- **This supersedes the bare `Rechtsstand MM/JJJJ` form on the page.** Once item 6 ships, the raw string
-  renders in exactly one place: the CO₂ block of item 5, where the citation already stands beside it.
-  Any check that looks for a bare stamp in the footer — or page-wide, which the footer used to satisfy —
-  is asserting the defect and is removed, not restated. The stamps are covered footer-side by
-  `packages/pdf/tests/test_statement_rechtsstand_labels.py`, block-side by
-  `packages/pdf/tests/test_statement_template.py`, both resolved from `packages/rules-store`.
+Labels and stamps travel together. `— verify before production` never renders. A bare list of dates
+is forbidden.
 
 ### The carried-intermediates contract (slice 3)
 
-> **Rechtsstand 08/2026** (transcribed 04.08.2026). Introduces **no legal value** into
-> `packages/rules-store` and changes **no arithmetic**: every field below is already computed inside
-> `engine.py` / `co2.py` and dropped before the result object is built. Slice 3 is therefore a pure
-> engine-package change (CLAUDE.md rule 1: no framework/DB/vendor import, `mypy --strict`, `Decimal` +
-> integer cents) and is **not demo-visible** — the rendered PDF must come out byte-identical, no golden
-> in `scripts/assert_statement_pdf.py` moves, nothing under `packages/pdf/` changes.
+The shipped frozen result carries every operand needed by Blocks A–C and CO₂. Required invariants:
 
-Items 1–5 above name the figures in prose. This is the same list in the form the engine has to take, so
-that `engine-implementer` has no design decision left to make. Golden fixtures, written first and red
-on purpose: `packages/heating-engine/tests/test_heating_disclosure.py` plus the `source` assertions in
-`packages/rules-store/tests/test_rule_data.py`.
+- required disclosure fields have no silent defaults;
+- `None` means the branch was not applied, except the explicitly visible missing-unit branch;
+- money is `Cents`; scaled names state their scale;
+- the renderer reads results, never parallel inputs;
+- `WarmWaterSeparation` identifies method and operands;
+- `HeatingResult` carries billable cost, pots, applied share/bounds, fallbacks and unit;
+- `HeatingLine` carries days, unit total, area-day weight, consumption weights and degree-day
+  numerator/denominator;
+- `Co2Result` carries emissions, heated area, CO₂ cost, band, day counts and annualisation factor;
+- `OwnerResidual` retains origins and is always present.
 
-**Rules that apply to all four tables below:**
+The live dataclasses in `packages/heating-engine` are the exact shipped field/type source. This
+contract prevents a renderer from recomputing discarded intermediates.
 
-1. **Every new field is required — no default value.** A default lets a caller construct a result that
-   silently omits a legally required disclosure figure, and the omission then shows up as a blank on a
-   tenant's statement instead of as a `TypeError` in CI.
-2. **`None` means "this figure was not applied", never "not carried".** Where a branch did not run, its
-   operands are `None` and the fixtures assert that they are — a template that prints the wrong branch
-   then prints `None`, loudly, rather than a plausible wrong formula (item 3's hard rule).
-3. **Money is `Cents`.** Weights and areas keep the engine's existing fixed-point convention; a field
-   carrying a ×100 value **says so in its name**, because `docs/03`'s de-scaling warning is precisely
-   about values that look right as integers and render wrong (`18.250` vs `1.825.000`).
-4. **Nothing here is recomputed at render time**, and nothing is read from the engine *input* alongside
-   the result — the drift rule stated at the top of this section.
-5. **Two existing engine conventions stay exactly as they are in this slice.** The result *echoes what
-   the engine divided by*; it does not harmonise it. Namely: § 9's area fallback pro-rates over a flat
-   `365` while the CO₂ period factor anchors its reference year on `valid_from` (366 in a leap year).
-   That inconsistency is real and is recorded in the gaps below — **it is not fixed here**, because
-   changing it would move a euro figure in a slice whose whole point is that no euro figure moves.
+## 7. Which text on the statement is legally required
 
-#### `WarmWaterSeparation` — new frozen dataclass (§ 9 HeizkostenV), item 3
+This file assigns carriers; `docs/05` owns thresholds.
 
-Lives in `packages/heating-engine/src/lokara_heating_engine/inputs.py` next to the other result shapes
-and is exported from the package. It records **which § 9 branch ran and with which operands** — today
-not recoverable from the result at all.
+| Content | Carrier | Tier |
+| --- | --- | --- |
+| BGH totals, keys, shares and advances | cost rows, `.key-label`, `tfoot` | 1 |
+| NK key and Gesamtbemessung | `.key-label` | 1 |
+| heating Blocks A/B/C | `.cost-split`, `.basis-table`, `.party-change` | 1 |
+| heating footer reconciliation | `tfoot .foot-note` | 1 |
+| § 9a estimation/fallback | `.note` | 1 |
+| CO₂ split/basis | `.co2` | 1 |
+| party totals and no-advances sentence | `.party-total` | 1 |
+| labelled `Rechtsstand` and disclaimer | `footer` | 2 |
 
-| Field | Type | Demo value | Required by |
-| --- | --- | --- | --- |
-| `method` | `Literal["MEASURED", "AREA_FALLBACK"]` | `"MEASURED"` | item 3: the two branches print different text and the wrong one must be unprintable |
-| `q_ww_kwh` | `Decimal` | `5000` | § 9 Abs. 2 — the separated warm-water energy, the result of the printed formula |
-| `total_energy_kwh` | `Decimal` | `20000` | the denominator the copy prints (`… von 20.000 kWh Gesamtenergie`) |
-| `volume_m3` | `Decimal \| None` | `40` | measured branch operand |
-| `factor_kwh_per_m3_kelvin` | `Decimal \| None` | `2.5` | measured branch operand (`WarmWaterFormula`, resolved rule value — never a literal in the template) |
-| `hot_temp_c` | `Decimal \| None` | `60` | measured branch operand |
-| `cold_temp_c` | `Decimal \| None` | `10` | measured branch operand |
-| `area_fallback_kwh_per_sqm_year` | `Decimal \| None` | `None` | fallback branch operand (`32 kWh je m² und Jahr`) |
-| `heated_area_sqm` | `Decimal \| None` | `None` | fallback branch operand (`× 100 m²`) — the area the fallback actually used |
-| `period_days` | `int \| None` | `None` | fallback branch operand (`365 von 365 Tagen`, numerator) |
-| `reference_year_days` | `int \| None` | `None` | fallback branch operand (denominator — the flat `365` the engine divides by, per rule 5 above) |
+Every carrier is in exactly one tier. `.note` is tier 1 because it changes how the renter reads the
+applied key or whether a value is measured. Ordinary metadata and framing remain body/secondary copy
+under the normal AA requirement. This assignment is current artifact evidence, not product-wide
+accessibility certification.
 
-In the `AREA_FALLBACK` branch the four measured-branch fields are `None` and the four fallback fields
-are set; in the `MEASURED` branch, the other way round. `heated_area_sqm` is deliberately **not** hoisted
-onto `HeatingResult`: outside this branch no disclosure in this section needs a bare building area, and a
-field that is merely useful is a field that will drift.
+## 8. Mieter-Einzelabrechnung and finalization contract
 
-#### `HeatingResult` — the vertical half (Block A), items 2 and 3
+### Page 01b output reconciliation
 
-| Field | Type | Demo value | Required by |
-| --- | --- | --- | --- |
-| `billable_cost` | `Cents` | `1_014_292` | Block A's `= umlagefähige Kosten` line; equals `total` when `co2 is None` |
-| `heating_pot` | `Cents` | `760_719` | § 9 result — `→ Heizung 7.607,19 €` |
-| `ww_pot` | `Cents` | `253_573` | § 9 result — `→ Warmwasser 2.535,73 €`; `0` when there is no central warm water |
-| `heat_base_pot` | `Cents` | `228_216` | §§ 7/8 — `Heizung: Grundkosten 2.282,16 €` |
-| `heat_cons_pot` | `Cents` | `532_503` | §§ 7/8 — `Verbrauchskosten 5.325,03 €` |
-| `ww_base_pot` | `Cents` | `76_072` | § 8 — `Warmwasser: Grundkosten 760,72 €`; `0` without central warm water |
-| `ww_cons_pot` | `Cents` | `177_501` | § 8 — `Verbrauchskosten 1.775,01 €`; `0` without central warm water |
-| `applied_consumption_share` | `Decimal` | `0.7` | item 2 — *what was applied*, printed as `30 % / 70 %`, derived from the resolved rule value and never a template literal |
-| `split_bounds` | `HeatingSplitBounds` | `0.5 / 0.7` | item 2 — *what the law permits*, the second of the two facts; § 7 Abs. 1 HeizkostenV |
-| `warm_water_separation` | `WarmWaterSeparation \| None` | see above | item 3; `None` exactly when `HeatingInput.warm_water is None` |
-| `heat_fallback_to_area` | `bool` | `False` | § 9a Abs. 2 — Block B states an Umlageschlüssel **per column**, and today the result cannot say that the heating column fell back to Wohnfläche while warm water did not |
-| `ww_fallback_to_area` | `bool` | `False` | as above, for the warm-water column |
-| `heat_consumption_unit` *(slice 5)* | `MeasurementUnit \| None` | `HKV_UNITS` | the Maßeinheit the heating-consumption Bemessung is *in* — Block B's `1.000 HKV-Einheiten` and the device named in its Umlageschlüssel cell. `None` = not applied (§ 9a Abs. 2) or not recorded; resolution and both spellings in *"`MeasurementUnit` travels with the value"* |
+The complete calculation contract remains in `docs/03`. Its document projection is:
 
-`consumption_fallback_to_area` **stays and keeps its meaning** (`heat_fallback or ww_fallback`) — it is
-read by existing tests and by the PDF layer, and this slice moves nothing that renders.
+| Page 01b output | Required statement behavior |
+| --- | --- |
+| four heating pots and keys | show §§ 7/8/9 split, ratio, every denominator and party Bemessung |
+| owner residual | one unconditional owner row; no quota; zero/negative allowed; never on tenant copy |
+| CO₂ duty | show renter amount, landlord deduction, one-decimal annualised/classified intensity, unchanged band and reproducible operands; no block for heat pump/biomass |
+| supplier fallback | label derived mass and warn; internal rule metadata retains the direct `0,201` Hu and `0,181` Ho paths, but statement requirements expose only the shared EBeV provenance at `Rechtsstand 01/2023`; never print `0,903`, `geprüft` or the register-review date `07/2026`, and never derive cost |
+| device evidence | device, room, old/new reading, factor and one-decimal units; label § 9a estimates/basis |
+| readiness/reduction risks | show 15 % and each 3 % separately; never auto-deduct or combine while sources conflict; hard stop means no statement |
+| WW central/unit difference | leave unmetered use in owner residual; show 10 % notice and 20 % warning without blocking |
+| MDL | confirm every extracted field; net never double-deducts CO₂; gross rescales exactly and records accepted residuals; excess blocks |
+| § 6a annual information | source/THG/primary energy, taxes/charges, equipment/readout/billing fees, contact, dispute notice, average-user information and graphical prior-year comparison |
+| prior-year graph | adjust heat with each year's DWD factor; keep WW raw; label unadjusted fallback; no empty graph; source line required |
 
-#### `HeatingLine` — the horizontal half (Blocks B and C), item 1 and item 4
+The BAnz notice identity under § 6a Abs. 3 S. 4 remains pre-legal. The UVI has a different
+no-omission contract owned by future `docs/16`.
 
-One row per party, so every field is per party.
+M6 must add, without reinterpreting Page 01:
 
-| Field | Type | Demo values (A · B-Mieter · B-Vermieter · C) | Required by |
-| --- | --- | --- | --- |
-| `days` | `int` | `365 · 181 · 184 · 365` | § 9b Abs. 3 Zeitanteile; Block C prints `181 von 365 Tagen` |
-| `unit_total_days` | `int` | `365 · 365 · 365 · 365` | the denominator that was applied (`von 365`), which is a per-unit sum, not the period length |
-| `base_weight_sqm_days_x100` | `Decimal` | `1_825_000 · 543_000 · 552_000 · 730_000` | Block B's `Fläche·Tage` Bemessung — §§ 7 Abs. 1 / 8 Abs. 1 HeizkostenV. **×100 fixed point**: ÷ 100 gives the printed `18.250 · 5.430 · 5.520 · 7.300`, Σ `36.500` |
-| `heat_consumption_weight` | `Decimal \| None` | `600 · 146.25 · 103.75 · 150` | the consumption Bemessung actually applied to the heating pot. `None` **iff** `heat_fallback_to_area` — then the applied Bemessung was Fläche·Tage and no consumption figure may be shown |
-| `ww_consumption_weight_m3` | `Decimal \| None` | `20 · 5.950684… · 6.049315… · 8` | Block B's `Verbrauch Warmwasser` Bemessung (m³, unscaled). `None` **iff** there is no central warm water or `ww_fallback_to_area` |
-| `degree_day_promille` | `Decimal` | `10000 · 5833 · 4167 · 10000` | Block C's `583,3 ‰` — § 9b Abs. 2. **Zehntelpromille since K3** (VDI 2067, `docs/03`); the render boundary divides by ten |
-| `unit_degree_day_promille_total` | `Decimal` | `10000 · 10000 · 10000 · 10000` | Block C's `von 1.000 ‰` (10.000 Zehntelpromille). Never omit it: over a partial billing period a unit's parties sum to **less** than the full year and a bare `583,3 ‰` would then read as wrong |
+- addressee and creation date;
+- the rendered operator and numerator derivation needed to close minimum #3;
+- start/end meter evidence and consistency provenance;
+- actual paid advances and positive/negative/zero Saldo branches;
+- late-Nachforderung and Guthaben notices;
+- payment/credit details;
+- one isolated document per eligible tenancy;
+- immutable snapshot, archived bytes/keys and hashes.
 
-- `degree_day_promille` is carried for **every** party, including single-party units, exactly as
-  `_build_parties` already computes it; the template decides whether Block C renders (unit with > 1
-  party), the engine does not. `unit_degree_day_promille_total` is the sum over that unit's parties —
-  i.e. the denominator `_consumption_weights` divides by.
-- **The unit-level reading (`12 m³` in Block C) is deliberately not a field.** It is the exact sum of
-  that unit's parties' `ww_consumption_weight_m3` (the apportionment is `value × own/total`), so
-  carrying it again would create two sources for one number. The fixture asserts the identity.
+Page 01b additionally requires supplier-fallback provenance, device evidence, readiness/reduction
+risks, WW central/unit difference notices, MDL confirmation and § 6a annual information as specified
+in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto-deducted.
 
-#### `Co2Result` — § 7 Abs. 3 CO2KostAufG Berechnungsgrundlagen, item 5
+## 9. Open dependencies — not permission to invent
 
-> ⚠️ **SUPERSEDED by H2 (Berkay 01b, 13.08.2026) — read `docs/03` §(3) before implementing any of
-> the short-period CO₂ wording below.** Everything in this section that shortens the Anlage table by
-> a period factor (`band_max_exclusive = step.max_intensity_exclusive × period_factor`, "bounds …
-> already shortened", and the copy `Werte der Anlage anteilig gekürzt (§ 5 Abs. 1 Satz 4
-> CO2KostAufG)`) states the **old** rule. H2 replaces it: **annualise the intensity**
-> (`spezifisch × 365 / nTage`) and look it up against the **unshortened** table with **unscaled**
-> Anlage bounds. Both methods select the same Stufe; only the disclosed figure differs, and H2's is
-> the one that prints. The field is `Co2Result.annualisation_factor` — `period_factor` no longer
-> exists, and it was renamed rather than kept because an inverted meaning behind an old name is how
-> a renderer silently prints the wrong band. The § 5 Abs. 1 S. 4 reading below was carefully argued
-> and is left in place as the record of what it replaced; **do not "restore" it.**
+- **M6:** actual advances, Saldo, ledger, immutable finalization, tenant isolation, archives.
+- **Page 01 #3:** operator and numerator derivation remain missing from the current PDF.
+- **Meters:** start/end readings and their consistency path are not carried to the statement.
+- **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in
+  `docs/03`; different §§ 7/8 shares need a future input shape.
+- **Page 01b implementation:** derived-mass provenance, § 7 Abs. 4/readiness risks, device evidence
+  and annual comparison remain exactly as `docs/03` records.
+- **D2 owners:** `docs/09` classification; `docs/11` tax mapping; `docs/12` guards; `docs/15` bank
+  matching; `docs/16` UVI/DWD and the unresolved § 6a notice identity.
+- **Page 01 E16/E21:** tenant disclosure and tax timing remain unguessed and visibly open.
 
-| Field | Type | Demo value | Required by |
-| --- | --- | --- | --- |
-| `total_co2_kg` | `Decimal` | `4000` | § 7 Abs. 3 — the emissions the Einstufung was computed from |
-| `heated_area_sqm` | `Decimal` | `100` | § 7 Abs. 3 — the divisor. Repeated from `WarmWaterSeparation` on purpose: § 7 Abs. 3 is discharged by this object alone, and the two must be the same number (fixture asserts it) |
-| `co2_cost` | `Cents` | `26_180` | § 7 Abs. 3 — the amount being split, and the only way a tenant can check `104,72 + 157,08 = 261,80` |
-| `band_min_inclusive` | `Decimal \| None` | `37` | § 7 Abs. 3 *Einstufung*, printed as a band because `Co2Step` carries no ordinal. `None` = the first step, which has no lower bound (`unter 12`) |
-| `band_max_exclusive` | `Decimal \| None` | `42` | as above. `None` = the open-ended top step |
-| `period_days` | `int` | `365` | the short-period copy in item 5 prints `(181 von 365 Tagen)`, and `period_factor` alone cannot be un-divided back into it |
-| `reference_year_days` | `int` | `365` | as above — the denominator, anchored on `valid_from` (366 in a leap year, `docs/03`) |
+## Interim framing
 
-**How the band is derived — the one place this slice touches arithmetic-shaped code:**
+The shipped demo is described only as:
 
-```
-band_max_exclusive = step.max_intensity_exclusive × period_factor   # None → None (open-ended, never scaled)
-band_min_inclusive = previous_step.max_intensity_exclusive × period_factor   # first step → None
-```
+> This is the landlord's calculation view — every party, reconciling to the cent. The tenant letter,
+> with actual advance payments and the resulting balance, is a later document from the same engine.
 
-- Both bounds are the ones **actually compared against**, i.e. already shortened by `period_factor`
-  (§ 5 Abs. 1 S. 4). The template must not multiply anything: a second implementation of a legal rule
-  in the template layer is how the two drift apart. For the demo year the factor is exactly 1 and the
-  band is `37` / `42` — the printed page does not move.
-- `landlord_share_percent_for_intensity` keeps its current signature and behaviour; it is public and
-  fixture-covered. The band is derived inside `split_co2_cost` from the same table and the same factor.
-- `period_factor` is unchanged and stays on the result (it landed with the § 5 Abs. 1 S. 4 slice); it
-  belongs to this picture rather than beside it, because the short-period copy in item 5 needs the
-  factor **and** the two day counts together.
+Do not present the current PDF as a tenant statement.
 
-### Which text on the statement is legally required
+## Appendix A — fixture coverage, exactly `08-F01` through `08-F24`
 
-**This section names the text and assigns each carrier a tier. It sets no thresholds.** The
-typographic rules — the tier-1 pair (`legal-t1-size`, `legal-t1-contrast`) and the tier-2 pair
-(`legal-t2-contrast`, `legal-t2-scale`, **no size floor**) — live in `docs/05-design-system.md`
-§*Legally required disclosure — two tiers, split by what the content is for*, together with the
-measured ratios of the brand pairs and the reason there is no absolute pt floor. A design-system rule
-with two homes is a rule waiting to disagree with itself, so no number is repeated here.
+The data-only oracle is `packages/domain/tests/berkay_01_golden.py`; completeness/arithmetic checks
+are in `test_berkay_01_complete_coverage.py`. Green oracle tests prove transcription, not application
+closure.
 
-On this document, the following is legally required and falls under those rules. **Every carrier is
-in exactly one tier**; adding a carrier without a tier is a defect, and the test in this section
-fails on it.
+| Fixture | Current rule/result |
+| --- | --- |
+| `08-F01` | MDL reference: `1.072.600` total, `1.055.069` allocated, `17.531` owner residual |
+| `08-F02` | `288.577 − 288.000 = 577` Nachzahlung |
+| `08-F03` | `116.007 − 120.000 = −3.993` Guthaben |
+| `08-F04` | zero Saldo at advances `288.577` |
+| `08-F05` | heat pump/no labor: heating `93.876`, total `293.453`, no CO₂/§35a |
+| `08-F06` | owner overview reconciles and prints owner column including zeros |
+| `08-F07` | MDL evidence passes through; device delta does not move money |
+| `08-F08` | area fallback `40.034`; mixed-path overhang `9.034` hard-warns |
+| `08-F09` | CO₂ `30.954 = 12.382 + 18.572`; tenant shares sum `18.572` |
+| `08-F10` | NULL actual advances hard-block; confirmed zero yields `288.577` Nachzahlung |
+| `08-F11` | separate gross/credit rounding `10.943 − 882 = 10.061`; net-first forbidden |
+| `08-F12` | zero consumption leaves `126.000` with owner; Erika `−24.871` |
+| `08-F13` | 31-day overlap over-allocates `2.294` m²-days and blocks |
+| `08-F14` | 275 days: `12.412 / 53.350`, share `22.800`, Saldo `1.800` |
+| `08-F15` | 455 days hard-blocks |
+| `08-F16` | isolated documents `245.571/15.571` and `116.007/−3.993` |
+| `08-F17` | zero clipped usage: no document/portal item and not vacancy |
+| `08-F18` | late positive `577` becomes `Rechnerischer Saldo` |
+| `08-F19` | late negative `−3.993` remains payable Guthaben |
+| `08-F20` | leap year uses 366 days / `71.004` area-days |
+| `08-F21` | block (a) `17.531`; counterfactual `17.536`; block (b) `100.800`; (c) `0` |
+| `08-F22` | fictional occupancy moves `1.858` to owner; total `62.000` |
+| `08-F23` | full-year vacancy remains in denominators: owner `37.381` tax, `20.667` waste |
+| `08-F24` | self-billing: heating `338.218`, allocated `1.076.002`, owner `20.816` |
 
-| Content | Carrier | Tier | Basis |
-| --- | --- | --- | --- |
-| The four BGH formal minimums — Gesamtkosten, Umlageschlüssel, Anteil des Mieters, Vorauszahlungen | the cost rows, `.key-label`, the `tfoot` totals | **1** | BGH-Mindestangaben, § 259 BGB |
-| Umlageschlüssel + Gesamtbemessung | `.key-label` | **1** | minimum #2, and the denominator #3 rests on |
-| Block A — the §§ 7/8/9 split of the Gesamtkosten into the four pots | `.cost-split` | **1** | §§ 7, 8, 9 HeizkostenV; it is the vertical half of minimum #3 |
-| Block B — Umlageschlüssel + Gesamtbemessung + Bemessung per money column | `.basis-table` | **1** | minimums #2/#3 for the heating table, which the `.key-label` line does not reach |
-| Block C — the Nutzerwechsel apportionment (Gradtagszahlen, Zeitanteile) | `.party-change` | **1** | § 9b Abs. 2/Abs. 3 HeizkostenV; it derives the Bemessung a renter checks |
-| The heating footer's reconciliation sentence | `tfoot .foot-note` | **1** | HeizkostenV disclosure; it reconciles the Gesamtkosten a reader adds up |
-| § 9a estimation / fallback disclosure | `.note` | **1** | § 9a HeizkostenV — see *Why `.note` is tier 1* below |
-| The CO₂ split and its Berechnungsgrundlagen | `.co2` | **1** | § 7 Abs. 3 CO2KostAufG — the reconciliation `104,72 + 157,08 = 261,80` |
-| `Anteil gesamt` per Partei + the Σ row + the "Vorauszahlungen sind darin nicht berücksichtigt" sentence | `.party-total` | **1** | BGH-Mindestangaben #3 — *Berechnung des Anteils des Mieters*; a reader recomputes each figure from two amounts already on the page |
-| `Rechtsstand` stamps + the "keine Rechts- oder Steuerberatung" disclaimer | `footer` | **2** | `CLAUDE.md` cross-cutting rules — **not** a BGH minimum, our own rule |
+## Appendix B — Page 01 register inventory
 
-Everything else on the page — the Vermieter/period meta line, column headings, decorative framing — is
-body or secondary copy and keeps the ordinary **AA** bar from `docs/05`.
+The 26 Page 01 rows are **11 `geprüft`** and **15 `verify-before-production`**.
 
-**Why `.note` is tier 1.** It is emitted in exactly two places (`packages/pdf/src/lokara_pdf/statement.py`,
-the `notes` list) and both are § 9a HeizkostenV notices: *"Fehlende Ablesungen wurden gemäß § 9a
-HeizkostenV geschätzt …"* and *"Mehr als 25 % der Fläche ohne Ablesung — der Verbrauchsanteil wurde
-nach Wohnfläche umgelegt (§ 9a Abs. 2 HeizkostenV)."* Both change **how the renter must read their own
-Bemessung**. The first says the figure in the Verbrauch column is an **estimate, not a reading**. The
-second says the **consumption key was replaced by the area key** — i.e. the Umlageschlüssel printed in
-`.key-label` is *not* the one that was applied. A renter cannot verify their share without either
-fact, which puts both squarely inside BGH minimums #2 and #3. It is not incidental copy, and its
-9,0 pt setting is a defect, not a deliberate de-emphasis.
+| Status | Exact CSV rows |
+| --- | --- |
+| `geprüft` | CO₂-Stufenmodell Wohngebäude · CO₂-Pflichtangaben in der Abrechnung · § 35a-Ausweis für den Mieter · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Abrechnungsfrist Betriebskosten · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Leerstand bleibt im Gesamtverteiler · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Einwendungsfrist des Mieters · Belegeinsicht — elektronische Bereitstellung zulässig (Wohnraum) |
+| `verify-before-production` | Fiktivbelegung bei Leerstand · Gradtagszahltabelle VDI (K3) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Rundungsweg (Seite 01 / docs/03 § 6) · Geräteliste auf der Mieterausfertigung (K10) · Zahlungsfrist bei Nachzahlung · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information (UVI + Abrechnungs-Infoblock) · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · § 35a-Block auf der Betriebskostenabrechnung · Wording Leerstandsaufstellung · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6) |
 
-**The state of the page today** (this is the defect, not the rule): `.key-label` is **8,5 pt Slate on
-Mint = 4,81:1** — below body copy (10 pt) and AA-by-0,31 where tier 1 owes AAA; `tfoot .foot-note` is
-8,5 pt Slate on Paper and `.note` 9,0 pt Slate on Paper, both below body copy and both 5,44:1 against
-a 7:1 bar. Slate leaves tier 1 entirely; Petrol Ink and Forest Deep are the qualifying inks. `.co2`
-declares neither `font-size` nor `color`, so it inherits 10 pt Petrol Ink on Mint (13,91:1) and is
-already compliant. **`footer` is now compliant**: at 8,0 pt Slate on Paper it is 5,44:1 ≥ the tier-2
-4,5:1 bar, and tier 2 has no size floor — the 8,0 pt that read as a violation under the old flat tier
-is the correct setting for provenance text.
+K9's rounding direction remains a flagged convention. Antwort 03 § 1 separately fixes the owner
+residual destination as a model rule. Neither status erases the other.
 
-Checkable in `packages/pdf/tests/test_statement_legal_typography.py` against `statement_html()`: the
-carriers above are enumerated per tier, tier 1 is compared against the stylesheet's own body
-font-size **and** the AAA floor, tier 2 against the AA floor **only** — the tier-2 code path has no
-size branch at all, by construction. A further test asserts the two tiers partition the carrier list,
-so a newly added carrier cannot fall through untested. A stylesheet-level assertion, deliberately not
-a pixel one — rendering and measuring glyphs would test Chromium.
+## Appendix C — correspondence disposition and deferred ownership
 
-### Gaps — not invented here
+| Source | Destination | Disposition |
+| --- | --- | --- |
+| `FRAGEN-an-Berkay-02.md` § 1; `Antwort-an-Emir_02.md` §§ 1.1–1.4 | `docs/02`; `docs/03` § 9.2; Eigentümer sections here | current unconditional residual resolution |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4; `Antwort-an-Emir_02.md` §§ 2–4 | future `docs/16` | deferred heat-only D2, over-500 fallback and comparison source |
+| `FRAGEN-an-Berkay-02.md` § 5; `Antwort-an-Emir_02.md` § 5 | `docs/03` register inventory | current source rule |
+| `Antwort-an-Emir_02.md` § 6 | fixtures here and `docs/03`; future `docs/16` | current evidence routed by owner |
+| `FRAGEN-an-Berkay-03.md` § 1; `Antwort-an-Emir_03.md` § 1 | `docs/03` § 9.2; Appendix B | current residual correction |
+| `FRAGEN-an-Berkay-03.md` § 2; `Antwort-an-Emir_03.md` § 2 | `08-F21`; vacancy annex | block (b) corrected to `100.800` ct |
+| `FRAGEN-an-Berkay-03.md` § 3; `Antwort-an-Emir_03.md` § 3 | future `docs/16` | older Wärme+WW wording superseded |
+| `FRAGEN-an-Berkay-03.md` §§ 4–6; `Antwort-an-Emir_03.md` §§ 4–6 | `docs/03`; Page 01b projection | current/superseded exactly as mapped there |
+| `FEEDBACK-to-Berkay-01b.md` §§ 1–6, 9; `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | `docs/03`; Page 01b projection | current or superseded per `docs/03` ledger |
+| `FEEDBACK-to-Berkay-01b.md` §§ 7–8; `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–11 | `docs/09`; future `docs/16` | § 7 is transcribed and merged in `docs/09`; § 8 and Antwort §§ 5–8 remain deferred to `docs/16`; Antwort §§ 9–11 retain current routing/history per `docs/03` |
 
-- ~~**The unit of the heating-consumption Bemessung.**~~ **Closed 06.08.2026 by slice 5** —
-  *"`MeasurementUnit` travels with the value — the plumbing decision"* above. `HeatingUnit` and
-  `ConsumptionValue` carry the unit, `HeatingResult` and `NkResult` surface it, a mixed key is an
-  input error, an absent unit still prints the withholding sentence, and the **sub-question the lead
-  had left open** (withhold vs. a unit-free `1.000`) is **answered: withhold**. Warm water was never
-  affected — `ww_consumption_m3` / `volume_m3` fix m³ by type, `CANONICAL_UNITS` maps
-  `WARM_WATER → CUBIC_METRE`, and § 9's formula is defined per m³; that unit is derived, not guessed.
-- **German spellings of `MeasurementUnit`** (display copy, no legal value, no `Rechtsstand`; the
-  *spellings* half of the `CONSUMPTION` gap, closed 05.08.2026 — the *plumbing* half closed
-  06.08.2026, and **which spelling goes in which cell** is settled in *"Which spelling goes where"*
-  above):
-
-  | `MeasurementUnit` | Rendered | Note |
-  | --- | --- | --- |
-  | `KWH` | `kWh` | Wärmemengenzähler; the § 9 energy denominator |
-  | `CUBIC_METRE` | `m³` | Wasserzähler |
-  | `HKV_UNITS` | `Einheiten (Heizkostenverteiler)`, short `HKV-Einheiten` | dimensionless allocator reading |
-
-  On the statement the **compact** form (`kWh` / `m³` / `HKV-Einheiten`) is what a numeric cell takes;
-  the long form appears once, as the device name in the `Verbrauch Heizung` Umlageschlüssel cell, in
-  the parenthesis-free wording fixed above (`… in Einheiten eines Heizkostenverteilers`, `… in kWh am
-  Wärmemengenzähler`).
-
-- **Zählerstände (start/end readings) are not specified here and must not be improvised.** HeizkostenV
-  gives the tenant a right to check the readings, and the gap is listed under *"Also missing from the
-  tenant document"* — but the engine takes a *resolved consumption value*, not readings: there is no
-  `meter_id`, no start, no end anywhere in `HeatingInput`. Rendering readings therefore needs a data
-  path that does not exist (M3's Zähler slice), plus a decision on where the consistency check
-  `Ende − Anfang == Verbrauch` lives. Named, not designed.
-- **CO₂ over a non-annual period — annualisation and S. 3 rounding are specified.**
-  ~~`split_co2_cost` divides by area with no pro-rating~~ was true when this section was written and was
-  fixed on 04.08.2026: § 5 Abs. 1 S. 4 CO2KostAufG shortens the **Anlage table** by
-  `period_factor = min(1, days(period) / days(reference year))`, the emissions are *not* extrapolated,
-  and the disclosed intensity stays the period figure. Rule + conventions + edge cases:
-  `docs/03` → *"The Stufenmodell is a **per-year** table"*; fixtures
-  `packages/heating-engine/tests/test_co2_short_period_annualisation.py`; `Co2Result.annualisation_factor` carries the
-  applied factor and the contract above adds the two day counts, so item 5's short-period copy renders
-  without the template recomputing law. **Closed in Row 3:** annualise, round to one decimal, classify,
-  then print that same fixed-one-decimal value (`docs/03` R8; Antwort 03 § 6). What genuinely remains
-  open:
-  - **Two conventions that are conventions, not statute**: *anteilig* read day-exact rather than
-    month-exact, and S. 4 applied to a Rumpfperiode that was never *vereinbart*. A BMWSB Arbeitshilfe
-    or a Mietrechtler's sign-off would resolve both (`docs/03`).
-  - **A period longer than 12 months is refused** by the Page 01 statement boundary. Any future
-    non-residential exception needs a separate source-backed contract and must not weaken this rule.
-- **§ 9's area fallback divides by a flat 365, the CO₂ period factor does not.** `_separate_warm_water`
-  pro-rates the 32 kWh/m²/a Ersatzwert over `days / 365`, so a leap-year statement pro-rates to
-  366/365 = 1,0027 while `co2.py` anchors its reference year on `valid_from` and returns exactly 1. One
-  of the two is wrong for a full leap year; § 9 Abs. 2 does not define the divisor either. Named, not
-  guessed, and **not** changed by the carried-intermediates slice — the result echoes the divisor it
-  used (`WarmWaterSeparation.reference_year_days`) so the page states what happened. Resolving it needs
-  the same kind of source as the *anteilig* question above.
-- **§§ 7/8 with different shares for heating and warm water** — see item 2; the input cannot express it
-  today.
-- **A party's own date range is not on the result.** `HeatingLine` carries `days` and
-  `unit_total_days`; the `01.01.–30.06.2025` of item 4's drafted Block C would have to come from the
-  engine *input*, which is the drift this section forbids. Block C therefore names each segment by its
-  party label (4a, correction 1). Closing it means `HeatingLine` carrying its segment `Period` — an
-  engine change with no legal content, deliberately not folded into a rendering slice.
-- **Nothing carries a *unit* label into the statement.** `StatementData.party_labels` is keyed per
-  party and `unit-b` is an internal id, so no block may print a unit name (4a, correction 1). A
-  `unit_labels` mapping on `StatementData`, filled by the same caller that fills `party_labels`, is
-  what closes it; until then Block C's heading names no unit and the parties inside identify it.
-
-### Proposed implementation split
-
-Recorded here because the seams are a property of the spec, not of a sprint. **Five slices**; four are
-needed for the six items above, the fifth unblocks the one column they cannot ship.
-
-| # | Lands | Lane | Independent? |
-| --- | --- | --- | --- |
-| 1 | `Rechtsstand` labels (item 6) | `app-implementer` (`packages/pdf/src`) | yes |
-| 2 | Tier-1 disclosure meets `legal-t1-size` + `legal-t1-contrast`; tier 2 stays as it is (`docs/05`) | `app-implementer` (`packages/pdf/src`) | yes — but **before** 4 |
-| 3 | `HeatingResult` carries its intermediates (+ `Co2Result` Berechnungsgrundlagen, + § 9b in the degree-day `source`) | `engine-implementer` (`packages/{heating-engine,rules-store}/src`) | yes |
-| 4 | Blocks A / B / C render (items 1–5; rendered form, carriers and branch cases in **4a**) | `app-implementer` (`packages/pdf/src`) | **strictly after 3** (and after 2) |
-| 5 | **Specified 06.08.2026** — *"`MeasurementUnit` travels with the value"*. `MeasurementUnit` carried meter → engine input → engine result → statement; `Verbrauch Heizung` Gesamtbemessung + Bemessung column; NK `CONSUMPTION` reference total; the withholding branch kept for a building that records no unit | `engine-implementer` (`packages/{heating,nk}-engine/src`) **then** `app-implementer` (`packages/pdf/src`, `packages/pdf/src/lokara_pdf/demo.py`, `apps/api/src/lokara_api/statement_service.py`) | yes — and it is what unblocked the heating-consumption column |
-| 6 | The slice-4 defects: the `Verbrauch Heizung` row + its two branches and the two missing citations (item 1, *"All four rows render"*), the `rd.` / `(N von M Tagen)` / one-sentence rounding disclosure (item 1, *"The rounding is disclosed"*), the page-break rules (**4b**) | `app-implementer` (`packages/pdf/src`) | yes — after 4, independent of 5 |
-| 7 | The demo's CO₂ fixture: `total_co2_kg` 2.000 → **4.000 kg**, `co2_cost` 300,00 → **261,80 €**, in `packages/pdf/src/lokara_pdf/demo.py` **and** `packages/db/src/lokara_db/seed.py` together | `app-implementer` + `db` lane, one commit | yes — but the two files must move together, or the PDF demo and the API demo state different numbers for one building (`docs/06` → "One occupancy timeline drives every engine") |
-
-Slice 3 is **deliberately not demo-visible**; that is the cost of the seam, and it is the right cost.
-The alternative — pairing each disclosure with the fields it needs — means four separate edits to the
-same dataclass and four fixture rewrites, with the tree in a half-carried state in between.
-
-## BetrKV cost-type catalogue (to specify)
-
-`BetrKV §2` enumerates the umlagefähige Betriebskosten (Grundsteuer, Wasser, Abwasser, Aufzug,
-Straßenreinigung, Müllbeseitigung, Gebäudereinigung, Gartenpflege, Beleuchtung, Schornsteinreinigung,
-Sach-/Haftpflichtversicherung, Hauswart, Gemeinschaftsantenne, Wäschepflege, sonstige Betriebskosten).
-Needed from the Notion page: the **canonical list with default allocation keys per type**, and which are
-**not** umlagefähig (Instandhaltung, Verwaltung) so the UI can warn rather than silently allocate them.
-
-→ lands in `packages/rules-store` with a `Rechtsstand`, never hardcoded in an engine.
-
-**Two screens are already waiting on it**, and both currently take a free-text label rather than a
-type: *Kosten erfassen*, and the M4 *Beleg-Upload* review step. The extraction returns a category
-(`Müllabfuhr`) but deliberately derives **no** Umlageschlüssel from it — it reports the key as *not
-extracted* (`docs/04` → "Beleg-Upload"). Once the catalogue exists, that mapping becomes a suggested
-key with a `Rechtsstand`, and the non-umlagefähig types become a warning on entry. Until then a
-suggestion would be invented law, not a convenience.
-
-## D1 closure and remaining implementation/dependency gaps
-
-Page 01 now answers the former document-spec questions:
-
-- the tenant section order and per-cost contents are fixed by D2/D3;
-- the exact advances/Saldo arithmetic and all three result branches are fixed by D5 and
-  `08-F02`–`08-F04`; implementation waits for M6's *actual paid* advances;
-- § 556 notice wording and late-Nachforderung behaviour are fixed by D9 and `08-F18`–`08-F19`;
-- the three projections, owner residual, vacancy annex and reference examples are fixed by
-  D1/D11/D12 and the complete `08-F01`–`08-F24` oracle.
-
-The remaining gaps are not permission to invent missing rules:
-
-- **Implementation:** BGH minimum #3 still needs the rendered operator and numerator derivation;
-  minimum #4, immutable finalization and isolated tenant documents remain M6 work.
-- **Page 01b implementation:** device evidence, supplier-fallback provenance, readiness/risk output
-  and the annual comparison remain as recorded in `docs/03` and the Page 01b projection above.
-- **D2 dependencies:** cost classification/default keys/non-allocable flags (`docs/09`), tax/Anlage-V
-  mapping (`docs/11`), reusable guards (`docs/12`), bank matching (`docs/15`) and UVI/DWD
-  (`docs/16`).
-- **Unresolved source questions:** the DWD annex inconsistencies and § 6a notice identity stay with
-  `docs/16`; Page 01's E16 tenant disclosure and E21 tax timing remain unguessed and visibly open.
-
-## Current demo framing
-
-The current PDF is the **landlord's calculation view**, and it's honest to present it as such:
-
-> *"This is the landlord's calculation view — every party, reconciling to the cent. The tenant letter,
-> with advance payments and the resulting balance, is the next document off the same engine."*
-
-This remains true of the shipped demo. Do **not** present its PDF as the Page 01 tenant document.
+The six correspondence files remain source inputs until the separate D3 retirement gate proves that
+every section has an approved destination or explicit unresolved/superseded disposition.

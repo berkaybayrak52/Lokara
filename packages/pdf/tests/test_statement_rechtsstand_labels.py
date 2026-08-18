@@ -3,17 +3,17 @@
 Spec: `docs/08` → "Heizkostenabrechnung — the heating table's disclosure" → item 6
 ("M2 — every `Rechtsstand` names its statute").
 
-The footer prints `Rechtsstand 03/1989 · Rechtsstand 01/2009 · Rechtsstand
-01/1981 · Rechtsstand 01/2023` — four bare dates, the label repeated four times,
-and `HeizkostenV` nowhere on the page. `Rechtsstand 01/1981` is the
-Gradtagszahlen table, which no reader could know; worse, an unlabelled 1981 date
-standing between three statutory ones reads as *law from 1981*, which is exactly
+The footer once printed `Rechtsstand 03/1989 · Rechtsstand 01/2009 · Rechtsstand
+12/1983 · Rechtsstand 01/2023` — four bare dates, the label repeated four times,
+and `HeizkostenV` nowhere on the page. `Rechtsstand 12/1983` is the
+Gradtagszahlen table, which no reader could know; worse, an unlabelled 12/1983 date
+standing between three statutory ones reads as *law from 1983*, which is exactly
 what a VDI convention is not. A stamp that names no rule discloses nothing.
 
 Required form (docs/08), the label once and each rule named beside its date:
 
     Rechtsstand: § 7 Abs. 1 HeizkostenV 03/1989 · § 9 Abs. 2 HeizkostenV 01/2009 ·
-    Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 01/1981 ·
+    Gradtagszahlen-Promilletabelle (VDI-Konvention, keine Rechtsnorm) 12/1983 ·
     § 5 Abs. 1 i. V. m. Anlage CO2KostAufG 01/2023 · Erstellt mit Lokara.
 
 This is **presentation only**: the three statutory labels are already carried by
@@ -151,7 +151,7 @@ def test_shared_co2_fallback_public_provenance_is_clean() -> None:
 def test_no_bare_rechtsstand_remains_in_the_footer() -> None:
     """The label is printed once as a prefix; every date after it is named.
 
-    `Rechtsstand 01/1981` standing alone is the defect this slice exists for, so
+    `Rechtsstand 12/1983` standing alone is the defect this slice exists for, so
     it is asserted absent by name as well as by the general rule.
     """
     footer = _rendered_footer()
