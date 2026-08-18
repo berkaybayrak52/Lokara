@@ -322,12 +322,15 @@ Heating costs remain in `HeatingCostEntry`, never a flagged `CostEntry`. Heizkos
 split; presenting an ordinary allocation-key selector for them would model a choice the user does
 not have.
 
-Page 02 is transcribed and awaiting Emir's review in
-[`docs/09-betrkv-catalogue.md`](09-betrkv-catalogue.md) with the exact `09-F01`–`09-F32` data oracle.
-That is **specified**, not production closure: no production catalogue or Page 02 gate is wired, and
-the missing register rows and unresolved classifications remain `verify-before-production`. Slice C
-owns production NK eligibility, classification, renter half-up allocation and owner-residual
-integration after the contract is approved.
+Page 02 is merged in [`docs/09-betrkv-catalogue.md`](09-betrkv-catalogue.md) with the exact
+`09-F01`–`09-F32` data oracle. Merge is **specified**, not production closure or legal approval: no
+production catalogue or Page 02 gate is wired, and the missing register rows and unresolved
+classifications remain `verify-before-production`. Slice C owns production NK eligibility,
+classification, renter half-up allocation and owner-residual integration.
+
+The Page 08 bank-matching contract is only **Prepared but unmerged** on `slice/docs-15`. Its source
+omits `BANKMATCH-F03`; the prepared oracle preserves that ID as a missing-source sentinel with no
+invented inputs or result. It supplies no current receivable, ledger or bank-matching implementation.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
 
@@ -545,7 +548,8 @@ to compare what was owed with what moved.
 | Secure pre-context identity read (`app_bootstrap_contexts`, migration `0006`) | **Prepared but unmerged** on `slice/m5-bootstrap-contexts` | M5, after documentation and Slices A–C |
 | Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Future** | M5 remainder |
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
-| Page 02 production catalogue, classifications, NK half-up rounding and owner residual | **Specified; Emir review pending**; production missing and flags remain | Slice C |
+| Page 02 production catalogue, classifications, NK half-up rounding and owner residual | Merged specification; production missing and flags remain | Slice C |
+| Page 08 bank-matching specification | **Prepared but unmerged** on `slice/docs-15`; blocked by missing authoritative `BANKMATCH-F03` | D2 / `slice/docs-15` |
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Not yet specified | Future AfA specification/M7 |

@@ -135,7 +135,7 @@ session. It is not an input for agent work and never overrides Git or the tracke
    closes the legally-required surface first* — rather than the milestone numbering. **It carries no
    deadline on purpose:** dates in `lokara-arch.md` are communication events (when something gets
    shown), never planning inputs, and they do not reorder the work.
-4. **`lokara-arch.md`** — canonical architecture (v3), the deepest source of truth.
+4. **`lokara-arch.md`** — canonical current architecture (v4); `PLAN.md` owns delivery order.
 5. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
 6. **`docs/`** — modular specs:
    - `00-product-overview.md` — what/why/who, competitive thesis, pitch framing
@@ -146,19 +146,9 @@ session. It is not an input for agent work and never overrides Git or the tracke
      legal flags, shipped capabilities and end-to-end gaps
    - `04-web-app-structure.md` — canonical app/API structure, route and delivery-status contract
    - `05-design-system.md` — canonical brand, component, accessibility and interaction contract
-   - `06-demo-scenarios.md` — seeded example cases for the investor demo
-   - `07-compliance.md` — DSGVO, two-clocks retention, "tool not advice", immutability
-   - `08-statement-document.md` — **the largest spec here (~2,000 lines):** what a legally complete
-     Abrechnung must *contain*, as opposed to what the engines compute. The four BGH formal minimums
-     and exactly which are rendered today; the Gesamtbemessung reference totals per allocation key;
-     the whole **Heizkostenabrechnung disclosure** — Blocks A/B/C, the Umlageschlüssel and
-     Gesamtbemessung per money column, the §§ 7/8 ratio as applied, § 9 warm-water separation,
-     degree-day apportionment at a Nutzerwechsel, § 7 Abs. 3 CO2KostAufG; the
-     **carried-intermediates contract**, naming every value `HeatingResult` computes and discards
-     today; the **`MeasurementUnit` travels with the value** plumbing decision; slice **4b**'s
-     page-break rules (*break at the seams, never inside a statement*); and the labelled
-     `Rechtsstand` form — `§ 7 Abs. 1 HeizkostenV 03/1989 · …` — that supersedes a bare stamp.
-     It also keeps its open questions and gaps explicit, so they are not silently invented.
+   - `06-demo-scenarios.md` — canonical seeded-demo, pitch-path, figure and delivery-status contract
+   - `07-compliance.md` — canonical cross-cutting compliance, two-clock lifecycle and delivery-status contract
+   - `08-statement-document.md` — canonical Page 01 statement, audience, disclosure, fixture and delivery-status contract
    - `09-betrkv-catalogue.md` — Page 02's versioned operating-cost catalogue, allocability gate,
      allocation-key precedence, non-allocable routing, 14 edge cases and exact 32-fixture trace.
 

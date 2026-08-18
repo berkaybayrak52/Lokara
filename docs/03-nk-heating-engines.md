@@ -112,9 +112,9 @@ the later renter-half-up/owner-residual method, so it does not hide the pending 
 
 ### Current Slice C boundary
 
-`docs/09-betrkv-catalogue.md` now contains the Page 02 contract and exact `09-F01`–`09-F32` data
-oracle, but it is still awaiting Emir's review. It does not prove a production catalogue or engine
-behavior. Until Slice C implements the reviewed Page 02 contract:
+`docs/09-betrkv-catalogue.md` is merged with the Page 02 contract and exact `09-F01`–`09-F32` data
+oracle. Merge does not prove a production catalogue, legal approval or engine behavior. Until Slice
+C implements the merged Page 02 contract:
 
 - NK remains largest-remainder and continues to represent owner-side occupancy as ordinary result
   lines with `tenancy_id = None`;
@@ -124,6 +124,10 @@ behavior. Until Slice C implements the reviewed Page 02 contract:
   `verify-before-production`;
 - `DIRECT`, `PERSONS`, `CONSUMPTION`, period validation, and end-to-end Page 02 fixtures remain Slice C
   closure work, even where current primitives already exist.
+
+The Page 08 bank-matching contract is only **Prepared but unmerged** on `slice/docs-15` and is
+blocked because the authoritative source omits `BANKMATCH-F03`. Its twelve executable cases and
+missing-source sentinel do not change any current NK or heating behavior.
 
 ## 3. Page 01b current decisions
 
@@ -663,7 +667,7 @@ here does not merge them.
 | Status | Exact CSV rows |
 | --- | --- |
 | `geprüft` | BEHG CO₂-Preis 2025 · Emissionsfaktor Erdgas (K4) · UVI-Turnus · Emissionsfaktor Flüssiggas (K4) · Warmwasser-Pauschale ohne Messung · CO₂-Aufteilung Nichtwohngebäude · CO₂-Stufenmodell Wohngebäude · Denkmal-/Milieuschutz — vollständiger Ausschluss · CO₂-Pflichtangaben in der Abrechnung · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Emissionsfaktor Heizöl (K4) · § 9a-Schwelle für Schätzungen · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Nachrüstfrist fernablesbare Ausstattung · Denkmal-/Milieuschutz — Halbierung · Leerstand bleibt im Gesamtverteiler · Warmwasser-Ersatzgleichung · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Verbrauchsabhängiger Anteil — gesetzliche Bandbreite |
-| `verify-before-production` | Plausibilitätsband CO₂ (K6) · Abweichungsschwelle Warmwasserzähler · Vermutungswirkung Witterungsbereinigung · Gradtagszahltabelle VDI (K3) · Geräteeinheiten — Rundung (K11) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Warmwassertemperatur tw (K5) · Durchschnittsnutzer-Vergleichswerte (K13) · Rundungsweg (Seite 01 / docs/03 § 6) · BEHG CO₂-Preis 2026 · Geräteliste auf der Mieterausfertigung (K10) · Heizwert Heizöl (K7) · Rechnungsabgrenzung (K8) · Klimafaktoren DWD (K12) · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · MDL-Beträge werden nie nachgerechnet (K14) · Schätzung bei Geräteausfall · CO₂-Ausweispflicht des Brennstofflieferanten · Umlagefähige Betriebskosten der Heizanlage · Informationspflichten bei nicht verbrauchsbasierter Abrechnung · Nutzerwechsel im Abrechnungszeitraum · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6) |
+| `verify-before-production` | Plausibilitätsband CO₂ (K6) · Abweichungsschwelle Warmwasserzähler · Vermutungswirkung Witterungsbereinigung · Gradtagszahltabelle VDI (K3) · Geräteeinheiten — Rundung (K11) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Warmwassertemperatur tw (K5) · Durchschnittsnutzer-Vergleichswerte (K13) · Rundungsweg (Seite 01 / docs/03 § 6) · BEHG CO₂-Preis 2026 · Geräteliste auf der Mieterausfertigung (K10) · Heizwert Heizöl (K7) · Rechnungsabgrenzung (K8) · Klimafaktoren DWD (K12) · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information (UVI + Abrechnungs-Infoblock) · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · MDL-Beträge werden nie nachgerechnet (K14) · Schätzung bei Geräteausfall · CO₂-Ausweispflicht des Brennstofflieferanten · Umlagefähige Betriebskosten der Heizanlage · Informationspflichten bei nicht verbrauchsbasierter Abrechnung · Nutzerwechsel im Abrechnungszeitraum · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6) |
 
 ## Appendix D — correspondence-retirement disposition ledger
 
@@ -673,7 +677,7 @@ disposition remains in the correspondence set until its target documentation and
 | Source section | Canonical destination | Disposition |
 | --- | --- | --- |
 | `FEEDBACK-to-Berkay-01b.md` §§ 1–6 | §§ 3–9 and Appendices B/C | **Current**, except the old factor disagreement superseded by CSV `0.201 Hu / 0.181 Ho`; F19 correction, F16/F26 reading and K3 remain current |
-| `FEEDBACK-to-Berkay-01b.md` § 7 | `docs/09` | **Transcribed in D2**, awaiting Emir review; production still Slice C |
+| `FEEDBACK-to-Berkay-01b.md` § 7 | `docs/09` | **Transcribed and merged in D2**; production still Slice C |
 | `FEEDBACK-to-Berkay-01b.md` § 8 | future `docs/16` | **Deferred to D2**: DWD import, notice identity, K13 and UVI |
 | `FEEDBACK-to-Berkay-01b.md` § 9 | `docs/02`; §§ 5 and 9.2 | **Superseded question**: Antworten 02/03 fix one unconditional Liegenschafts-Residuum |
 | `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | §§ 3, 7, 9.5 and Appendices B/C | **Current**: F19 correction, F16/F26 confirmation and CSV precedence |
