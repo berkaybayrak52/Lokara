@@ -151,6 +151,8 @@ session. It is not an input for agent work and never overrides Git or the tracke
    - `08-statement-document.md` — canonical Page 01 statement, audience, disclosure, fixture and delivery-status contract
    - `09-betrkv-catalogue.md` — Page 02's versioned operating-cost catalogue, allocability gate,
      allocation-key precedence, non-allocable routing, 14 edge cases and exact 32-fixture trace.
+   - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,
+     reversal and duplicate-handling contract, with all 13 source-backed fixtures transcribed.
 
 ## The one-paragraph version
 

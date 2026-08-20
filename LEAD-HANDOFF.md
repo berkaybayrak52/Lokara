@@ -1,45 +1,33 @@
 # LEAD-HANDOFF.md — next main session
 
-Read `CLAUDE.md`, `AGENTS.md`, `PLAN.md`, then `docs/03-nk-heating-engines.md` § 0.
-Verify this handoff with `git status` and `git log` before acting.
+Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`,
+`git log` and the named branch before acting.
 
-## Repository state — 17.08.2026
+## Repository state — 20.08.2026
 
-- Branch: `slice/reconcile-page01b-v2`.
-- Baseline before the current checkpoint:
-  `a350f98 test(heating): define Page 01b A4 plant aggregation`.
-- The checkpoint includes the A4 self-billing source, F02 CSV reconciliation, supporting docs and
-  fixtures, the restored single Slice A and the D1–D3 documentation gate.
-- Nothing was merged or pushed.
-- No `berkay-work/` or rules-store numeric value changed.
+- Branch: `slice/docs-15-f03`, based on `main` at `d5e2f80`.
+- `main` remains two commits ahead of `origin/main`; nothing was pushed.
+- D1 is complete, approved and closed. `docs/09` is merged.
+- `docs/15` is complete and approved by Emir on 20.08.2026, but not merged yet.
+- Do not merge or push without Emir's separate instruction.
 
-## Slice A status
+## F03 resolution
 
-Green on the current branch:
+Berkay's tracked `08_BankMatching_F03_Patch.md` resolves the omitted F03 as E12. All thirteen
+`BANKMATCH-F01…F13` oracle entries are executable. F03 keeps two mechanisms separate:
 
-- A1/H7 gross MDL rescaling: `9f7d744`.
-- Corrected A2 RED spec: `ca07f3b`.
-- A2 implementation, F02 missing-cost refusal and exact Berkay F18 totals: `716f741`.
-- A3 RED spec: `e20d792`.
-- A3 plant/CO₂ implementation: `89db9e0`.
-- A4 RED spec: `a350f98`; self-billing implementation included in the current checkpoint.
-- Main-tree fast gate: formatting, lint, strict mypy, engine purity and agent parity green; 307
-  pure-package tests passed.
+- `isPotentialDuplicate = true` forces Review and is never silently discarded;
+- the same provider transaction `id` is deduplicated before channel selection and scoring.
 
-Slice A is not finished. The implemented seams are supporting capability evidence, not full
-Page-01b end-to-end fixture closure. The exact remaining closure conditions are in `PLAN.md`.
-Implementation is paused while D1–D3 reconcile the docs and retire the extracted correspondence.
+The focused Page 08 suite passed 13 tests. Ruff, formatting, diff checks and the fast gate passed;
+the fast gate reported 348 pure-package tests. These are data-only transcription checks, not
+production bank-matching approval.
 
-## Source decisions that must stay
+## D2 continuation
 
-- F18 uses Berkay's table: renters `108090/74932/43121/101117`, owner `10958`.
-- The earlier derived F18 R1 table is superseded.
-- F02 missing supplier CO₂ cost is a hard refusal.
-- F02 uses the authoritative CSV values: Erdgas Hu `0.201`, Ho `0.181`, conversion provenance
-  `0.903`, status `geprüft`, Rechtsstand `07/2026`. The later 01b handoff confirms that the CSV wins
-  over Antwort 03's stale pair. Focused F02 and public-provenance verification is green: 64 passed;
-  statement re-review has no remaining blocker or high finding.
-- A4 oil logic uses consumed stock, not purchases, and does not invent CO₂ cost.
+The F03 source blocker and `docs/15` review gate are closed. The next D2 document is `docs/12`,
+followed by `docs/16`. Because every slice starts from `main`, first merge `slice/docs-15-f03` only
+after Emir separately authorizes it, then create a fresh `slice/docs-12` from updated `main`.
 
-Do not resume Slice A, start Slice B, resume M5, merge or push before D1–D3 are approved. After
-that, Slice A must close green before later implementation work.
+Implementation, D3, Slices A–C and M5 remain paused. Do not edit `berkay-work/`, and do not read or
+modify `docs/01-tech-stack-explanations.md`.

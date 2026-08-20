@@ -1,6 +1,6 @@
 # BetrKV catalogue — versioned classification before allocation
 
-**Status:** D2 transcription complete; awaiting Emir approval  
+**Status:** D2 transcription complete; approved and merged
 **Authoritative Page:**
 `berkay-work/Spec-Seiten/02 · BetrKV — Betriebskosten-Katalog 3a95fd4207318199a2c8fd9b390aacf4.md`  
 **Fixtures:** exactly `09-F01`–`09-F32` in
@@ -324,7 +324,7 @@ not current engine behavior.
 | `FEEDBACK-to-Berkay-01b.md` § 7 | §§ 4, 9 | current: existing screens must not infer a key before implementation |
 | `FRAGEN-an-Berkay-03.md` § 2 | §§ 1, 7 | superseded question |
 | `Antwort-an-Emir_03.md` § 2 | §§ 1, 7 | current correction: block (b) = 100,800 cents |
-| Other sections of the six-file correspondence set | later assigned docs | no additional Page 02-owned rule |
+| Other sections of the correspondence set | later assigned docs | no additional Page 02-owned rule |
 
 ## 8. Explicit non-goals and dependencies
 
