@@ -34,8 +34,8 @@ and the `08-F21` oracle.
 
 The audit in `Anlagen/README-for-Emir.md` confirms all 32 worked examples cent-exact, but explicitly
 does not clear flagged values. It also requires a nullable `afaKlasseVorschlag` catalogue field for
-the future 15% AfA guard. This document records that interface without inventing mappings; Page 03
-and future `docs/10-afa.md` own the values.
+the 15% AfA guard. This document records the interface; prepared `docs/10-afa.md` now owns the exact
+three proposals and explicitly refuses to infer `erweiterung`.
 
 ## 2. Legal basis and legal status
 
@@ -99,8 +99,8 @@ rechtsstand: MM/YYYY
 verificationFlag: geprüft | verify-before-production
 ```
 
-`afaKlasseVorschlag` and `anlageVKategorie` are dependency seams, not values owned here. The former
-waits for `docs/10`; the latter waits for `docs/11`.
+`afaKlasseVorschlag` and `anlageVKategorie` are dependency seams, not values owned here. Prepared
+`docs/10-afa.md` defines the former's exact proposals; the latter still waits for `docs/11`.
 
 ### 3.1 Allocable catalogue rows
 
@@ -150,9 +150,9 @@ never enter an allocation denominator.
 | ID | German label | Basis | Later destination |
 | --- | --- | --- | --- |
 | `verwaltungskosten` | Verwaltungskosten, Hausverwalter-Honorar | § 1 Abs. 2 Nr. 1 BetrKV | `docs/11` |
-| `instandhaltung` | Instandhaltung / Instandsetzung / Reparatur | § 1 Abs. 2 Nr. 2 BetrKV | `docs/11` |
+| `instandhaltung` | Instandhaltung / Instandsetzung / Reparatur | § 1 Abs. 2 Nr. 2 BetrKV | `docs/10`/`docs/11` |
 | `erneuerung` | Erneuerung / Anschaffung, including smoke-detector rent | § 1 Abs. 2 Nr. 2 BetrKV | `docs/10`/`docs/11` |
-| `schoenheitsreparaturen` | Schönheitsreparaturen | § 1 Abs. 2 Nr. 2 BetrKV | `docs/11` |
+| `schoenheitsreparaturen` | Schönheitsreparaturen | § 1 Abs. 2 Nr. 2 BetrKV | `docs/10`/`docs/11` |
 | `instandhaltungsruecklage` | Zuführung zur Instandhaltungsrücklage | not a current § 1 Abs. 1 cost | on use only |
 | `bankgebuehren` | Kontoführung, Bankgebühren, Zahlungsverkehr | § 1 Abs. 2 Nr. 1 BetrKV | `docs/11` |
 | `mietausfallwagnis` | Mietausfallwagnis | no actual cost | none |

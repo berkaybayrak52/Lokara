@@ -2,7 +2,8 @@
 
 This is Lokara's interim living compliance contract. It separates current controls from prepared,
 specified and future obligations. The final tax/archive reconciliation remains blocked until
-`docs/10` and `docs/11` are source-backed and approved; this file does not fill either gap.
+prepared `docs/10` is approved and `docs/11` is source-backed and approved; this file does not fill
+either gap.
 
 The complete predecessor remains available through
 `git show 635acf9:docs/07-compliance.md`; no separate history file is needed.
@@ -18,8 +19,9 @@ pre-production obligations. Detail remains with its specialist contract:
   interaction requirements.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the statement audiences, formal
   minimums, output contents and current render gaps.
-- Future `docs/10` owns AfA, `docs/11` owns tax/export/archive rules and `docs/12` owns reusable
-  deadline and guard rules. Their details are not invented here.
+- `docs/10-afa.md` now contains the prepared AfA transcription awaiting approval; `docs/11` owns
+  future tax/export/archive rules and `docs/12` owns approved reusable deadline and guard rules.
+  Their details are not duplicated here.
 
 Every status below describes repository delivery, not legal certainty:
 

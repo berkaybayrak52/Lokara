@@ -283,7 +283,8 @@ area-time remainder, so three mutable state flags can never drift apart.
 A unit-area day must not be both rented and self-used; overlapping tenancies in the same unit also
 block. Partial self-use is an area, not a boolean. Below-market family letting remains a real
 tenancy and is flagged for tax review rather than converted into self-use. Mid-year change between
-self-use and rental still needs a future month-accurate AfA specification.
+self-use and rental is specified by `docs/10-afa.md` as an unresolved production choice: the Page
+preserves both month-accurate and day-accurate results and blocks production until one is approved.
 
 ### DEFECT: `Tenancy.advance_payment_cents` is a scalar on a temporal row
 
@@ -553,7 +554,7 @@ to compare what was owed with what moved.
 | Page 08 bank-matching specification | **Approved but unmerged** on `slice/docs-15-f03`; F03 resolved with all thirteen oracle cases executable | D2 / `slice/docs-15-f03` |
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
-| Mid-year self-use/rental change for AfA apportionment | Not yet specified | Future AfA specification/M7 |
+| Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
 | `Verteilungsrest (K9)` authoritative register wording | Unresolved source issue; repository copy remains untouched | Next authoritative register export |
 
 Other later temporal or immutable records arrive only with their owning milestones: `AfaRecord`,
