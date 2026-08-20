@@ -328,9 +328,10 @@ production catalogue or Page 02 gate is wired, and the missing register rows and
 classifications remain `verify-before-production`. Slice C owns production NK eligibility,
 classification, renter half-up allocation and owner-residual integration.
 
-The Page 08 bank-matching contract is only **Prepared but unmerged** on `slice/docs-15`. Its source
-omits `BANKMATCH-F03`; the prepared oracle preserves that ID as a missing-source sentinel with no
-invented inputs or result. It supplies no current receivable, ledger or bank-matching implementation.
+The Page 08 bank-matching contract is **complete and approved but unmerged** on
+`slice/docs-15-f03`. The authoritative patch resolves `BANKMATCH-F03` as E12 and distinguishes
+potential-duplicate Review from silent same-ID re-import dedupe. The thirteen-case oracle supplies
+no current receivable, ledger or bank-matching implementation.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
 
@@ -549,7 +550,7 @@ to compare what was owed with what moved.
 | Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Future** | M5 remainder |
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
 | Page 02 production catalogue, classifications, NK half-up rounding and owner residual | Merged specification; production missing and flags remain | Slice C |
-| Page 08 bank-matching specification | **Prepared but unmerged** on `slice/docs-15`; blocked by missing authoritative `BANKMATCH-F03` | D2 / `slice/docs-15` |
+| Page 08 bank-matching specification | **Approved but unmerged** on `slice/docs-15-f03`; F03 resolved with all thirteen oracle cases executable | D2 / `slice/docs-15-f03` |
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Not yet specified | Future AfA specification/M7 |

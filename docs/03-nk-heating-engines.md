@@ -125,9 +125,9 @@ C implements the merged Page 02 contract:
 - `DIRECT`, `PERSONS`, `CONSUMPTION`, period validation, and end-to-end Page 02 fixtures remain Slice C
   closure work, even where current primitives already exist.
 
-The Page 08 bank-matching contract is only **Prepared but unmerged** on `slice/docs-15` and is
-blocked because the authoritative source omits `BANKMATCH-F03`. Its twelve executable cases and
-missing-source sentinel do not change any current NK or heating behavior.
+The Page 08 bank-matching contract is **approved but unmerged** on `slice/docs-15-f03`. The
+authoritative patch resolves `BANKMATCH-F03`, and all thirteen oracle cases are executable. This
+specification status does not change any current NK or heating behavior.
 
 ## 3. Page 01b current decisions
 
