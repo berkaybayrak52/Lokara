@@ -3,7 +3,7 @@
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`,
 `git log` and the named branch before acting.
 
-## Repository state — 20.08.2026
+## Repository state — 21.08.2026
 
 - Branch: `main`, after the no-fast-forward merge of `slice/docs-12`.
 - `main` is six commits ahead of `origin/main`; nothing was pushed.
