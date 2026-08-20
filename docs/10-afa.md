@@ -1,6 +1,6 @@
 # AfA — purchase allocation, deduction and 15% guard
 
-**Status:** D2 transcription prepared; awaiting Emir's approval
+**Status:** D2 transcription complete; approved and merged 21.08.2026
 **Rechtsstand:** 07/2026
 **Authoritative Page:**
 `berkay-work/Spec-Seiten/03 · AfA (Abschreibung) 3a95fd4207318179b865c8a1c9e4b487.md`

@@ -1,13 +1,14 @@
-# LEAD-HANDOFF.md — docs/10 prepared
+# LEAD-HANDOFF.md — docs/10 merged
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
 and the named branch before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `slice/docs-10`, created from clean `main`.
-- The docs/10 transcription is prepared and uncommitted for Emir's review.
-- No commit, merge or push was performed.
+- Branch: `main`, after the no-fast-forward merge of `slice/docs-10`.
+- Slice commit: `b785605`. Merge commit: `c2caf28`.
+- The docs/10 transcription is approved, committed and merged.
+- Nothing was pushed.
 
 ## AfA transcription
 
@@ -30,14 +31,13 @@ Variante S remains isolated from the Page 01/02 reference strand.
 
 ## Verification
 
-Focused AfA pytest passed 10 tests. Focused Ruff lint/format and `git diff --check` passed. The fast
-gate is green: strict mypy, purity, parity and 378 pure-package tests passed.
+Focused AfA pytest passed 10 tests. Focused Ruff lint/format and the staged diff check passed. The
+full gate is green under the UTF-8 locale: lint, strict mypy, purity, parity, 652 Python tests and 30
+web tests passed.
 
-The slice must contain only documentation and the two data-only fixture files. No production,
-schema, migration, API, engine, adapter, UI or PDF source belongs in it. `berkay-work/`, the seven
-correspondence files and `docs/01-tech-stack-explanations.md` remain untouched.
+No production, schema, migration, API, engine, adapter, UI or PDF source changed. `berkay-work/`,
+the seven correspondence files and `docs/01-tech-stack-explanations.md` remain untouched.
 
 ## Next decision
 
-Emir reviews the uncommitted docs/10 slice. A later merge requires separate commit and merge
-authorization plus `scripts/gate.sh full`. Do not start `docs/11` from this session.
+The next D2 transcription is `docs/11`. Do not start it without Emir's instruction.

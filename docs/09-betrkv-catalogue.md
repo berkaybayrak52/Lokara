@@ -34,7 +34,7 @@ and the `08-F21` oracle.
 
 The audit in `Anlagen/README-for-Emir.md` confirms all 32 worked examples cent-exact, but explicitly
 does not clear flagged values. It also requires a nullable `afaKlasseVorschlag` catalogue field for
-the 15% AfA guard. This document records the interface; prepared `docs/10-afa.md` now owns the exact
+the 15% AfA guard. This document records the interface; approved `docs/10-afa.md` owns the exact
 three proposals and explicitly refuses to infer `erweiterung`.
 
 ## 2. Legal basis and legal status
