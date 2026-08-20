@@ -1,6 +1,6 @@
 # Bank matching — deterministic proposals and immutable settlement
 
-**Status:** complete D2 transcription; approved 20.08.2026; not merged
+**Status:** complete D2 transcription; approved and merged 20.08.2026
 
 **Authoritative sources:**
 
@@ -36,8 +36,8 @@ The arithmetic audit confirms the arithmetic printed for the twelve original cas
 supplies the thirteenth case and its own summation checks. Neither source clears any
 `verify-before-production` flag. The CSV controls structured values, legal nature, source and flag;
 the Page and later patch supply the expanded method where the CSV row is shorthand. Emir approved
-this transcription on 20.08.2026. The slice remains unmerged until separate authorization. No M6
-implementation is approved; after merge, D2 continues with `docs/12`.
+this transcription on 20.08.2026, and the slice was merged into `main` with a no-fast-forward merge.
+No M6 implementation is approved; D2 continues with `docs/16` after approved Page 05.
 
 ## 2. Legal rules versus matching conventions
 
@@ -340,5 +340,5 @@ engine, UI or PDF source.
 All thirteen cases, register rows, model boundaries and correspondence coverage are fully
 transcribed. Emir approved the transcription on 20.08.2026. The focused data-only checks may verify
 source coverage and arithmetic, but they do not prove production bank-matching behavior or approve
-any legal or product convention. The slice remains unmerged until separate authorization. M6
-implementation remains paused; after merge, the next D2 document is `docs/12`.
+any legal or product convention. The specification is merged, but M6 implementation remains paused;
+the next D2 document is `docs/16`.
