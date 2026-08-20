@@ -1,47 +1,43 @@
-# LEAD-HANDOFF.md — docs/16 merged
+# LEAD-HANDOFF.md — docs/10 prepared
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
 and the named branch before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `main`, after the no-fast-forward merge of `slice/docs-16`.
-- Slice commit: `f8db915`. Merge commit: `f0c609a`.
-- The docs/16 transcription is approved, committed and merged.
-- `main` remains ahead of `origin/main`; nothing was pushed.
-- Do not push without Emir's separate instruction.
+- Branch: `slice/docs-10`, created from clean `main`.
+- The docs/10 transcription is prepared and uncommitted for Emir's review.
+- No commit, merge or push was performed.
 
-## UVI transcription
+## AfA transcription
 
-`docs/16-uvi.md` and its source-named data-only oracle cover the complete UVI annex, DWD annual
-climate-factor import and latest-state note, all 18 Heizspiegel rows, Page 01b H8/F31, approved Page
-05 W4, all eleven relevant Non-Goals, README-for-Emir, twelve register rows and the exact seven-file
-correspondence ledger.
+`docs/10-afa.md` and its data-only oracle cover all Page 03 inputs, `R1`–`R13`, `10-K01`–`10-K15`,
+`10-E01`–`10-E26` and exactly `10-F01`–`10-F34`. They also preserve all 13 Page-03 Non-Goals,
+README-for-Emir, Antwort 01b § 4b and the exact seven-file correspondence ledger.
 
-The approved transcription applies the later corrections: DWD range `0.40–1.80`; annual factors separate from
-monthly degree days; D2 heat-only deductions `24/8`; non-positive guard; labelled over-500
-fallback; corrected `1,368 / +132 / +9.6%`; renter as Person/Tenancy context; no second heating-money
-allocation; three valid Block D units including the target; provisional HKV, labelled raw-weather
-fallback and elapsed-day interpolation.
+The current CSV metadata is mirrored exactly: four rows are `geprüft` and 42 remain
+`verify-before-production`. Self-use reduces deductible AfA, never its basis, and does not extend
+the depreciation period. The 15% guard requires `leistungBis`, separately from Page 02 `abfluss`.
+Variante S remains isolated from the Page 01/02 reference strand.
 
 ## Explicit unresolved items
 
-- The exact monthly DWD degree-day dataset and station-to-PLZ mapping remain
-  `verify-before-production` and block production Blocks C/D2.
-- W4 retains its year-round versus heating-season uncertainty.
-- The GEG § 82 notice identity and Wärmepumpe deduction/year freshness remain flagged.
-- Block C says to compute on unrounded values but prints `-52 / 952 = -5.5%`; the exact-value path
-  yields `-5.4%`. The oracle preserves the printed result and records the conflict for resolution.
+- Weg B remains production-blocked until the BMF source tables replace the four F02 placeholders.
+- The month-granular K09 result and day-granular F11 alternative remain unresolved and block
+  production use-change output.
+- Unverified EStR versions, BFH citations and § 7b values remain explicit.
+- No new question file was created during D2.
 
 ## Verification
 
-Focused UVI pytest passed 10 tests. Focused Ruff lint/format and `git diff --check` passed. The full
-gate is green: strict mypy, purity, parity, 642 Python tests and 30 web tests passed.
+Focused AfA pytest passed 10 tests. Focused Ruff lint/format and `git diff --check` passed. The fast
+gate is green: strict mypy, purity, parity and 378 pure-package tests passed.
 
-No production, schema, migration, API, engine, adapter, UI or PDF source changed. `berkay-work/`
-and `docs/01-tech-stack-explanations.md` remain untouched.
+The slice must contain only documentation and the two data-only fixture files. No production,
+schema, migration, API, engine, adapter, UI or PDF source belongs in it. `berkay-work/`, the seven
+correspondence files and `docs/01-tech-stack-explanations.md` remain untouched.
 
 ## Next decision
 
-The next D2 specs in the recorded dependency order are `docs/10` and `docs/11`. Do not start them
-without Emir's instruction.
+Emir reviews the uncommitted docs/10 slice. A later merge requires separate commit and merge
+authorization plus `scripts/gate.sh full`. Do not start `docs/11` from this session.
