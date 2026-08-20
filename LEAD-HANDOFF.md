@@ -6,7 +6,7 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 ## Repository state — 21.08.2026
 
 - Branch: `main`, after the no-fast-forward merge of `slice/docs-12`.
-- `main` is six commits ahead of `origin/main`; nothing was pushed.
+- `main` remains ahead of `origin/main`; nothing was pushed.
 - Approved Page 08 is merged. Production bank matching remains open.
 - Page 05 is fully transcribed, approved, committed and merged.
 - Do not push without Emir's separate instruction.
