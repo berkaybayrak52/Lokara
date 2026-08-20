@@ -278,8 +278,8 @@ The legal/conventional inputs K1–K14 remain individually visible:
 | K9 | Half-up residual rounding direction | `verify-before-production`; destination is fixed model rule |
 | K10 | Device list on renter output | `verify-before-production` |
 | K11 | Device units rounded half up to one decimal | `verify-before-production` |
-| K12 | Versioned DWD climate factor | `verify-before-production`; exact import deferred to `docs/16` |
-| K13 | Average-user comparison source/method | `verify-before-production`; corrected D2/UVI ownership deferred to `docs/16` |
+| K12 | Versioned DWD annual climate factor | `verify-before-production`; exact annual import specified in the unapproved `docs/16` draft |
+| K13 | Average-user comparison source/method | `verify-before-production`; corrected heat-only D2/UVI contract specified in the unapproved `docs/16` draft |
 | K14 | MDL amounts are validated and passed through, never recalculated | `verify-before-production` |
 
 ### H0–H8
@@ -326,8 +326,8 @@ capability is shipped. Net ingest, branch-specific control sums, confirmed OCR f
 risk/readiness output remain open.
 
 **H8 — annual comparison.** Heat is weather-adjusted; WW remains raw. Missing climate data produces
-a labelled fallback, never an implicit factor of one. The versioned DWD import and conflicting
-range/date inputs belong to `docs/16`; H8 remains open until that authority is reconciled.
+a labelled fallback, never an implicit factor of one. The annual import contract and resolved
+range/date inputs are in the unapproved `docs/16` draft; H8 implementation remains open.
 
 Compact arithmetic, with every quotient kept as exact `Decimal`:
 
@@ -474,10 +474,12 @@ documents reference their numbers.
     used; do not re-derive it.
 14. **Unresolved reduction cumulation.** Page F25 forbids summing the three 3 percent rights and the
     15 percent right; one CSV entry says the 3 percent rights cumulate. Show each separately.
-15. **K12/DWD dependency.** Annexes disagree on an acceptance boundary and an update date.
-    `docs/16` must resolve the import contract before H8.
-16. **K13/D2 dependency.** The corrected heat-only comparison, guards, and licensed source belong to
-    `docs/16`; annual statement comparison and UVI are related consumers, not one calculation.
+15. **K12/DWD dependency.** The `docs/16` draft resolves the annual importer boundary to
+    `0.40–1.80` and the latest-state note to the May-ending file. H8 remains unimplemented, and the
+    § 6a notice identity remains pre-legal.
+16. **K13/D2 dependency.** The unapproved `docs/16` draft specifies the corrected heat-only
+    comparison, guards and source. Annual statement comparison and UVI are related consumers, not
+    one calculation; annual DWD factors are not monthly degree-day inputs.
 17. **Resolved F18 oracle.** Only WE-03 is affected, `58 / 194 = 29.90 percent`; Berkay's printed
     totals control and no general per-block override is inferred.
 18. **Scope exclusion.** No MDL raw-input recalculation, automatic legal reduction, proprietary
@@ -497,7 +499,7 @@ documents reference their numbers.
 | H5 persistence and integration | **Open**: DB device valuation factor, segmented readings, adapter and `HeatingInput` handoff are incomplete | Slice A |
 | H7 net/control/risk behavior | **Open**: confirmed OCR input, net branch, correct branch reference sums, F29 hard stop and F30 risk output | Slice A; M3 later revalidates adapter/API behavior |
 | Shared readiness/provenance/risk channel | **Open**: F02, F12, F17, F20, F21, F23–F26c, F30/F31 obligations are not one result channel | Slice A |
-| H8 annual comparison | **Open and authority-blocked** by DWD conflicts and future `docs/16` contract | After `docs/16`, within Slice A closure |
+| H8 annual comparison | **Open**; annual DWD import is specified in the unapproved `docs/16` draft, but no integration exists | Slice A closure after `docs/16` approval |
 
 No bounded capability counts as full Page 01b closure. Closure requires one H0–H7 pipeline covering
 every applicable fixture, the shared readiness channel, H8 after its authority is settled, all 34
@@ -678,18 +680,18 @@ disposition remains in the correspondence set until its target documentation and
 | --- | --- | --- |
 | `FEEDBACK-to-Berkay-01b.md` §§ 1–6 | §§ 3–9 and Appendices B/C | **Current**, except the old factor disagreement superseded by CSV `0.201 Hu / 0.181 Ho`; F19 correction, F16/F26 reading and K3 remain current |
 | `FEEDBACK-to-Berkay-01b.md` § 7 | `docs/09` | **Transcribed and merged in D2**; production still Slice C |
-| `FEEDBACK-to-Berkay-01b.md` § 8 | future `docs/16` | **Deferred to D2**: DWD import, notice identity, K13 and UVI |
+| `FEEDBACK-to-Berkay-01b.md` § 8 | `docs/16` | **Transcribed in D2 draft**: DWD import, notice identity, K13 and UVI |
 | `FEEDBACK-to-Berkay-01b.md` § 9 | `docs/02`; §§ 5 and 9.2 | **Superseded question**: Antworten 02/03 fix one unconditional Liegenschafts-Residuum |
 | `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | §§ 3, 7, 9.5 and Appendices B/C | **Current**: F19 correction, F16/F26 confirmation and CSV precedence |
-| `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–8 | future `docs/16` | **Deferred to D2**: DWD/K12, § 6a notice and K13/D2; range/date conflict remains |
-| `Antwort-an-Emir_01b-Uebergabe.md` §§ 9–11 | this ledger and future `docs/16` | **Current routing/history**; no calculation value introduced |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–8 | `docs/16` | **Transcribed in D2 draft**: DWD/K12, § 6a notice and K13/D2; range/date conflict resolved, legal notice identity retained |
+| `Antwort-an-Emir_01b-Uebergabe.md` §§ 9–11 | this ledger and `docs/16` | **Current routing/history**; no calculation value introduced |
 | `FRAGEN-an-Berkay-02.md` § 1 and `Antwort-an-Emir_02.md` § 1 | `docs/02`; §§ 5 and 9.2; `docs/08` | **Current resolution**: owner is a residual, always exists, and may be negative |
-| `FRAGEN-an-Berkay-02.md` §§ 2–4 and `Antwort-an-Emir_02.md` §§ 2–4 | future `docs/16` | **Deferred to D2**: heat-only comparison, over-500 fallback and source handling |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4 and `Antwort-an-Emir_02.md` §§ 2–4 | `docs/16` | **Transcribed in D2 draft**: heat-only comparison, over-500 fallback and source handling |
 | `FRAGEN-an-Berkay-02.md` § 5 and `Antwort-an-Emir_02.md` § 5 | Appendix C | **Current source rule**: one authoritative CSV; `geprüft` is not lawyer approval |
-| `Antwort-an-Emir_02.md` § 6 | §§ 7–8 and future `docs/16` | **Current evidence**, split by ownership; no default inferred |
+| `Antwort-an-Emir_02.md` § 6 | §§ 7–8 and `docs/16` | **Current evidence**, split by ownership; no default inferred |
 | `FRAGEN-an-Berkay-03.md` § 1 and `Antwort-an-Emir_03.md` § 1 | § 9.2 | **Current method correction**: fixed residual destination; K9 direction remains flagged |
 | `FRAGEN-an-Berkay-03.md` § 2 and `Antwort-an-Emir_03.md` § 2 | `docs/08`, `08-F21` | **Current correction**: Page 01 block (b) is 100,800 ct |
-| `FRAGEN-an-Berkay-03.md` § 3 and `Antwort-an-Emir_03.md` § 3 | future `docs/16` | **Deferred to D2**: D2 compares heat with heat; old heat+WW wording superseded |
+| `FRAGEN-an-Berkay-03.md` § 3 and `Antwort-an-Emir_03.md` § 3 | `docs/16` | **Transcribed in D2 draft**: D2 compares heat with heat; old heat+WW wording superseded |
 | `FRAGEN-an-Berkay-03.md` § 4 and `Antwort-an-Emir_03.md` § 4 | § 7 item 1 and Appendix C | **Superseded by CSV**: `0.2016 / 0.1820` and older flag do not control |
 | `FRAGEN-an-Berkay-03.md` § 5 and `Antwort-an-Emir_03.md` § 5 | §§ 3, 7 item 4 and 9.5 | **Current**: missing supplier CO₂ cost refuses; mass-only fallback survives |
 | `FRAGEN-an-Berkay-03.md` § 6 and `Antwort-an-Emir_03.md` § 6 | § 3 decision 3 and § 5 R8 | **Current**: annualise, round one decimal, classify and print the same value |

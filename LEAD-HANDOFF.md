@@ -1,35 +1,46 @@
-# LEAD-HANDOFF.md — next main session
+# LEAD-HANDOFF.md — docs/16 review
 
-Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`,
-`git log` and the named branch before acting.
+Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
+and the named branch before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `main`, after the no-fast-forward merge of `slice/docs-12`.
+- Branch: `slice/docs-16`, created from clean `main` after the approved `docs/12` merge.
+- The docs/16 transcription is uncommitted and awaits Emir's review.
 - `main` remains ahead of `origin/main`; nothing was pushed.
-- Approved Page 08 is merged. Production bank matching remains open.
-- Page 05 is fully transcribed, approved, committed and merged.
-- Do not push without Emir's separate instruction.
+- Do not commit, merge or push without Emir's separate instruction.
 
-## Page 05 transcription
+## UVI transcription
 
-`docs/12-guards-deadlines.md` and the data-only Page 05 oracle cover exactly `12-F01…F24`.
-The transcription includes W1–W8, all eighteen Page-specific Rechtsstand rows, six shared rows,
-all ten Page 05 non-goals, README-for-Emir and the seven-file correspondence ledger.
+`docs/16-uvi.md` and its source-named data-only oracle cover the complete UVI annex, DWD annual
+climate-factor import and latest-state note, all 18 Heizspiegel rows, Page 01b H8/F31, approved Page
+05 W4, all eleven relevant Non-Goals, README-for-Emir, twelve register rows and the exact seven-file
+correspondence ledger.
 
-All eighteen Page-specific rows remain `verify-before-production`. The unresolved 5-year/6-year
-meter conflict and every other authority gap remain explicit. `12-F10` is a 3b-to-3a downgrade,
-not a complete resolution.
+The draft applies the later corrections: DWD range `0.40–1.80`; annual factors separate from
+monthly degree days; D2 heat-only deductions `24/8`; non-positive guard; labelled over-500
+fallback; corrected `1,368 / +132 / +9.6%`; renter as Person/Tenancy context; no second heating-money
+allocation; three valid Block D units including the target; provisional HKV, labelled raw-weather
+fallback and elapsed-day interpolation.
+
+## Explicit unresolved items
+
+- The exact monthly DWD degree-day dataset and station-to-PLZ mapping remain
+  `verify-before-production` and block production Blocks C/D2.
+- W4 retains its year-round versus heating-season uncertainty.
+- The GEG § 82 notice identity and Wärmepumpe deduction/year freshness remain flagged.
+- Block C says to compute on unrounded values but prints `-52 / 952 = -5.5%`; the exact-value path
+  yields `-5.4%`. The oracle preserves the printed result and records the conflict for resolution.
 
 ## Verification
 
-The focused Page 05 suite passed 10 tests. Focused Ruff lint/format and `git diff --check` passed.
-The full gate is green: strict mypy, 632 Python tests and 30 web tests passed. These are data-only
-transcription checks, not production guard behavior or legal approval.
+Focused UVI pytest passed 10 tests. Focused Ruff lint/format and `git diff --check` passed. The fast
+gate is green: strict mypy, purity, parity and 368 pure-package tests passed.
 
-No production, schema, migration, API, engine, adapter, UI or PDF file changed. `berkay-work/`
-remains unchanged on this slice. Do not read or modify `docs/01-tech-stack-explanations.md`.
+No production, schema, migration, API, engine, adapter, UI or PDF source changed. `berkay-work/`
+and `docs/01-tech-stack-explanations.md` remain untouched.
 
 ## Next decision
 
-The next D2 document is `docs/16`. Do not start it without Emir's instruction.
+Review the uncommitted docs/16 transcription. A later commit needs authorization. A later merge also
+needs `scripts/gate.sh full` and separate commit/merge authorization.
