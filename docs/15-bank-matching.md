@@ -37,7 +37,8 @@ supplies the thirteenth case and its own summation checks. Neither source clears
 `verify-before-production` flag. The CSV controls structured values, legal nature, source and flag;
 the Page and later patch supply the expanded method where the CSV row is shorthand. Emir approved
 this transcription on 20.08.2026, and the slice was merged into `main` with a no-fast-forward merge.
-No M6 implementation is approved; D2 continues with `docs/16` after approved Page 05.
+No M6 implementation is approved. The separate `docs/16` D2 transcription is now prepared for
+review; it does not change this contract.
 
 ## 2. Legal rules versus matching conventions
 
@@ -341,4 +342,4 @@ All thirteen cases, register rows, model boundaries and correspondence coverage 
 transcribed. Emir approved the transcription on 20.08.2026. The focused data-only checks may verify
 source coverage and arithmetic, but they do not prove production bank-matching behavior or approve
 any legal or product convention. The specification is merged, but M6 implementation remains paused;
-the next D2 document is `docs/16`.
+the separate `docs/16` D2 transcription is prepared for review.

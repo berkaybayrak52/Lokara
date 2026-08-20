@@ -155,6 +155,8 @@ session. It is not an input for agent work and never overrides Git or the tracke
      rent adjustments and vacancy, with all 24 source-backed fixtures transcribed.
    - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,
      reversal and duplicate-handling contract, with all 13 source-backed fixtures transcribed.
+   - `16-uvi.md` — UVI monthly-consumption, comparison, DWD import, Heizspiegel fallback,
+     tenant-document and delivery-evidence contract, with source-named data-only fixtures.
 
 ## The one-paragraph version
 
