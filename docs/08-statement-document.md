@@ -65,7 +65,7 @@ eligible tenancy, document archives and delivery-safe output.
 
 Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to future
 `docs/11`; reusable deadline orchestration to `docs/12`; bank matching to `docs/15`; and UVI/DWD
-rules to the unapproved `docs/16` D2 draft. This file records their boundaries and does not duplicate or
+rules to approved `docs/16`. This file records their boundaries and does not duplicate or
 invent their contracts.
 
 ## 2. Page 01 source coverage and output contract
@@ -687,7 +687,7 @@ The complete calculation contract remains in `docs/03`. Its document projection 
 | prior-year graph | adjust heat with each year's DWD factor; keep WW raw; label unadjusted fallback; no empty graph; source line required |
 
 The BAnz notice identity under § 6a Abs. 3 S. 4 remains pre-legal. The UVI has a different
-no-omission contract owned by the separate `docs/16` draft.
+no-omission contract owned by approved `docs/16`.
 
 M6 must add, without reinterpreting Page 01:
 
@@ -776,15 +776,15 @@ residual destination as a model rule. Neither status erases the other.
 | Source | Destination | Disposition |
 | --- | --- | --- |
 | `FRAGEN-an-Berkay-02.md` § 1; `Antwort-an-Emir_02.md` §§ 1.1–1.4 | `docs/02`; `docs/03` § 9.2; Eigentümer sections here | current unconditional residual resolution |
-| `FRAGEN-an-Berkay-02.md` §§ 2–4; `Antwort-an-Emir_02.md` §§ 2–4 | `docs/16` | transcribed heat-only D2, over-500 fallback and comparison source in the D2 draft |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4; `Antwort-an-Emir_02.md` §§ 2–4 | `docs/16` | heat-only D2, over-500 fallback and comparison source transcribed and merged in D2 |
 | `FRAGEN-an-Berkay-02.md` § 5; `Antwort-an-Emir_02.md` § 5 | `docs/03` register inventory | current source rule |
 | `Antwort-an-Emir_02.md` § 6 | fixtures here, `docs/03` and `docs/16` | current evidence routed by owner |
 | `FRAGEN-an-Berkay-03.md` § 1; `Antwort-an-Emir_03.md` § 1 | `docs/03` § 9.2; Appendix B | current residual correction |
 | `FRAGEN-an-Berkay-03.md` § 2; `Antwort-an-Emir_03.md` § 2 | `08-F21`; vacancy annex | block (b) corrected to `100.800` ct |
-| `FRAGEN-an-Berkay-03.md` § 3; `Antwort-an-Emir_03.md` § 3 | `docs/16` | older Wärme+WW wording superseded in D2 draft |
+| `FRAGEN-an-Berkay-03.md` § 3; `Antwort-an-Emir_03.md` § 3 | `docs/16` | older Wärme+WW wording superseded in merged D2 transcription |
 | `FRAGEN-an-Berkay-03.md` §§ 4–6; `Antwort-an-Emir_03.md` §§ 4–6 | `docs/03`; Page 01b projection | current/superseded exactly as mapped there |
 | `FEEDBACK-to-Berkay-01b.md` §§ 1–6, 9; `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | `docs/03`; Page 01b projection | current or superseded per `docs/03` ledger |
-| `FEEDBACK-to-Berkay-01b.md` §§ 7–8; `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–11 | `docs/09`; `docs/16` | § 7 is merged in `docs/09`; § 8 and Antwort §§ 5–8 are transcribed in the `docs/16` D2 draft; Antwort §§ 9–11 retain routing/history per `docs/03` |
+| `FEEDBACK-to-Berkay-01b.md` §§ 7–8; `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–11 | `docs/09`; `docs/16` | § 7 is merged in `docs/09`; § 8 and Antwort §§ 5–8 are merged in `docs/16`; Antwort §§ 9–11 retain routing/history per `docs/03` |
 
 The six correspondence files remain source inputs until the separate D3 retirement gate proves that
 every section has an approved destination or explicit unresolved/superseded disposition.

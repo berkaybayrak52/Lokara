@@ -398,10 +398,10 @@ source arithmetic, not current application behavior.
 | Non-Goals V1, Page 05 | § 9 and oracle metadata | all ten exclusions preserved |
 | `Anlagen/README-for-Emir.md` | §§ 1, 7 | 24-case exact arithmetic evidence retained; does not clear red flags |
 | `FEEDBACK-to-Berkay-01b.md` | other assigned docs | no Page-05-owned correction found; retained for D3 ledger |
-| `FRAGEN-an-Berkay-02.md` | `docs/03`/`docs/16` | UVI content questions are transcribed in the D2 draft, not W4 cadence; no Page-05 correction |
+| `FRAGEN-an-Berkay-02.md` | `docs/03`/`docs/16` | UVI content questions are transcribed in merged `docs/16`, not W4 cadence; no Page-05 correction |
 | `FRAGEN-an-Berkay-03.md` | other assigned docs | no Page-05-owned correction found; retained for D3 ledger |
-| `Antwort-an-Emir_01b-Uebergabe.md` | `docs/03`/`docs/16` | UVI comparison/fallback content transcribed in the D2 draft, not Page-05 cadence |
-| `Antwort-an-Emir_02.md` | `docs/03`/`docs/16` | UVI comparison/licence content transcribed in the D2 draft, not Page-05 cadence |
+| `Antwort-an-Emir_01b-Uebergabe.md` | `docs/03`/`docs/16` | UVI comparison/fallback content transcribed in merged `docs/16`, not Page-05 cadence |
+| `Antwort-an-Emir_02.md` | `docs/03`/`docs/16` | UVI comparison/licence content transcribed in merged `docs/16`, not Page-05 cadence |
 | `Antwort-an-Emir_03.md` | other assigned docs | no Page-05-owned correction found; retained for D3 ledger |
 | `08_BankMatching_F03_Patch.md` | `docs/15` | no Page-05-owned correction; retained for D3 ledger |
 
