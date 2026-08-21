@@ -21,10 +21,15 @@ from ..deps import PathAccountSession
 from ..schemas import (
     DemoStatementResponse,
     DemoSummaryResponse,
+    StatementAnnualComparison,
     StatementCo2,
+    StatementDeviceEvidence,
+    StatementFinding,
     StatementHeatingLine,
     StatementNkCost,
     StatementNkLine,
+    StatementProvenance,
+    StatementReductionRisk,
 )
 from ..statement_service import (
     ALLOCATION_KEY_LABELS,
@@ -144,6 +149,32 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
         else None
     )
     heating_total = heating.total if heating is not None else cents(0)
+    page = bundle.page01b_result
+    findings = (
+        [
+            StatementFinding(
+                code=finding.code,
+                message=finding.message_de,
+                severity=finding.severity,
+                dismissible=finding.dismissible,
+            )
+            for finding in page.findings
+        ]
+        if page is not None
+        else (
+            [
+                StatementFinding(
+                    code="heating_input_missing",
+                    message=bundle.heating_missing_reason,
+                    severity="BLOCKER",
+                    dismissible=False,
+                )
+            ]
+            if bundle.heating_missing_reason is not None
+            else []
+        )
+    )
+    annual = page.annual_comparison if page is not None else None
 
     building = bundle.building
     return DemoStatementResponse(
@@ -159,6 +190,90 @@ def demo_statement(account_id: str, session: PathAccountSession) -> DemoStatemen
         heating_total_eur=format_eur(heating_total),
         heating_input_total_cents=int(bundle.heating_input_total),
         heating_missing_reason=bundle.heating_missing_reason,
+        heating_readiness=(page.readiness if page is not None else "BLOCKED"),
+        heating_findings=findings,
+        heating_provenance=[
+            StatementProvenance(
+                code=entry.code,
+                source=entry.source_ref,
+                detail=entry.detail_de,
+            )
+            for entry in (page.provenance if page is not None else ())
+        ],
+        heating_device_evidence=[
+            StatementDeviceEvidence(
+                device_id=line.device_id,
+                unit_id=line.unit_id,
+                room=line.room,
+                measurement_unit=line.measurement_unit,
+                valuation_factor=format_number_de(line.valuation_factor),
+                allocation_kind=line.allocation_kind,
+                target_id=line.target_id,
+                opening=(format_number_de(line.opening) if line.opening is not None else None),
+                closing=(format_number_de(line.closing) if line.closing is not None else None),
+                units=format_number_de(line.units),
+                estimated=line.estimated,
+                estimation_basis=line.estimation_basis,
+                reading_reasons=list(line.reading_reasons),
+                reading_sources=list(line.reading_sources),
+                provenance_refs=list(line.provenance_refs),
+            )
+            for line in (page.device_evidence if page is not None else ())
+        ],
+        heating_reduction_risks=[
+            StatementReductionRisk(
+                code=risk.code,
+                percent=format_number_de(risk.percent),
+                amounts_eur=[format_eur(amount) for amount in risk.amounts],
+                message=risk.message_de,
+            )
+            for risk in (page.risks if page is not None else ())
+        ],
+        annual_comparison=(
+            StatementAnnualComparison(
+                state=annual.state,
+                current_heat=format_number_de(annual.current_heat_raw),
+                previous_heat=(
+                    format_number_de(annual.previous_heat_raw)
+                    if annual.previous_heat_raw is not None
+                    else None
+                ),
+                current_heat_adjusted=(
+                    format_number_de(annual.current_heat_adjusted)
+                    if annual.current_heat_adjusted is not None
+                    else None
+                ),
+                previous_heat_adjusted=(
+                    format_number_de(annual.previous_heat_adjusted)
+                    if annual.previous_heat_adjusted is not None
+                    else None
+                ),
+                current_warm_water=(
+                    format_number_de(annual.current_warm_water)
+                    if annual.current_warm_water is not None
+                    else None
+                ),
+                previous_warm_water=(
+                    format_number_de(annual.previous_warm_water)
+                    if annual.previous_warm_water is not None
+                    else None
+                ),
+                raw_change_percent=(
+                    format_number_de(annual.raw_change_percent)
+                    if annual.raw_change_percent is not None
+                    else None
+                ),
+                adjusted_change_percent=(
+                    format_number_de(annual.adjusted_change_percent)
+                    if annual.adjusted_change_percent is not None
+                    else None
+                ),
+                graph_required=annual.graph_required,
+                note=annual.note_de,
+            )
+            if annual is not None
+            else None
+        ),
         co2=co2_out,
         rechtsstaende=list(bundle.rechtsstaende),
         disclaimer=DISCLAIMER,

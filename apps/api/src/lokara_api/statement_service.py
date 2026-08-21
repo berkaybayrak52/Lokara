@@ -23,17 +23,24 @@ from lokara_adapters import (
     MeterGateway,
     MeterKind,
     consumption_by_meter,
+    device_reading_segments,
 )
 from lokara_db import Building, CostEntry, HeatingCostEntry, Unit
 from lokara_domain import AllocationKey, Cents, Occupancy, Period, cents
 from lokara_heating_engine import (
+    AnnualComparisonInput,
     Co2Input,
+    DeviceReadingSpan,
+    HeatingDevice,
     HeatingInput,
     HeatingResult,
     HeatingRules,
     HeatingUnit,
+    InvoiceCostInput,
+    Page01bStatementResult,
+    SelfBillingStatementInput,
     WarmWaterInput,
-    calculate_heating_statement,
+    calculate_page01b_statement,
 )
 from lokara_nk_engine import CostItem, NkInput, NkResult, UnitBasis, calculate_nk_statement
 from lokara_pdf import PartyKey, StatementData, rechtsstand_entry
@@ -85,6 +92,7 @@ class StatementBundle:
     # None when the heating inputs are incomplete — `heating_missing_reason`
     # then carries the German explanation shown instead of an invented table.
     heating_result: HeatingResult | None
+    page01b_result: Page01bStatementResult | None
     heating_input_total: Cents
     heating_missing_reason: str | None
     party_labels: dict[PartyKey, str]
@@ -130,6 +138,8 @@ class MeterFacts:
     # for that flat, which propagates to the withheld disclosure rather than to
     # a guess.
     heat_unit_by_unit: dict[str, MeasurementUnit]
+    devices: tuple[HeatingDevice, ...]
+    device_spans: tuple[DeviceReadingSpan, ...]
 
 
 def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
@@ -144,6 +154,7 @@ def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
     # Closed window: a period needs its opening AND its closing register value.
     readings = gateway.list_readings(building_id, BILLING_START, BILLING_END - timedelta(days=1))
     consumptions = consumption_by_meter(readings).values()
+    segmented = device_reading_segments(readings)
 
     total_energy: Decimal | None = None
     ww_volume: Decimal | None = None
@@ -182,6 +193,31 @@ def _meter_facts(gateway: MeterGateway, building_id: str) -> MeterFacts:
             for unit_id, units in heat_units_by_unit.items()
             if len(units) == 1
         },
+        devices=tuple(
+            HeatingDevice(
+                device_id=device.device_id,
+                unit_id=device.unit_id,
+                room=device.room,
+                measurement_unit=device.measurement_unit,
+                valuation_factor=device.valuation_factor,
+            )
+            for device in segmented.devices
+        ),
+        device_spans=tuple(
+            DeviceReadingSpan(
+                device_id=span.device_id,
+                allocation_kind=span.allocation_kind,
+                target_id=span.target_id,
+                opening=span.opening,
+                closing=span.closing,
+                previous_period_units=span.previous_period_units,
+                estimation_basis=span.estimation_basis,
+                reading_reasons=tuple(reason.value for reason in span.reading_reasons),
+                reading_sources=tuple(source.value for source in span.reading_sources),
+                provenance_refs=span.provenance_refs,
+            )
+            for span in segmented.spans
+        ),
     )
 
 
@@ -285,46 +321,74 @@ def compute_statement(session: Session) -> StatementBundle:
     facts = _meter_facts(DbMeterGateway(session), building.id)
 
     heating_result: HeatingResult | None = None
+    page01b_result: Page01bStatementResult | None = None
     missing = _heating_missing_reason(heating_costs, facts)
     if missing is None:
         # Narrowed by _heating_missing_reason; assert so mypy and a future
         # reader see why this cannot be None.
         assert facts.total_energy_kwh is not None
-        heating_result = calculate_heating_statement(
-            HeatingInput(
-                billing_period=BILLING_PERIOD,
-                total_cost=heating_total,
-                total_energy_kwh=facts.total_energy_kwh,
-                units=tuple(
-                    HeatingUnit(
-                        unit_id=u.id,
-                        area_sqm_x100=u.area_sqm_x100,
-                        heat_consumption=facts.heat_by_unit.get(u.id),
-                        ww_consumption_m3=facts.ww_by_unit.get(u.id),
-                        # The unit rides with the value all the way from the
-                        # meter: the DB row and the adapter both carry it, and
-                        # dropping it here is what left the statement guessing.
-                        heat_consumption_unit=facts.heat_unit_by_unit.get(u.id),
+        heating_input = HeatingInput(
+            billing_period=BILLING_PERIOD,
+            total_cost=heating_total,
+            total_energy_kwh=facts.total_energy_kwh,
+            units=tuple(
+                HeatingUnit(
+                    unit_id=u.id,
+                    area_sqm_x100=u.area_sqm_x100,
+                    heat_consumption=facts.heat_by_unit.get(u.id),
+                    ww_consumption_m3=facts.ww_by_unit.get(u.id),
+                    # The unit rides with the value all the way from the
+                    # meter: the DB row and the adapter both carry it, and
+                    # dropping it here is what left the statement guessing.
+                    heat_consumption_unit=facts.heat_unit_by_unit.get(u.id),
+                )
+                for u in units
+            ),
+            occupancies=occupancies,
+            rules=HeatingRules(
+                consumption_share=DEFAULT_CONSUMPTION_SHARE,
+                split_bounds=split_bounds.value,
+                warm_water_formula=warm_water_rule.value,
+                degree_days=degree_days.value,
+                co2_table=co2_table.value,
+                co2_rechtsstand=co2_table.rechtsstand,
+            ),
+            warm_water=(
+                WarmWaterInput(volume_m3=facts.warm_water_volume_m3)
+                if facts.has_warm_water
+                else None
+            ),
+            co2=_co2_input(heating_costs),
+        )
+        page01b_result = calculate_page01b_statement(
+            SelfBillingStatementInput(
+                heating=heating_input,
+                invoice_costs=tuple(
+                    InvoiceCostInput(
+                        kind="other",
+                        amount=cents(row.amount_cents),
+                        period_from=row.period_from,
+                        period_to=row.period_to,
                     )
-                    for u in units
+                    for row in heating_costs
                 ),
-                occupancies=occupancies,
-                rules=HeatingRules(
-                    consumption_share=DEFAULT_CONSUMPTION_SHARE,
-                    split_bounds=split_bounds.value,
-                    warm_water_formula=warm_water_rule.value,
-                    degree_days=degree_days.value,
-                    co2_table=co2_table.value,
-                    co2_rechtsstand=co2_table.rechtsstand,
+                devices=facts.devices,
+                device_spans=facts.device_spans,
+                annual_comparison=AnnualComparisonInput(
+                    current_heat=sum(facts.heat_by_unit.values(), Decimal(0)),
+                    previous_heat=None,
+                    current_warm_water=(
+                        sum(facts.ww_by_unit.values(), Decimal(0)) if facts.has_warm_water else None
+                    ),
+                    previous_warm_water=None,
                 ),
-                warm_water=(
-                    WarmWaterInput(volume_m3=facts.warm_water_volume_m3)
-                    if facts.has_warm_water
-                    else None
-                ),
-                co2=_co2_input(heating_costs),
             )
         )
+        if page01b_result.readiness == "READY":
+            assert page01b_result.values is not None
+            heating_result = page01b_result.values.heating_result
+        else:
+            missing = page01b_result.findings[0].message_de
 
     stamps = tuple(
         dict.fromkeys(
@@ -351,6 +415,7 @@ def compute_statement(session: Session) -> StatementBundle:
         nk_result=nk_result,
         nk_costs=nk_costs,
         heating_result=heating_result,
+        page01b_result=page01b_result,
         heating_input_total=heating_total,
         heating_missing_reason=missing,
         party_labels=_party_labels(units),
@@ -392,6 +457,7 @@ def to_pdf_data(bundle: StatementBundle, landlord_name: str) -> StatementData:
         party_labels=bundle.party_labels,
         rechtsstaende=bundle.rechtsstand_entries,
         heating_result=bundle.heating_result,
+        page01b_result=bundle.page01b_result,
     )
 
 

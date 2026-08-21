@@ -63,6 +63,27 @@ class WarmWaterInput:
     """Central warm water exists. volume_m3=None → § 9 Abs. 2 area fallback."""
 
     volume_m3: Decimal | None
+    # A dedicated heat meter for the warm-water preparation has priority over
+    # the volume formula (Page 01b H3).  ``volume_m3`` may still be present: it
+    # remains the denominator for distributing the warm-water consumption pot.
+    measured_energy_kwh: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class HeatingConsumptionSegment:
+    """A measured usage segment already assigned to one occupancy slice.
+
+    It closes the old ``HeatingUnit`` gap at a tenant change.  A unit-level
+    annual reading stays on ``HeatingUnit`` and is apportioned with K3/days;
+    an interim reading travels here and must never be apportioned a second time.
+    ``tenancy_id=None`` is the measured vacancy/self-use segment and enters the
+    owner denominator without becoming a party row.
+    """
+
+    unit_id: str
+    tenancy_id: str | None
+    heat_consumption: Decimal | None = None
+    ww_consumption_m3: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +131,14 @@ class HeatingInput:
     rules: HeatingRules
     warm_water: WarmWaterInput | None = None
     co2: Co2Input | None = None
+    # Optional exact tenant-change readings.  For each column, a unit either
+    # uses these segments or its annual ``HeatingUnit`` value, never both.
+    consumption_segments: tuple[HeatingConsumptionSegment, ...] = ()
+    # Compatibility switches for the Page 01b orchestrator.  The legacy entry
+    # point keeps its historical annual-reading arithmetic unless the unified
+    # path explicitly enables the now-complete H5/H6 rules.
+    round_degree_day_units: bool = False
+    use_central_ww_denominator: bool = False
     # The Bezugsgröße of `total_energy_kwh` — Brennwert (Ho), as a German gas
     # invoice bills, or Heizwert (Hu), which § 3 Abs. 1 Nr. 3 CO2KostAufG's
     # factor refers to. Read **only** on the K4 mass fallback; where the supplier
@@ -129,7 +158,7 @@ class WarmWaterSeparation:
     four measured ones are.
     """
 
-    method: Literal["MEASURED", "AREA_FALLBACK"]
+    method: Literal["MEASURED", "MEASURED_ENERGY", "AREA_FALLBACK"]
     # § 9 Abs. 2 — the separated warm-water energy, the result of the formula.
     q_ww_kwh: Decimal
     # The denominator the copy prints ("… von 20.000 kWh Gesamtenergie").
@@ -188,6 +217,9 @@ class HeatingLine:
     # parties sum to less than 1.000 and "585 ‰" alone would read as wrong.
     degree_day_promille: Decimal
     unit_degree_day_promille_total: Decimal
+    # Page 01b K3 pre-rounding value.  None on the compatibility path; when
+    # present, renderers can mark the applied one-decimal device value as rd.
+    heat_consumption_exact_weight: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -262,6 +294,7 @@ class OwnerResidualOrigin:
     ww_consumption_weight_m3: Decimal | None
     degree_day_promille: Decimal
     unit_degree_day_promille_total: Decimal
+    heat_consumption_exact_weight: Decimal | None = None
 
 
 @dataclass(frozen=True)

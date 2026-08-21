@@ -212,6 +212,7 @@ The complete shipped tenant-to-tenant edge set is:
 | 15 | `heating_cost_entry` → `building` | `(building_id, account_id)` | required |
 | 16 | `building_assignment` → `membership` | `(membership_id, account_id)` | required; delete cascades |
 | 17 | `building_assignment` → `building` | `(building_id, account_id)` | required |
+| 18 | `meter_reading` → `tenancy` | `(tenancy_id, account_id)` | optional Page 01b segment target |
 
 `building_assignment.account_id` is intentional denormalization. Deriving scope only through
 `membership` cannot prove that the assigned building belongs to the same account. The two composite
@@ -344,15 +345,17 @@ devices, so the unit alone does not identify the device.
 
 | Record | Shipped evidence fields | Invariant |
 | --- | --- | --- |
-| `Meter` | building, optional unit, kind, measurement unit, serial, label, `calibration_valid_until` | `unit_id = NULL` means building-level meter. Serial is unique per building. Expiry is derived, never stored as a flag. |
-| `MeterReading` | meter, `read_at`, `value_x1000`, reason, source, note, `recorded_at` | Point-in-time, fixed-point and create-only. Unit and kind come from the referenced meter. |
+| `Meter` | building, optional unit, kind, measurement unit, serial, label, `calibration_valid_until`, optional exact `valuation_factor_x1000` | `unit_id = NULL` means building-level meter. Serial is unique per building. Every heat meter has a positive factor; migration `0006` backfills the neutral **1.000**. Water factors remain null. Expiry is derived, never stored as a flag. |
+| `MeterReading` | meter, `read_at`, `value_x1000`, reason, source, note, optional tenancy, optional `estimated_consumption_x1000` plus basis, provenance reference, `recorded_at` | Point-in-time, fixed-point and create-only. Unit and kind come from the referenced meter. Estimates require their basis; tenancy uses an account-scoped composite FK. |
 | `HeatingCostEntry` | building, label, amount, period, optional CO₂ mass and cost | Separate invoice input; it never exposes an ordinary allocation key. |
 
 Readings are create-only by shipped API shape and model design: there is no replacement pointer or
 update timestamp and no PUT/PATCH route. A wrong value is corrected by inserting a new reading for
 the same `read_at` with reason `CORRECTION`; later `recorded_at` evidence wins while the original
 remains visible, including as struck-through history where the UI shows it. Adapter and manual
-sources normalize into the same downstream shape. A meter's calibration deadline feeds the shared
+sources normalize into the same downstream shape. Effective corrections, tenant-change segments,
+estimates, device replacements and provenance survive the adapter boundary and feed the shared
+Page 01b result. A meter's calibration deadline feeds the shared
 guard system; null means not applicable for a device such as a heat-cost allocator, not “unknown.”
 
 ## 5. Owner residual and Page 01 statement model

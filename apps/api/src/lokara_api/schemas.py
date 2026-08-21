@@ -346,6 +346,8 @@ class MeterCreate(ApiModel):
     serial: str = Field(min_length=1, max_length=100)
     label: str | None = Field(default=None, max_length=200)
     calibration_valid_until: date | None = None  # Eichfrist; null = nicht eichpflichtig
+    # Exact K11 factor × 1000. Heat devices default to the neutral 1.000.
+    valuation_factor_x1000: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _unit_matches_kind(self) -> "MeterCreate":
@@ -357,6 +359,8 @@ class MeterCreate(ApiModel):
             raise ValueError(f"{self.kind.value} is measured in {expected.value}")
         if self.kind is MeterKind.HEAT and self.measurement_unit is (MeasurementUnit.CUBIC_METRE):
             raise ValueError("HEAT is measured in KWH or HKV_UNITS")
+        if self.kind is not MeterKind.HEAT and self.valuation_factor_x1000 is not None:
+            raise ValueError("valuation_factor_x1000 is only valid for HEAT meters")
         return self
 
 
@@ -370,6 +374,16 @@ class MeterReadingCreate(ApiModel):
     reason: ReadingReason
     source: ReadingSource = ReadingSource.MANUAL
     note: str | None = Field(default=None, max_length=500)
+    tenancy_id: str | None = None
+    estimated_consumption_x1000: int | None = Field(default=None, ge=0)
+    estimation_basis: str | None = Field(default=None, min_length=1, max_length=500)
+    provenance_ref: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _estimate_has_basis(self) -> "MeterReadingCreate":
+        if (self.estimated_consumption_x1000 is None) != (self.estimation_basis is None):
+            raise ValueError("estimated_consumption_x1000 and estimation_basis belong together")
+        return self
 
 
 class MeterReadingOut(ApiModel):
@@ -380,6 +394,10 @@ class MeterReadingOut(ApiModel):
     reason: ReadingReason
     source: ReadingSource
     note: str | None
+    tenancy_id: str | None
+    estimated_consumption_x1000: int | None
+    estimation_basis: str | None
+    provenance_ref: str | None
     recorded_at: datetime
     # True when a later reading for the same date replaced this one. The row
     # stays visible — an append-only log shows its own history.
@@ -397,6 +415,8 @@ class MeterOut(ApiModel):
     serial: str
     label: str | None
     calibration_valid_until: date | None
+    valuation_factor_x1000: int | None
+    valuation_factor_display: str | None
     # Computed, never stored (CLAUDE.md: guards are derived from data).
     calibration_status: Literal["EXPIRED", "EXPIRING_SOON", "VALID", "NOT_APPLICABLE"]
     readings: list[MeterReadingOut]  # newest first
@@ -498,6 +518,58 @@ class ExtractionOut(ApiModel):
     duplicate: ExtractionDuplicate | None
 
 
+class StatementFinding(ApiModel):
+    code: str
+    message: str
+    severity: Literal["NOTICE", "WARNING", "BLOCKER"]
+    dismissible: bool
+
+
+class StatementProvenance(ApiModel):
+    code: str
+    source: str
+    detail: str
+
+
+class StatementDeviceEvidence(ApiModel):
+    device_id: str
+    unit_id: str
+    room: str
+    measurement_unit: MeasurementUnit
+    valuation_factor: str
+    allocation_kind: Literal["PARTY", "OWNER", "ANNUAL_UNSEGMENTED"]
+    target_id: str | None
+    opening: str | None
+    closing: str | None
+    units: str
+    estimated: bool
+    estimation_basis: str | None
+    reading_reasons: list[str]
+    reading_sources: list[str]
+    provenance_refs: list[str]
+
+
+class StatementReductionRisk(ApiModel):
+    code: str
+    percent: str
+    amounts_eur: list[str]
+    message: str
+
+
+class StatementAnnualComparison(ApiModel):
+    state: Literal["READY", "RAW_FALLBACK", "NO_PRIOR"]
+    current_heat: str
+    previous_heat: str | None
+    current_heat_adjusted: str | None
+    previous_heat_adjusted: str | None
+    current_warm_water: str | None
+    previous_warm_water: str | None
+    raw_change_percent: str | None
+    adjusted_change_percent: str | None
+    graph_required: bool
+    note: str | None
+
+
 class DemoStatementResponse(ApiModel):
     building_name: str
     building_address: str
@@ -513,6 +585,12 @@ class DemoStatementResponse(ApiModel):
     # Set when the heating inputs are incomplete: heating_lines is then empty
     # and this German sentence says what is missing. Never a silent zero.
     heating_missing_reason: str | None
+    heating_readiness: Literal["READY", "BLOCKED"]
+    heating_findings: list[StatementFinding]
+    heating_provenance: list[StatementProvenance]
+    heating_device_evidence: list[StatementDeviceEvidence]
+    heating_reduction_risks: list[StatementReductionRisk]
+    annual_comparison: StatementAnnualComparison | None
     co2: StatementCo2 | None
     rechtsstaende: list[str]
     disclaimer: str

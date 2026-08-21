@@ -244,8 +244,8 @@ class TestTheRequiredSentence:
         owner_cents = int(heating.owner_residual.total)
 
         assert int(heating.billable_cost) == 1_014_292
-        assert renter_cents == 885_955
-        assert owner_cents == 128_337
+        assert renter_cents == 885_942
+        assert owner_cents == 128_350
         assert int(heating.billable_cost) - renter_cents == owner_cents
         assert int(heating.total) == 1_030_000
         assert int(heating.total) - renter_cents != owner_cents

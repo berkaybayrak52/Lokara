@@ -151,8 +151,13 @@ class TestDemoStatement:
         vacancy = next(line for line in lines if line["isLandlord"])
         # 583,3/416,7 ‰ degree-day apportionment of unit B's annual consumption
         # (VDI 2067, K3 — docs/03).
-        assert bernd["heatingConsumptionEur"] == f"776,52{NBSP}€"
-        assert vacancy["heatingConsumptionEur"] == f"554,74{NBSP}€"
+        assert bernd["heatingConsumptionEur"] == f"776,39{NBSP}€"
+        assert vacancy["heatingConsumptionEur"] == f"554,87{NBSP}€"
+        assert body["heatingReadiness"] == "READY"
+        assert len(body["heatingDeviceEvidence"]) == 3
+        assert {line["valuationFactor"] for line in body["heatingDeviceEvidence"]} == {"1"}
+        assert body["annualComparison"]["state"] == "NO_PRIOR"
+        assert body["heatingReductionRisks"] == []
         assert "Auszug 30.06.2025" in bernd["partyLabel"]
 
         assert body["heatingTotalCents"] == 1_030_000

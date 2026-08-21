@@ -1,6 +1,7 @@
 """Zähler + the heating statement built from real readings.
 
-THE test in this file: the heating goldens — 583,3/416,7 ‰, € 776,52 / € 554,74 and
+THE test in this file: the heating goldens — rounded device units and the resulting
+€ 776,39 / € 554,87 split, plus
 the CO₂ block — must come out of `meter_reading` and `heating_cost_entry` rows,
 not out of a constant. (Those two euro figures were € 786,24 / € 557,76 until
 05.08.2026, when the demo's CO₂ fixture was corrected: 4.000 kg / 261,80 €
@@ -13,8 +14,10 @@ The ratio itself then moved on 13.08.2026 — K3 (`docs/03`) adopts VDI 2067 Bl.
 12/1983, Tab. 22, whose June/July/August/December values differ, taking Jan–Jun
 from 585,0 ‰ to 583,3 ‰. That is the third re-base of this pair, and the reason
 the engine now carries **Zehntelpromille**: the table's months are fractional.
-The pot did not move — 77.652 + 55.474 = 133.126, as before — so this was a
-re-split, not a re-price.) The
+Slice A now rounds each renter's device units to one decimal and assigns the
+device-unit residual to the owner before the money split. The pot still does
+not move — 77.639 + 55.487 = 133.126 — so this remains a re-split, not a
+re-price.) The
 last four fixtures in statement_service.py (€ 10.300 / 20.000 kWh / 40 m³ / CO₂)
 are gone, so this is what stops them from being reintroduced by accident.
 
@@ -50,8 +53,8 @@ DEMO_BUILDING_ID = "bld_demo_muster12"
 
 # docs/06 Scenario 2 — unit B's heating consumption splits Mieter/Vermieter by
 # degree days at the 30.06. move-out. These are the pitch numbers.
-GOLDEN_B_RENTER_CENTS = 77652
-GOLDEN_B_LANDLORD_CENTS = 55474
+GOLDEN_B_RENTER_CENTS = 77639
+GOLDEN_B_LANDLORD_CENTS = 55487
 GOLDEN_HEATING_TOTAL_CENTS = 1_030_000
 
 
@@ -161,6 +164,8 @@ class TestSeededMeters:
         heat = {m["serial"]: m["measurementUnit"] for m in meters if m["kind"] == "HEAT"}
         assert heat["WMZ-2022-004711"] == "KWH"
         assert heat["HKV-A-100231"] == "HKV_UNITS"
+        assert {m["valuationFactorX1000"] for m in meters if m["kind"] == "HEAT"} == {1000}
+        assert all(m["valuationFactorX1000"] is None for m in meters if m["kind"] != "HEAT")
 
     def test_period_consumption_matches_the_engine_inputs(self, client: TestClient) -> None:
         by_serial = {m["serial"]: m["periodConsumptionDisplay"] for m in _meters(client)}
@@ -176,6 +181,44 @@ class TestSeededMeters:
         assert meter["kindLabel"] == "Warmwasser"
         assert meter["unitSymbol"] == "m³"
         assert meter["unitLabel"] is None  # building-level
+
+    def test_device_factor_and_estimate_provenance_round_trip(self, client: TestClient) -> None:
+        created = client.post(
+            f"{BASE}/buildings/{DEMO_BUILDING_ID}/meters",
+            headers=DEMO,
+            json={
+                "unitId": "unit_demo_a",
+                "kind": "HEAT",
+                "measurementUnit": "HKV_UNITS",
+                "serial": "HKV-A-PAGE01B",
+                "label": "Arbeitszimmer",
+                "valuationFactorX1000": 1250,
+            },
+        )
+        assert created.status_code == 201
+        meter_id = created.json()["id"]
+        assert created.json()["valuationFactorDisplay"] == "1,25"
+
+        response = client.post(
+            f"{BASE}/meters/{meter_id}/readings",
+            headers=DEMO,
+            json={
+                "readAt": "2025-12-31",
+                "valueX1000": 0,
+                "reason": "INTERIM",
+                "tenancyId": "ten_demo_a1",
+                "estimatedConsumptionX1000": 30000,
+                "estimationBasis": "Vorjahreswert 2024",
+                "provenanceRef": "MDL-Datei Zeile 17",
+            },
+        )
+        assert response.status_code == 201
+        [reading] = response.json()["readings"]
+        assert reading["tenancyId"] == "ten_demo_a1"
+        assert reading["estimatedConsumptionX1000"] == 30000
+        assert reading["estimationBasis"] == "Vorjahreswert 2024"
+        assert reading["provenanceRef"] == "MDL-Datei Zeile 17"
+        assert client.delete(f"{BASE}/meters/{meter_id}", headers=DEMO).status_code == 204
 
 
 class TestEichfrist:
@@ -218,23 +261,20 @@ class TestEichfrist:
 class TestHeatingStatementFromRealReadings:
     """The last four fixtures are gone — these numbers now come from rows."""
 
-    def test_unit_b_splits_583_3_416_7_permille_between_renter_and_landlord(
+    def test_unit_b_rounds_renter_device_units_and_assigns_the_residual_to_owner(
         self, client: TestClient
     ) -> None:
         renter, landlord = _unit_b_heating(client)
         assert renter["isLandlord"] is False
         assert landlord["isLandlord"] is True
-        assert renter["heatingConsumptionEur"] == f"776,52{NBSP}€"
-        assert landlord["heatingConsumptionEur"] == f"554,74{NBSP}€"
+        assert renter["heatingConsumptionEur"] == f"776,39{NBSP}€"
+        assert landlord["heatingConsumptionEur"] == f"554,87{NBSP}€"
 
-        renter_cents, landlord_cents = GOLDEN_B_RENTER_CENTS, GOLDEN_B_LANDLORD_CENTS
-        total = renter_cents + landlord_cents
-        # 583,3/416,7 ‰ — the degree-day split at the 30.06. move-out, which is
-        # the depth the competitors do not show (docs/06). The tenths matter: the
-        # VDI 2067 table (K3, docs/03) has fractional months, which is why the
-        # engine carries Zehntelpromille and why this is no longer 585/415.
-        assert round(renter_cents * 10_000 / total) == 5_833
-        assert round(landlord_cents * 10_000 / total) == 4_167
+        # K3 first applies the 583,3/416,7 ‰ degree-day split to 250 device
+        # units, rounds the renter to 145,8 and leaves the exact 104,2 residual
+        # with the owner. The final euro ratio also includes cent rounding, so
+        # it must not be used to reconstruct the underlying promille weights.
+        assert GOLDEN_B_RENTER_CENTS + GOLDEN_B_LANDLORD_CENTS == 133126
 
     def test_heating_reconciles_to_the_entered_invoice(self, client: TestClient) -> None:
         body = _statement(client)
@@ -317,7 +357,7 @@ class TestReadingsAreCreateOnly:
         assert typo.status_code == 201
         assert typo.json()["periodConsumptionDisplay"] == "450 Einheiten"
         # The statement really recomputed — B's consumption share moved.
-        assert _unit_b_heating(client)[0]["heatingConsumptionEur"] != f"776,52{NBSP}€"
+        assert _unit_b_heating(client)[0]["heatingConsumptionEur"] != f"776,39{NBSP}€"
 
         # ── the fix is an APPEND, not an edit ───────────────────────────────
         fixed = client.post(
@@ -347,8 +387,8 @@ class TestReadingsAreCreateOnly:
 
         # ── and the goldens are back, to the cent ───────────────────────────
         renter, landlord = _unit_b_heating(client)
-        assert renter["heatingConsumptionEur"] == f"776,52{NBSP}€"
-        assert landlord["heatingConsumptionEur"] == f"554,74{NBSP}€"
+        assert renter["heatingConsumptionEur"] == f"776,39{NBSP}€"
+        assert landlord["heatingConsumptionEur"] == f"554,87{NBSP}€"
 
         # Clean up so the module's other tests keep their exact fixture.
         with Session(create_db_engine(DbSettings().direct_url)) as session, session.begin():

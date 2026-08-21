@@ -47,8 +47,8 @@ MUST_APPEAR: dict[str, str] = {
     # 12/1983, Tab. 22). Jan-Jun 585,0 -> 583,3 permille. The POT is unchanged
     # (77.652 + 55.474 = 133.126) -- this is a re-split, not a re-price, which is the
     # check to run if these two ever look wrong again.
-    "776,52": "docs/06: unit B heating, Mieter share (583,3 permille)",
-    "554,74": "docs/06: unit B heating, Vermieter share (416,7 permille)",
+    "776,39": "docs/06: unit B heating, Mieter share after K3 device rounding",
+    "554,87": "docs/06: unit B heating, owner device-unit residual",
     # --- de-scaled forms of the fields slice 4 newly put on the page (I7).
     # Asserted POSITIVELY rather than as absence-of-the-leak-form, on purpose. The leak
     # forms of two of these are `10.000` and `40.000`, which are entirely plausible euro

@@ -316,6 +316,7 @@ def seed_demo(session: Session) -> None:
                 serial=serial,
                 label=meter_label,
                 calibration_valid_until=eichfrist,
+                valuation_factor_x1000=1000 if kind is MeterKind.HEAT else None,
             )
         )
         for suffix, read_at, value in (

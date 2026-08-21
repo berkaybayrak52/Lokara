@@ -18,7 +18,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from lokara_adapters import consumption_by_meter
-from lokara_db import Building, HeatingCostEntry, Meter, MeterReading, Unit, new_id
+from lokara_db import Building, HeatingCostEntry, Meter, MeterReading, Tenancy, Unit, new_id
 from lokara_domain import MeasurementUnit, MeterKind, cents, format_eur
 from lokara_pdf import format_number_de
 from sqlalchemy import select
@@ -99,6 +99,12 @@ def _meter_out(meter: Meter, consumption_display: str | None, today: date) -> Me
         serial=meter.serial,
         label=meter.label,
         calibration_valid_until=meter.calibration_valid_until,
+        valuation_factor_x1000=meter.valuation_factor_x1000,
+        valuation_factor_display=(
+            format_number_de(_scaled(meter.valuation_factor_x1000))
+            if meter.valuation_factor_x1000 is not None
+            else None
+        ),
         calibration_status=_calibration_status(meter.calibration_valid_until, today),
         readings=[
             MeterReadingOut(
@@ -109,6 +115,10 @@ def _meter_out(meter: Meter, consumption_display: str | None, today: date) -> Me
                 reason=r.reason,
                 source=r.source,
                 note=r.note,
+                tenancy_id=r.tenancy_id,
+                estimated_consumption_x1000=r.estimated_consumption_x1000,
+                estimation_basis=r.estimation_basis,
+                provenance_ref=r.provenance_ref,
                 recorded_at=r.recorded_at,
                 superseded=effective_per_date[r.read_at] != r.id,
             )
@@ -184,6 +194,11 @@ def create_meter(
         serial=body.serial,
         label=body.label,
         calibration_valid_until=body.calibration_valid_until,
+        valuation_factor_x1000=(
+            body.valuation_factor_x1000
+            if body.valuation_factor_x1000 is not None
+            else (1000 if body.kind is MeterKind.HEAT else None)
+        ),
     )
     session.add(meter)
     session.flush()
@@ -220,6 +235,10 @@ def create_reading(
     meter = session.get(Meter, meter_id)
     if meter is None:
         raise HTTPException(status_code=404, detail="Meter not found")
+    if body.tenancy_id is not None:
+        tenancy = session.get(Tenancy, body.tenancy_id)
+        if tenancy is None or meter.unit_id is None or tenancy.unit_id != meter.unit_id:
+            raise HTTPException(status_code=422, detail="Tenancy is not assigned to this meter")
     session.add(
         MeterReading(
             id=new_id(),
@@ -230,6 +249,10 @@ def create_reading(
             reason=body.reason,
             source=body.source,
             note=body.note,
+            tenancy_id=body.tenancy_id,
+            estimated_consumption_x1000=body.estimated_consumption_x1000,
+            estimation_basis=body.estimation_basis,
+            provenance_ref=body.provenance_ref,
         )
     )
     session.flush()

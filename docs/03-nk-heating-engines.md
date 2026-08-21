@@ -285,7 +285,8 @@ The legal/conventional inputs K1–K14 remain individually visible:
 
 **H0 — select one path.** `MDL` runs H7 only; self-billing runs H1–H6. Both converge on one heating
 amount per tenancy. They are never added and their source fixtures are not asserted against each
-other.
+other. `calculate_page01b_statement(...)` now enforces this choice and returns one typed readiness,
+value, finding, provenance, device-evidence, risk and annual-comparison result.
 
 **H1 — aggregate plant costs.** Sum normalized fuel/district-heat and operating positions. H1a
 allocates partial invoice overlap by inclusive days with half-up cents and a non-dismissible coverage
@@ -310,7 +311,8 @@ preview before save.
 `round_half_up((closing − opening) × valuation_factor, 1 decimal)`. Reject a negative delta; never
 take `abs()`. Sum rounded device values. Tenant change needs both outgoing and incoming readings;
 otherwise the unsegmented period goes through K3. The pure capability is shipped; persistence and
-integration into `HeatingInput`/H6 remain open.
+integration into `HeatingInput`/H6 are shipped through migration `0006`, the normalized adapter and
+the Page 01b orchestrator. K11 remains `verify-before-production` as recorded above.
 
 **H6 — distribute four blocks.** Base blocks use m²-days including vacancy. Heat consumption uses
 HKV units or heat-meter kWh, with K3 for an unread change segment. WW consumption uses unit m³ over
@@ -321,12 +323,15 @@ is distinct and must be explicitly selected.
 **H7 — MDL.** Validate and pass through; never recompute MDL amounts. A confirmed net statement gets
 no second CO₂ deduction. A gross statement runs H2 and rescales every position using the exact
 quotient; a one-cent source residual is accepted and reconciled to the owner. The gross rescaling
-capability is shipped. Net ingest, branch-specific control sums, confirmed OCR fields, and F29/F30
-risk/readiness output remain open.
+capability is shipped. Net passthrough, branch-specific control sums and F29/F30 risk/readiness
+output are now part of the shared orchestrator. Confirmed MDL OCR/API ingestion stays outside this
+slice and remains Slice B work.
 
 **H8 — annual comparison.** Heat is weather-adjusted; WW remains raw. Missing climate data produces
 a labelled fallback, never an implicit factor of one. The annual import contract and resolved
-range/date inputs are in approved `docs/16`; H8 implementation remains open.
+range/date inputs are in approved `docs/16`. The pure annual comparison now accepts normalized
+annual DWD factors, validates the approved range and returns either adjusted values, an explicitly
+raw-labelled fallback or a no-prior notice. Monthly import, scheduling and UVI remain future work.
 
 Compact arithmetic, with every quotient kept as exact `Decimal`:
 
@@ -474,8 +479,9 @@ documents reference their numbers.
 14. **Unresolved reduction cumulation.** Page F25 forbids summing the three 3 percent rights and the
     15 percent right; one CSV entry says the 3 percent rights cumulate. Show each separately.
 15. **K12/DWD dependency.** Approved `docs/16` resolves the annual importer boundary to
-    `0.40–1.80` and the latest-state note to the May-ending file. H8 remains unimplemented, and the
-    § 6a notice identity remains pre-legal.
+    `0.40–1.80` and the latest-state note to the May-ending file. H8 now consumes normalized annual
+    factors; the monthly importer/scheduler remains future work and the § 6a notice identity remains
+    pre-legal.
 16. **K13/D2 dependency.** Approved `docs/16` specifies the corrected heat-only
     comparison, guards and source. Annual statement comparison and UVI are related consumers, not
     one calculation; annual DWD factors are not monthly degree-day inputs.
@@ -490,20 +496,20 @@ documents reference their numbers.
 | Area | Exact repository status | Closure owner |
 | --- | --- | --- |
 | Core heating allocation, K3, H2/R8, Ho/Hu refusal, owner residual, disclosure intermediates | **Shipped** and green for their current interfaces | Preserve through Slice A |
-| A2 device and segmented-reading aggregation | **Capability shipped**; covers F01/F15/F16/F17/F22/F27 shapes | Slice A integrates persistence, normalized input, H5 and H6 |
-| A3 plant/CO₂ assessment | **Capability shipped**; covers F07–F10 and F23 branches | Slice A integrates it into the shared result |
-| A4 self-billing aggregation | **Capability shipped**; covers F11–F14, F19, F20 and F24 pure seams | Slice A integrates H1–H4 with H5/H6 and output |
+| A2 device and segmented-reading aggregation | **Integrated**; migration `0006`, adapter and orchestrator cover F01/F15/F16/F17/F22/F27 | Preserve through later meter work |
+| A3 plant/CO₂ assessment | **Integrated**; F07–F10 and F23 reach the shared result | Preserve through Slice B ingestion |
+| A4 self-billing aggregation | **Integrated**; F11–F14, F19, F20 and F24 reach H5/H6 and output | Preserve through later application work |
 | Exact F18 area fallback | **Shipped** executable oracle | Preserve through integrated pipeline |
-| F28b gross MDL rescaling | **Capability shipped** with exact quotient and owner reconciliation | H7 integration |
-| H5 persistence and integration | **Open**: DB device valuation factor, segmented readings, adapter and `HeatingInput` handoff are incomplete | Slice A |
-| H7 net/control/risk behavior | **Open**: confirmed OCR input, net branch, correct branch reference sums, F29 hard stop and F30 risk output | Slice A; M3 later revalidates adapter/API behavior |
-| Shared readiness/provenance/risk channel | **Open**: F02, F12, F17, F20, F21, F23–F26c, F30/F31 obligations are not one result channel | Slice A |
-| H8 annual comparison | **Open**; annual DWD import is specified in approved `docs/16`, but no integration exists | Slice A closure |
+| F28b gross MDL rescaling | **Integrated** with exact quotient and owner reconciliation | Slice B later supplies confirmed MDL input |
+| H5 persistence and integration | **Shipped**: exact device factor, segment metadata, adapter and `HeatingInput` handoff | K11 remains `verify-before-production` |
+| H7 net/control/risk behavior | **Shipped in the pure orchestrator**: net/gross branches, control sum, F29 block and F30 risks | Confirmed OCR/API input remains Slice B |
+| Shared readiness/provenance/risk channel | **Shipped** for F02, F12, F17, F20, F21, F23–F26c, F30/F31 | Final wording/cumulation choices remain provisional |
+| H8 annual comparison | **Shipped for normalized annual factors and raw/no-prior fallbacks** | Monthly import, scheduling and UVI remain future work |
 
-No bounded capability counts as full Page 01b closure. Closure requires one H0–H7 pipeline covering
-every applicable fixture, the shared readiness channel, H8 after its authority is settled, all 34
-fixture obligations executable end to end, and verified statement projection. A data-only oracle,
-primitive test, or isolated capability is supporting evidence only.
+Slice A supplies one H0–H7 pipeline, the shared readiness channel, normalized-factor H8, all 34
+fixture obligations executable end to end and statement projection. This is technical closure, not
+production approval: every `verify-before-production` register flag, both open Page 01b choices,
+confirmed MDL ingestion and the future monthly DWD/UVI work remain explicit.
 
 ## 9. Wiring R1/R5/K9 and Ho/Hu into the engine — current split-site map
 
@@ -590,8 +596,10 @@ At 20,000 kWh and 100 m², the register's natural-gas factors demonstrate why: `
 | [`packages/heating-engine/src/lokara_heating_engine/plant_co2.py`](../packages/heating-engine/src/lokara_heating_engine/plant_co2.py) | A3 applicability, proof, protection/exclusion, and warning capability. |
 | [`packages/heating-engine/src/lokara_heating_engine/self_billing.py`](../packages/heating-engine/src/lokara_heating_engine/self_billing.py) | A4 H1–H4 pure self-billing capabilities. |
 | [`packages/heating-engine/src/lokara_heating_engine/mdl.py`](../packages/heating-engine/src/lokara_heating_engine/mdl.py) | F28b gross rescaling capability. |
+| [`packages/heating-engine/src/lokara_heating_engine/page01b.py`](../packages/heating-engine/src/lokara_heating_engine/page01b.py) | H0–H8 orchestration, typed readiness, findings, provenance, risks and annual comparison. |
+| [`packages/adapters/src/lokara_adapters/meter.py`](../packages/adapters/src/lokara_adapters/meter.py) and migration `0006` | Corrections, device changes, tenancy segments, estimates, factors and provenance. |
 | [`packages/pdf/src/lokara_pdf/statement.py`](../packages/pdf/src/lokara_pdf/statement.py) and [`heating_disclosure.py`](../packages/pdf/src/lokara_pdf/heating_disclosure.py) | De-scaling, one owner row, disclosure intermediates, Rechtsstand, and landlord-facing projection. |
-| [`apps/api/src/lokara_api/routers/portal.py`](../apps/api/src/lokara_api/routers/portal.py) | Landlord overview appends the owner row once; it does not turn it back into a party. |
+| [`apps/api/src/lokara_api/routers/portal.py`](../apps/api/src/lokara_api/routers/portal.py) and [`apps/web/src/features/portal/statement.tsx`](../apps/web/src/features/portal/statement.tsx) | Shared-result API shape and German landlord-facing projection; risks stay separate. |
 
 Every consumer that iterates `HeatingResult.lines` must remember that the tuple contains renters
 only. Reconciliation is `sum(lines.total) + owner_residual.total == result.total`.
@@ -619,45 +627,46 @@ executable end to end.
 
 Every ID has a data oracle in
 [`berkay_01b_golden.py`](../packages/heating-engine/tests/berkay_01b_golden.py). The coverage test
-checks the exact 34-ID set and allocation reconciliation. “Capability shipped” below never means the
-complete fixture is closed.
+checks the exact 34-ID set, readiness shape and allocation reconciliation. Every row below now
+reaches one durable orchestrator result; the status text also retains the narrower capability or
+production limitation that matters after technical closure.
 
 | Fixture | Required result | Current executable status |
 | --- | --- | --- |
-| `01b-F01` | Full self-billing; four renter totals plus owner reconcile to 338,218 ct | A2/device and allocation primitives green; integrated pipeline open |
-| `01b-F02` | Missing mass uses matching K4 factor; missing supplier cost refuses | Factor/reference/rules/refusal components green; E2E provenance and § 7 Abs. 4 risk open |
+| `01b-F01` | Full self-billing; four renter totals plus owner reconcile to 338,218 ct | Orchestrator E2E green; A2/device and allocation primitives remain lower-level evidence |
+| `01b-F02` | Missing mass uses matching K4 factor; missing supplier cost refuses | Orchestrator E2E green with provenance and separate § 7 Abs. 4 risk; K4 flag retained |
 | `01b-F03` | Exact 12.0 boundary selects 10 percent | Exact executable green |
 | `01b-F04` | Exact 52.0 boundary selects 95 percent | Exact executable green |
 | `01b-F05` | Annualise, R8 to 12.0, classify at 10 percent; deduction 1,280 ct, renter CO₂ 11,523 ct, billable 349,320 ct | Exact executable green |
 | `01b-F06` | 275-day annualisation before R8 gives 28.7 | Exact executable green |
-| `01b-F07` | Non-residential 50/50 | A3 capability green; E2E open |
-| `01b-F08` | Protected building halves landlord percentage only with proof | A3 capability green; E2E open |
-| `01b-F09` | Proven full exclusion, disclosure retained | A3 capability green; E2E open |
-| `01b-F10` | Heat pump/biomass turns CO₂ module and disclosure off | A3 capability green; E2E open |
-| `01b-F11` | Measured WW energy priority, 9,100 kWh | A4 capability green; H1–H6 integration open |
-| `01b-F12` | 32 kWh/m² fallback plus warning | A4 calculation capability green; shared warning output open |
-| `01b-F13` | Non-connected plant, one heat block | A4 capability green; integrated distribution open |
-| `01b-F14` | 50/50 choice and owner-impact preview | A4 capability green; integrated distribution/output open |
-| `01b-F15` | Heat-meter kWh weights retain unit | A2 capability green; E2E open |
-| `01b-F16` | Missing interim reading uses K3 and owner vacancy segment | Exact K3 executable plus A2 shape regression green |
-| `01b-F17` | At most 25 percent estimated with visible provenance | A2 estimate capability green; shared provenance output open |
+| `01b-F07` | Non-residential 50/50 | Orchestrator E2E and A3 capability green |
+| `01b-F08` | Protected building halves landlord percentage only with proof | Orchestrator E2E and proof-gated A3 capability green |
+| `01b-F09` | Proven full exclusion, disclosure retained | Orchestrator E2E and proof-gated A3 capability green |
+| `01b-F10` | Heat pump/biomass turns CO₂ module and disclosure off | Orchestrator E2E and A3 capability green |
+| `01b-F11` | Measured WW energy priority, 9,100 kWh | Orchestrator E2E through H1–H6 and dedicated PDF disclosure branch |
+| `01b-F12` | 32 kWh/m² fallback plus warning | Orchestrator E2E with shared warning output; K5 flag retained |
+| `01b-F13` | Non-connected plant, one heat block | Orchestrator E2E through integrated distribution |
+| `01b-F14` | 50/50 choice and owner-impact preview | Orchestrator E2E with owner-impact output |
+| `01b-F15` | Heat-meter kWh weights retain unit | Orchestrator E2E; A2 unit-preservation capability retained |
+| `01b-F16` | Missing interim reading uses K3 and owner vacancy segment | Orchestrator E2E; exact K3 and A2 regressions retained |
+| `01b-F17` | At most 25 percent estimated with visible provenance | Orchestrator E2E with device evidence and provenance |
 | `01b-F18` | WE-03-only failure; all consumption blocks dissolve to area | Exact executable green with Berkay's printed cents |
-| `01b-F19` | Oil stock/weighted cost; CO₂ on consumption; no cost fallback | A4 capability green; integrated pipeline open |
-| `01b-F20` | District-heat pass-through, step model and § 6a fields | A4 carry capability and CO₂ primitive green; shared output open |
-| `01b-F21` | Zero denominator hard stop | Core primitive green; shared readiness closure open |
-| `01b-F22` | Negative delta rejected; replacement segments summed | A2 capability green; E2E open |
-| `01b-F23` | K6 plausibility warning carries R8 values 74.7 / 4.1 | A3 warning capability green; shared channel open |
-| `01b-F24` | Day-linear overlap plus non-dismissible coverage warning | A4 capability green; shared channel/open integration |
-| `01b-F25` | Four risks separate; never auto-deducted or summed | Data oracle only; readiness/output seam open |
-| `01b-F26` | 5.13 percent WW gap silent; 4,227 ct remains with owner | Residual primitive executable; complete pipeline open |
-| `01b-F26b` | 11.54 percent WW gap produces non-blocking notice | Data oracle; warning channel open |
-| `01b-F26c` | 21.79 percent WW gap produces legal-risk warning | Data oracle; warning channel open |
-| `01b-F27` | Device rounding/aggregation and two change readings | A2 capability green; persistence/integration open |
-| `01b-F28a` | MDL net branch; no second CO₂ deduction | Data oracle; H7 net path open |
-| `01b-F28b` | MDL gross exact rescale, accepted one cent, owner residual | Exact gross-rescaling capability green |
-| `01b-F29` | OCR decimal shift blocks against net-branch control sum | Data oracle; H7 control/readiness open |
-| `01b-F30` | No CO₂ evidence: separate 3 percent risks, no deduction | Data oracle; H7/shared output open |
-| `01b-F31` | Heat-adjusted/WW-raw graph with labelled missing-data fallback | Structural oracle; H8/DWD/output open |
+| `01b-F19` | Oil stock/weighted cost; CO₂ on consumption; no cost fallback | Orchestrator E2E with provenance; K7 flag retained |
+| `01b-F20` | District-heat pass-through, step model and § 6a fields | Orchestrator E2E with supplier provenance |
+| `01b-F21` | Zero denominator hard stop | Orchestrator E2E as explicit `BLOCKED` readiness |
+| `01b-F22` | Negative delta rejected; replacement segments summed | Orchestrator E2E; structural negative input still raises |
+| `01b-F23` | K6 plausibility warning carries R8 values 74.7 / 4.1 | Orchestrator E2E on shared warning channel; K6 flag retained |
+| `01b-F24` | Day-linear overlap plus non-dismissible coverage warning | Orchestrator E2E with non-dismissible finding; K8 flag retained |
+| `01b-F25` | Four risks separate; never auto-deducted or summed | Orchestrator, API, web and PDF keep every risk separate; cumulation unresolved |
+| `01b-F26` | 5.13 percent WW gap silent; 4,227 ct remains with owner | Orchestrator E2E with central-meter owner residual |
+| `01b-F26b` | 11.54 percent WW gap produces non-blocking notice | Orchestrator E2E on shared notice channel |
+| `01b-F26c` | 21.79 percent WW gap produces legal-risk warning | Orchestrator E2E on shared warning channel |
+| `01b-F27` | Device rounding/aggregation and two change readings | Orchestrator E2E plus migration/adapter integration; K10/K11 flags retained |
+| `01b-F28a` | MDL net branch; no second CO₂ deduction | Orchestrator E2E; confirmed MDL ingest remains Slice B |
+| `01b-F28b` | MDL gross exact rescale, accepted one cent, owner residual | Orchestrator E2E and exact gross-rescaling capability green |
+| `01b-F29` | OCR decimal shift blocks against net-branch control sum | Orchestrator E2E as explicit `BLOCKED`; OCR connection remains Slice B |
+| `01b-F30` | No CO₂ evidence: separate 3 percent risks, no deduction | Orchestrator E2E; risks remain separate and unapplied |
+| `01b-F31` | Heat-adjusted/WW-raw graph with labelled missing-data fallback | Orchestrator and web/PDF output green for normalized annual factors and raw/no-prior fallbacks |
 
 ## Appendix C — all 47 Page 01b register rows and flags
 
