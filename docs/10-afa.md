@@ -11,8 +11,8 @@ screen, PDF, migration, tax export or production rules-store data is added by th
 
 This document turns a purchase, construction or unentgeltlicher Erwerb into the annual object AfA,
 the deductible share, the remaining book value, the 15% guard and an annual loan-interest prefill.
-It owns the calculation boundary handed to future `docs/11` and `docs/14`; it does not own Anlage-V
-lines, DATEV, archive/readiness rules or full financing KPIs.
+It owns the calculation boundary handed to prepared `docs/11` and future `docs/14`; it does not own
+Anlage-V lines, DATEV, archive/readiness rules or full financing KPIs.
 
 ## 1. Sources, precedence and settled corrections
 
@@ -365,9 +365,10 @@ Owned here: R2 purchase cost; three allocation routes and Weg B; rate/detection;
 basis, annual AfA and book value; later production cost; 15% guard; annual loan-interest/Disagio
 prefill and R13 handoff.
 
-Deferred to separate `docs/11`: all Anlage-V line mappings, SKR03/SKR04 accounts, DATEV EXTF,
-export archive, readiness and tax-year form data. Deferred to `docs/14`: net/return/DSCR/cashflow,
-full annuity plan, forecasts, scenarios and the tax rate as a calculation input.
+Prepared, unapproved `docs/11` owns all Anlage-V line mappings, SKR03/SKR04 accounts, DATEV EXTF,
+export archive, readiness and tax-year form data. It consumes the Page-03 handoff without
+recalculation. Deferred to `docs/14`: net/return/DSCR/cashflow, full annuity plan, forecasts,
+scenarios and the tax rate as a calculation input.
 
 The complete Non-Goals V1 set is:
 
