@@ -161,6 +161,9 @@ session. It is not an input for agent work and never overrides Git or the tracke
    - `13-contract-clauses.md` — Page 06's clause-selection, compatibility, warning and workflow-
      routing contract, with all 19 source-backed fixtures transcribed; complete clause and action-
      letter bodies remain missing and block implementation.
+   - `14-investment-kpis.md` — Page 07's seven planning KPIs, financing/AfA provenance,
+     sensitivity axes and deterministic Bank-PDF view, with exactly 14 data-only fixtures;
+     conventions and missing concept sources remain blocked.
    - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,
      reversal and duplicate-handling contract, with all 13 source-backed fixtures transcribed.
    - `16-uvi.md` — UVI monthly-consumption, comparison, DWD import, Heizspiegel fallback,

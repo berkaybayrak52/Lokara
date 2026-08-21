@@ -22,6 +22,8 @@ pre-production obligations. Detail remains with its specialist contract:
 - `docs/10-afa.md` contains the approved AfA transcription; approved
   [`docs/11-tax-export.md`](11-tax-export.md) owns future tax/export/archive rules and `docs/12`
   owns approved reusable deadline and guard rules. Their details are not duplicated here.
+- `docs/14-investment-kpis.md` owns the future planning KPI and deterministic Bank-PDF boundaries.
+  Its flat-tax scenario is not a tax export, promised refund or substitute for `docs/11`.
 
 Every status below describes repository delivery, not legal certainty:
 

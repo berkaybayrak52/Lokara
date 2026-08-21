@@ -19,6 +19,10 @@ source amounts. Both consume accepted ledger entries, year-versioned mappings, t
 handoff and an adviser profile. The readiness check runs before generation and keeps missing or
 unverified facts visible.
 
+The Bank-PDF defined by `docs/14-investment-kpis.md` is a separate deterministic planning view. It
+does not consume this cash-basis export contract, enter this archive or supply Anlage-V/DATEV
+values; its negative flat-tax scenario is not a promised refund or tax-output value.
+
 ## 1. Sources, precedence and arithmetic audit
 
 The transcription uses the complete Page 04, all 13 Page-04 rows in the current 180-row
