@@ -568,5 +568,6 @@ Other later temporal or immutable records arrive only with their owning mileston
 `Loan`, shared guard/reminder records, `LettingEffort`, tickets, export archives, subprocessors,
 activation codes, IBAN history, delivery logs, clause/contract versions and prospect objects.
 `docs/13` defines only their future logical references, composition evidence and risk routing; it
-does not approve a schema or provide clause text. Their names in this inventory do not approve their
-final schemas.
+does not approve a schema or provide clause text. `docs/14` likewise defines only the future
+Prüfobjekt snapshot, provenance, partial-result, annuity, sensitivity and Bank-PDF boundaries; it
+approves no prospect schema. Their names in this inventory do not approve their final schemas.
