@@ -338,8 +338,9 @@ self-performance valuation, unmeasured causation keys and a § 560 increase lett
 Page 01 owns denominators, day weighting, fictitious occupancy, renter rounding, owner residuals,
 printed statement order, advances and deadlines. `docs/03` owns heating content. `docs/10` owns AfA
 class values, approved `docs/11` owns the Anlage-V/DATEV mapping contract, `docs/12` owns reusable
-date guards, and `docs/13` owns clause text. OCR extraction may propose `kostenartId`, but the user
-must confirm it.
+date guards, and `docs/13` owns future clause selection, warnings and routing. Page 06 does not
+supply the complete clause text/version catalogue; that remains a separate production block. OCR
+extraction may propose `kostenartId`, but the user must confirm it.
 
 ## 9. Implementation gap and approval gate
 

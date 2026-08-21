@@ -158,6 +158,9 @@ session. It is not an input for agent work and never overrides Git or the tracke
      all line, account and format placeholders remain blocked.
    - `12-guards-deadlines.md` — Page 05's shared guard contract for deadlines, arrears, UVI,
      rent adjustments and vacancy, with all 24 source-backed fixtures transcribed.
+   - `13-contract-clauses.md` — Page 06's clause-selection, compatibility, warning and workflow-
+     routing contract, with all 19 source-backed fixtures transcribed; complete clause and action-
+     letter bodies remain missing and block implementation.
    - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,
      reversal and duplicate-handling contract, with all 13 source-backed fixtures transcribed.
    - `16-uvi.md` — UVI monthly-consumption, comparison, DWD import, Heizspiegel fallback,

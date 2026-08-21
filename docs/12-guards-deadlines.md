@@ -424,8 +424,9 @@ Page 05 excludes all ten items listed by both the Page and Non-Goals V1:
 
 `docs/16` depends on W4's cadence but owns UVI calculation, content and document isolation. M6's
 payment ledger supplies W3 payment events and may consume Page-05 costs/interest under the approved
-bank contract. `docs/13` owns future approved letter/clause content. M9 owns actual reminders,
-e-mail, push and checklists. All external providers stay behind adapters.
+bank contract. `docs/13` owns future clause selection, risk results and action-workflow routing, but
+Page 06 supplies no complete clause or letter bodies. M9 owns actual reminders, e-mail, push and
+checklists. All external providers stay behind adapters.
 
 ## 10. Approval and implementation boundary
 
