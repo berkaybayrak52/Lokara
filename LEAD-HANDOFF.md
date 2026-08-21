@@ -1,13 +1,14 @@
-# LEAD-HANDOFF.md — Slice A complete and approved
+# LEAD-HANDOFF.md — Slice A complete, approved and merged
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting.
 
 ## Repository state — 21.08.2026
 
+- Branch: local `main`; Slice A merged at `d6cbb19` from implementation commit `bb41f7c`.
 - Slice A passed its implementation, migration, application, document and review gates.
-- Emir approved Slice A on 21.08.2026 and authorized its local commit and merge.
-- No push was authorized. M5 remains paused.
+- Emir approved Slice A on 21.08.2026. It is committed and merged locally.
+- Nothing was pushed. M5 remains paused.
 - D1–D3 remain complete, approved and merged locally.
 
 ## Slice A result

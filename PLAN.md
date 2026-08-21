@@ -17,7 +17,7 @@ before UI. Dates are communication events, not planning inputs.
 - Composite foreign-key isolation and M5a identity/RLS are complete.
 - Three earlier Page 01b fixes remain complete. Slice A now gives Page 01b technical implementation
   closure: all 34 fixture IDs execute through one orchestrator and the full and non-fresh demo gates
-  are green. Emir approved Slice A on 21.08.2026; open wording, cumulation and
+  are green. Emir approved Slice A and it was merged locally on 21.08.2026; open wording, cumulation and
   `verify-before-production` flags remain explicit.
 - Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
 - Page 01 is completely transcribed in `docs/08`/`docs/02` with a 24-ID data oracle and green
@@ -37,8 +37,8 @@ before UI. Dates are communication events, not planning inputs.
 - Phase D3 is **complete and approved 21.08.2026**. `docs/03` Appendix D is the single historical
   ledger, genuine source questions are in the current round-four question file, governance uses the
   post-D3 source model, and the seven retired files have no live dependency. D1-D3 now form the
-  approved implementation baseline. Slice A is technically closed and approved 21.08.2026. Slice B
-  is next, but starting it remains a separate decision.
+  approved implementation baseline. Slice A is technically closed, approved and merged locally on
+  21.08.2026. Slice B is next, but starting it remains a separate decision.
 - M5 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
   but the slice is not merged yet.
 - That M5 foundation has not added a new dashboard, portal or account switcher.
@@ -54,7 +54,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. This is specification closure, not application closure: Slice B revalidates M3/M4 and M6 still owns actual advances, Saldo, finalization and isolated tenant documents. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green and Slice A was approved 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Merged with a full D2 source trace and exact 32-ID data oracle. Merge is not production closure or legal approval: no production catalogue or gate was implemented. The current 180-row CSV has no Page 02-assigned rows, so `09-K01…K11` and the three unresolved classifications remain production-blocking. Slice C still owns M1 implementation closure and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
@@ -245,7 +245,7 @@ not replace the complete documentation or reconciliation gates.
 | D1 | **complete; approved 17.08.2026; final reconciliation closed 18.08.2026** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. |
 | D2 | **complete; approved 21.08.2026** | Create source-backed `docs/09`–`docs/16` | All assigned transcriptions are approved and merged, including `docs/14`; the final `docs/07` tax/archive reconciliation is approved. The phase added documentation and data-only fixtures, not investment implementation. |
 | D3 | **complete; approved 21.08.2026** | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-four question file, updated governance, permanent dependency guard and joint deletion. |
-| A | **complete; approved 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
+| A | **complete; approved and merged 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
 | B | After A | Reconcile M3–M4 with Page 01 | Revalidate the approved Page 01 contract against persisted calculation and extraction, close M3/M4 gaps and leave ledger/finalization work to M6. |
 | C | After B | Reconcile M1 with Page 02 | Revalidate NK eligibility, allocation, classification and rounding against merged `docs/09` and close M1. |
 | M5 | After A–C | Roles, URL context and switcher | Finish the prepared secure bootstrap slice, role enforcement, owner contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
@@ -302,7 +302,7 @@ Verified closure evidence: 37 orchestrator tests exercise the exact 34-ID regist
 Slice A suites pass 363 Python tests plus the API and web projections; the UTF-8 full gate passes
 722 Python and 31 web tests; the non-fresh demo gate passes. The PDF fingerprint changed from
 `34e4f8bda4658f1cc233b38e1c2a8fad` to `a45fa3d1e3d69957948e58885b4ab797` and the reviewed output is
-three clean A4 pages. Emir approved Slice A on 21.08.2026.
+three clean A4 pages. Emir approved Slice A and it was merged locally on 21.08.2026.
 
 The D1–D3 documentation and correspondence-retirement gates precede the A–C implementation
 reconciliation gate. Do not resume M5 or start later feature work until D1–D3 are approved, A–C are
@@ -625,8 +625,8 @@ M0 is complete. M1–M4 are the current green, demoable floor: a persisted-data 
 heating calculation view with CO₂ allocation and tenant isolation. They are not yet fully
 spec-closed. D1 is complete; approved 17.08.2026; final reconciliation closed 18.08.2026. D2 and all
 `docs/09`–`docs/16` transcriptions are complete, approved and merged. D3 is complete and approved;
-the correspondence retirement closes the documentation program. Slice A is complete and approved;
-Slice B is next, but requires a separate start decision. Slices A–C retain
+the correspondence retirement closes the documentation program. Slice A is complete, approved and
+merged locally; Slice B is next, but requires a separate start decision. Slices A–C retain
 their order and reconcile implementation with Pages 01b, 01 and 02 before feature work continues.
 The finalized tenant document still waits for M6.
 
