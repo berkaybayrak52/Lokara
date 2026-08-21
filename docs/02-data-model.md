@@ -65,6 +65,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 17 enfo
 | Statement row | `Statement` with period, version, status, total and optional content hash | **Shipped**, but not the complete Page 01 snapshot/finalization contract |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Specified** |
 | Temporal advance schedule, receivables, payment ledger and immutable finalization | M6 handoff described below | **Future** |
+| Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is prepared in unapproved `docs/11` | **Specified, pending approval** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
 These principles decide ambiguous additions:
@@ -105,7 +106,7 @@ deletion so historical authorization and attribution remain explainable.
 | --- | --- |
 | `OWNER` | Full account scope: billing, roles, bank data and every building. |
 | `EMPLOYEE` | Only assigned buildings. Zero `BuildingAssignment` rows means no building access. |
-| `TAX_ADVISOR` | Read-only guest access for tax, export and AfA work. |
+| `TAX_ADVISOR` | Read-only guest access for tax, export and AfA work, except the future adviser-owned profile and account-mapping fields prepared in `docs/11`. |
 | `RENTER` | Not a `Role`; it is an account-scoped person/tenancy domain relationship. |
 | `Landlord` | Legal lessor data printed on a statement, never an authorization role. |
 
@@ -520,28 +521,32 @@ M6 owns the handoff in this order:
 2. A positive finalized Saldo creates an account-scoped **receivable**. It does not itself create a
    payment or tax cash event. A negative Saldo is the corresponding tenant credit/refund obligation.
 3. An imported or manual money movement, once matched and accepted, creates append-only ledger
-   entries with mandatory payment date, amount, direction, account/property/party dimensions,
-   category, source, receipt reference and version history.
+   entries with payment date, amount, direction, account/property/party dimensions, category state,
+   source, receipt reference and version history. Missing payment date is a tax-export hard block;
+   an uncategorized movement remains representable but produces a yellow readiness finding.
 4. The ledger, not the statement or receivable, feeds tax and deterministic exports through a
    year-versioned `TaxCategoryMapping`.
 
-| Future record | Minimum contract owned by M6 |
+| Future record | Minimum contract and owner |
 | --- | --- |
-| `AdvancePaymentPeriod` | Account, tenancy, amount, effective dates and version/declaration evidence. |
-| `Receivable` | Account, finalized statement/version, tenancy, amount, due state and immutable origin. |
-| Payment event/ledger entry | Mandatory payment date, integer cents, direction, account, landlord/building/unit/renter dimensions as applicable, category, source (`finAPI`, manual or invoice), receipt reference and version history. |
-| Matching evidence | Normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
-| `TaxCategoryMapping` | Year-versioned category to Anlage-V line plus SKR03 and SKR04, with tax-advisor override provenance. |
-| Export archive | Deterministic function inputs, output bytes, timestamp and hash. DATEV EXTF uses Windows-1252, semicolon delimiters and CRLF. |
+| `AdvancePaymentPeriod` | M6: account, tenancy, amount, effective dates and version/declaration evidence. |
+| `Receivable` | M6: account, finalized statement/version, tenancy, amount, due state and immutable origin. |
+| Payment event/ledger entry | M6: payment date state, integer cents, direction, account, landlord/building/unit/renter dimensions as applicable, category state, source (`finAPI`, manual or invoice), receipt reference and version history. Missing date is red; missing category is yellow before tax export. |
+| Matching evidence | M6: normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
+| `TaxCategoryMapping` | M7: tax-year category to Anlage-V line plus SKR03/SKR04, validity/source version and tax-adviser override provenance. All current lines/accounts remain blocked placeholders. |
+| Tax-adviser profile | M7: adviser/client number, chart, account length and fiscal-year start; write access is limited to these adviser-owned export parameters. |
+| Readiness result | M7: immutable ordered red/yellow findings, acknowledgements, input/mapping/profile versions and blocked/generated outcome. |
+| Export archive | M7: deterministic input references, output bytes, version, `Rechtsstand`, timestamp and hash. Re-export appends a version. Working DATEV EXTF encoding is Windows-1252 with semicolons and CRLF, still blocked pending official-format and real-import verification. |
 
 The statement's Saldo is BGH formal minimum #4. It must use **geleistete** advances from accepted
 payment allocations, not `advance_payment_cents × months`. The temporal Soll schedule is still
 needed to identify arrears and explain what was due, but it does not prove what was paid.
 
 This separation fixes the former ambiguous phrase “statements feed the ledger”: a statement creates
-an obligation; an actual payment creates the cash-basis ledger event. M6 also owns bank matching,
-versioned IBAN-to-renter mappings, immutable export archives and the temporal Soll schedule needed
-to compare what was owed with what moved.
+an obligation; an actual payment creates the cash-basis ledger event. M6 owns bank matching,
+versioned IBAN-to-renter mappings and the temporal Soll schedule needed to compare what was owed
+with what moved. M7 consumes the accepted ledger snapshot and owns the separate tax-export archive;
+prepared `docs/11` approves no schema or API.
 
 ## 7. Known gaps and milestone ownership
 
@@ -555,6 +560,7 @@ to compare what was owed with what moved.
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
+| Page 04 Anlage-V/DATEV export contract | **Prepared but unapproved** on `slice/docs-11`; no production implementation | D2 / `docs/11-tax-export.md` |
 | `Verteilungsrest (K9)` authoritative register wording | Unresolved source issue; repository copy remains untouched | Next authoritative register export |
 
 Other later temporal or immutable records arrive only with their owning milestones: `AfaRecord`,

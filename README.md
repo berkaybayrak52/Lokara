@@ -153,6 +153,9 @@ session. It is not an input for agent work and never overrides Git or the tracke
      allocation-key precedence, non-allocable routing, 14 edge cases and exact 32-fixture trace.
    - `10-afa.md` — Page 03's purchase-cost, purchase-price-allocation, AfA, self-use, 15%-guard and
      annual financing contract, with all 34 source-backed fixtures transcribed.
+   - `11-tax-export.md` — Page 04's prepared payment-ledger, Anlage-V overview, DATEV EXTF,
+     readiness and immutable export-archive contract, with all 16 source-backed fixtures transcribed;
+     all line, account and format placeholders remain blocked.
    - `12-guards-deadlines.md` — Page 05's shared guard contract for deadlines, arrears, UVI,
      rent adjustments and vacancy, with all 24 source-backed fixtures transcribed.
    - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,

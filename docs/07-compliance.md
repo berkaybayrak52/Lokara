@@ -1,9 +1,9 @@
 # 07 — Cross-cutting compliance and delivery status
 
 This is Lokara's interim living compliance contract. It separates current controls from prepared,
-specified and future obligations. The approved `docs/10` now owns AfA; final tax/archive
-reconciliation remains blocked until `docs/11` is source-backed and approved. This file does not
-fill that gap.
+specified and future obligations. Approved `docs/10` owns AfA. Source-backed `docs/11` is prepared
+on `slice/docs-11`, but neither document nor this final tax/archive reconciliation is approved or
+merged yet.
 
 The complete predecessor remains available through
 `git show 635acf9:docs/07-compliance.md`; no separate history file is needed.
@@ -19,9 +19,9 @@ pre-production obligations. Detail remains with its specialist contract:
   interaction requirements.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the statement audiences, formal
   minimums, output contents and current render gaps.
-- `docs/10-afa.md` contains the approved AfA transcription; `docs/11` owns future
-  tax/export/archive rules and `docs/12` owns approved reusable deadline and guard rules.
-  Their details are not duplicated here.
+- `docs/10-afa.md` contains the approved AfA transcription; prepared
+  [`docs/11-tax-export.md`](11-tax-export.md) owns future tax/export/archive rules and `docs/12`
+  owns approved reusable deadline and guard rules. Their details are not duplicated here.
 
 Every status below describes repository delivery, not legal certainty:
 
@@ -94,9 +94,25 @@ immutable, reproducible or archived.
 - A correction appends `vN+1`, retains and supersedes `vN`, and preserves the referenced inputs and
   archived bytes or immutable storage keys needed to reproduce every version.
 - Actual paid advances, Saldo, receivables, the payment ledger, bank-matching evidence and the
-  complete archive handoff remain M6 work. Tax/export archives remain dependent on approved
-  `docs/10` and `docs/11`; delivery evidence and contract/IBAN histories arrive with their owning
-  later milestones.
+  statement archive handoff remain M6 work. Tax/export archives remain M7 work and depend on
+  approved `docs/10` and `docs/11`; delivery evidence and contract/IBAN histories arrive with their
+  owning later milestones.
+
+### Prepared tax-export contract, pending approval
+
+- One accepted payment-ledger snapshot feeds two deterministic outputs: the Anlage-V overview and
+  DATEV EXTF. A receivable or statement Saldo is not a tax cash event.
+- Export readiness records ordered red/yellow findings and the exact input, mapping and adviser
+  profile versions. A red finding blocks; a yellow finding stays visible and is never cleared by
+  generation alone.
+- Re-export appends an archive version containing deterministic input references, output bytes,
+  rule/mapping versions, applicable `Rechtsstand`, timestamp and hash. Earlier bytes remain.
+- DATEV booking text defaults to the unit instead of a renter's full name and carries a ledger
+  reference. Only data needed for the adviser purpose may leave the account boundary.
+- Lokara supplies calculation help and data transport. It does not submit through ELSTER, provide
+  tax structuring or claim DATEV certification.
+- Anlage-V lines, SKR accounts, EXTF parameters and S/H orientation, and the BFH citation remain
+  `verify-before-production`; a prepared calculation path cannot clear those sentinels.
 
 ## Two clocks: access and data lifecycle
 
@@ -108,9 +124,11 @@ Access eligibility and data deletion are separate lifecycles:
    class and verified legal duty. Retaining a record does not grant portal access.
 
 There is no one retention period for statements, invoices, bank data, contracts, identity data,
-support records and technical logs. Exact periods and conflict handling remain explicitly blocked
-pending approved `docs/11` tax/archive rules and a separate source-backed privacy retention schedule.
-No duration is inferred from a neighboring record class or an older planning note.
+support records and technical logs. Page 04 records the checked, conditional § 147a AO six-year
+duty above the stated positive-income threshold; it does not create a universal Lokara retention
+period. Exact class periods and conflict handling remain blocked pending approval of `docs/11` and
+a separate source-backed privacy retention schedule. No duration is inferred from a neighboring
+record class or an older planning note.
 
 ## External services and deployment controls
 
@@ -180,8 +198,8 @@ The following remain open requirements, not completed controls:
 - breach detection, assessment, notification and evidence handling;
 - authenticated secure data export and delivery;
 - the class-specific privacy retention, restriction and deletion schedule;
-- approved tax/export/archive rules after `docs/10` and `docs/11`;
+- approval and implementation of the prepared `docs/11` tax/export/archive rules;
 - real-provider configuration, hosting, AVV/DPA and sub-processor verification.
 
-Production compliance and the final `docs/07` reconciliation remain blocked until their owning,
-source-backed contracts and evidence are approved.
+Production compliance and this prepared final `docs/07` reconciliation remain blocked until
+`docs/11` and the other owning source-backed contracts and evidence are approved.
