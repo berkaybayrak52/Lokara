@@ -561,7 +561,7 @@ approved `docs/11` adds no schema or API.
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Complete transcription approved and merged 21.08.2026; no production implementation | D2 / `docs/11-tax-export.md` |
-| Page 06 clause selection, risk and workflow-routing contract | D2 transcription prepared for review; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |
+| Page 06 clause selection, risk and workflow-routing contract | Complete transcription approved and merged 21.08.2026; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |
 | `Verteilungsrest (K9)` authoritative register wording | Unresolved source issue; repository copy remains untouched | Next authoritative register export |
 
 Other later temporal or immutable records arrive only with their owning milestones: `AfaRecord`,

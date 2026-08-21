@@ -1,6 +1,6 @@
 # Contract clauses — selection, risk and workflow routing
 
-**Status:** D2 transcription prepared for Emir's review; not approved or implemented
+**Status:** D2 transcription approved and merged 21.08.2026; not implemented
 
 **Rechtsstand:** 07/2026
 

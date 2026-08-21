@@ -1,13 +1,14 @@
-# LEAD-HANDOFF.md — docs/13 prepared for review
+# LEAD-HANDOFF.md — docs/13 merged
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
 and the named branch before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `slice/docs-13`, based on clean local `main` at `5ce53b4`.
-- The Page-06 transcription is an uncommitted review diff.
-- Nothing was committed, merged or pushed. No full/demo gate or PDF fingerprint was run.
+- Branch: `main`, after the no-fast-forward merge of `slice/docs-13`.
+- Slice commit: `fbba9f1`. Merge commit: `910b340`.
+- The Page-06 transcription is approved and merged.
+- Nothing was pushed. No demo gate or PDF fingerprint was run.
 
 ## Contract-clause transcription
 
@@ -38,13 +39,12 @@ Focused Page-06 pytest passed 9 tests. Focused Ruff lint and format checks passe
 rows match the authoritative CSV field for field. `git diff --check` passed. The fast gate is green:
 strict mypy, engine purity, agent parity and 397 pure-package tests passed.
 
-The staged path list is empty. The non-ignored unstaged/untracked path list contains only this
-handoff, the five other proven reference reconciliations, `docs/13` and the two data-only Page-06
-test files. The ignored local `LAST_OUTPUT.md` session summary was updated separately.
+The UTF-8 full gate is green: Ruff, format, strict mypy, engine purity, agent parity, 671 Python
+tests, 30 web tests, web lint/typecheck and the handoff check passed.
 
 `berkay-work/`, the seven correspondence files, production source,
 `docs/01-tech-stack-explanations.md` remain untouched.
 
-## Review decision
+## Next decision
 
-Stop with the uncommitted diff for Emir's review. Do not commit, merge or push unless he asks.
+The next D2 transcription is `docs/14`. Do not start it without Emir's instruction.
