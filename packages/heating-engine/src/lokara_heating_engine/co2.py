@@ -11,9 +11,9 @@ lookup (R8):
     step = lookup10(spezifisch)          # against the UNSHORTENED Anlage table
 
 The rounded value is both classified and carried for disclosure. `ROUND_HALF_UP`
-is Lokara's explicit tie convention; neither the statute nor Berkay specifies a
-tie mode. Source: `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 6;
-`docs/03-nk-heating-engines.md` R8. Rechtsstand 08/2026.
+is Lokara's explicit tie convention; neither the statute nor the original Page
+specifies a tie mode. Source: `docs/03-nk-heating-engines.md` decision 3/R8 and
+original Page 01b. Rechtsstand 08/2026.
 
 ⚠️ **Do not "fix" this back to shortening the table.** The § 5 Abs. 1 S. 4
 reading (scale every finite bound by days/reference-year, leave the intensity as

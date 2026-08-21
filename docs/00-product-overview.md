@@ -22,8 +22,8 @@ M1–M4 are a green, demoable floor:
 
 This floor is not yet spec-closed. The current PDF is **not** the finalized Page 01 tenant document:
 it contains the landlord's building-wide view, lacks actual paid advances and Saldo, and is not the
-independently rendered per-tenancy archive required for dispatch. D1–D3 pause implementation while
-the documentation baseline is completed and approved.
+independently rendered per-tenancy archive required for dispatch. The approved D1–D3 documentation
+baseline is complete; Slice A is the next implementation reconciliation.
 
 ## Billing-period boundary
 

@@ -34,8 +34,8 @@ from lokara_domain import (
     co2_grams_from_energy,
 )
 
-# Authoritative Rechtsstand-Register CSV values for F02, confirmed by
-# Antwort-an-Emir_01b-Uebergabe.md § 4a/4b. Rechtsstand 07/2026, status geprüft.
+# Authoritative Rechtsstand-Register CSV values for F02, preserved in approved
+# `docs/03` decision 4 and Appendix C. Rechtsstand 07/2026, status geprüft.
 ERDGAS_HU = EmissionFactor(kg_co2_per_kwh=Decimal("0.201"), reference=EnergyReference.HU)
 ERDGAS_HO = EmissionFactor(kg_co2_per_kwh=Decimal("0.181"), reference=EnergyReference.HO)
 ERDGAS_HU_TO_HO = Decimal("0.903")

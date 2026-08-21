@@ -1,47 +1,40 @@
-# LEAD-HANDOFF.md — docs/14 merged
+# LEAD-HANDOFF.md — D1-D3 complete; Slice A next
 
-Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
-and the named branch before acting.
+Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
+`git log` before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `main`, after the no-fast-forward merge of `slice/docs-14`.
-- Slice commit: `9b69f97`. Merge commit: `9f9b549`.
-- The Page-07 transcription and Phase D2 are approved and merged.
-- Nothing was pushed. No demo gate or PDF fingerprint was run.
+- D1 is complete and approved; its final reconciliation closed 18.08.2026.
+- D2 is complete, approved and merged with all `docs/09`–`docs/16` transcriptions.
+- D3 is complete, approved and merged locally into `main`.
+- Nothing was pushed. No demo gate or PDF fingerprint was run because runtime and rendered output
+  did not change.
 
-## Investment-KPI transcription
+## D3 retirement baseline
 
-`docs/14-investment-kpis.md` and its data-only oracle preserve all seven KPIs, `R1`–`R10`,
-`14-K01`–`14-K19`, `14-E01`–`14-E15` and exactly `14-F01`–`14-F14`. The alias map retains every
-source `KPI-*` identifier. All 18 register rows, eight Non-Goals, eight source exclusions, the
-arithmetic audit and exact seven-file correspondence ledger are present.
+The seven correspondence files are deleted together. `docs/03` Appendix D is their single
+historical section-level disposition ledger. Git retains their text, but they are no longer source
+authority. Original Pages/annexes and the authoritative register feed approved `docs/00`–`docs/16`;
+approved docs and golden fixtures then control code.
 
-The future-only contracts cover the Prüfobjekt snapshot, financing/AfA provenance, partial KPI
-results, twelve-month annuity schedule, sensitivity axes and deterministic Bank-PDF view. No
-schema, migration, API, engine, UI, PDF renderer, pricing or bank integration was added.
+The current round-four question file contains only Berkay-answerable missing sources and choices.
+It routes each group to its owning approved doc. Repeated correspondence ledgers and path assertions
+were removed from other docs, comments and data-only oracles.
 
-## Explicit unresolved items
+## Permanent guard and verification
 
-- Two Page-07 register rows are `geprüft`; sixteen remain `verify-before-production`.
-- Page 03 owns real AfA and deductible interest. The Page-07 acquisition defaults remain labelled
-  assumptions, and the R13-interest versus Page-07 R3-interest tax-scenario choice is unresolved.
-- Negative tax remains flat-rate scenario arithmetic, never a promised refund or export value.
-- The capital-markets permission claim, all defaults/thresholds and AfA availability remain blocked.
-- `Lokara_Investitionsmodul_Demo.html` and `AfA-Wizard_Konzept_Entwurf.md` are absent; no contents
-  were invented. No question file was created.
+The retirement checker requires all seven paths to stay absent and rejects retired-name references
+outside `docs/03` Appendix D and its own denylist. Its focused test proves restored paths and live
+references fail. The checker and its test run in the always-on fast/full gate path.
 
-## Verification
+Focused verification passed 279 tests. The fast gate passed 404 pure-package tests. The UTF-8 full
+gate passed 679 Python and 30 web tests plus lint, formatting, strict types, purity, parity and
+handoff checks. `git diff --check` passed and the index remains empty.
 
-Focused Page-07 pytest passed 7 tests. Focused Ruff lint and format checks passed. The 18 register
-rows match the authoritative CSV field for field. `git diff --check` passed. The fast gate passed
-404 pure-package tests. The UTF-8 full gate passed 678 Python tests and 30 web tests, plus lint,
-types, purity, parity and handoff checks.
+## Next slice
 
-`berkay-work/`, the seven correspondence files, production source,
-`docs/01-tech-stack-explanations.md` remain untouched.
-
-## Next decision
-
-Phase D2 is complete and approved. Do not start D3 correspondence retirement without Emir's
-instruction.
+Slice A is next and may start without Berkay's current answers. It implements only the settled
+Page 01b contract. The exact block-(c) wording and reduction-cumulation choice remain explicit
+source gaps; do not guess them or present affected output as production-approved. No Slice A
+implementation is included in D3.

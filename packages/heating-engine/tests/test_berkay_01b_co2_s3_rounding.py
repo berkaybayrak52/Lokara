@@ -1,8 +1,8 @@
 """§ 5 Abs. 1 S. 3 CO2KostAufG — round the specific CO₂ intensity to one
 decimal before classification.
 
-Source: `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 6,
-15.08.2026. Spec: `docs/03-nk-heating-engines.md` R8. Rechtsstand
+Source: original Page 01b and approved `docs/03-nk-heating-engines.md`
+decision 3/R8. Rechtsstand
 08/2026. Official norm: https://www.gesetze-im-internet.de/co2kostaufg/__5.html
 
 Berkay confirms that R4/E3 and the old `01b-F05` are superseded. The order is

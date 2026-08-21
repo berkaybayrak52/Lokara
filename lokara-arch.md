@@ -7,8 +7,8 @@ schema sketches, dated rollout notes and repeated examples, remains available ex
 `CLAUDE.md` overrides this file. `PLAN.md` owns delivery order and milestone status. Detailed
 contracts live in `docs/01-tech-stack-and-decisions.md` through
 `docs/08-statement-document.md`; this file names their boundaries instead of duplicating them.
-For calculation and legal rules, `berkay-work/` remains higher precedence than `docs/`, and
-`docs/` remains higher precedence than code.
+For calculation and legal rules, original Pages/annexes and the Rechtsstand register feed approved
+`docs/00`–`docs/16`; approved docs then control code.
 
 ## Status model
 

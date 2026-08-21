@@ -27,17 +27,16 @@ before UI. Dates are communication events, not planning inputs.
   24-ID data oracle. The UVI annex is approved and merged in `docs/16` with source-named data-only
   fixtures. Pages 03, 04, 06 and 07 are completely transcribed, approved and merged in `docs/10`,
   `docs/11`, `docs/13` and `docs/14`.
-- Phase D1 is **complete; approved 17.08.2026; final reconciliation closed 18.08.2026**. All
-  implementation remains paused until D2–D3 have been reviewed and approved.
+- Phase D1 is **complete; approved 17.08.2026; final reconciliation closed 18.08.2026**.
 - Phase D2's `docs/15` review gate was approved and its slice merged on **20.08.2026**. The
   `docs/12` and `docs/16` review gates were approved and their slices merged on **21.08.2026**.
   The `docs/10` and `docs/11` slices and the final `docs/07` tax/archive reconciliation were
   approved and merged on **21.08.2026**. The `docs/13` and `docs/14` transcriptions were approved
-  and merged on **21.08.2026**. D2 is complete; D3 has not started.
-- Phase D3 starts only after Emir reviews and approves D2. It proves that the seven Berkay
-  correspondence files have been completely extracted, moves every genuinely unresolved item into
-  one current `FRAGEN-an-Berkay-04.md`, updates governance references and then deletes the retired
-  correspondence. Implementation remains paused through D3.
+  and merged on **21.08.2026**. D2 is complete.
+- Phase D3 is **complete and approved 21.08.2026**. `docs/03` Appendix D is the single historical
+  ledger, genuine source questions are in the current round-four question file, governance uses the
+  post-D3 source model, and the seven retired files have no live dependency. D1-D3 now form the
+  approved implementation baseline. Slice A is next.
 - M5 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
   but the slice is not merged yet.
 - That M5 foundation has not added a new dashboard, portal or account switcher.
@@ -60,7 +59,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. The exact 24-ID data oracle covers date arithmetic, strict arrears thresholds, cent rounding, UVI cadence, rent limits, VPI and vacancy. All 18 Page-specific register rows remain `verify-before-production`; the 5-year/6-year meter conflict is unresolved. No guard implementation exists. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
-| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. The later F03 patch resolves the Page's omitted case as E12, so all thirteen oracle entries are executable dictionaries. Production bank matching remains open for M6. |
+| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. Production bank matching remains open for M6. |
 | UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. No implementation exists. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
@@ -70,9 +69,8 @@ engine contract; it does not create a second competing heating specification.
 
 - The complete Page, including inputs, units, formula order, rounding, edge cases, worked examples,
   output wording and out-of-scope sections.
-- Its matching `Antworten/` corrections and handoff decisions while those source files still exist.
-  D1 and D2 must extract all of their settled content into the target docs and golden fixtures before
-  D3 retires them; worked examples become fixtures rather than long copied prose.
+- The approved supersession and correction history recorded in the target doc and `docs/03`
+  Appendix D. Retired correspondence is Git history, not a current input.
 - Every matching `Rechtsstand-Register` entry, including `Rechtsstand`, source, legal/convention
   status and `verify-before-production` flags.
 - `Anlagen/Non-Goals V1`; its section for the Page must remain out of scope.
@@ -83,11 +81,12 @@ engine contract; it does not create a second competing heating specification.
 
 ### Source precedence and known conflicts
 
-- `Rechtsstand-Register.csv` controls values and production flags. `Antworten/` controls later
-  method corrections. If they conflict, stop and resolve the register; do not choose silently.
-- F02's former Hu/Ho conflict is resolved by the authoritative CSV and confirmed by
-  `Antwort-an-Emir_01b-Uebergabe.md` § 4a/4b: Erdgas uses `0.201` Hu, `0.181` Ho and the documented
-  `0.903` conversion relation, with CSV status `geprüft` and Rechtsstand `07/2026`.
+- `Rechtsstand-Register.csv` controls structured values and production flags. Approved docs preserve
+  method corrections and supersession history. If an original Page/annex conflicts with the
+  register or its approved doc, stop and resolve the authority gap; do not choose silently.
+- F02's former Hu/Ho conflict is resolved by the authoritative CSV and preserved in approved
+  `docs/03` decision 4 and Appendix C: Erdgas uses `0.201` Hu, `0.181` Ho and the documented `0.903`
+  conversion relation, with CSV status `geprüft` and Rechtsstand `07/2026`.
 - Page 03 says self-use reduces deductible AfA, not the AfA basis. This replaces stale wording in
   Page 06/Non-Goals.
 - The DWD annex contains both `0.40–1.80` and an old `0.50–1.80` test boundary. Its update note also
@@ -95,7 +94,7 @@ engine contract; it does not create a second competing heating specification.
 - The UVI annex's `RENTER` Membership role and largest-remainder wording conflict with the current
   identity and allocation models. Reconcile them; do not copy them into code.
 - `Non-Goals V1` and `README-for-Emir.md` are dated inputs. They contain useful constraints, but
-  later Antworten and register corrections must be recorded in each target doc.
+  later register or original-source corrections must be recorded in each target doc.
 
 ### Transcription gate
 
@@ -118,9 +117,9 @@ Current trace status after merged `docs/09`, `docs/15` and approved `docs/12` tr
   supporting evidence. Slice A assigns every remaining Page 01b case.
 - Page 02 now has a complete source-section trace, all 32 allocable and 11 non-allocable catalogue
   identities, and a data-only oracle covering exactly `09-F01…F32`. Its green checks include the
-  Page 01 and Antwort 03 reconciliation. This does not claim current rules-store or NK behavior.
+  approved Page-01 block-(b) reconciliation. This does not claim current rules-store or NK behavior.
 - Page 08 has a complete section/register/correspondence trace and an exact executable oracle for
-  `BANKMATCH-F01…F13`. The authoritative later patch resolves F03 as E12 and separates
+  `BANKMATCH-F01…F13`. Approved `docs/15` and its oracle resolve F03 as E12 and separate
   `isPotentialDuplicate` Review from silent same-ID re-import dedupe. Emir approved the
   transcription on 20.08.2026 and the slice is merged. Green data-only checks do not claim
   production behavior.
@@ -144,25 +143,14 @@ Current trace status after merged `docs/09`, `docs/15` and approved `docs/12` tr
 Source ownership stays explicit during all three phases:
 
 - repository code, `CLAUDE.md` and this plan control shipped architecture and current status;
-- `berkay-work/` controls legal and calculation rules, subject to the source precedence above;
+- original Pages/annexes and the authoritative register feed approved docs under the source
+  precedence above;
 - `docs/00`–`docs/08` record dependencies on material assigned by the source registry to
   `docs/09`–`docs/16`; they do not duplicate those detailed contracts.
 
-The correspondence-retirement scope is exactly:
-
-- `FEEDBACK-to-Berkay-01b.md`;
-- `FRAGEN-an-Berkay-02.md`;
-- `FRAGEN-an-Berkay-03.md`;
-- `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md`;
-- `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md`;
-- `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md`;
-- `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md`.
-
-Until D3 passes, these files remain source inputs and must not be deleted or edited merely to remove
-a conflict. Every section must be mapped to one target doc section, one golden fixture, an explicit
-superseded-history note, or the single unresolved-question file. Git preserves the retired
-correspondence history after deletion; the approved `docs/` transcription becomes the durable
-project knowledge.
+The exact seven-file retirement scope and every section-level disposition live only in `docs/03`
+Appendix D. Git preserves the deleted text. Approved docs, fixtures and the current round-four
+question file preserve the durable rule, arithmetic, supersession and unresolved-source knowledge.
 
 **Phase D1 — complete; approved 17.08.2026; final reconciliation closed 18.08.2026.** The completed
 reconciliation changed documentation and data-only fixtures, not implementation source, and
@@ -191,10 +179,10 @@ must identify the originating correspondence file and section, the destination, 
 is current, superseded or still unresolved. Information assigned to `docs/09`–`docs/16` remains in
 the retirement ledger for D2 instead of being duplicated into an existing doc.
 
-**Phase D2 — only after D1 approval.** Create `docs/09`–`docs/16` as separate source-backed spec
-slices. The source registry above owns each Berkay Page-to-doc and fixture assignment; do not
-duplicate that registry here. Every slice includes its complete coverage table and golden fixtures,
-then stops for review with no implementation. Preserve this dependency order:
+**Phase D2 — complete; approved 21.08.2026.** `docs/09`–`docs/16` were created as separate
+source-backed spec slices. The source registry above owns each Berkay Page-to-doc and fixture
+assignment; do not duplicate that registry here. Every slice includes its complete coverage table
+and golden fixtures and was reviewed without implementation. The dependency order was:
 
 1. `docs/09`;
 2. `docs/15`;
@@ -203,16 +191,17 @@ then stops for review with no implementation. Preserve this dependency order:
 5. `docs/13`;
 6. `docs/14`, only after `docs/09`–`docs/11`.
 
-During D2, finish the correspondence-retirement ledger by extracting every remaining settled item
-into `docs/09`–`docs/16` and their golden fixtures. Do not delete the correspondence at the D2 exit.
-Stop for Emir's review and approval first.
+During D2, every remaining settled item was extracted into `docs/09`–`docs/16` and their golden
+fixtures. The correspondence stayed in place at the D2 exit and was retired only after Emir's D3
+approval.
 
-**Phase D3 — only after D2 approval.** Retire the correspondence without losing information:
+**Phase D3 — complete; approved 21.08.2026.** The correspondence was retired without losing
+information:
 
 1. Prove that every section of all seven files is mapped to an approved doc section, golden fixture,
    superseded-history note or unresolved item.
-2. Create `FRAGEN-an-Berkay-04.md` only if genuine questions remain. It contains no settled history,
-   completed requests or implementation status.
+2. Keep one current round-four question file because genuine source questions remain. It contains
+   no settled history, completed requests or implementation status.
 3. Verify the target docs preserve every rule, correction, source reference, supersession,
    verification flag and unresolved risk. Preserve exact arithmetic in fixtures rather than copying
    long worked examples into prose.
@@ -221,14 +210,17 @@ Stop for Emir's review and approval first.
    source model.
 5. Verify that no live repository reference depends on any retiring path and that no unresolved item
    is left only in Git history.
-6. Delete the seven files together, inspect the complete deletion diff, and stop for Emir's approval.
+6. Delete the seven files together and inspect the complete deletion diff. Emir approved the
+   retirement on 21.08.2026.
 
-Implementation resumes only after D3 has passed and Emir has approved the retirement diff. At that
-point the approved `docs/00`–`docs/16`, their golden fixtures, the original Pages and annexes, and
-the Rechtsstand register form the complete implementation baseline. Later slices and milestones use
-that baseline; they do not restart transcription or silently reinterpret a source.
+The approved `docs/00`–`docs/16`, their golden fixtures, the original Pages and annexes, and the
+Rechtsstand register now form the complete implementation baseline. Later slices and milestones use
+that baseline; they do not restart transcription or silently reinterpret a source. Berkay's open
+Page 01b answers are not required to start Slice A. The exact block-(c) wording and reduction-
+cumulation choice remain explicit source gaps and may not be guessed or presented as production-
+approved behavior.
 
-The documentation program is complete only when:
+The completed documentation program satisfies all four conditions:
 
 1. every existing doc is reconciled and every planned `docs/09`–`docs/16` file is approved;
 2. every Page, annex, register row and correspondence section has a documented destination or an
@@ -253,8 +245,8 @@ not replace the complete documentation or reconciliation gates.
 | --- | --- | --- | --- |
 | D1 | **complete; approved 17.08.2026; final reconciliation closed 18.08.2026** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. |
 | D2 | **complete; approved 21.08.2026** | Create source-backed `docs/09`–`docs/16` | All assigned transcriptions are approved and merged, including `docs/14`; the final `docs/07` tax/archive reconciliation is approved. The phase added documentation and data-only fixtures, not investment implementation. |
-| D3 | After D2 approval | Complete extraction and retire Berkay correspondence | Close the seven-file coverage ledger, create only one current `FRAGEN-an-Berkay-04.md` if needed, update governance references, verify no dependent paths, delete the seven files together and stop for Emir's approval. |
-| A | Paused for D1–D3 | Reconcile M2 with Page 01b | Integrate the approved Page 01b contract into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
+| D3 | **complete; approved 21.08.2026** | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-four question file, updated governance, permanent dependency guard and joint deletion. |
+| A | **next** | Reconcile M2 with Page 01b | Integrate the approved Page 01b contract into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
 | B | After A | Reconcile M3–M4 with Page 01 | Revalidate the approved Page 01 contract against persisted calculation and extraction, close M3/M4 gaps and leave ledger/finalization work to M6. |
 | C | After B | Reconcile M1 with Page 02 | Revalidate NK eligibility, allocation, classification and rounding against merged `docs/09` and close M1. |
 | M5 | After A–C | Roles, URL context and switcher | Finish the prepared secure bootstrap slice, role enforcement, owner contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
@@ -268,7 +260,7 @@ not replace the complete documentation or reconciliation gates.
 
 ### Slice A — progress and closure
 
-Progress preserved on the current branch:
+Progress preserved in the current implementation baseline:
 
 - The complete source trace and 34-ID data oracle are transcribed. The three earlier Page 01b fixes
   remain green for their bounded scope.
@@ -314,6 +306,10 @@ spec-closed and the full and demo gates pass. The three earlier Page 01b fixes r
 for their named scope; they do not count as full Page 01b coverage. UVI implementation is no longer
 blocked by the co2online licence, but it remains blocked until `docs/16`, the shared guard
 foundation and Slice A are approved and green. A real § 6a output must still be checked later.
+
+Slice A may start before Berkay answers the current Page 01b questions. It must implement and test
+the settled contract first, keep the two open choices visible, and stop before any output or
+production claim that would require guessing their answer.
 
 ### M7 value warning
 
@@ -438,7 +434,7 @@ Slice B, without bypassing review or tenant-document isolation.
 
 ---
 
-## 4. M5 remainder — paused until D1–D3 and Slices A–C close
+## 4. M5 remainder — paused until Slices A–C close
 
 ### Prepared on the unmerged `slice/m5-bootstrap-contexts`
 
@@ -621,14 +617,10 @@ registry above remains authoritative. Create these only in D2 and in its depende
 
 M0 is complete. M1–M4 are the current green, demoable floor: a persisted-data operating-cost and
 heating calculation view with CO₂ allocation and tenant isolation. They are not yet fully
-spec-closed. D1 is complete; approved 17.08.2026; final reconciliation closed 18.08.2026.
-`docs/09` and the approved `docs/15`, `docs/12`, `docs/16`, `docs/10`, `docs/11`, `docs/13` and
-`docs/14` transcriptions are merged. D2 is complete and approved. Implementation remains paused;
-D3 still requires Emir's instruction and review.
-After all three
-documentation and correspondence-retirement gates are approved, Slices
-A–C retain their order and reconcile implementation
-with Pages 01b, 01 and 02 before feature work continues. The finalized tenant document still waits
-for M6.
+spec-closed. D1 is complete; approved 17.08.2026; final reconciliation closed 18.08.2026. D2 and all
+`docs/09`–`docs/16` transcriptions are complete, approved and merged. D3 is complete and approved;
+the correspondence retirement closes the documentation program. Slice A is next. Slices A–C retain
+their order and reconcile implementation with Pages 01b, 01 and 02 before feature work continues.
+The finalized tenant document still waits for M6.
 
 Protect that floor. Correctness comes before breadth. If work stops, stop at a green state.

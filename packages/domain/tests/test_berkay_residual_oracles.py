@@ -2,8 +2,8 @@
 
 Spec: `docs/02-data-model.md` -> "The Eigentümeranteil is a residual line, not a
 party"; `docs/08` -> "Die Eigentümerzeile" § 5. Sources:
-`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 and § 6 items 1-3 (14.08.2026);
-`berkay-work/Spec-Seiten/01 · Die Abrechnung ….md` -> **D12** and **08-F21**
+approved `docs/03` § 9.2 and `docs/08` owner-residual rules;
+original Page 01 -> **D12** and **08-F21**
 (line 757); `berkay-work/Spec-Seiten/02 · BetrKV — Betriebskosten-Katalog ….md`
 -> `09-F07` (his `08-F22`), `09-F08`, `09-F19` (his `08-F21`).
 

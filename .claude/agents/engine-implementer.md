@@ -41,9 +41,8 @@ Rounding is **per engine** — do not "correct" one to the other (`CLAUDE.md` Do
   `distribute_cents` there.**
 
 The owner bucket is **one residual line per Liegenschaft and Kostenart**, never a party derived
-from occupancy, and it exists even when nothing is vacant (Berkay
-`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1, Seite 01 D12: *"ALWAYS as a residual, NEVER computed
-separately"*). Two consequences that look like bugs and are not: where a figure could be computed
+from occupancy, and it exists even when nothing is vacant (`docs/02` § 5, `docs/03` § 9.2 and
+original Page 01 D12: *"ALWAYS as a residual, NEVER computed separately"*). Two consequences that look like bugs and are not: where a figure could be computed
 per unit **or** taken as the residual, **the residual is what ships**, so a per-unit recomputation
 that disagrees by a cent is the rounding difference and not an error to chase; and a fully-let
 building's Eigentümer line is typically **−0,01 €**, because half-up biases the renter shares

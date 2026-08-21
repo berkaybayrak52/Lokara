@@ -6,7 +6,8 @@ Read this file first. Then read `PLAN.md` and the relevant file under `docs/`.
 - `PLAN.md` defines what is built and what comes next.
 - `lokara-arch.md` defines the architecture.
 - `AGENTS.md` defines how agents execute work.
-- For calculation rules, `berkay-work/` overrides `docs/`, and `docs/` overrides code.
+- For calculation rules, original Pages/annexes and the Rechtsstand register feed the approved
+  `docs/00`–`docs/16`; approved docs then control implementation.
 
 The current stack is v4: FastAPI and pure Python engines, Supabase Postgres, Next.js, Bun,
 Turborepo, shadcn/ui and shared TypeScript packages. There is one backend, and it is Python.
@@ -80,20 +81,23 @@ Login has one bounded exception because it must find the Person before account c
 
 For calculations, use this order:
 
-1. `berkay-work/`
-2. `docs/`
-3. engines and application code
+1. original Pages and annexes under `berkay-work/Spec-Seiten/`, plus the authoritative register;
+2. their approved transcription in `docs/00`–`docs/16` and committed golden fixtures;
+3. engines and application code.
 
 Rules:
 
 - Agents must not change `berkay-work/` without Emir's explicit permission.
 - Its maintained top level contains only `Rechtsstand-Register/` and `Spec-Seiten/`.
+- Retired correspondence is not source authority. Git preserves it, and `docs/03` Appendix D is
+  its sole historical disposition ledger.
 - Do not copy Berkay's exports into `docs/`. Transcribe the rule, inputs, formula, edge cases, legal
   basis and `Rechtsstand`.
-- Every transcription names its exact source file in `berkay-work/`.
+- Every transcription names its original Page, annex or register source in `berkay-work/`.
 - If no suitable `docs/` file exists, create one and link it from `README.md`.
 - Turn worked examples into tests, not long documentation sections.
-- If Berkay's material contradicts `docs/`, stop and ask. Do not choose silently.
+- If an original Page, annex or register contradicts its approved doc, stop and ask. Do not choose
+  silently.
 - When a confirmed spec supersedes an old rule, update every affected doc and agent instruction.
   Record the reason in the transcribed spec so the old rule is not restored later.
 

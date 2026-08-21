@@ -88,9 +88,9 @@ verification before customer documents are sent.
 Lokara consumes a licensed PSD2/AIS provider; it does not become an AISP. finAPI/Tink remain
 provider candidates behind the bank adapter. The current bank edge is a stub.
 
-The Page 08 matching contract is complete and approved on `slice/docs-15-f03`, but not merged yet.
-The authoritative patch resolved `BANKMATCH-F03` as the two-part E12 duplicate case. No production
-bank matching, receivable or payment ledger exists.
+The Page 08 matching contract is complete, approved and merged in `docs/15`. That approved doc and
+its oracle preserve `BANKMATCH-F03` as the two-part E12 duplicate case. No production bank matching,
+receivable or payment ledger exists.
 
 ## D6 — Transactional email
 

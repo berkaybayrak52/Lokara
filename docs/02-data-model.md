@@ -330,9 +330,9 @@ production catalogue or Page 02 gate is wired, and the missing register rows and
 classifications remain `verify-before-production`. Slice C owns production NK eligibility,
 classification, renter half-up allocation and owner-residual integration.
 
-The Page 08 bank-matching contract is **complete and approved but unmerged** on
-`slice/docs-15-f03`. The authoritative patch resolves `BANKMATCH-F03` as E12 and distinguishes
-potential-duplicate Review from silent same-ID re-import dedupe. The thirteen-case oracle supplies
+The Page 08 bank-matching contract is **complete, approved and merged** in `docs/15`. That approved
+doc and its oracle resolve `BANKMATCH-F03` as E12 and distinguish potential-duplicate Review from
+silent same-ID re-import dedupe. The thirteen-case oracle supplies
 no current receivable, ledger or bank-matching implementation.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
@@ -359,8 +359,8 @@ guard system; null means not applicable for a device such as a heat-cost allocat
 
 ### The Eigentümeranteil is a residual line, not a party
 
-This model is fixed by Page 01 D0/D12 and edge cases E3, E17 and E19, as clarified by
-`Antwort-an-Emir_02.md` § 1. It is a model rule, not a Lokara convention. The fictional person count
+This model is fixed by original Page 01 D0/D12 and edge cases E3, E17 and E19, and preserved in
+approved `docs/03` § 9.2. It is a model rule, not a Lokara convention. The fictional person count
 that can feed a vacancy denominator retains its own `verify-before-production` flag; that does not
 make the residual destination optional.
 
@@ -556,7 +556,7 @@ approved `docs/11` adds no schema or API.
 | Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Future** | M5 remainder |
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
 | Page 02 production catalogue, classifications, NK half-up rounding and owner residual | Merged specification; production missing and flags remain | Slice C |
-| Page 08 bank-matching specification | **Approved but unmerged** on `slice/docs-15-f03`; F03 resolved with all thirteen oracle cases executable | D2 / `slice/docs-15-f03` |
+| Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |

@@ -1,4 +1,4 @@
-"""Data-only, cent-exact oracles transcribed from Berkay Page 08 and its F03 patch.
+"""Data-only, cent-exact oracle for original Page 08 and approved `docs/15`.
 
 All thirteen promised cases are executable dictionaries.  This module contains
 only source-stated values and imports no production code.

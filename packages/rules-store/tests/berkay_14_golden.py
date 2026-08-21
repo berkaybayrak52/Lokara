@@ -247,18 +247,6 @@ PAGE_07_SOURCE_EXCLUSIONS: Final = (
     "purchase_ranking_recommendations",
     "bank_pdf_valuation_credit_and_application_claims",
 )
-CORRESPONDENCE_RETIREMENT_FILES: Final = (
-    "FEEDBACK-to-Berkay-01b.md",
-    "FRAGEN-an-Berkay-02.md",
-    "FRAGEN-an-Berkay-03.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md",
-    "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md",
-)
-CORRESPONDENCE_DISPOSITION: Final = {
-    path: "no_page_07_content" for path in CORRESPONDENCE_RETIREMENT_FILES
-}
 FUTURE_CONTRACTS: Final = (
     "pruefobjekt_input_snapshot",
     "financing_and_afa_provenance",

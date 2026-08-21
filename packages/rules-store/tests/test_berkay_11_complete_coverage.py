@@ -3,7 +3,6 @@
 from berkay_11_golden import (
     ARITHMETIC_AUDIT,
     CONVENTION_IDS,
-    CORRESPONDENCE_RETIREMENT_FILES,
     EDGE_05_SUBCASES,
     EDGE_CASE_IDS,
     EXTF_WORKING_CONVENTION,
@@ -50,7 +49,7 @@ def test_fixture_and_namespace_surfaces_are_exact() -> None:
     assert EDGE_05_SUBCASES == ("11-E05a", "11-E05b", "11-E05c")
 
 
-def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None:
+def test_complete_source_register_and_non_goal_surfaces() -> None:
     assert len(PAGE_04_SOURCE_SECTIONS) == 14
     assert len(set(PAGE_04_SOURCE_SECTIONS)) == 14
     assert PAGE_04_REGISTER_PAGE.startswith("04 · Anlage V + DATEV-Export (")
@@ -71,8 +70,6 @@ def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None
         "AfA-, Zins- und Disagio-Berechnung kommt fertig von Seite 03",
         "Umlageschlüssel, NK-Arithmetik, Fristen und UVI bleiben auf Seiten 01/02/05",
     )
-    assert len(CORRESPONDENCE_RETIREMENT_FILES) == 7
-    assert len(set(CORRESPONDENCE_RETIREMENT_FILES)) == 7
 
 
 def test_future_contract_and_blocker_surfaces_stay_data_only_and_unverified() -> None:

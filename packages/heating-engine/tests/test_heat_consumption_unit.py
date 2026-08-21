@@ -32,8 +32,8 @@ Four rules, all from `docs/08`:
 allocated by; `TestNoEuroMoves` is the guard on that.
 
 **Re-shaped 14.08.2026 — and still no euro moves.** The Eigentümeranteil is one
-residual line per Liegenschaft rather than a party (`berkay-work/
-Antwort-an-Emir_02.md` § 1, `docs/02`), so this building's Leerstand row moved
+residual line per Liegenschaft rather than a party (`docs/02` § 5 and `docs/03`
+§ 9.2), so this building's Leerstand row moved
 from `lines` to `result.owner_residual` carrying the same 128.110 — one landlord
 party, whose amount already *was* the residual. Its 103,75 HKV-Einheiten are
 still inside the denominator the unit labels; they are just no longer a party's

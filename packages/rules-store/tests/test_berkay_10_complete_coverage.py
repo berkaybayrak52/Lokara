@@ -3,7 +3,6 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from berkay_10_golden import (
-    CORRESPONDENCE_RETIREMENT_FILES,
     PAGE_02_AFA_CLASS_PROPOSALS,
     PAGE_03_GOLDENS,
     PAGE_03_NON_GOALS,
@@ -43,7 +42,7 @@ def test_fixture_surface_is_exactly_10_f01_through_10_f34() -> None:
     assert set(PAGE_03_GOLDENS) == EXPECTED_IDS
 
 
-def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None:
+def test_complete_source_register_and_non_goal_surfaces() -> None:
     assert len(PAGE_03_SOURCE_SECTIONS) == 13
     assert len(set(PAGE_03_SOURCE_SECTIONS)) == 13
     assert PAGE_03_REGISTER_PAGE.startswith("03 · AfA (Abschreibung) (")
@@ -57,8 +56,6 @@ def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None
     assert all(row[8] == "07/2026" for row in PAGE_03_REGISTER_ROWS)
     assert len(PAGE_03_NON_GOALS) == 13
     assert len(set(PAGE_03_NON_GOALS)) == 13
-    assert len(CORRESPONDENCE_RETIREMENT_FILES) == 7
-    assert len(set(CORRESPONDENCE_RETIREMENT_FILES)) == 7
 
 
 def test_acquisition_cost_ordering_and_all_three_allocation_routes_reconcile() -> None:

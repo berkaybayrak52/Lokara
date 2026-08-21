@@ -31,8 +31,8 @@ from different inputs. They are **two data paths** and must never be asserted
 against each other. Nothing in this file mixes them; do not "unify" them.
 
 ⛔ **AMENDED 14.08.2026 — the owner bucket is one Liegenschafts-Residuum.**
-`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1 replaced the
-model this file was written against: the Eigentümeranteil is not a party derived
+Approved `docs/03` § 9.2 replaced the model this file was written against: the
+Eigentümeranteil is not a party derived
 from vacancy but one structural residual line per Liegenschaft, which exists even when nothing is
 vacant. R1 and R5 themselves were **confirmed and did not change** — what changed
 is where the Verteilungsrest goes and how many rows can hold it. Two consequences
@@ -340,9 +340,8 @@ class TestAFullyLetBlockUsesTheResidualModelToo:
         SUPERSEDED  ("unit-b", 20245, 39366,  6748, 15747,  82106)
         SUPERSEDED  ("unit-c", 13497, 23620,  4499, 10498,  52114)   Σ = 299.935, no owner row
 
-    `Antwort-an-Emir_02.md` § 1.3 Frage 3: *"Euer Largest-Remainder-Vorschlag
-    für den Rest ist damit **nicht** nötig und soll **nicht** verwendet
-    werden."* And § 1.2: the owner bucket exists *"unabhängig von Leerstand,
+    Approved `docs/03` § 9.2 rejects Largest Remainder for a fully let heating
+    block. The owner bucket exists *"unabhängig von Leerstand,
     unabhängig von Belegung"* — there is no Fall B, so there is nothing for a
     second allocation method to cover. **Do not restore the class or its
     table.**

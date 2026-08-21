@@ -10,7 +10,6 @@
 - `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`
 - `berkay-work/Spec-Seiten/Anlagen/Non-Goals V1 3a95fd42073181a5be79cbe2ab8e3e12.md`
 - `berkay-work/Spec-Seiten/Anlagen/README-for-Emir.md`
-- the seven-file correspondence-retirement set listed in § 8
 
 **Fixtures:** exactly `12-F01`–`12-F24` in
 `packages/rules-store/tests/berkay_12_golden.py`
@@ -29,9 +28,9 @@ The complete Page 05, its eighteen Page-05-specific Rechtsstand rows, six shared
 Page 05 Non-Goals section and the arithmetic audit were reconciled. The arithmetic audit confirms
 all 24 printed worked examples cent-exactly. It does not clear a legal or convention flag.
 
-The CSV controls structured values, source, legal nature, flag and Rechtsstand. Page 05 controls
-the expanded rule method, German output and worked examples. No item in the seven correspondence
-files supplies a later Page-05-specific correction.
+The CSV controls structured values, source, legal nature, flag and Rechtsstand. Original Page 05
+controls the expanded rule method, German output and worked examples. `docs/03` Appendix D records
+that the retired correspondence supplied no later Page-05-specific correction.
 
 The following authority gaps remain explicit and block production use of their affected paths:
 
@@ -382,7 +381,7 @@ source arithmetic, not current application behavior.
 | `12-F23` | comparative rent null; 96,000 cap; 16,000 increase; `KAPPUNG_ONLY` |
 | `12-F24` | current 95,000 above 90,000 ceiling; increase clamps to zero |
 
-## 8. Source and correspondence ledger
+## 8. Source coverage ledger
 
 | Source | Destination | Disposition |
 | --- | --- | --- |
@@ -397,15 +396,7 @@ source arithmetic, not current application behavior.
 | shared CSV rows 4, 26, 30, 41, 43, 44 | § 2.2 and oracle metadata | all six shared W1/W4 rows; flags unchanged |
 | Non-Goals V1, Page 05 | § 9 and oracle metadata | all ten exclusions preserved |
 | `Anlagen/README-for-Emir.md` | §§ 1, 7 | 24-case exact arithmetic evidence retained; does not clear red flags |
-| `FEEDBACK-to-Berkay-01b.md` | other assigned docs | no Page-05-owned correction found; retained for D3 ledger |
-| `FRAGEN-an-Berkay-02.md` | `docs/03`/`docs/16` | UVI content questions are transcribed in merged `docs/16`, not W4 cadence; no Page-05 correction |
-| `FRAGEN-an-Berkay-03.md` | other assigned docs | no Page-05-owned correction found; retained for D3 ledger |
-| `Antwort-an-Emir_01b-Uebergabe.md` | `docs/03`/`docs/16` | UVI comparison/fallback content transcribed in merged `docs/16`, not Page-05 cadence |
-| `Antwort-an-Emir_02.md` | `docs/03`/`docs/16` | UVI comparison/licence content transcribed in merged `docs/16`, not Page-05 cadence |
-| `Antwort-an-Emir_03.md` | other assigned docs | no Page-05-owned correction found; retained for D3 ledger |
-| `08_BankMatching_F03_Patch.md` | `docs/15` | no Page-05-owned correction; retained for D3 ledger |
-
-The ledger is complete for Page 05. The files remain present until the D3 retirement gate.
+| Historical correspondence | `docs/03` Appendix D | single retirement ledger; no Page-05 correction |
 
 ## 9. Explicit non-goals and dependencies
 
@@ -431,10 +422,10 @@ checklists. All external providers stay behind adapters.
 ## 10. Approval and implementation boundary
 
 The exact 24-case fixture surface, all Page sections, all eighteen Page-specific register rows, six
-shared rows, ten non-goals and seven correspondence files are mapped. The data-only checks may prove
+shared rows and ten non-goals are mapped. The data-only checks may prove
 coverage and arithmetic, but they do not approve legal rules, resolve authority gaps or demonstrate
 production behavior.
 
-This slice changes documentation and tests only. It makes no production, schema, migration, API,
-engine, adapter, UI or PDF change. Implementation remains paused until the documentation program
-and Emir's later implementation authorization permit it.
+This specification slice changed documentation and tests only. It made no production, schema,
+migration, API, engine, adapter, UI or PDF change. The D1–D3 documentation program is complete;
+Page-05 implementation remains assigned to the later guard stages in `PLAN.md`.

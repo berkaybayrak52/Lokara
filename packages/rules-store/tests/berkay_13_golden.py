@@ -247,16 +247,6 @@ PAGE_06_SOURCE_EXCLUSIONS: Final = (
     "steuerliche Berechnung der Eigennutzung",
 )
 
-CORRESPONDENCE_RETIREMENT_FILES: Final = (
-    "FEEDBACK-to-Berkay-01b.md",
-    "FRAGEN-an-Berkay-02.md",
-    "FRAGEN-an-Berkay-03.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md",
-    "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md",
-)
-
 FUTURE_CONTRACTS: Final = (
     "versioned_clause_reference",
     "contract_composition",

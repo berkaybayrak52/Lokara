@@ -5,7 +5,6 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from berkay_12_golden import (
-    CORRESPONDENCE_RETIREMENT_FILES,
     PAGE_05_GOLDENS,
     PAGE_05_NON_GOALS,
     PAGE_05_REGISTER_FLAGS,
@@ -67,7 +66,7 @@ def test_fixture_surface_is_exactly_12_f01_through_12_f24() -> None:
     assert set(PAGE_05_GOLDENS) == EXPECTED_IDS
 
 
-def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None:
+def test_complete_source_register_and_non_goal_surfaces() -> None:
     assert len(PAGE_05_SOURCE_SECTIONS) == 8
     assert len(set(PAGE_05_SOURCE_SECTIONS)) == 8
     assert len(PAGE_05_REGISTER_ROWS) == 18
@@ -82,8 +81,6 @@ def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None
     assert set(PAGE_05_REGISTER_ROWS).isdisjoint(PAGE_05_SHARED_REGISTER_ROWS)
     assert len(PAGE_05_NON_GOALS) == 10
     assert len(set(PAGE_05_NON_GOALS)) == 10
-    assert len(CORRESPONDENCE_RETIREMENT_FILES) == 7
-    assert len(set(CORRESPONDENCE_RETIREMENT_FILES)) == 7
 
 
 def test_w1_date_arithmetic_and_deadline_states() -> None:

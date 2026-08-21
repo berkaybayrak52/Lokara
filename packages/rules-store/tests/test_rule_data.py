@@ -132,8 +132,8 @@ class TestCo2FallbackEmissionFactors:
     (`docs/06` -> "The demo's energy reference").
 
     F02 is resolved: the authoritative CSV gives Erdgas Hu 0,201 / Ho 0,181
-    plus conversion metadata 0,903. Antwort-an-Emir_01b-Uebergabe.md § 4a/4b
-    confirms that the register wins over the stale 0,2016 / 0,1820 answer.
+    plus conversion metadata 0,903. Approved `docs/03` decision 4 and Appendix C
+    record that the register wins over the stale 0,2016 / 0,1820 pair.
 
     The values are imported inside the focused tests so the surrounding rules
     remain independently collectable if this rule's implementation regresses.

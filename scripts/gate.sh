@@ -52,6 +52,8 @@ run "engine purity"       uv run python scripts/check_engine_purity.py
 # rounding is largest-remainder after CLAUDE.md had split the rule per engine -- an
 # instruction to revert correct code. Cheap check; no DB, no network.
 run "agent parity"        uv run python scripts/check_agent_parity.py
+run "correspondence retirement" uv run python scripts/check_correspondence_retirement.py
+run "retirement checker test" uv run pytest -q scripts/tests/test_correspondence_retirement.py
 
 case "$LEVEL" in
   fast)

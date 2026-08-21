@@ -46,7 +46,7 @@ UVI_EXAMPLES: Final[dict[str, dict[str, object]]] = {
         "delta_kwh": -140,
         "percent": "-13.5",
     },
-    "antwort_02_block_d2_heat_only": {
+    "approved_block_d2_heat_only": {
         "energy_source": "Erdgas",
         "size_class": "250-500",
         "heizspiegel_mittel_kwh_m2a": 114,
@@ -460,7 +460,7 @@ UVI_SOURCE_SECTIONS: Final[tuple[str, ...]] = (
     "Non_Goals_V1_Page_01b_all_11_rows",
     "README_for_Emir_complete_relevant_audit",
     "Rechtsstand_register_12_rows",
-    "seven_file_correspondence_ledger",
+    "historical_disposition_docs_03_appendix_d",
 )
 
 
@@ -479,25 +479,6 @@ UVI_NON_GOALS: Final[tuple[str, ...]] = (
 )
 
 
-CORRESPONDENCE_RETIREMENT_LEDGER: Final[dict[str, str]] = {
-    "FEEDBACK-to-Berkay-01b.md": "section_8_dwd_notice_k13_questions_resolved_or_retained_here",
-    "FRAGEN-an-Berkay-02.md": "sections_2_to_4_superseded_by_antwort_02_heat_only_fallback_license",
-    "FRAGEN-an-Berkay-03.md": "section_3_confirms_heat_only_d2_supersession",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md": (
-        "sections_5_to_8_current_dwd_notice_and_d2_history"
-    ),
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md": (
-        "sections_2_to_4_current_heat_only_deductions_fallback_and_license"
-    ),
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md": (
-        "section_3_current_confirmation_of_heat_only_comparison"
-    ),
-    "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md": (
-        "no_uvi_owned_content_docs_15"
-    ),
-}
-
-
 SUPERSESSION_LEDGER: Final[dict[str, object]] = {
     "dwd_minimum_0_50": "replaced_by_0_40_after_observed_0_49",
     "latest_state_april_2026_end": "replaced_by_verified_may_2026_end_file",
@@ -509,7 +490,7 @@ SUPERSESSION_LEDGER: Final[dict[str, object]] = {
         "norm_month_kwh": 1_733,
         "delta_kwh": 467,
         "percent": "27.0",
-        "status": "history_only_replaced_by_antwort_02_heat_only_example",
+        "status": "history_only_replaced_by_approved_heat_only_example",
     },
     "missing_over_500_omit_or_extrapolate": "use_250_500_with_visible_label",
 }

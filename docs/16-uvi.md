@@ -16,10 +16,9 @@ remains effective.
   3a95fd420731814e9e5be043028d4856.md`
 - `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
 - `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`
-- the later correspondence mapped in § 15
 
-The structured register controls values and production flags. Later Antworten control explicit
-method corrections. The data-only oracle is
+The structured register controls values and production flags. Approved supersessions in this
+document control explicit method corrections. The data-only oracle is
 `packages/rules-store/tests/berkay_uvi_golden.py`; its checks prove transcription and arithmetic,
 not implementation or legal approval. The oracle uses source names instead of inventing a
 `16-Fxx` namespace.
@@ -63,8 +62,8 @@ transcription.
 
 ## 2. Legal and register inventory
 
-The twelve relevant CSV rows are reproduced with their flags intact. Later correspondence may
-clarify a method, but it does not silently change the CSV flag.
+The twelve relevant CSV rows are reproduced with their flags intact. Approved method corrections
+below do not silently change a CSV flag.
 
 | CSV row | Value | Source and basis | Nature · flag · Rechtsstand |
 | ---: | --- | --- | --- |
@@ -81,7 +80,7 @@ clarify a method, but it does not silently change the CSV flag.
 | 51 | non-consumption/readings billing requires only § 6a Abs. 3 Nr. 2 and 3 | § 6a Abs. 5 | Verordnung · `verify-before-production` · 07/2026 |
 | 117 | W4 due at month end; year-round versus heating-season-only remains uncertain | § 6a Abs. 1 Nr. 2 | Konvention · `verify-before-production` · 10/2023 |
 
-Antwort 01b identifies the BMWi/BMI notice as “Regeln für Energieverbrauchswerte im
+The approved source trace identifies the BMWi/BMI notice as “Regeln für Energieverbrauchswerte im
 Wohngebäudebestand”, 29.03.2021, BAnz AT 16.04.2021 B1. Its direction supports K12. Whether the
 notice published under GEG § 82 is legally the intended § 6a notice remains pre-legal and does not
 clear row 11. The notice's 36-month/three-factor energy-certificate method must not enter either
@@ -377,7 +376,7 @@ slice.
 | `emir_spec_block_b_previous_month` | `900 - 850 = +50 kWh; +5.9%` |
 | `emir_spec_block_c_weather_adjusted` | arithmetic-only `590/620` case: `952, -52, -5.5%` |
 | `emir_spec_block_d_building_cross_section` | three valid units including target: `1,040, -140, -13.5%` |
-| `antwort_02_block_d2_heat_only` | `114 - 24`, then `1,368, +132, +9.6%` |
+| `approved_block_d2_heat_only` | `114 - 24`, then `1,368, +132, +9.6%` |
 | `approved_hkv_provisional` | measured rolling building total, visible provisional label, missing-total block |
 | `approved_block_c_raw_weather_fallback` | raw `-100, -10.0%`, visibly not weather-adjusted |
 | `approved_linear_mid_month_interpolation` | elapsed-day boundaries and provenance; February `280 kWh` |
@@ -386,7 +385,7 @@ slice.
 | `HEIZSPIEGEL_2025_ROWS` | all 18 source rows exactly |
 | `HEIZSPIEGEL_D2_CONTRACT` | deductions, heat-pump exception, non-positive guard, fallback and attribution |
 | `UVI_REGISTER_ROWS` | exact 12-row identity and every production flag |
-| `UVI_SOURCE_SECTIONS` | annex/Page/W4/register/non-goal/audit/correspondence coverage |
+| `UVI_SOURCE_SECTIONS` | annex/Page/W4/register/non-goal/audit coverage |
 
 ## 14. Explicit non-goals and boundaries
 
@@ -409,7 +408,7 @@ Annual billing consumption, annual heating-money allocation, § 9 warm-water mon
 contract/letter content, legal advice, an appropriateness verdict and a second identity-role model
 are also outside this document.
 
-## 15. Complete source and correspondence ledger
+## 15. Complete source ledger
 
 | Source | Destination | Disposition |
 | --- | --- | --- |
@@ -424,15 +423,7 @@ are also outside this document.
 | register CSV rows 4, 11, 17, 21, 29, 30, 35, 43, 45, 50, 51, 117 | § 2 and oracle | every value/source/basis/nature/Rechtsstand/flag retained |
 | Non-Goals V1 Page 01b | § 14 and oracle | all eleven entries mapped; dated deferral preserved |
 | README-for-Emir | introduction, §§ 2, 12 | arithmetic evidence retained; no red flag cleared |
-| `FEEDBACK-to-Berkay-01b.md` | §§ 1, 2, 9, 16 | § 8 DWD/notice/K13 questions resolved or retained; old largest-remainder question belongs to `docs/03` history |
-| `FRAGEN-an-Berkay-02.md` | §§ 1, 8, 16 | §§ 2–4 superseded by Antwort 02 heat-only, over-500 and licence decisions |
-| `FRAGEN-an-Berkay-03.md` | §§ 1, 8, 16 | § 3 confirms heat-only D2; other sections stay owned by `docs/03`/`docs/08` |
-| `Antwort-an-Emir_01b-Uebergabe.md` | §§ 1, 2, 8–9, 16 | DWD corrections, notice evidence and D2 history current; open legal identity retained |
-| `Antwort-an-Emir_02.md` | §§ 1, 8, 16 | heat-only deductions, guard, over-500 fallback and licence decision current |
-| `Antwort-an-Emir_03.md` | §§ 1, 8, 16 | heat-only confirmation current; no second heating allocation imported |
-| `08_BankMatching_F03_Patch.md` | `docs/15` | no UVI-owned content; exact seven-file ledger entry retained |
-
-The ledger is complete for this document. No correspondence file is edited or deleted in D2.
+| Historical correspondence | `docs/03` Appendix D | single retirement ledger; all UVI corrections above remain durable |
 
 ## 16. Compact supersession and unresolved ledger
 
@@ -457,5 +448,5 @@ The ledger is complete for this document. No correspondence file is edited or de
 
 This slice is documentation plus data-only fixtures. It changes no production, schema, migration,
 API, engine, adapter, UI or PDF code. Passing oracle tests proves that the sources, arithmetic,
-flags, non-goals and correspondence coverage were transcribed. It does not demonstrate a working
+flags, non-goals and historical dispositions were transcribed. It does not demonstrate a working
 UVI, clear the unresolved monthly DWD authority, or authorize implementation.
