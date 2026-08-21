@@ -26,6 +26,7 @@ from lokara_domain import (
 )
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -613,6 +614,14 @@ class Meter(Base):
     serial: Mapped[str]  # Zählernummer as printed on the device
     label: Mapped[str | None]  # e.g. "Küche" when a flat has several
     calibration_valid_until: Mapped[date | None]
+    # Exact K11 factor × 1000.  Every heat device (including a kWh main
+    # meter) has a factor; water meters do not participate in H5.
+    valuation_factor_x1000: Mapped[int | None] = mapped_column(
+        BigInteger,
+        default=lambda context: (
+            1000 if context.get_current_parameters().get("kind") is MeterKind.HEAT else None
+        ),
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     building: Mapped["Building"] = relationship(
@@ -636,6 +645,12 @@ class Meter(Base):
         _scoped_fk("meter", "unit_id", "unit"),
         _scoped_pair("meter"),
         UniqueConstraint("building_id", "serial"),
+        CheckConstraint(
+            "(kind = 'HEAT' AND valuation_factor_x1000 IS NOT NULL "
+            "AND valuation_factor_x1000 > 0) OR "
+            "(kind <> 'HEAT' AND valuation_factor_x1000 IS NULL)",
+            name="ck_meter_heat_valuation_factor",
+        ),
         Index("ix_meter_account", "account_id"),
         Index("ix_meter_building", "building_id"),
         Index("ix_meter_unit", "unit_id"),
@@ -665,6 +680,13 @@ class MeterReading(Base):
     reason: Mapped[ReadingReason]
     source: Mapped[ReadingSource]
     note: Mapped[str | None]
+    # Optional exact assignment/evidence for H5.  A tenant-change reading can
+    # be tied to its tenancy; an estimate carries its already normalized
+    # consumption × 1000 plus the basis and source reference.
+    tenancy_id: Mapped[str | None]
+    estimated_consumption_x1000: Mapped[int | None] = mapped_column(BigInteger)
+    estimation_basis: Mapped[str | None]
+    provenance_ref: Mapped[str | None]
     recorded_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     meter: Mapped["Meter"] = relationship(
@@ -675,8 +697,16 @@ class MeterReading(Base):
 
     __table_args__ = (
         _scoped_fk("meter_reading", "meter_id", "meter"),
+        _scoped_fk("meter_reading", "tenancy_id", "tenancy"),
+        CheckConstraint(
+            "(estimated_consumption_x1000 IS NULL AND estimation_basis IS NULL) OR "
+            "(estimated_consumption_x1000 IS NOT NULL AND estimated_consumption_x1000 >= 0 "
+            "AND estimation_basis IS NOT NULL)",
+            name="ck_meter_reading_estimate_basis",
+        ),
         Index("ix_meter_reading_account", "account_id"),
         Index("ix_meter_reading_meter", "meter_id"),
+        Index("ix_meter_reading_tenancy", "tenancy_id"),
     )
 
 

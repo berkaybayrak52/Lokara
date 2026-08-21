@@ -21,20 +21,25 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Protocol
+from itertools import pairwise
+from typing import Literal, Protocol
 
 from lokara_domain import MeasurementUnit, MeterKind, ReadingReason, ReadingSource
 
 __all__ = [
     "MeasurementUnit",
     "MeterConsumption",
+    "MeterDevice",
+    "MeterDeviceSegmentation",
     "MeterGateway",
     "MeterKind",
     "MeterReading",
+    "MeterReadingSpan",
     "ReadingReason",
     "ReadingSource",
     "StubMeterGateway",
     "consumption_by_meter",
+    "device_reading_segments",
 ]
 
 
@@ -60,6 +65,46 @@ class MeterReading:
     reason: ReadingReason
     source: ReadingSource
     recorded_at: datetime
+    # Page 01b device evidence.  Optional for building meters and old rows;
+    # unit heat devices carry the exact factor and the assignment/evidence
+    # needed to reconstruct tenant-change and estimate segments.
+    meter_serial: str | None = None
+    room: str | None = None
+    valuation_factor: Decimal = Decimal("1.000")
+    tenancy_id: str | None = None
+    estimated_consumption: Decimal | None = None
+    estimation_basis: str | None = None
+    provenance_ref: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class MeterDevice:
+    device_id: str
+    unit_id: str
+    room: str
+    measurement_unit: MeasurementUnit
+    valuation_factor: Decimal
+
+
+@dataclass(frozen=True)
+class MeterReadingSpan:
+    device_id: str
+    allocation_kind: Literal["PARTY", "OWNER", "ANNUAL_UNSEGMENTED"]
+    target_id: str | None
+    opening: Decimal | None
+    closing: Decimal | None
+    previous_period_units: Decimal | None
+    estimation_basis: str | None
+    reading_reasons: tuple[ReadingReason, ...]
+    reading_sources: tuple[ReadingSource, ...]
+    provenance_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MeterDeviceSegmentation:
+    devices: tuple[MeterDevice, ...]
+    spans: tuple[MeterReadingSpan, ...]
 
 
 class MeterGateway(Protocol):
@@ -134,6 +179,80 @@ def consumption_by_meter(
             value=value,
         )
     return consumption
+
+
+def _effective_by_meter(
+    readings: Iterable[MeterReading],
+) -> dict[str, list[MeterReading]]:
+    latest: dict[str, dict[date, MeterReading]] = {}
+    for reading in readings:
+        by_date = latest.setdefault(reading.meter_id, {})
+        previous = by_date.get(reading.read_at)
+        if previous is None or reading.recorded_at >= previous.recorded_at:
+            by_date[reading.read_at] = reading
+    return {
+        meter_id: [by_date[read_at] for read_at in sorted(by_date)]
+        for meter_id, by_date in latest.items()
+    }
+
+
+def device_reading_segments(readings: Iterable[MeterReading]) -> MeterDeviceSegmentation:
+    """Normalize effective unit-heat readings into H5 device/span evidence.
+
+    Corrections are resolved by ``recorded_at`` without deleting their source
+    rows.  Device changes remain separate meter ids.  A tenancy id assigns a
+    measured span directly; an unassigned tenant-change span belongs to the
+    owner, while ordinary annual readings remain explicitly unsegmented for K3.
+    """
+
+    devices: list[MeterDevice] = []
+    spans: list[MeterReadingSpan] = []
+    for meter_id, effective in _effective_by_meter(readings).items():
+        sample = effective[-1]
+        if sample.kind is not MeterKind.HEAT or sample.unit_id is None:
+            continue
+        if not sample.valuation_factor.is_finite() or sample.valuation_factor <= 0:
+            raise ValueError(f"Meter {meter_id}: valuation factor must be finite and > 0")
+        devices.append(
+            MeterDevice(
+                device_id=meter_id,
+                unit_id=sample.unit_id,
+                room=sample.room or sample.meter_serial or meter_id,
+                measurement_unit=sample.measurement_unit,
+                valuation_factor=sample.valuation_factor,
+            )
+        )
+        for opening, closing in pairwise(effective):
+            target_id = closing.tenancy_id
+            if target_id is not None:
+                allocation_kind: Literal["PARTY", "OWNER", "ANNUAL_UNSEGMENTED"] = "PARTY"
+            elif closing.reason is ReadingReason.TENANT_CHANGE:
+                allocation_kind = "OWNER"
+            else:
+                allocation_kind = "ANNUAL_UNSEGMENTED"
+            estimated = closing.estimated_consumption
+            provenance = tuple(
+                dict.fromkeys(
+                    ref
+                    for ref in (opening.provenance_ref, closing.provenance_ref)
+                    if ref is not None
+                )
+            )
+            spans.append(
+                MeterReadingSpan(
+                    device_id=meter_id,
+                    allocation_kind=allocation_kind,
+                    target_id=target_id,
+                    opening=None if estimated is not None else opening.value,
+                    closing=None if estimated is not None else closing.value,
+                    previous_period_units=estimated,
+                    estimation_basis=closing.estimation_basis,
+                    reading_reasons=(opening.reason, closing.reason),
+                    reading_sources=(opening.source, closing.source),
+                    provenance_refs=provenance,
+                )
+            )
+    return MeterDeviceSegmentation(devices=tuple(devices), spans=tuple(spans))
 
 
 _STUB_RECORDED_AT = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)

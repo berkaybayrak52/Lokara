@@ -64,8 +64,10 @@ The canonical 2025 fixture is:
 
 The tenancy rows supply the dates for NK, heating and the statement. Unit B must therefore show the
 same renter/landlord boundary everywhere. Its heating consumption is split by degree days at
-**583,3/416,7 ‰**, producing **776,52 € / 554,74 €**. No demo layer carries a second occupancy
-timeline.
+**583,3/416,7 ‰**. Page 01b K3 rounds the renter's 145,825 device units to **145,8** and assigns
+the exact **104,2** device-unit residual to the landlord. The resulting shares are
+**776,39 € / 554,87 €**; their **1.331,26 €** pot is unchanged. No demo layer carries a second
+occupancy timeline.
 
 ## Scenario 2 — Heating + CO₂ split
 
@@ -85,7 +87,7 @@ The same building carries one central gas-heating fixture for 2025.
 | CO₂ band result | **60 % landlord / 40 % renters** |
 | CO₂ landlord share | **157,08 €** |
 | Allocable heating cost | **10.142,92 €** |
-| Unit B renter/vacancy split | **583,3/416,7 ‰ = 776,52 € / 554,74 €** |
+| Unit B renter/vacancy split | **583,3/416,7 ‰ → 145,8/104,2 units = 776,39 € / 554,87 €** |
 
 Meter evidence is fixed with the scenario:
 

@@ -221,6 +221,10 @@ export const MeterReadingOutSchema = z.object({
   reason: ReadingReasonSchema,
   source: ReadingSourceSchema,
   note: z.string().nullable(),
+  tenancyId: z.string().nullable(),
+  estimatedConsumptionX1000: z.number().int().nullable(),
+  estimationBasis: z.string().nullable(),
+  provenanceRef: z.string().nullable(),
   recordedAt: z.string(),
   superseded: z.boolean(),
 });
@@ -245,6 +249,8 @@ export const MeterOutSchema = z.object({
   serial: z.string(),
   label: z.string().nullable(),
   calibrationValidUntil: z.string().nullable(),
+  valuationFactorX1000: z.number().int().nullable(),
+  valuationFactorDisplay: z.string().nullable(),
   calibrationStatus: CalibrationStatusSchema,
   readings: z.array(MeterReadingOutSchema),
   periodConsumptionDisplay: z.string().nullable(),
@@ -309,6 +315,58 @@ export const StatementCo2Schema = z.object({
   rechtsstand: z.string(),
 });
 
+export const StatementFindingSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  severity: z.enum(['NOTICE', 'WARNING', 'BLOCKER']),
+  dismissible: z.boolean(),
+});
+
+export const StatementProvenanceSchema = z.object({
+  code: z.string(),
+  source: z.string(),
+  detail: z.string(),
+});
+
+export const StatementDeviceEvidenceSchema = z.object({
+  deviceId: z.string(),
+  unitId: z.string(),
+  room: z.string(),
+  measurementUnit: MeasurementUnitSchema,
+  valuationFactor: z.string(),
+  allocationKind: z.enum(['PARTY', 'OWNER', 'ANNUAL_UNSEGMENTED']),
+  targetId: z.string().nullable(),
+  opening: z.string().nullable(),
+  closing: z.string().nullable(),
+  units: z.string(),
+  estimated: z.boolean(),
+  estimationBasis: z.string().nullable(),
+  readingReasons: z.array(z.string()),
+  readingSources: z.array(z.string()),
+  provenanceRefs: z.array(z.string()),
+});
+
+export const StatementReductionRiskSchema = z.object({
+  code: z.string(),
+  percent: z.string(),
+  amountsEur: z.array(z.string()),
+  message: z.string(),
+});
+
+export const StatementAnnualComparisonSchema = z.object({
+  state: z.enum(['READY', 'RAW_FALLBACK', 'NO_PRIOR']),
+  currentHeat: z.string(),
+  previousHeat: z.string().nullable(),
+  currentHeatAdjusted: z.string().nullable(),
+  previousHeatAdjusted: z.string().nullable(),
+  currentWarmWater: z.string().nullable(),
+  previousWarmWater: z.string().nullable(),
+  rawChangePercent: z.string().nullable(),
+  adjustedChangePercent: z.string().nullable(),
+  graphRequired: z.boolean(),
+  note: z.string().nullable(),
+});
+
 export const DemoStatementResponseSchema = z.object({
   buildingName: z.string(),
   buildingAddress: z.string(),
@@ -322,6 +380,12 @@ export const DemoStatementResponseSchema = z.object({
   heatingTotalEur: z.string(),
   heatingInputTotalCents: z.number().int(),
   heatingMissingReason: z.string().nullable(),
+  heatingReadiness: z.enum(['READY', 'BLOCKED']),
+  heatingFindings: z.array(StatementFindingSchema),
+  heatingProvenance: z.array(StatementProvenanceSchema),
+  heatingDeviceEvidence: z.array(StatementDeviceEvidenceSchema),
+  heatingReductionRisks: z.array(StatementReductionRiskSchema),
+  annualComparison: StatementAnnualComparisonSchema.nullable(),
   co2: StatementCo2Schema.nullable(),
   rechtsstaende: z.array(z.string()),
   disclaimer: z.string(),

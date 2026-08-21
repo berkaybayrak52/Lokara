@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@lokara/ui';
 import Link from 'next/link';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 import { API_URL, ApiError } from '@/lib/api';
 import type { DemoStatementResponse } from '@/lib/contracts';
@@ -80,7 +80,7 @@ export function StatementPage({ accountId }: { accountId: string }) {
   );
 }
 
-function StatementResult({
+export function StatementResult({
   data,
   pdfUrl,
   accountId,
@@ -235,6 +235,132 @@ function StatementResult({
             />
           </>
         )}
+        {data.heatingFindings.map((finding) => (
+          <StatusNote
+            key={finding.code}
+            kind={finding.severity === 'BLOCKER' ? 'danger' : 'warning'}
+            label={finding.severity === 'BLOCKER' ? 'Abrechnung blockiert.' : 'Prüfhinweis.'}
+            className="mt-3"
+          >
+            {finding.message}
+          </StatusNote>
+        ))}
+
+        {data.heatingDeviceEvidence.length > 0 ? (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base">Geräte- und Ableseprotokoll</CardTitle>
+              <CardDescription>
+                Bewertungsfaktor, Zeitraum und Zuordnung bleiben je Gerät nachvollziehbar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableCaption>Ablesesegmente der Heizkostenverteiler</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Gerät / Raum</TableHead>
+                    <TableHead>Zuordnung</TableHead>
+                    <TableHead className="text-right">Ablesung</TableHead>
+                    <TableHead className="text-right">Faktor</TableHead>
+                    <TableHead className="text-right">Einheiten</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.heatingDeviceEvidence.map((line) => (
+                    <TableRow key={`${line.deviceId}-${line.opening}-${line.closing}`}>
+                      <TableCell>
+                        {line.deviceId} · {line.room}
+                      </TableCell>
+                      <TableCell>
+                        {line.allocationKind === 'PARTY'
+                          ? 'Mietverhältnis'
+                          : line.allocationKind === 'OWNER'
+                            ? 'Eigentümer'
+                            : 'Jahreswert'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {line.estimated ? 'geschätzt' : `${line.opening} → ${line.closing}`}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {line.valuationFactor}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{line.units}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {data.heatingProvenance.length > 0 ? (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base">Herkunft der Angaben</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                {data.heatingProvenance.map((entry) => (
+                  <li key={`${entry.code}-${entry.source}`}>
+                    <strong>{entry.source}:</strong> {entry.detail}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {data.heatingReductionRisks.map((risk) => (
+          <StatusNote
+            key={risk.code}
+            kind="warning"
+            label={`${risk.percent}-%-Risiko`}
+            className="mt-3"
+          >
+            {risk.message} Einzelbeträge: {risk.amountsEur.join(' · ')}.
+          </StatusNote>
+        ))}
+
+        {data.annualComparison ? (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base">Verbrauchsvergleich zum Vorjahr</CardTitle>
+              <CardDescription>
+                {data.annualComparison.state === 'READY'
+                  ? 'Heizverbrauch mit bestätigten DWD-Klimafaktoren.'
+                  : data.annualComparison.state === 'RAW_FALLBACK'
+                    ? 'Heizverbrauch unbereinigt; DWD-Klimafaktor fehlt.'
+                    : 'Ein Vorjahresvergleich ist noch nicht möglich.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.annualComparison.graphRequired && data.annualComparison.previousHeat ? (
+                <div
+                  role="img"
+                  aria-label={`Heizverbrauch: Vorjahr ${data.annualComparison.previousHeat}, laufendes Jahr ${data.annualComparison.currentHeat}`}
+                  className="space-y-3"
+                >
+                  <ComparisonBar
+                    label="Vorjahr"
+                    value={data.annualComparison.previousHeat}
+                    current={data.annualComparison.currentHeat}
+                    previous={data.annualComparison.previousHeat}
+                  />
+                  <ComparisonBar
+                    label="Laufendes Jahr"
+                    value={data.annualComparison.currentHeat}
+                    current={data.annualComparison.currentHeat}
+                    previous={data.annualComparison.previousHeat}
+                  />
+                </div>
+              ) : null}
+              {data.annualComparison.note ? (
+                <p className="mt-3 text-sm text-slate">{data.annualComparison.note}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
       </section>
 
       <section aria-label="Dokument" className="flex flex-wrap items-center gap-4">
@@ -247,6 +373,39 @@ function StatementResult({
           {data.rechtsstaende.join(' · ')} — {data.disclaimer}
         </p>
       </section>
+    </div>
+  );
+}
+
+function comparisonBarWidth(value: string, current: string, previous: string): string {
+  const parse = (input: string) => Number(input.replaceAll('.', '').replace(',', '.'));
+  const maximum = Math.max(parse(current), parse(previous), 1);
+  return `${Math.max(4, Math.round((parse(value) / maximum) * 100))}%`;
+}
+
+function ComparisonBar({
+  label,
+  value,
+  current,
+  previous,
+}: {
+  label: string;
+  value: string;
+  current: string;
+  previous: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-sm">
+        <span>{label}</span>
+        <span className="tabular-nums">{value}</span>
+      </div>
+      <div className="h-3 rounded-full bg-mint">
+        <div
+          className="h-3 rounded-full bg-green"
+          style={{ width: comparisonBarWidth(value, current, previous) }}
+        />
+      </div>
     </div>
   );
 }

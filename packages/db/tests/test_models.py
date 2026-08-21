@@ -146,6 +146,16 @@ class TestSchemaShape:
         kWh are the § 9 denominator, so unit_id must be nullable."""
         assert _table("meter").columns["unit_id"].nullable
 
+    def test_page01b_device_metadata_uses_exact_fixed_point_columns(self) -> None:
+        meter = _table("meter")
+        reading = _table("meter_reading")
+        assert meter.columns["valuation_factor_x1000"].type.python_type is int
+        assert meter.columns["valuation_factor_x1000"].nullable
+        assert reading.columns["estimated_consumption_x1000"].type.python_type is int
+        assert reading.columns["estimated_consumption_x1000"].nullable
+        assert {"tenancy_id", "estimation_basis", "provenance_ref"} <= set(reading.columns.keys())
+        assert reading.columns["tenancy_id"].nullable
+
 
 class TestSettings:
     def test_libpq_url_is_normalized_to_psycopg(self) -> None:

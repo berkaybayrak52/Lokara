@@ -6,8 +6,11 @@ fixture with CO₂, rules resolved from the rules-store.
 """
 
 import re
+from dataclasses import replace
 from decimal import Decimal
 
+from lokara_domain import cents
+from lokara_heating_engine import ReductionRisk
 from lokara_pdf import DISCLAIMER, format_number_de, statement_html
 from lokara_pdf.demo import AS_OF, build_demo_statement
 from lokara_rules_store import CO2_SPLIT_TABLE, get_rule
@@ -144,6 +147,45 @@ def test_weights_display_human_scale_and_heating_is_coherent() -> None:
     # unit B splits Bernd/landlord, so the landlord label appears in both
     # tables (once for the NK vacancy line, once for the heating lines).
     assert html.count("Leerstand ab 01.07.2025") >= 2
+
+
+def test_page01b_evidence_and_separate_three_percent_risks_render() -> None:
+    data = build_demo_statement()
+    assert data.page01b_result is not None
+    page = replace(
+        data.page01b_result,
+        risks=(
+            ReductionRisk("remote", Decimal(3), (cents(300),), "Fernablesung fehlt."),
+            ReductionRisk("section6a", Decimal(3), (cents(300),), "§ 6a fehlt."),
+        ),
+    )
+    html = statement_html(replace(data, page01b_result=page))
+
+    assert "Geräte- und Ableseprotokoll" in html
+    assert "Kein Vorjahreswert vorhanden" in html
+    assert html.count("3-%-Risiko") == 2
+    assert "6-%-Risiko" not in html
+
+
+def test_measured_warm_water_energy_has_its_own_disclosure_branch() -> None:
+    data = build_demo_statement()
+    assert data.heating_result is not None
+    separation = data.heating_result.warm_water_separation
+    assert separation is not None
+    measured_energy = replace(
+        separation,
+        method="MEASURED_ENERGY",
+        q_ww_kwh=Decimal(5000),
+        volume_m3=None,
+        factor_kwh_per_m3_kelvin=None,
+        hot_temp_c=None,
+        cold_temp_c=None,
+    )
+    heating = replace(data.heating_result, warm_water_separation=measured_energy)
+    html = statement_html(replace(data, heating_result=heating))
+
+    assert "Warmwasserenergie durch Wärmemengenzähler erfasst" in html
+    assert "Warmwasserverbrauch nicht gemessen" not in html
 
 
 def test_untrusted_names_are_escaped() -> None:

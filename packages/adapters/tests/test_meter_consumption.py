@@ -16,6 +16,7 @@ from lokara_adapters import (
     ReadingSource,
     StubMeterGateway,
     consumption_by_meter,
+    device_reading_segments,
 )
 
 JAN = date(2025, 1, 1)
@@ -144,3 +145,91 @@ class TestStubFixtureReproducesTheGoldens:
         # Both are HEAT — only the measurement unit separates the building's
         # kWh meter from the flats' dimensionless allocators.
         assert by_meter["met_heat_a"].measurement_unit is MeasurementUnit.HKV_UNITS
+
+
+class TestDeviceSegments:
+    def test_correction_tenant_change_estimate_and_replacement_keep_evidence(self) -> None:
+        recorded = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
+
+        def enriched(
+            meter_id: str,
+            read_at: date,
+            value: str,
+            *,
+            tenancy_id: str | None,
+            reason: ReadingReason,
+            recorded_at: datetime = recorded,
+            estimated: str | None = None,
+            provenance: str | None = None,
+        ) -> MeterReading:
+            return MeterReading(
+                meter_id=meter_id,
+                unit_id="WE-02",
+                kind=MeterKind.HEAT,
+                measurement_unit=MeasurementUnit.HKV_UNITS,
+                read_at=read_at,
+                value=Decimal(value),
+                reason=reason,
+                source=ReadingSource.MDL,
+                recorded_at=recorded_at,
+                meter_serial=meter_id,
+                room="Wohnzimmer",
+                valuation_factor=Decimal("1.800"),
+                tenancy_id=tenancy_id,
+                estimated_consumption=None if estimated is None else Decimal(estimated),
+                estimation_basis="Vorjahreswert" if estimated is not None else None,
+                provenance_ref=provenance,
+            )
+
+        typo = enriched(
+            "old",
+            date(2025, 7, 31),
+            "900",
+            tenancy_id="Schneider",
+            reason=ReadingReason.TENANT_CHANGE,
+        )
+        correction = enriched(
+            "old",
+            date(2025, 7, 31),
+            "820",
+            tenancy_id="Schneider",
+            reason=ReadingReason.CORRECTION,
+            recorded_at=datetime(2026, 1, 6, 9, 0, tzinfo=UTC),
+            provenance="mdl://correction/42",
+        )
+        readings = (
+            enriched("old", JAN, "0", tenancy_id="Schneider", reason=ReadingReason.PERIODIC),
+            typo,
+            correction,
+            enriched(
+                "new",
+                date(2025, 9, 1),
+                "0",
+                tenancy_id="Weber",
+                reason=ReadingReason.DEVICE_CHANGE,
+            ),
+            enriched(
+                "new",
+                DEC,
+                "0",
+                tenancy_id="Weber",
+                reason=ReadingReason.PERIODIC,
+                estimated="280",
+                provenance="estimate://prior/2024",
+            ),
+        )
+
+        result = device_reading_segments(readings)
+
+        assert [device.device_id for device in result.devices] == ["old", "new"]
+        assert result.devices[0].valuation_factor == Decimal("1.800")
+        assert result.spans[0].target_id == "Schneider"
+        assert result.spans[0].closing == Decimal("820")
+        assert result.spans[0].provenance_refs == ("mdl://correction/42",)
+        assert result.spans[1].target_id == "Weber"
+        assert result.spans[1].previous_period_units == Decimal("280")
+        assert result.spans[1].estimation_basis == "Vorjahreswert"
+        assert result.spans[1].reading_reasons == (
+            ReadingReason.DEVICE_CHANGE,
+            ReadingReason.PERIODIC,
+        )

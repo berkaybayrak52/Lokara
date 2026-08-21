@@ -1,40 +1,49 @@
-# LEAD-HANDOFF.md — D1-D3 complete; Slice A next
+# LEAD-HANDOFF.md — Slice A complete and approved
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting.
 
 ## Repository state — 21.08.2026
 
-- D1 is complete and approved; its final reconciliation closed 18.08.2026.
-- D2 is complete, approved and merged with all `docs/09`–`docs/16` transcriptions.
-- D3 is complete, approved and merged locally into `main`.
-- Nothing was pushed. No demo gate or PDF fingerprint was run because runtime and rendered output
-  did not change.
+- Slice A passed its implementation, migration, application, document and review gates.
+- Emir approved Slice A on 21.08.2026 and authorized its local commit and merge.
+- No push was authorized. M5 remains paused.
+- D1–D3 remain complete, approved and merged locally.
 
-## D3 retirement baseline
+## Slice A result
 
-The seven correspondence files are deleted together. `docs/03` Appendix D is their single
-historical section-level disposition ledger. Git retains their text, but they are no longer source
-authority. Original Pages/annexes and the authoritative register feed approved `docs/00`–`docs/16`;
-approved docs and golden fixtures then control code.
+- `calculate_page01b_statement(...)` is the shared H0–H8 entry for explicit self-billing and MDL
+  inputs. It returns typed readiness, statement values, ordered findings, provenance, device
+  evidence, separate unapplied risks and annual comparison.
+- Exactly 34 Page 01b fixture IDs execute through that entry. The legacy
+  `calculate_heating_statement(...)` remains compatible.
+- Migration `0006_page01b_device_metadata` adds the exact heat-device factor and reading segment,
+  estimate, tenancy and provenance fields. Existing heat meters backfill to `1.000`.
+- The normalized adapter preserves corrections, tenant changes, estimates, device replacements and
+  provenance. API, web and PDF project the shared result in German.
+- H8 accepts normalized annual DWD factors and labels missing-factor/no-prior fallbacks. Monthly
+  import, scheduling and UVI remain outside Slice A.
 
-The current round-four question file contains only Berkay-answerable missing sources and choices.
-It routes each group to its owning approved doc. Repeated correspondence ledgers and path assertions
-were removed from other docs, comments and data-only oracles.
+## Verification
 
-## Permanent guard and verification
+- Focused Slice A suites: 363 Python tests; focused API: 30; focused web render: 1.
+- Fast gate: green with 441 pure-package tests.
+- UTF-8 full gate: green with 722 Python and 31 web tests.
+- Non-fresh demo gate: green; RLS covers 15 tenant tables and all 18 tenant FKs are scoped.
+- PDF fingerprint: `34e4f8bda4658f1cc233b38e1c2a8fad` →
+  `a45fa3d1e3d69957948e58885b4ab797` (`149280` bytes). The final three-page A4 render passed visual
+  review and the deterministic 22-golden/8-canary assertion.
 
-The retirement checker requires all seven paths to stay absent and rejects retired-name references
-outside `docs/03` Appendix D and its own denylist. Its focused test proves restored paths and live
-references fail. The checker and its test run in the always-on fast/full gate path.
+## Boundaries that remain
 
-Focused verification passed 279 tests. The fast gate passed 404 pure-package tests. The UTF-8 full
-gate passed 679 Python and 30 web tests plus lint, formatting, strict types, purity, parity and
-handoff checks. `git diff --check` passed and the index remains empty.
+- Keep the current structural block-(c) copy provisional; do not invent final wording.
+- Keep every 3-percent risk separate. There is no automatic sum or deduction.
+- Confirmed MDL OCR/API ingestion remains Slice B work.
+- Register flags and later Page 02, meter-rule, Page 03, Page 06 and Page 07 dependencies remain
+  production blockers in their owning slices.
+- The paused M5 branch also uses migration number `0006`; rebase it after Slice A and renumber that
+  migration before resuming M5.
 
-## Next slice
+## Next decision
 
-Slice A is next and may start without Berkay's current answers. It implements only the settled
-Page 01b contract. The exact block-(c) wording and reduction-cumulation choice remain explicit
-source gaps; do not guess them or present affected output as production-approved. No Slice A
-implementation is included in D3.
+Slice B is next in the execution order. Starting Slice B and any push remain separate decisions.

@@ -32,6 +32,22 @@ def to_normalized(row: MeterReadingRow, meter: Meter) -> MeterReading:
         reason=row.reason,
         source=row.source,
         recorded_at=row.recorded_at,
+        meter_serial=meter.serial,
+        room=meter.label,
+        valuation_factor=(
+            Decimal(meter.valuation_factor_x1000) / VALUE_SCALE
+            if meter.valuation_factor_x1000 is not None
+            else Decimal("1.000")
+        ),
+        tenancy_id=row.tenancy_id,
+        estimated_consumption=(
+            Decimal(row.estimated_consumption_x1000) / VALUE_SCALE
+            if row.estimated_consumption_x1000 is not None
+            else None
+        ),
+        estimation_basis=row.estimation_basis,
+        provenance_ref=row.provenance_ref,
+        note=row.note,
     )
 
 

@@ -29,6 +29,10 @@ class DeviceReadingSpan:
     opening: Decimal | None
     closing: Decimal | None
     previous_period_units: Decimal | None = None
+    estimation_basis: str | None = None
+    reading_reasons: tuple[str, ...] = ()
+    reading_sources: tuple[str, ...] = ()
+    provenance_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,9 @@ class DeviceReadingLine:
     units: Decimal
     estimated: bool
     estimation_basis: str | None
+    reading_reasons: tuple[str, ...]
+    reading_sources: tuple[str, ...]
+    provenance_refs: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -165,7 +172,12 @@ def aggregate_device_reading_spans(
                 previous_period_units=span.previous_period_units,
                 units=units,
                 estimated=estimated,
-                estimation_basis="previous_period_units" if estimated else None,
+                estimation_basis=(
+                    (span.estimation_basis or "previous_period_units") if estimated else None
+                ),
+                reading_reasons=span.reading_reasons,
+                reading_sources=span.reading_sources,
+                provenance_refs=span.provenance_refs,
             )
         )
         if estimated and resolved_device.device_id not in estimated_ids:

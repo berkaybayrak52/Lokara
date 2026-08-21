@@ -36,9 +36,9 @@ for what remains of it, the `round_half_up` direction; no output may present
 that as a norm.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from lokara_domain import (
     Cents,
@@ -122,7 +122,13 @@ def _split_parties(parties: list[_Party]) -> _Split:
     )
 
 
-def _allocate_to_parties(pot: Cents, weights: list[Decimal], split: _Split) -> _Block:
+def _allocate_to_parties(
+    pot: Cents,
+    weights: list[Decimal],
+    split: _Split,
+    *,
+    additional_owner_weight: Decimal = Decimal(0),
+) -> _Block:
     """R1/R5 with the Liegenschafts-Residuum: every renter gets its own
     `round_half_up` against a denominator that includes the owner's Bemessung,
     and the Eigentümerzeile gets `pot - Σ Mieteranteile`.
@@ -134,9 +140,8 @@ def _allocate_to_parties(pot: Cents, weights: list[Decimal], split: _Split) -> _
     """
     renter_weights = [weights[i] for i in split.renter_indexes]
     owner_weights = [weights[i] for i in split.owner_indexes]
-    renters, owner = distribute_cents_owner_residual(
-        pot, renter_weights, owner_weight=sum(owner_weights, Decimal(0))
-    )
+    owner_weight = sum(owner_weights, Decimal(0)) + additional_owner_weight
+    renters, owner = distribute_cents_owner_residual(pot, renter_weights, owner_weight=owner_weight)
     # Block (a): each empty unit's **own** `round_half_up` against the same full
     # denominator — what the Leerstandsaufstellung itemises for Anlage V, and
     # what D12 forbids as the *printed* figure. The same primitive with the roles
@@ -144,7 +149,9 @@ def _allocate_to_parties(pot: Cents, weights: list[Decimal], split: _Split) -> _
     # discarded, because (a) and the printed residual are two routes to one
     # quantity and their difference is block (c).
     origins, _ = distribute_cents_owner_residual(
-        pot, owner_weights, owner_weight=sum(renter_weights, Decimal(0))
+        pot,
+        owner_weights,
+        owner_weight=sum(renter_weights, Decimal(0)) + additional_owner_weight,
     )
     return _Block(renters=renters, origins=origins, owner=owner)
 
@@ -241,12 +248,25 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
     # `None` = no consumption Bemessung was applied to this column, so none may
     # be disclosed; otherwise these are the exact weights that were allocated by.
     heat_weights: list[Decimal] | None = None
+    heat_exact_weights: list[Decimal] | None = None
     if heat_fallback:
         # Site #3 — § 9a Abs. 2 replaces the *key*, never the rounding rule.
         heat_cons = _allocate_to_parties(heat_cons_pot, base_weights, split)
     else:
         # Site #4.
-        heat_weights = _consumption_weights(parties, heat_values, by_degree_days=True)
+        heat_weights = _consumption_weights(
+            parties,
+            heat_values,
+            by_degree_days=True,
+            heating_input=heating_input,
+        )
+        if heating_input.round_degree_day_units:
+            heat_exact_weights = _consumption_weights(
+                parties,
+                heat_values,
+                by_degree_days=True,
+                heating_input=replace(heating_input, round_degree_day_units=False),
+            )
         heat_cons = _allocate_to_parties(heat_cons_pot, heat_weights, split)
     # The unit follows the weights it labels: `None` under § 9a Abs. 2 means the
     # consumption key was *replaced*, so there is no Bemessung to put a unit on.
@@ -270,8 +290,26 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
             ww_cons = _allocate_to_parties(ww_cons_pot, base_weights, split)
         else:
             # Site #8.
-            ww_weights = _consumption_weights(parties, ww_values, by_degree_days=False)
-            ww_cons = _allocate_to_parties(ww_cons_pot, ww_weights, split)
+            ww_weights = _consumption_weights(
+                parties,
+                ww_values,
+                by_degree_days=False,
+                heating_input=heating_input,
+            )
+            additional_owner_weight = Decimal(0)
+            central_volume = heating_input.warm_water.volume_m3
+            if central_volume is not None and heating_input.use_central_ww_denominator:
+                applied = sum(ww_weights, Decimal(0))
+                # The central meter is the legal denominator.  A positive gap
+                # remains with the owner; unit readings above the central value
+                # are structurally inconsistent and are refused in _validate.
+                additional_owner_weight = central_volume - applied
+            ww_cons = _allocate_to_parties(
+                ww_cons_pot,
+                ww_weights,
+                split,
+                additional_owner_weight=additional_owner_weight,
+            )
     else:
         # No warm-water column exists at all — that is not a § 9a Abs. 2
         # fallback, and the statement must not claim one happened.
@@ -304,6 +342,9 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
             ww_consumption_weight_m3=None if ww_weights is None else ww_weights[index],
             degree_day_promille=parties[index].degree_day_promille,
             unit_degree_day_promille_total=unit_promille[parties[index].unit_id],
+            heat_consumption_exact_weight=(
+                None if heat_exact_weights is None else heat_exact_weights[index]
+            ),
         )
         for index, hb, hc, wb, wc in zip(
             split.renter_indexes,
@@ -319,6 +360,7 @@ def calculate_heating_statement(heating_input: HeatingInput) -> HeatingResult:
         split,
         (heat_base, heat_cons, ww_base, ww_cons),
         heat_weights,
+        heat_exact_weights,
         ww_weights,
         unit_days,
         unit_promille,
@@ -380,6 +422,7 @@ def _owner_residual(
     split: _Split,
     blocks: tuple[_Block, _Block, _Block, _Block],
     heat_weights: list[Decimal] | None,
+    heat_exact_weights: list[Decimal] | None,
     ww_weights: list[Decimal] | None,
     unit_days: dict[str, int],
     unit_promille: dict[str, Decimal],
@@ -408,6 +451,9 @@ def _owner_residual(
             ww_consumption_weight_m3=None if ww_weights is None else ww_weights[index],
             degree_day_promille=parties[index].degree_day_promille,
             unit_degree_day_promille_total=unit_promille[parties[index].unit_id],
+            heat_consumption_exact_weight=(
+                None if heat_exact_weights is None else heat_exact_weights[index]
+            ),
         )
         for index, hb, hc, wb, wc in zip(
             split.owner_indexes,
@@ -510,6 +556,74 @@ def _validate(heating_input: HeatingInput) -> None:
             f"({', '.join(sorted(u.value for u in declared_units))}); a Gesamtbemessung is a sum "
             "and units that cannot be summed cannot be a checkable denominator"
         )
+    unit_ids = {unit.unit_id for unit in heating_input.units}
+    party_keys = {
+        (party.unit_id, party.tenancy_id)
+        for party in _build_parties(
+            heating_input,
+            heating_input.billing_period.valid_from,
+            heating_input.billing_period.valid_to,
+        )
+    }
+    seen: set[tuple[str, str | None, str]] = set()
+    for segment in heating_input.consumption_segments:
+        if segment.unit_id not in unit_ids:
+            raise HeatingInputError(
+                f"Verbrauchssegment verweist auf unbekannte Wohnung {segment.unit_id}"
+            )
+        if (segment.unit_id, segment.tenancy_id) not in party_keys:
+            raise HeatingInputError(
+                "Verbrauchssegment passt zu keinem Belegungsabschnitt: "
+                f"{segment.unit_id}/{segment.tenancy_id}"
+            )
+        for column, value in (
+            ("heat", segment.heat_consumption),
+            ("ww", segment.ww_consumption_m3),
+        ):
+            if value is None:
+                continue
+            if not value.is_finite() or value < 0:
+                raise HeatingInputError(
+                    f"Verbrauchssegment {segment.unit_id}/{segment.tenancy_id}: "
+                    f"{column} muss endlich und nicht negativ sein"
+                )
+            key = (segment.unit_id, segment.tenancy_id, column)
+            if key in seen:
+                raise HeatingInputError(
+                    f"Verbrauchssegment {segment.unit_id}/{segment.tenancy_id}: "
+                    f"{column} ist doppelt"
+                )
+            seen.add(key)
+    if (
+        heating_input.use_central_ww_denominator
+        and heating_input.warm_water is not None
+        and heating_input.warm_water.volume_m3 is not None
+    ):
+        unit_ww_total = sum(
+            (
+                segment.ww_consumption_m3
+                for segment in heating_input.consumption_segments
+                if segment.ww_consumption_m3 is not None
+            ),
+            Decimal(0),
+        )
+        segmented_units = {
+            segment.unit_id
+            for segment in heating_input.consumption_segments
+            if segment.ww_consumption_m3 is not None
+        }
+        unit_ww_total += sum(
+            (
+                unit.ww_consumption_m3
+                for unit in heating_input.units
+                if unit.unit_id not in segmented_units and unit.ww_consumption_m3 is not None
+            ),
+            Decimal(0),
+        )
+        if unit_ww_total > heating_input.warm_water.volume_m3:
+            raise HeatingInputError(
+                "Summe der Wohnungs-Warmwasserzähler übersteigt den zentralen Zählerstand"
+            )
 
 
 def _build_parties(heating_input: HeatingInput, window_from: date, window_to: date) -> list[_Party]:
@@ -649,7 +763,22 @@ def _separate_warm_water(
         return _ZERO, billable, None
     formula = heating_input.rules.warm_water_formula
     total_energy = heating_input.total_energy_kwh
-    if heating_input.warm_water.volume_m3 is not None:
+    if heating_input.warm_water.measured_energy_kwh is not None:
+        q_ww = heating_input.warm_water.measured_energy_kwh
+        separation = WarmWaterSeparation(
+            method="MEASURED_ENERGY",
+            q_ww_kwh=q_ww,
+            total_energy_kwh=total_energy,
+            volume_m3=heating_input.warm_water.volume_m3,
+            factor_kwh_per_m3_kelvin=None,
+            hot_temp_c=None,
+            cold_temp_c=None,
+            area_fallback_kwh_per_sqm_year=None,
+            heated_area_sqm=None,
+            period_days=None,
+            reference_year_days=None,
+        )
+    elif heating_input.warm_water.volume_m3 is not None:
         volume_m3 = heating_input.warm_water.volume_m3
         q_ww = formula.energy_kwh_for_volume(volume_m3)
         separation = WarmWaterSeparation(
@@ -728,7 +857,11 @@ def _resolve_readings(
 
 
 def _consumption_weights(
-    parties: list[_Party], values: dict[str, Decimal], *, by_degree_days: bool
+    parties: list[_Party],
+    values: dict[str, Decimal],
+    *,
+    by_degree_days: bool,
+    heating_input: HeatingInput,
 ) -> list[Decimal]:
     """Splits each unit's single reading across its parties: heating by
     degree-days (weather-dependent), warm water by days."""
@@ -736,14 +869,54 @@ def _consumption_weights(
     for party in parties:
         unit_parties.setdefault(party.unit_id, []).append(party)
 
+    segment_values: dict[tuple[str, str | None], Decimal] = {}
+    segmented_units: set[str] = set()
+    for segment in heating_input.consumption_segments:
+        value = segment.heat_consumption if by_degree_days else segment.ww_consumption_m3
+        if value is None:
+            continue
+        segment_values[(segment.unit_id, segment.tenancy_id)] = value
+        segmented_units.add(segment.unit_id)
+
+    apportioned_by_key: dict[tuple[str, str | None], Decimal] = {}
+    if by_degree_days and heating_input.round_degree_day_units:
+        for unit_id, siblings in unit_parties.items():
+            if unit_id in segmented_units or len(siblings) == 1:
+                continue
+            value = values[unit_id]
+            total = sum((party.degree_day_promille for party in siblings), Decimal(0))
+            renter_sum = Decimal(0)
+            owner: _Party | None = None
+            for sibling in siblings:
+                if sibling.tenancy_id is None:
+                    owner = sibling
+                    continue
+                apportioned = (value * sibling.degree_day_promille / total).quantize(
+                    Decimal("0.1"), rounding=ROUND_HALF_UP
+                )
+                apportioned_by_key[(unit_id, sibling.tenancy_id)] = apportioned
+                renter_sum += apportioned
+            if owner is not None:
+                # R7/K3: the measured annual device total stays exact.  Renter
+                # segments round to one decimal and the unoccupied segment is
+                # the device-unit residual, just like the later money split.
+                apportioned_by_key[(unit_id, None)] = value - renter_sum
+
     weights: list[Decimal] = []
     for party in parties:
+        if party.unit_id in segmented_units:
+            weights.append(segment_values.get((party.unit_id, party.tenancy_id), Decimal(0)))
+            continue
         value = values[party.unit_id]
         siblings = unit_parties[party.unit_id]
         if len(siblings) == 1:
             weights.append(value)
             continue
         if by_degree_days:
+            resolved_apportioned = apportioned_by_key.get((party.unit_id, party.tenancy_id))
+            if resolved_apportioned is not None:
+                weights.append(resolved_apportioned)
+                continue
             own = party.degree_day_promille
             total = sum((p.degree_day_promille for p in siblings), Decimal(0))
         else:

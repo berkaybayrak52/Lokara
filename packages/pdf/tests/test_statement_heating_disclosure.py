@@ -789,7 +789,7 @@ class TestBlockBBemessungsgrundlagen:
             table,
             "Wohnung B — Bernd Muster (Auszug 30.06.2025)",
             "5.430",
-            f"rd. 145,83 {HKV_UNIT}",
+            f"rd. 145,8 {HKV_UNIT}",
             "rd. 5,95 m³",
         )
         # Re-labelled 14.08.2026: Block B is a Liegenschafts-level table whose
@@ -802,7 +802,7 @@ class TestBlockBBemessungsgrundlagen:
             table,
             "Eigentümeranteil",
             "5.520",
-            f"rd. 104,17 {HKV_UNIT}",
+            f"rd. 104,2 {HKV_UNIT}",
             "rd. 6,05 m³",
         )
         assert has_row(table, "Wohnung C — Clara Vorlage", "7.300", f"150 {HKV_UNIT}", "8 m³")
@@ -815,9 +815,11 @@ class TestBlockBBemessungsgrundlagen:
 
         Under the VDI 2067 table (K3, `docs/03`) the Nutzerwechsel figures are no
         longer exact: 250 × 5.833/10.000 = 145,825 and 250 × 4.167/10.000 = 104,175.
-        Both are marked. 600 and 150 are whole readings and stay bare. This test
-        previously asserted that *no* heat Bemessung carried the marker, which was
-        true only of the old 585/415 table where 146,25 and 103,75 came out exact —
+        Page 01b K3 applies 145,8 to the renter and the 104,2 device-unit
+        residual to the owner; both are marked. 600 and 150 are whole readings and
+        stay bare. This test previously asserted that *no* heat Bemessung carried
+        the marker, which was true only of the old 585/415 table where 146,25 and
+        103,75 came out exact —
         the premise moved with the table, not the rule.
 
         The two rounded halves still sum to the exact 250 the meter recorded.
@@ -826,16 +828,16 @@ class TestBlockBBemessungsgrundlagen:
         renders **last** rather than in unit order — so the filter cannot be
         `startswith("Wohnung")` (it would drop the row this test is about) and
         the expected order is the printed one, owner last. No figure moved:
-        104,17 is where it always was, one row further down."""
+        104,2 is on that last row."""
         table = rows(block(statement_html(build_demo_statement()), BLOCK_B))
         party_labels = ("Wohnung", OWNER_LABEL)
         heat_cells = [row[2] for row in table if len(row) == 4 and row[0].startswith(party_labels)]
 
         assert heat_cells == [
             f"600 {HKV_UNIT}",
-            f"rd. 145,83 {HKV_UNIT}",
+            f"rd. 145,8 {HKV_UNIT}",
             f"150 {HKV_UNIT}",
-            f"rd. 104,17 {HKV_UNIT}",
+            f"rd. 104,2 {HKV_UNIT}",
         ]
         assert [cell.startswith(ROUNDED) for cell in heat_cells] == [False, True, False, True]
         assert Decimal("145.83") + Decimal("104.17") == Decimal("250.00")
@@ -1018,7 +1020,7 @@ class TestBlockBBemessungsgrundlagen:
         assert HEAT_KEY_WITH_CHANGE in text  # with the key that was applied
         assert WITHHELD_CELL in text  # and only the figure withheld
         assert "1.000" not in text  # Σ of the heat Bemessungen, withheld
-        assert "145,83" not in text  # Bernd's heat Bemessung, withheld
+        assert "145,8" not in text  # Bernd's heat Bemessung, withheld
         assert "103,75" not in text  # the landlord party's, withheld
         # No device is named either — the key cell may not name a
         # Heizkostenverteiler while the cell beside it says the unit is unknown.
@@ -1528,8 +1530,9 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
         heating = _heating(build_demo_statement())
 
         # Re-based by K3 (VDI 2067, `docs/03`): the degree-day split moves the two
-        # unit-B parties against each other. 149.553 + 128.110 = 277.663 =
-        # 149.326 + 128.337 — the pair re-splits, the pot does not move, and the
+        # unit-B parties against each other. Page 01b K3 then rounds the renter
+        # device units to one decimal and gives the residual to the owner:
+        # 149.313 + 128.350 = 277.663. The pair re-splits, the pot does not move, and the
         # two unaffected units do not move at all.
         #
         # 128.337 is asserted off `owner_residual` since 14.08.2026: the landlord
@@ -1540,10 +1543,10 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
         # holds unchanged, over the same four amounts.
         assert [int(line.total) for line in heating.lines] == [
             560_397,
-            149_326,
+            149_313,
             176_232,
         ]
-        assert int(heating.owner_residual.total) == 128_337
+        assert int(heating.owner_residual.total) == 128_350
         assert int(heating.total) == 1_030_000  # the invoice did not move
         assert int(heating.billable_cost) == 1_014_292
 
@@ -1570,24 +1573,33 @@ class TestOnlyTheCo2FixtureMovedTheAmounts:
 
         It has now moved once: K3 (`docs/03`) adopts VDI 2067 Bl. 1, 12/1983,
         Tab. 22, and Jan–Jun goes 585,0 ‰ → 583,3 ‰, so 778,79 / 552,47 re-bases
-        to 776,52 / 554,74. **The pot does not move** — 77.652 + 55.474 = 133.126,
+        to 776,52 / 554,74 before Page 01b K3 applies the one-decimal device
+        rounding. The applied split is 776,39 / 554,87. **The pot does not move** —
+        77.639 + 55.487 = 133.126,
         the same total as before — which is the check that this was a re-split and
         not a re-price."""
         heating = _heating(build_demo_statement())
         # 14.08.2026: unit B's Vermieter half is no longer a party row — it is
         # the Liegenschafts-Residuum. **Neither figure moves**: this building has
         # exactly one landlord party, so its amount already *was* the residual,
-        # which is why `scripts/assert_statement_pdf.py`'s 776,52 / 554,74
-        # goldens hold across the model change (`docs/03` § 9.2).
+        # and Page 01b K3's 776,39 / 554,87 goldens hold across the model change
+        # (`docs/03` § 9.2).
         mieter = int(
             next(line for line in heating.lines if line.unit_id == "unit-b").heating_consumption
         )
         vermieter = int(heating.owner_residual.heating_consumption)
-        assert (mieter, vermieter) == (77_652, 55_474)
+        assert (mieter, vermieter) == (77_639, 55_487)
         assert mieter + vermieter == 133_126
-        # Within the cent the pot-level rounding can move it — the ratio is the
-        # invariant, the last cent belongs to the distribution primitive.
-        assert abs(Decimal(mieter) - Decimal("0.5833") * (mieter + vermieter)) <= 1
+        renter_line = next(line for line in heating.lines if line.unit_id == "unit-b")
+        [owner_origin] = heating.owner_residual.origins
+        assert renter_line.heat_consumption_exact_weight == Decimal("145.825")
+        assert renter_line.heat_consumption_weight == Decimal("145.8")
+        assert owner_origin.heat_consumption_exact_weight == Decimal("104.175")
+        assert owner_origin.heat_consumption_weight == Decimal("104.2")
+        assert (
+            renter_line.heat_consumption_weight + owner_origin.heat_consumption_weight
+            == Decimal(250)
+        )
 
 
 class TestTheEigentuemerzeileRendersInAFullyLetBuilding:

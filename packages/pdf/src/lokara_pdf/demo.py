@@ -13,13 +13,18 @@ from pathlib import Path
 
 from lokara_domain import AllocationKey, MeasurementUnit, Occupancy, cents, period
 from lokara_heating_engine import (
+    AnnualComparisonInput,
     Co2Input,
+    DeviceReadingSpan,
+    HeatingDevice,
     HeatingInput,
     HeatingResult,
     HeatingRules,
     HeatingUnit,
+    Page01bStatementResult,
+    SelfBillingStatementInput,
     WarmWaterInput,
-    calculate_heating_statement,
+    calculate_page01b_statement,
 )
 from lokara_nk_engine import CostItem, NkInput, NkResult, UnitBasis, calculate_nk_statement
 from lokara_rules_store import (
@@ -77,7 +82,7 @@ def compute_nk() -> NkResult:
     )
 
 
-def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
+def compute_page01b() -> tuple[Page01bStatementResult, tuple[str, ...]]:
     """Runs the heating fixture with rules resolved from the store; returns the
     result plus one deduped Rechtsstand entry per rule version used — each
     naming its rule, as ``docs/08`` item 6 requires."""
@@ -86,61 +91,94 @@ def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
     degree_days = get_rule(DEGREE_DAY_TABLE, AS_OF)
     co2_table = get_rule(CO2_SPLIT_TABLE, AS_OF)
 
-    result = calculate_heating_statement(
-        HeatingInput(
-            billing_period=BILLING_PERIOD,
-            total_cost=cents(1_030_000),
-            total_energy_kwh=Decimal(20000),
-            # The Maßeinheit travels with the value (`docs/08` → slice 5): the
-            # three flats carry Heizkostenverteiler, so their 600 / 250 / 150
-            # are dimensionless Einheiten and Σ 1.000 can be printed as such.
-            # `packages/adapters` `_SPEC` is the register source of the same
-            # figures (1200→1800, 3400→3650, 880→1030). Without this the demo
-            # lands on the withholding branch and the largest denominator on
-            # the page stays unprintable.
-            units=(
-                HeatingUnit(
-                    "unit-a",
-                    5000,
-                    heat_consumption=Decimal(600),
-                    ww_consumption_m3=Decimal(20),
-                    heat_consumption_unit=MeasurementUnit.HKV_UNITS,
-                ),
-                HeatingUnit(
-                    "unit-b",
-                    3000,
-                    heat_consumption=Decimal(250),
-                    ww_consumption_m3=Decimal(12),
-                    heat_consumption_unit=MeasurementUnit.HKV_UNITS,
-                ),
-                HeatingUnit(
-                    "unit-c",
-                    2000,
-                    heat_consumption=Decimal(150),
-                    ww_consumption_m3=Decimal(8),
-                    heat_consumption_unit=MeasurementUnit.HKV_UNITS,
-                ),
+    heating_input = HeatingInput(
+        billing_period=BILLING_PERIOD,
+        total_cost=cents(1_030_000),
+        total_energy_kwh=Decimal(20000),
+        # The Maßeinheit travels with the value (`docs/08` → slice 5): the
+        # three flats carry Heizkostenverteiler, so their 600 / 250 / 150
+        # are dimensionless Einheiten and Σ 1.000 can be printed as such.
+        # `packages/adapters` `_SPEC` is the register source of the same
+        # figures (1200→1800, 3400→3650, 880→1030). Without this the demo
+        # lands on the withholding branch and the largest denominator on
+        # the page stays unprintable.
+        units=(
+            HeatingUnit(
+                "unit-a",
+                5000,
+                heat_consumption=Decimal(600),
+                ww_consumption_m3=Decimal(20),
+                heat_consumption_unit=MeasurementUnit.HKV_UNITS,
             ),
-            # Same occupancy timeline as the NK section: one coherent statement.
-            # Unit B's annual consumption is apportioned Bernd/landlord by
-            # degree-days (583,3/416,7 ‰ at the Jul 1 change), base costs by days.
-            occupancies=_OCCUPANCIES,
-            rules=HeatingRules(
-                consumption_share=DEFAULT_CONSUMPTION_SHARE,
-                split_bounds=split_bounds.value,
-                warm_water_formula=warm_water.value,
-                degree_days=degree_days.value,
-                co2_table=co2_table.value,
-                co2_rechtsstand=co2_table.rechtsstand,
+            HeatingUnit(
+                "unit-b",
+                3000,
+                heat_consumption=Decimal(250),
+                ww_consumption_m3=Decimal(12),
+                heat_consumption_unit=MeasurementUnit.HKV_UNITS,
             ),
-            warm_water=WarmWaterInput(volume_m3=Decimal(40)),
-            # Both figures are copied off the supplier's invoice (§ 3 Abs. 1
-            # CO2KostAufG) — no price is held anywhere and nothing multiplies by
-            # one. 4.000 kg on 20.000 kWh is 0,200 kg CO₂/kWh (Erdgas) and
-            # 261,80 € on 4 t is 65,45 €/t (55,00 € per § 10 Abs. 2 BEHG + 19 %
-            # USt). `docs/06` → "Scenario 2 — the fuel, the emissions and the
-            # CO₂ price"; the same pair is seeded in `packages/db`.
-            co2=Co2Input(total_co2_kg=Decimal(4000), co2_cost=cents(26180)),
+            HeatingUnit(
+                "unit-c",
+                2000,
+                heat_consumption=Decimal(150),
+                ww_consumption_m3=Decimal(8),
+                heat_consumption_unit=MeasurementUnit.HKV_UNITS,
+            ),
+        ),
+        # Same occupancy timeline as the NK section: one coherent statement.
+        # Unit B's annual consumption is apportioned Bernd/landlord by
+        # degree-days (583,3/416,7 ‰ at the Jul 1 change), base costs by days.
+        occupancies=_OCCUPANCIES,
+        rules=HeatingRules(
+            consumption_share=DEFAULT_CONSUMPTION_SHARE,
+            split_bounds=split_bounds.value,
+            warm_water_formula=warm_water.value,
+            degree_days=degree_days.value,
+            co2_table=co2_table.value,
+            co2_rechtsstand=co2_table.rechtsstand,
+        ),
+        warm_water=WarmWaterInput(volume_m3=Decimal(40)),
+        # Both figures are copied off the supplier's invoice (§ 3 Abs. 1
+        # CO2KostAufG) — no price is held anywhere and nothing multiplies by
+        # one. 4.000 kg on 20.000 kWh is 0,200 kg CO₂/kWh (Erdgas) and
+        # 261,80 € on 4 t is 65,45 €/t (55,00 € per § 10 Abs. 2 BEHG + 19 %
+        # USt). `docs/06` → "Scenario 2 — the fuel, the emissions and the
+        # CO₂ price"; the same pair is seeded in `packages/db`.
+        co2=Co2Input(total_co2_kg=Decimal(4000), co2_cost=cents(26180)),
+    )
+    page = calculate_page01b_statement(
+        SelfBillingStatementInput(
+            heating=heating_input,
+            devices=tuple(
+                HeatingDevice(
+                    device_id=f"hkv-{unit_id}",
+                    unit_id=unit_id,
+                    room="Wohnzimmer",
+                    measurement_unit=MeasurementUnit.HKV_UNITS,
+                    valuation_factor=Decimal("1.000"),
+                )
+                for unit_id in ("unit-a", "unit-b", "unit-c")
+            ),
+            device_spans=tuple(
+                DeviceReadingSpan(
+                    device_id=f"hkv-{unit_id}",
+                    allocation_kind="ANNUAL_UNSEGMENTED",
+                    target_id=None,
+                    opening=Decimal(0),
+                    closing=closing,
+                )
+                for unit_id, closing in (
+                    ("unit-a", Decimal(600)),
+                    ("unit-b", Decimal(250)),
+                    ("unit-c", Decimal(150)),
+                )
+            ),
+            annual_comparison=AnnualComparisonInput(
+                current_heat=Decimal(1000),
+                previous_heat=None,
+                current_warm_water=Decimal(40),
+                previous_warm_water=None,
+            ),
         )
     )
     # Label + date per rule, in resolution order. The citations come from the
@@ -156,11 +194,21 @@ def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
             )
         )
     )
-    return result, stamps
+    return page, stamps
+
+
+def compute_heating() -> tuple[HeatingResult, tuple[str, ...]]:
+    page, stamps = compute_page01b()
+    assert page.readiness == "READY" and page.values is not None
+    assert page.values.heating_result is not None
+    return page.values.heating_result, stamps
 
 
 def build_demo_statement() -> StatementData:
-    heating_result, stamps = compute_heating()
+    page01b_result, stamps = compute_page01b()
+    assert page01b_result.values is not None
+    heating_result = page01b_result.values.heating_result
+    assert heating_result is not None
     return StatementData(
         landlord_name="Demo Vermieter",
         building_label="Musterstraße 12, 60311 Frankfurt am Main",
@@ -170,6 +218,7 @@ def build_demo_statement() -> StatementData:
         party_labels=PARTY_LABELS,
         rechtsstaende=stamps,
         heating_result=heating_result,
+        page01b_result=page01b_result,
     )
 
 

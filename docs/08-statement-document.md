@@ -420,11 +420,13 @@ heat-device values 600/250/150 HKV units; warm-water values 20/12/8 m³; 4.000 k
 | § 9 separation | Q(WW) 5.000 of 20.000 kWh; WW 2.535,73 €; heating 7.607,19 € |
 | 30/70 split | heating 2.282,16/5.325,03 €; WW 760,72/1.775,01 € |
 | area denominator | 18.250 / 5.430 / 5.520 / 7.300 = 36.500 m²·Tage |
-| heat denominator | 600 / 146,25 / 103,75 / 150 = 1.000 HKV-Einheiten |
+| heat denominator | 600 / rd. 145,8 / rd. 104,2 / 150 = 1.000 HKV-Einheiten |
 | WW denominator | 20 / 5,950684… / 6,049315… / 8 = 40 m³ |
 | unit-B degree days | 583,3 / 416,7 ‰ of 1.000 ‰ |
 
-Unit B's heating-consumption amounts are 776,52/554,74 €. The pot remains 1.331,26 €.
+Unit B's heating-consumption amounts are 776,39/554,87 €. Page 01b K3 rounds the renter's
+145,825 device units to one decimal and assigns the 104,2 device-unit residual to the landlord.
+The pot remains 1.331,26 €.
 
 ### 1 — Umlageschlüssel and Gesamtbemessung per money column
 

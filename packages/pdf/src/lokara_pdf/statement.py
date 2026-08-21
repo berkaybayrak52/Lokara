@@ -12,7 +12,7 @@ from decimal import Decimal
 from html import escape
 
 from lokara_domain import AllocationKey, MeasurementUnit, cents, format_eur
-from lokara_heating_engine import HeatingResult
+from lokara_heating_engine import HeatingResult, Page01bStatementResult
 from lokara_nk_engine import CostItem, NkResult, ShareLine
 
 from .formatting import format_co2_intensity_de, format_number_de
@@ -87,6 +87,7 @@ class StatementData:
     party_labels: Mapping[PartyKey, str]
     rechtsstaende: tuple[str, ...]
     heating_result: HeatingResult | None = None
+    page01b_result: Page01bStatementResult | None = None
     heating_cost_label: str = field(default="Heiz- und Warmwasserkosten")
 
 
@@ -228,7 +229,7 @@ def _nk_section(data: StatementData) -> str:
 def _heating_section(data: StatementData) -> str:
     heating = data.heating_result
     if heating is None:
-        return ""
+        return _page01b_section(data.page01b_result)
     rows = []
     # Resolved once and handed to the disclosure blocks: the same label names a
     # party in the money table, in Block B and in Block C, so a reader can follow
@@ -350,7 +351,77 @@ def _heating_section(data: StatementData) -> str:
   </table>
   {heating_disclosure_html(heating, party_labels, origin_labels)}
   {co2_block}
-  {"".join(notes)}"""
+  {"".join(notes)}
+  {_page01b_section(data.page01b_result)}"""
+
+
+def _page01b_section(page: Page01bStatementResult | None) -> str:
+    if page is None:
+        return ""
+    severity_labels = {"NOTICE": "Hinweis", "WARNING": "Warnung", "BLOCKER": "Blockiert"}
+    allocation_labels = {
+        "PARTY": "Mietverhältnis",
+        "OWNER": "Eigentümer",
+        "ANNUAL_UNSEGMENTED": "Jahreswert",
+    }
+    findings = "".join(
+        f'<p class="note"><strong>{severity_labels[finding.severity]}:</strong> '
+        f"{escape(finding.message_de)}</p>"
+        for finding in page.findings
+    )
+    evidence_rows = "".join(
+        "<tr>"
+        f"<td>{escape(line.device_id)} · {escape(line.room)}</td>"
+        f"<td>{allocation_labels[line.allocation_kind]}</td>"
+        f'<td class="num">{escape(format_number_de(line.valuation_factor))}</td>'
+        f'<td class="num">{escape(format_number_de(line.units))}</td>'
+        "</tr>"
+        for line in page.device_evidence
+    )
+    evidence = (
+        "<h3>Geräte- und Ableseprotokoll</h3>"
+        "<table><thead><tr><th>Gerät / Raum</th><th>Zuordnung</th>"
+        '<th class="num">Faktor</th><th class="num">Einheiten</th></tr></thead>'
+        f"<tbody>{evidence_rows}</tbody></table>"
+        if evidence_rows
+        else ""
+    )
+    provenance = (
+        "<h3>Herkunft der Angaben</h3><ul>"
+        + "".join(
+            f"<li><strong>{escape(entry.source_ref)}:</strong> {escape(entry.detail_de)}</li>"
+            for entry in page.provenance
+        )
+        + "</ul>"
+        if page.provenance
+        else ""
+    )
+    risks = "".join(
+        '<div class="co2"><strong>'
+        f"{escape(format_number_de(risk.percent))}-%-Risiko:</strong> "
+        f"{escape(risk.message_de)} Einzelbeträge: "
+        f"{escape(' · '.join(format_eur(amount) for amount in risk.amounts))}."
+        "</div>"
+        for risk in page.risks
+    )
+    annual = ""
+    if page.annual_comparison is not None:
+        comparison = page.annual_comparison
+        if comparison.state == "READY":
+            label = "Heizverbrauch mit bestätigten DWD-Klimafaktoren."
+        elif comparison.state == "RAW_FALLBACK":
+            label = "Heizverbrauch unbereinigt; DWD-Klimafaktor fehlt."
+        else:
+            label = "Kein Vorjahreswert vorhanden."
+        annual = (
+            "<h3>Verbrauchsvergleich zum Vorjahr</h3>"
+            f'<p class="note">{escape(comparison.note_de or label)}</p>'
+        )
+    return (
+        '<div class="page01b-evidence">'
+        "<h2>Prüf- und Herkunftsangaben</h2>"
+        f"{findings}{evidence}{provenance}{risks}{annual}</div>"
+    )
 
 
 def _party_total_section(data: StatementData) -> str:
@@ -556,6 +627,16 @@ def statement_html(data: StatementData) -> str:
      on Paper (11,32:1). line-height 1.5 is the hygiene both tiers owe (>= 1,4);
      it is running prose and is now set at body size. */
   .note {{ color: var(--color-forest); line-height: 1.5; }}
+  .page01b-evidence {{
+    color: var(--color-forest); line-height: 1.45; margin-top: 4mm;
+    padding-top: 3mm; border-top: 0.5pt solid var(--color-mint);
+    orphans: 2; widows: 2;
+  }}
+  .page01b-evidence h2 {{ margin-top: 0; }}
+  .page01b-evidence h3 {{ font-size: 10.5pt; margin: 2.5mm 0 1.5mm; break-after: avoid; }}
+  .page01b-evidence td {{ padding: 1.1mm 2.5mm; }}
+  .page01b-evidence p {{ margin: 1.5mm 0; }}
+  .page01b-evidence ul {{ margin: 0; padding-left: 5mm; }}
   /* The three heating-disclosure carriers. All tier 1: no font-size, so each
      inherits body copy, and Forest Deep on Paper is 11,32:1 (>= 7:1, SC 1.4.6).
      They sit on Paper rather than on a tinted panel — three stacked slabs under
@@ -671,7 +752,7 @@ def statement_html(data: StatementData) -> str:
   .co2-grounds {{ display: block; margin-top: 2mm; }}
   footer {{
     color: var(--color-slate); font-size: 8pt; border-top: 0.5pt solid var(--color-slate);
-    padding-top: 3mm; margin-top: 10mm; line-height: 1.6;
+    padding-top: 3mm; margin-top: 6mm; line-height: 1.6;
   }}
 </style>
 </head>

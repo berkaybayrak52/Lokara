@@ -166,6 +166,7 @@ class BemessungRow:
     ww_consumption_weight_m3: Decimal | None
     degree_day_promille: Decimal
     unit_degree_day_promille_total: Decimal
+    heat_consumption_exact_weight: Decimal | None
 
 
 def _row(source: HeatingLine | OwnerResidualOrigin, label: str, *, owner: bool) -> BemessungRow:
@@ -180,6 +181,7 @@ def _row(source: HeatingLine | OwnerResidualOrigin, label: str, *, owner: bool) 
         ww_consumption_weight_m3=source.ww_consumption_weight_m3,
         degree_day_promille=source.degree_day_promille,
         unit_degree_day_promille_total=source.unit_degree_day_promille_total,
+        heat_consumption_exact_weight=source.heat_consumption_exact_weight,
     )
 
 
@@ -281,6 +283,18 @@ class BemessungColumn:
             printed_total=printed_total,
         )
 
+    @classmethod
+    def applied(
+        cls, exact_values: Sequence[Decimal], applied_values: Sequence[Decimal]
+    ) -> "BemessungColumn":
+        """Carry K3's already rounded device values and their exact origins."""
+        return cls(
+            exact=tuple(exact_values),
+            printed=tuple(applied_values),
+            exact_total=sum(exact_values, Decimal(0)),
+            printed_total=sum(applied_values, Decimal(0)),
+        )
+
     def cell(self, index: int, unit: str = "") -> str:
         return _marked(self.printed[index], self.exact[index], unit)
 
@@ -343,6 +357,12 @@ def _warm_water_separation_lines(separation: WarmWaterSeparation) -> list[str]:
             f" {_num(_required(separation.cold_temp_c, 'Kaltwassertemperatur'))} °C)"
             f" = {_num(separation.q_ww_kwh)} kWh"
             f" von {_num(separation.total_energy_kwh)} kWh Gesamtenergie</p>"
+        ]
+    if separation.method == "MEASURED_ENERGY":
+        return [
+            '<p class="formula">Warmwasserenergie durch Wärmemengenzähler erfasst: '
+            f"{_num(separation.q_ww_kwh)} kWh von "
+            f"{_num(separation.total_energy_kwh)} kWh Gesamtenergie</p>"
         ]
     return [
         "<p>Warmwasserverbrauch nicht gemessen — Ersatzwert nach § 9 Abs. 2 HeizkostenV:</p>",
@@ -918,9 +938,18 @@ def heat_display_weights(heating: HeatingResult, rows: Sequence[BemessungRow]) -
     unit = heating.heat_consumption_unit
     if unit is None or heating.heat_fallback_to_area:
         return None
+    applied = [_required(row.heat_consumption_weight, "Wärmebemessung") for row in rows]
+    exact = [
+        applied_value
+        if row.heat_consumption_exact_weight is None
+        else row.heat_consumption_exact_weight
+        for row, applied_value in zip(rows, applied, strict=True)
+    ]
     return UnitColumn(
-        column=BemessungColumn.of(
-            [_required(row.heat_consumption_weight, "Wärmebemessung") for row in rows]
+        column=(
+            BemessungColumn.applied(exact, applied)
+            if any(row.heat_consumption_exact_weight is not None for row in rows)
+            else BemessungColumn.of(applied)
         ),
         symbol=UNIT_SYMBOLS[unit],
     )

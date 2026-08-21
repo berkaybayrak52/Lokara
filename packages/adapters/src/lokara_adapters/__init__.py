@@ -33,13 +33,17 @@ from .email import (
 from .meter import (
     MeasurementUnit,
     MeterConsumption,
+    MeterDevice,
+    MeterDeviceSegmentation,
     MeterGateway,
     MeterKind,
     MeterReading,
+    MeterReadingSpan,
     ReadingReason,
     ReadingSource,
     StubMeterGateway,
     consumption_by_meter,
+    device_reading_segments,
 )
 from .vision import (
     ExtractedInvoiceFields,
@@ -66,9 +70,12 @@ __all__ = [
     "FieldConfidences",
     "MeasurementUnit",
     "MeterConsumption",
+    "MeterDevice",
+    "MeterDeviceSegmentation",
     "MeterGateway",
     "MeterKind",
     "MeterReading",
+    "MeterReadingSpan",
     "OutgoingEmail",
     "PriceIndexGateway",
     "PriceIndexValue",
@@ -85,4 +92,5 @@ __all__ = [
     "TransactionDirection",
     "VisionGateway",
     "consumption_by_meter",
+    "device_reading_segments",
 ]
