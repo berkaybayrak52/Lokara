@@ -100,7 +100,7 @@ verificationFlag: geprüft | verify-before-production
 ```
 
 `afaKlasseVorschlag` and `anlageVKategorie` are dependency seams, not values owned here. Approved
-`docs/10-afa.md` defines the former's exact proposals. Prepared, unapproved `docs/11-tax-export.md`
+`docs/10-afa.md` defines the former's exact proposals. Approved `docs/11-tax-export.md`
 defines the year-versioned mapping structure and the exact Page-04 reference categories. It does
 not populate `anlageVKategorie` for every Page-02 row, so the complete catalogue mapping remains
 future M7 work.
@@ -337,7 +337,7 @@ self-performance valuation, unmeasured causation keys and a § 560 increase lett
 
 Page 01 owns denominators, day weighting, fictitious occupancy, renter rounding, owner residuals,
 printed statement order, advances and deadlines. `docs/03` owns heating content. `docs/10` owns AfA
-class values, prepared `docs/11` owns the Anlage-V/DATEV mapping contract, `docs/12` owns reusable
+class values, approved `docs/11` owns the Anlage-V/DATEV mapping contract, `docs/12` owns reusable
 date guards, and `docs/13` owns clause text. OCR extraction may propose `kostenartId`, but the user
 must confirm it.
 

@@ -65,7 +65,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 17 enfo
 | Statement row | `Statement` with period, version, status, total and optional content hash | **Shipped**, but not the complete Page 01 snapshot/finalization contract |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Specified** |
 | Temporal advance schedule, receivables, payment ledger and immutable finalization | M6 handoff described below | **Future** |
-| Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is prepared in unapproved `docs/11` | **Specified, pending approval** |
+| Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
 These principles decide ambiguous additions:
@@ -106,7 +106,7 @@ deletion so historical authorization and attribution remain explainable.
 | --- | --- |
 | `OWNER` | Full account scope: billing, roles, bank data and every building. |
 | `EMPLOYEE` | Only assigned buildings. Zero `BuildingAssignment` rows means no building access. |
-| `TAX_ADVISOR` | Read-only guest access for tax, export and AfA work, except the future adviser-owned profile and account-mapping fields prepared in `docs/11`. |
+| `TAX_ADVISOR` | Read-only guest access for tax, export and AfA work, except the future adviser-owned profile and account-mapping fields specified in `docs/11`. |
 | `RENTER` | Not a `Role`; it is an account-scoped person/tenancy domain relationship. |
 | `Landlord` | Legal lessor data printed on a statement, never an authorization role. |
 
@@ -546,7 +546,7 @@ This separation fixes the former ambiguous phrase â€œstatements feed the ledgerâ
 an obligation; an actual payment creates the cash-basis ledger event. M6 owns bank matching,
 versioned IBAN-to-renter mappings and the temporal Soll schedule needed to compare what was owed
 with what moved. M7 consumes the accepted ledger snapshot and owns the separate tax-export archive;
-prepared `docs/11` approves no schema or API.
+approved `docs/11` adds no schema or API.
 
 ## 7. Known gaps and milestone ownership
 
@@ -560,7 +560,7 @@ prepared `docs/11` approves no schema or API.
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
-| Page 04 Anlage-V/DATEV export contract | **Prepared but unapproved** on `slice/docs-11`; no production implementation | D2 / `docs/11-tax-export.md` |
+| Page 04 Anlage-V/DATEV export contract | Complete transcription approved and merged 21.08.2026; no production implementation | D2 / `docs/11-tax-export.md` |
 | `Verteilungsrest (K9)` authoritative register wording | Unresolved source issue; repository copy remains untouched | Next authoritative register export |
 
 Other later temporal or immutable records arrive only with their owning milestones: `AfaRecord`,

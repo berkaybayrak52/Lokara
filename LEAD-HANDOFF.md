@@ -1,13 +1,14 @@
-# LEAD-HANDOFF.md — docs/11 prepared
+# LEAD-HANDOFF.md — docs/11 merged
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
 and the named branch before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `slice/docs-11`, created from clean `main` at `61ba292`.
-- The Page-04 transcription is prepared, unapproved, uncommitted and unstaged.
-- Nothing was merged or pushed. No full/demo gate or PDF fingerprint was run.
+- Branch: `main`, after the no-fast-forward merge of `slice/docs-11`.
+- Slice commit: `f23e4be`. Merge commit: `873c10b`.
+- The Page-04 transcription and final `docs/07` tax/archive reconciliation are approved and merged.
+- Nothing was pushed. No demo gate or PDF fingerprint was run.
 
 ## Tax-export transcription
 
@@ -33,12 +34,12 @@ rules data, schema, API, adapter, screen, PDF or archive was added.
 ## Verification
 
 Focused Page-04 pytest passed 10 tests. Focused Ruff lint/format and both diff checks passed. The
-13 fixture rows match the authoritative 180-row CSV field for field. `scripts/gate.sh fast` is
-green: Ruff, format, strict mypy, engine purity, agent parity and 388 pure-package tests passed.
+13 fixture rows match the authoritative 180-row CSV field for field. The full gate is green: Ruff,
+format, strict mypy, engine purity, agent parity, 662 Python tests and 30 web tests passed.
 
 `berkay-work/`, the seven correspondence files, production source and
 `docs/01-tech-stack-explanations.md` remain untouched.
 
 ## Next decision
 
-Review the prepared diff. Commit or merge only after Emir approves it.
+The next D2 transcription is `docs/13`. Do not start it without Emir's instruction.

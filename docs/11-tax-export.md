@@ -1,6 +1,6 @@
 # Tax export — Anlage V overview and DATEV EXTF
 
-**Status:** D2 transcription prepared on `slice/docs-11`; not approved or merged
+**Status:** D2 transcription complete; approved and merged 21.08.2026
 
 **Rechtsstand:** 07/2026
 

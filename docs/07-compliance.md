@@ -1,9 +1,9 @@
 # 07 — Cross-cutting compliance and delivery status
 
-This is Lokara's interim living compliance contract. It separates current controls from prepared,
-specified and future obligations. Approved `docs/10` owns AfA. Source-backed `docs/11` is prepared
-on `slice/docs-11`, but neither document nor this final tax/archive reconciliation is approved or
-merged yet.
+This is Lokara's living compliance contract. It separates current controls from prepared,
+specified and future obligations. Approved `docs/10` owns AfA. Approved `docs/11` owns the
+source-backed tax/export/archive contract; this final tax/archive reconciliation was approved and
+merged with it on 21.08.2026.
 
 The complete predecessor remains available through
 `git show 635acf9:docs/07-compliance.md`; no separate history file is needed.
@@ -19,7 +19,7 @@ pre-production obligations. Detail remains with its specialist contract:
   interaction requirements.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the statement audiences, formal
   minimums, output contents and current render gaps.
-- `docs/10-afa.md` contains the approved AfA transcription; prepared
+- `docs/10-afa.md` contains the approved AfA transcription; approved
   [`docs/11-tax-export.md`](11-tax-export.md) owns future tax/export/archive rules and `docs/12`
   owns approved reusable deadline and guard rules. Their details are not duplicated here.
 
@@ -98,7 +98,7 @@ immutable, reproducible or archived.
   approved `docs/10` and `docs/11`; delivery evidence and contract/IBAN histories arrive with their
   owning later milestones.
 
-### Prepared tax-export contract, pending approval
+### Specified tax-export contract
 
 - One accepted payment-ledger snapshot feeds two deterministic outputs: the Anlage-V overview and
   DATEV EXTF. A receivable or statement Saldo is not a tax cash event.
@@ -112,7 +112,7 @@ immutable, reproducible or archived.
 - Lokara supplies calculation help and data transport. It does not submit through ELSTER, provide
   tax structuring or claim DATEV certification.
 - Anlage-V lines, SKR accounts, EXTF parameters and S/H orientation, and the BFH citation remain
-  `verify-before-production`; a prepared calculation path cannot clear those sentinels.
+  `verify-before-production`; a specified calculation path cannot clear those sentinels.
 
 ## Two clocks: access and data lifecycle
 
@@ -126,9 +126,9 @@ Access eligibility and data deletion are separate lifecycles:
 There is no one retention period for statements, invoices, bank data, contracts, identity data,
 support records and technical logs. Page 04 records the checked, conditional § 147a AO six-year
 duty above the stated positive-income threshold; it does not create a universal Lokara retention
-period. Exact class periods and conflict handling remain blocked pending approval of `docs/11` and
-a separate source-backed privacy retention schedule. No duration is inferred from a neighboring
-record class or an older planning note.
+period. Exact class periods and conflict handling remain blocked pending a separate source-backed
+privacy retention schedule. No duration is inferred from a neighboring record class or an older
+planning note.
 
 ## External services and deployment controls
 
@@ -198,8 +198,8 @@ The following remain open requirements, not completed controls:
 - breach detection, assessment, notification and evidence handling;
 - authenticated secure data export and delivery;
 - the class-specific privacy retention, restriction and deletion schedule;
-- approval and implementation of the prepared `docs/11` tax/export/archive rules;
+- implementation of the approved `docs/11` tax/export/archive rules;
 - real-provider configuration, hosting, AVV/DPA and sub-processor verification.
 
-Production compliance and this prepared final `docs/07` reconciliation remain blocked until
-`docs/11` and the other owning source-backed contracts and evidence are approved.
+The final `docs/07` tax/archive reconciliation is approved. Production compliance remains blocked
+until the other owning source-backed contracts, implementations and evidence are complete.
