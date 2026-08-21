@@ -25,15 +25,15 @@ before UI. Dates are communication events, not planning inputs.
   and engine integration remain open. Page 08 is completely transcribed, approved and merged with
   all thirteen executable cases. Page 05 is completely transcribed and approved with an exact
   24-ID data oracle. The UVI annex is approved and merged in `docs/16` with source-named data-only
-  fixtures. Pages 03, 04 and 06 are completely transcribed, approved and merged in `docs/10`,
-  `docs/11` and `docs/13`; Page 07 is transcribed in the current unapproved `docs/14` slice.
+  fixtures. Pages 03, 04, 06 and 07 are completely transcribed, approved and merged in `docs/10`,
+  `docs/11`, `docs/13` and `docs/14`.
 - Phase D1 is **complete; approved 17.08.2026; final reconciliation closed 18.08.2026**. All
   implementation remains paused until D2–D3 have been reviewed and approved.
 - Phase D2's `docs/15` review gate was approved and its slice merged on **20.08.2026**. The
   `docs/12` and `docs/16` review gates were approved and their slices merged on **21.08.2026**.
   The `docs/10` and `docs/11` slices and the final `docs/07` tax/archive reconciliation were
-  approved and merged on **21.08.2026**. The `docs/13` transcription was approved and merged on
-  **21.08.2026**. The uncommitted `docs/14` transcription now awaits Emir's review.
+  approved and merged on **21.08.2026**. The `docs/13` and `docs/14` transcriptions were approved
+  and merged on **21.08.2026**. D2 is complete; D3 has not started.
 - Phase D3 starts only after Emir reviews and approves D2. It proves that the seven Berkay
   correspondence files have been completely extracted, moves every genuinely unresolved item into
   one current `FRAGEN-an-Berkay-04.md`, updates governance references and then deletes the retired
@@ -59,7 +59,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. The exact 24-ID data oracle covers date arithmetic, strict arrears thresholds, cent rounding, UVI cadence, rent limits, VPI and vacancy. All 18 Page-specific register rows remain `verify-before-production`; the 5-year/6-year meter conflict is unresolved. No guard implementation exists. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
-| Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Transcribed in the current unapproved slice with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
+| Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. The later F03 patch resolves the Page's omitted case as E12, so all thirteen oracle entries are executable dictionaries. Production bank matching remains open for M6. |
 | UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. No implementation exists. |
 
@@ -132,10 +132,9 @@ Current trace status after merged `docs/09`, `docs/15` and approved `docs/12` tr
   data-only oracles for Blocks A–D2, all nine annual DWD PLZ values/import guards and all 18
   Heizspiegel rows. Emir approved it and the slice was merged on 21.08.2026; it is not implemented. Monthly DWD data and
   station-to-PLZ authority remain production-blocking.
-- Pages 03, 04 and 06 have complete approved and merged transcriptions. Page 04 includes the exact
-  16-ID data oracle and final `docs/07` tax/archive reconciliation. Page 06 includes exactly
-  `CLAUSES-F01…F19`; Page 07 is transcribed in the current unapproved slice with exactly
-  `14-F01…F14`.
+- Pages 03, 04, 06 and 07 have complete approved and merged transcriptions. Page 04 includes the
+  exact 16-ID data oracle and final `docs/07` tax/archive reconciliation. Page 06 includes exactly
+  `CLAUSES-F01…F19`; Page 07 includes exactly `14-F01…F14`.
 - Page 06's approved routing and risk transcription preserves all source gaps. Its missing complete
   clause-text/version catalogue and complete Mieterhöhung/Kündigung/Mahnung bodies need a separate
   legal source before M8 implementation.
@@ -253,7 +252,7 @@ not replace the complete documentation or reconciliation gates.
 | Stage | Status | Work | Required result |
 | --- | --- | --- | --- |
 | D1 | **complete; approved 17.08.2026; final reconciliation closed 18.08.2026** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. |
-| D2 | **In progress — `docs/14` transcribed; review pending** | Create source-backed `docs/09`–`docs/16` | `docs/09`, approved `docs/15`, `docs/12`, `docs/16`, `docs/10`, `docs/11` and `docs/13` are merged. The final `docs/07` tax/archive reconciliation is approved. The current `docs/14` diff is documentation and data-only fixtures, not investment implementation. |
+| D2 | **complete; approved 21.08.2026** | Create source-backed `docs/09`–`docs/16` | All assigned transcriptions are approved and merged, including `docs/14`; the final `docs/07` tax/archive reconciliation is approved. The phase added documentation and data-only fixtures, not investment implementation. |
 | D3 | After D2 approval | Complete extraction and retire Berkay correspondence | Close the seven-file coverage ledger, create only one current `FRAGEN-an-Berkay-04.md` if needed, update governance references, verify no dependent paths, delete the seven files together and stop for Emir's approval. |
 | A | Paused for D1–D3 | Reconcile M2 with Page 01b | Integrate the approved Page 01b contract into executable end-to-end fixtures and close M2. Capability seams are supporting evidence, not Slice A closure. |
 | B | After A | Reconcile M3–M4 with Page 01 | Revalidate the approved Page 01 contract against persisted calculation and extraction, close M3/M4 gaps and leave ledger/finalization work to M6. |
@@ -623,9 +622,9 @@ registry above remains authoritative. Create these only in D2 and in its depende
 M0 is complete. M1–M4 are the current green, demoable floor: a persisted-data operating-cost and
 heating calculation view with CO₂ allocation and tenant isolation. They are not yet fully
 spec-closed. D1 is complete; approved 17.08.2026; final reconciliation closed 18.08.2026.
-`docs/09` and the approved `docs/15`, `docs/12`, `docs/16`, `docs/10`, `docs/11` and `docs/13`
-transcriptions are merged. Implementation remains paused; later D2 and D3 gates still require
-Emir's review.
+`docs/09` and the approved `docs/15`, `docs/12`, `docs/16`, `docs/10`, `docs/11`, `docs/13` and
+`docs/14` transcriptions are merged. D2 is complete and approved. Implementation remains paused;
+D3 still requires Emir's instruction and review.
 After all three
 documentation and correspondence-retirement gates are approved, Slices
 A–C retain their order and reconcile implementation

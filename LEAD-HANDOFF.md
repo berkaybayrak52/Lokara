@@ -1,13 +1,14 @@
-# LEAD-HANDOFF.md — docs/14 transcription for review
+# LEAD-HANDOFF.md — docs/14 merged
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status`, `git log`
 and the named branch before acting.
 
 ## Repository state — 21.08.2026
 
-- Branch: `slice/docs-14`, based on main after the approved Page-06 merge.
-- The Page-07 transcription is an uncommitted review diff.
-- Nothing was committed, merged or pushed. No full/demo gate or PDF fingerprint was run.
+- Branch: `main`, after the no-fast-forward merge of `slice/docs-14`.
+- Slice commit: `9b69f97`. Merge commit: `9f9b549`.
+- The Page-07 transcription and Phase D2 are approved and merged.
+- Nothing was pushed. No demo gate or PDF fingerprint was run.
 
 ## Investment-KPI transcription
 
@@ -33,13 +34,14 @@ schema, migration, API, engine, UI, PDF renderer, pricing or bank integration wa
 ## Verification
 
 Focused Page-07 pytest passed 7 tests. Focused Ruff lint and format checks passed. The 18 register
-rows match the authoritative CSV field for field. `git diff --check` passed. The main session still
-owns the fast gate and independent final diff review.
+rows match the authoritative CSV field for field. `git diff --check` passed. The fast gate passed
+404 pure-package tests. The UTF-8 full gate passed 678 Python tests and 30 web tests, plus lint,
+types, purity, parity and handoff checks.
 
 `berkay-work/`, the seven correspondence files, production source,
-`docs/01-tech-stack-explanations.md` and `LAST_OUTPUT.md` remain untouched.
+`docs/01-tech-stack-explanations.md` remain untouched.
 
-## Current review decision
+## Next decision
 
-The uncommitted `docs/14` transcription and exact 14-fixture data oracle await Emir's review. It
-adds no production investment implementation, schema, API, UI or PDF renderer.
+Phase D2 is complete and approved. Do not start D3 correspondence retirement without Emir's
+instruction.
