@@ -25,10 +25,10 @@ values; its negative flat-tax scenario is not a promised refund or tax-output va
 
 ## 1. Sources, precedence and arithmetic audit
 
-The transcription uses the complete Page 04, all 13 Page-04 rows in the current 180-row
+The transcription uses the complete original Page 04, all 13 Page-04 rows in the current 180-row
 `Rechtsstand-Register.csv`, their entry notes, the Page-04 section of `Non-Goals V1`, the
-`README-for-Emir` audit and all seven correspondence-retirement files. The CSV controls structured
-values and flags. No correspondence file contains a later Page-04 calculation or format correction.
+`README-for-Emir` audit. The CSV controls structured values and flags. `docs/03` Appendix D records
+that retired correspondence contained no later Page-04 calculation or format correction.
 
 The audit recomputed all 16 Page-04 examples as cent-exact. That verifies only the printed
 arithmetic. It does **not** verify the Anlage-V line numbers, SKR accounts, EXTF field parameters,
@@ -327,19 +327,10 @@ Page 04 also has exactly two delegated source boundaries: AfA/interest/Disagio c
 from Page 03; operating-cost keys, NK allocation arithmetic, deadlines and UVI remain with Pages
 01, 02 and 05. These are source boundaries, not additional Page-04 Non-Goals.
 
-## 11. Exact seven-file correspondence ledger
+## 11. Historical source disposition
 
-These files remain unchanged until D3. Page 04 owns no deletion.
-
-| File | Page-04 disposition |
-| --- | --- |
-| `FEEDBACK-to-Berkay-01b.md` | Heating/CO₂ implementation feedback; no Page-04 rule. |
-| `FRAGEN-an-Berkay-02.md` | Owner-residual/UVI questions; no Page-04 rule. |
-| `FRAGEN-an-Berkay-03.md` | Heating/UVI follow-up; its Page-04 R4 name collision is only a warning about namespaces. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` | Heating/UVI corrections and current-register explanation; no Page-04 delta. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` | Owner-residual/UVI decisions; no Page-04 delta. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` | Later heating decisions; no Page-04 delta. |
-| `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` | Owned by `docs/15`; it does not alter the Page-04 payment-ledger export rules. |
+`docs/03` Appendix D is the single historical correspondence-retirement ledger. Page-04 authority
+comes from the original Page, the register and the approved rules and fixtures here.
 
 ## 12. Source coverage gate
 
@@ -356,6 +347,6 @@ These files remain unchanged until D3. Page 04 owns no deletion.
 | Page-04 scope and eight Non-Goals | § 10 | exact eight-item tuple | complete |
 | Current register CSV + 13 entry notes | § 2 | 13 complete metadata tuples; 7 checked/6 blocked | complete |
 | README-for-Emir audit | §§ 1, 7, 9 | arithmetic green without clearing flags | complete |
-| Seven-file correspondence scope | § 11 | exact seven-path tuple | complete |
+| Historical disposition boundary | § 11 and `docs/03` Appendix D | no Page-04 delta | complete |
 
 This gate completes transcription only. It makes no production-readiness or implementation claim.

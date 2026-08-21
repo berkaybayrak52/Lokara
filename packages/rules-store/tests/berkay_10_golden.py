@@ -2,7 +2,7 @@
 """Data-only, cent-exact oracle transcribed from Berkay Page 03.
 
 This module imports no production code. It records exactly ``10-F01`` through
-``10-F34`` plus the source, register, non-goal and correspondence surfaces used
+``10-F34`` plus the source, register and non-goal surfaces used
 by the D2 transcription. Money is integer cents. Weg B values in F02 remain
 arithmetic evidence only and are explicitly production-blocking placeholders.
 """
@@ -25,7 +25,7 @@ PAGE_03_SOURCE_SECTIONS: Final[tuple[str, ...]] = (
     "non_goals_v1_page_03",
     "open_points_1_through_9",
     "readme_for_emir_audit",
-    "antwort_01b_section_4b_current_csv_flags",
+    "approved_cross_source_flag_history",
 )
 
 # Wert, Betrag/Satz, Flag, Letzte Änderung, Prüfen bis, Quelle,
@@ -560,16 +560,6 @@ PAGE_03_NON_GOALS: Final[tuple[str, ...]] = (
     "foreign_buildings_heritable_building_right_usufruct",
     "automatic_expansion_classification",
     "business_assets_and_commercial_units",
-)
-
-CORRESPONDENCE_RETIREMENT_FILES: Final[tuple[str, ...]] = (
-    "FEEDBACK-to-Berkay-01b.md",
-    "FRAGEN-an-Berkay-02.md",
-    "FRAGEN-an-Berkay-03.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md",
-    "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md",
 )
 
 PAGE_02_AFA_CLASS_PROPOSALS: Final[dict[str, str]] = {

@@ -28,8 +28,8 @@ figures: `docs/06` → "Scenario 2 — the fuel, the emissions and the CO₂ pri
 statutory basis in `docs/03` → "Where `total_co2_kg` and `co2_cost` come from".
 
 **Re-shaped 14.08.2026 — the fourth row moved off `lines`, and no euro moved.**
-`berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1: the
-Eigentümeranteil is not a party but one residual line per Liegenschaft, so
+Approved `docs/03` § 9.2: the Eigentümeranteil is not a party but one residual
+line per Liegenschaft, so
 `("unit-b", None)` is now
 `result.owner_residual` and every four-element list below is three elements plus
 the residual. **The three renter rows keep the values they have today**, because

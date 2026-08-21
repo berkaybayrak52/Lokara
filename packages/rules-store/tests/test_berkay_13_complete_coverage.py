@@ -9,7 +9,6 @@ from berkay_12_golden import PAGE_05_GOLDENS
 from berkay_13_golden import (
     ARITHMETIC_AUDIT,
     COMPATIBILITY_ANCHORS,
-    CORRESPONDENCE_RETIREMENT_FILES,
     EDGE_CASE_IDS,
     FORMULA_IDS,
     FUTURE_CONTRACTS,
@@ -65,7 +64,7 @@ def test_fixture_and_named_rule_surfaces_are_exact() -> None:
     }
 
 
-def test_complete_source_register_non_goal_exclusion_and_correspondence_surfaces() -> None:
+def test_complete_source_register_non_goal_and_exclusion_surfaces() -> None:
     assert len(PAGE_06_SOURCE_SECTIONS) == 8
     assert len(set(PAGE_06_SOURCE_SECTIONS)) == 8
     assert PAGE_06_REGISTER_PAGE.startswith("06 · Vertragsklauseln — Risiko-Memo (")
@@ -83,8 +82,6 @@ def test_complete_source_register_non_goal_exclusion_and_correspondence_surfaces
     assert len(set(PAGE_06_NON_GOALS)) == 7
     assert len(PAGE_06_SOURCE_EXCLUSIONS) == 11
     assert len(set(PAGE_06_SOURCE_EXCLUSIONS)) == 11
-    assert len(CORRESPONDENCE_RETIREMENT_FILES) == 7
-    assert len(set(CORRESPONDENCE_RETIREMENT_FILES)) == 7
 
 
 def test_future_contracts_keep_missing_catalogues_and_authority_visible() -> None:

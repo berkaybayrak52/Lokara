@@ -3,9 +3,7 @@
 Spec: `docs/02-data-model.md` -> "The Eigentümeranteil is a residual line, not a
 party"; `docs/03-nk-heating-engines.md` § 9.2 (which supersedes the two
 conventions this file's predecessor asserted); `docs/08` -> "Die
-Eigentümerzeile", §§ 1-6. Rule source: `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 1
-(14.08.2026), primary rule text
-`berkay-work/Spec-Seiten/01 · Die Abrechnung ….md` -> **D0**, **D12**,
+Eigentümerzeile", §§ 1-6. Primary rule text: original Page 01 -> **D0**, **D12**,
 **08-F21**, edge cases **E3** / **E17** / **E19**. Numeric oracles:
 `09-F07` (his `08-F22`) and `09-F19` (his `08-F21`), re-derived in
 `packages/domain/tests/test_berkay_residual_oracles.py`.

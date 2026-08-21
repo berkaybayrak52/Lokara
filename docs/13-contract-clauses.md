@@ -21,9 +21,9 @@ or Mahnung bodies. Those missing sources still block M8 implementation.
 
 ## 1. Sources, precedence, correction and arithmetic audit
 
-The transcription uses the complete Page 06, all 17 Page-06 rows in the current 180-row
+The transcription uses the complete original Page 06, all 17 Page-06 rows in the current 180-row
 `Rechtsstand-Register.csv`, the seven Page-06 entries in `Non-Goals V1`, its later Wizard-field
-note, the `README-for-Emir` audit and all seven correspondence-retirement files. The CSV controls
+note and the `README-for-Emir` audit. The CSV controls
 structured register values and flags.
 
 The audit recomputed all 19 Page-06 examples with `Decimal`, integer cents and half-up rounding and
@@ -84,9 +84,8 @@ The complete CSV metadata is mirrored field for field in `PAGE_06_REGISTER_ROWS`
 | SEPA-Lastschriftmandat — Einzug/Verfall | collection needs creditor ID/PIS; stated expiry 36 months | `verify-before-production` | Verordnung · 07/2026 |
 
 The exact flag count is nine `geprüft` and eight `verify-before-production`. `geprüft` means the
-primary statutory text was checked, not lawyer-approved. The § 556d row is also confirmed by
-`Antwort-an-Emir_01b-Uebergabe.md` § 4b. That correspondence does not clear the adjacent warn-only
-product convention.
+primary statutory text was checked, not lawyer-approved. The authoritative CSV controls the § 556d
+row and does not clear the adjacent warn-only product convention.
 
 ## 3. Future logical contracts — no schema approval
 
@@ -356,19 +355,10 @@ Page 06's own Out-of-Scope paragraph contains exactly eleven exclusions:
 The later Wizard-field note confirms that capture of the SEPA fields and self-use flag is in scope,
 while collection and tax calculation remain outside Page 06.
 
-## 9. Exact seven-file correspondence ledger
+## 9. Historical source disposition
 
-These files remain unchanged until D3. Page 06 owns no deletion.
-
-| File | Page-06 disposition |
-| --- | --- |
-| `FEEDBACK-to-Berkay-01b.md` | Heating owner-residual/self-use presentation question; no Page-06 clause rule. |
-| `FRAGEN-an-Berkay-02.md` | Repeats the owner-residual/self-use presentation question; no Page-06 clause rule. |
-| `FRAGEN-an-Berkay-03.md` | Heating/UVI follow-up; no Page-06-owned correction. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` | § 4b confirms the § 556d +10% and 31.12.2029 checked register value; remaining content belongs to heating/UVI/register history. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` | Owner-residual/UVI decisions; no Page-06-owned correction. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` | Later heating decisions; no Page-06-owned correction. |
-| `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` | Bank-matching F03 correction only; no Page-06 rule. |
+`docs/03` Appendix D is the single historical correspondence-retirement ledger. Page-06 authority
+comes from the original Page, the register and the approved rules and fixtures here.
 
 ## 10. Complete source coverage
 
@@ -384,7 +374,7 @@ These files remain unchanged until D3. Page 06 owns no deletion.
 | Current Page-06 register rows | § 2 | exact 17-row, nine/ eight flag checks |
 | `Non-Goals V1`, Page 06 | § 8 | exact seven-item tuple |
 | `README-for-Emir` | §§ 1, 6–7 | exact arithmetic; does not clear source flags |
-| Seven correspondence files | § 9 | exact path tuple and dispositions |
+| Historical disposition boundary | § 9 and `docs/03` Appendix D | no Page-06 rule lost |
 | Approved Page-03/04/05 ownership | §§ 1, 3–5 | compatibility checks against docs/10, docs/11 and docs/12 oracles |
 
 ## 11. Approval and implementation boundary

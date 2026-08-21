@@ -7,9 +7,8 @@ with `git show 7b08f2b:docs/08-statement-document.md`; they are not part of the 
 
 The authoritative Page 01 source is
 `berkay-work/Spec-Seiten/01 · Die Abrechnung 3a95fd420731816c9048ed7a517c3e9e.md`, read with the
-26 matching rows in `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` and the later method
-corrections mapped in Appendix C. Structured values and flags follow the CSV. A later Antwort may
-correct a method, but it does not silently replace a CSV value or verification flag.
+26 matching rows in `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` and the approved
+method corrections here and in `docs/03`. Structured values and flags follow the CSV.
 
 ## Reading guide, ownership and status
 
@@ -768,23 +767,11 @@ The 26 Page 01 rows are **11 `geprüft`** and **15 `verify-before-production`**.
 | `geprüft` | CO₂-Stufenmodell Wohngebäude · CO₂-Pflichtangaben in der Abrechnung · § 35a-Ausweis für den Mieter · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Abrechnungsfrist Betriebskosten · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Leerstand bleibt im Gesamtverteiler · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Einwendungsfrist des Mieters · Belegeinsicht — elektronische Bereitstellung zulässig (Wohnraum) |
 | `verify-before-production` | Fiktivbelegung bei Leerstand · Gradtagszahltabelle VDI (K3) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Rundungsweg (Seite 01 / docs/03 § 6) · Geräteliste auf der Mieterausfertigung (K10) · Zahlungsfrist bei Nachzahlung · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information (UVI + Abrechnungs-Infoblock) · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · § 35a-Block auf der Betriebskostenabrechnung · Wording Leerstandsaufstellung · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6) |
 
-K9's rounding direction remains a flagged convention. Antwort 03 § 1 separately fixes the owner
-residual destination as a model rule. Neither status erases the other.
+K9's rounding direction remains a flagged convention. Approved `docs/03` § 9.2 separately fixes
+the owner-residual destination as a model rule. Neither status erases the other.
 
-## Appendix C — correspondence disposition and deferred ownership
+## Appendix C — historical source disposition
 
-| Source | Destination | Disposition |
-| --- | --- | --- |
-| `FRAGEN-an-Berkay-02.md` § 1; `Antwort-an-Emir_02.md` §§ 1.1–1.4 | `docs/02`; `docs/03` § 9.2; Eigentümer sections here | current unconditional residual resolution |
-| `FRAGEN-an-Berkay-02.md` §§ 2–4; `Antwort-an-Emir_02.md` §§ 2–4 | `docs/16` | heat-only D2, over-500 fallback and comparison source transcribed and merged in D2 |
-| `FRAGEN-an-Berkay-02.md` § 5; `Antwort-an-Emir_02.md` § 5 | `docs/03` register inventory | current source rule |
-| `Antwort-an-Emir_02.md` § 6 | fixtures here, `docs/03` and `docs/16` | current evidence routed by owner |
-| `FRAGEN-an-Berkay-03.md` § 1; `Antwort-an-Emir_03.md` § 1 | `docs/03` § 9.2; Appendix B | current residual correction |
-| `FRAGEN-an-Berkay-03.md` § 2; `Antwort-an-Emir_03.md` § 2 | `08-F21`; vacancy annex | block (b) corrected to `100.800` ct |
-| `FRAGEN-an-Berkay-03.md` § 3; `Antwort-an-Emir_03.md` § 3 | `docs/16` | older Wärme+WW wording superseded in merged D2 transcription |
-| `FRAGEN-an-Berkay-03.md` §§ 4–6; `Antwort-an-Emir_03.md` §§ 4–6 | `docs/03`; Page 01b projection | current/superseded exactly as mapped there |
-| `FEEDBACK-to-Berkay-01b.md` §§ 1–6, 9; `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | `docs/03`; Page 01b projection | current or superseded per `docs/03` ledger |
-| `FEEDBACK-to-Berkay-01b.md` §§ 7–8; `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–11 | `docs/09`; `docs/16` | § 7 is merged in `docs/09`; § 8 and Antwort §§ 5–8 are merged in `docs/16`; Antwort §§ 9–11 retain routing/history per `docs/03` |
-
-The six correspondence files remain source inputs until the separate D3 retirement gate proves that
-every section has an approved destination or explicit unresolved/superseded disposition.
+`docs/03` Appendix D is the single historical correspondence-retirement ledger. Current statement
+authority here comes from original Page 01, approved `docs/02`/`docs/03`, the register rows above and
+the committed `08-F01…F24` oracle. The heat-only UVI correction remains owned by approved `docs/16`.

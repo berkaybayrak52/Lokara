@@ -29,9 +29,9 @@ fully let one, where it is the pure line-wise Rundungsdifferenz and typically
 shares upward. Model: `docs/02` → *"The Eigentümeranteil is a residual line, not
 a party"*; engine wiring and the two conventions it superseded: `docs/03` § 9.2.
 
-Rechtsnatur: Berkay's **fixed model rule** (`Antwort-an-Emir_02.md` § 1.4 —
-*"meine feste Modellregel, keine offene Konvention"*), so the destination of the
-Verteilungsrest carries no `verify-before-production` flag. K9 keeps its flag
+Rechtsnatur: the approved fixed model rule in `docs/03` § 9.2 and original Page
+01 D12, so the destination of the Verteilungsrest carries no
+`verify-before-production` flag. K9 keeps its flag
 for what remains of it, the `round_half_up` direction; no output may present
 that as a norm.
 """

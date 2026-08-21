@@ -325,13 +325,3 @@ PAGE_05_NON_GOALS = (
     "limitation_period_for_additional_claims",
     "legal_advice_and_binding_declarations",
 )
-
-CORRESPONDENCE_RETIREMENT_FILES = (
-    "FEEDBACK-to-Berkay-01b.md",
-    "FRAGEN-an-Berkay-02.md",
-    "FRAGEN-an-Berkay-03.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md",
-    "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md",
-)

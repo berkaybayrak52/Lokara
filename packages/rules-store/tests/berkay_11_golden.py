@@ -2,8 +2,8 @@
 """Data-only, cent-exact oracle transcribed from Berkay Page 04.
 
 This module imports no production code. It records exactly ``11-F01`` through
-``11-F16`` plus the complete source, register, non-goal, correspondence,
-readiness and blocked-format surfaces used by the D2 transcription. Money is
+``11-F16`` plus the complete source, register, non-goal, readiness and
+blocked-format surfaces used by the D2 transcription. Money is
 integer cents. Anlage-V lines, SKR accounts, EXTF parameters/Soll-Haben
 orientation and the BFH citation remain explicitly unverified.
 """
@@ -27,7 +27,7 @@ PAGE_04_SOURCE_SECTIONS: Final[tuple[str, ...]] = (
     "7_page_scope_boundaries",
     "non_goals_v1_exact_eight",
     "readme_for_emir_arithmetic_audit",
-    "seven_file_correspondence_ledger",
+    "historical_disposition_docs_03_appendix_d",
 )
 
 PAGE_04_REGISTER_PAGE: Final = (
@@ -206,16 +206,6 @@ PAGE_04_NON_GOALS: Final[tuple[str, ...]] = (
 PAGE_04_DELEGATED_BOUNDARIES: Final[tuple[str, ...]] = (
     "AfA-, Zins- und Disagio-Berechnung kommt fertig von Seite 03",
     "Umlageschlüssel, NK-Arithmetik, Fristen und UVI bleiben auf Seiten 01/02/05",
-)
-
-CORRESPONDENCE_RETIREMENT_FILES: Final[tuple[str, ...]] = (
-    "FEEDBACK-to-Berkay-01b.md",
-    "FRAGEN-an-Berkay-02.md",
-    "FRAGEN-an-Berkay-03.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md",
-    "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md",
-    "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md",
 )
 
 FUTURE_CONTRACTS: Final[tuple[str, ...]] = (

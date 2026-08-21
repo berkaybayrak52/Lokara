@@ -5,7 +5,7 @@
 **Authoritative sources:**
 
 - `berkay-work/Spec-Seiten/08 · Bank-Matching 3ac5fd42073181c3a63dd13b94ff4f57.md`
-- `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md`
+- the approved F03/E12 correction preserved in §§ 1, 4, 7–8 and the oracle
 
 **Fixtures:** exactly thirteen executable cases, `BANKMATCH-F01`–`BANKMATCH-F13`, in
 `packages/rules-store/tests/berkay_15_golden.py`
@@ -20,22 +20,22 @@ Auto-Match allowed by this contract or an explicit user confirmation.
 
 ## 1. Source status, precedence and resolved gap
 
-The complete Page 08, its later F03 patch, Rechtsstand-Register CSV rows 169–181, the Page 08
-section of Non-Goals V1 and the arithmetic audit were reconciled. The Page header promises exactly
+The complete original Page 08, the approved F03 contract preserved here, Rechtsstand-Register CSV
+rows 169–181, the Page 08 section of Non-Goals V1 and the arithmetic audit were reconciled. The Page header promises exactly
 `BANKMATCH-F01…F13`, but the original worked examples jumped from F02 to F04. The authoritative
-patch resolves that omission: F03 is E12 and distinguishes a potential-duplicate Review from a
-silent exact-ID re-import dedupe. The patch controls that later F03/E12 correction; the original
-Page controls the remaining method and cases. It does not contradict the Page.
+correction resolves that omission: F03 is E12 and distinguishes a potential-duplicate Review from a
+silent exact-ID re-import dedupe. This approved doc and its oracle control F03/E12; the original Page
+controls the remaining method and cases.
 
 The earlier prepared transcription correctly kept F03 as a missing-source sentinel while no
-authority existed. That historical blocker is resolved only by the supplied patch: the sentinel is
+authority existed. That historical blocker is resolved by the approved correction: the sentinel is
 replaced with its stated inputs and outcomes, without reconstructing a case from neighboring
 examples. The oracle now contains exactly thirteen executable dictionaries.
 
-The arithmetic audit confirms the arithmetic printed for the twelve original cases. The patch
+The arithmetic audit confirms the arithmetic printed for the twelve original cases. The correction
 supplies the thirteenth case and its own summation checks. Neither source clears any
 `verify-before-production` flag. The CSV controls structured values, legal nature, source and flag;
-the Page and later patch supply the expanded method where the CSV row is shorthand. Emir approved
+the original Page and this approved contract supply the expanded method where the CSV row is shorthand. Emir approved
 this transcription on 20.08.2026, and the slice was merged into `main` with a no-fast-forward merge.
 No M6 implementation is approved. The approved, merged `docs/16` D2 transcription does not change
 this contract.
@@ -276,12 +276,12 @@ current implementation.
 | `BANKMATCH-F12` | Page 01 24,500 Nachzahlung copied to receivable; designated and settled at 24,500 |
 | `BANKMATCH-F13` | first payment 40 and Review; confirmed non-null IBAN learned; following month Auto |
 
-Page 08 edge cases E1–E12 map to the named fixtures above. The F03 patch assigns E12 to
+Page 08 edge cases E1–E12 map to the named fixtures above. The approved F03 correction assigns E12 to
 `BANKMATCH-F03` and keeps its two mechanisms separate: `isPotentialDuplicate` is a distinct
 transaction that requires Review, while the same provider transaction `id` is the already processed
 movement and is silently deduplicated before channel selection or scoring.
 
-## 8. Source and correspondence ledger
+## 8. Source coverage ledger
 
 | Source | Destination | Disposition |
 | --- | --- | --- |
@@ -292,19 +292,14 @@ movement and is silently deduplicated before channel selection or scoring.
 | Page 08 § 4 steps 1–5 | § 4 | channel, candidates, signals, confidence and decision |
 | Page 08 § 4 step 6 | § 5 | designation, FIFO, § 367 order, status, overpayment and split |
 | Page 08 reversal paragraph | § 5.3 | immutable compensating-event form |
-| Page 08 § 5 E1–E12 | §§ 3–7 | all mapped; E12 is assigned to F03 by the later patch |
+| Page 08 § 5 E1–E12 | §§ 3–7 | all mapped; the approved correction assigns E12 to F03 |
 | Page 08 § 6 | § 7 + oracle | twelve original examples transcribed exactly |
-| `Antworten/08_BankMatching_F03_Patch.md` | §§ 1, 4, 7 + oracle | current correction; adds E12 reference and executable F03 with separate Review/dedupe paths; retained for D3 ledger |
+| Approved F03/E12 correction | §§ 1, 4, 7 + oracle | potential duplicate Review and same-ID dedupe remain separate |
 | Page 08 § 7 | § 9 | complete out-of-scope transcription |
 | CSV rows 169–181 | § 2 | all values, sources, natures, flags and Rechtsstand preserved |
 | Non-Goals V1, Page 08 | § 9 | all six Page 08 exclusions preserved |
-| `Anlagen/README-for-Emir.md` | §§ 1, 7 | arithmetic evidence for the twelve original cases retained; later patch closes F03 |
-| `FEEDBACK-to-Berkay-01b.md` | other assigned docs | no Page 08-owned item found; file remains present for D3 ledger |
-| `FRAGEN-an-Berkay-02.md` | other assigned docs | no Page 08-owned item found; file remains present for D3 ledger |
-| `FRAGEN-an-Berkay-03.md` | other assigned docs | no Page 08-owned item found; file remains present for D3 ledger |
-| `Antwort-an-Emir_01b-Uebergabe.md` | other assigned docs | no Page 08-owned item found; file remains present for D3 ledger |
-| `Antwort-an-Emir_02.md` | other assigned docs | no Page 08-owned item found; file remains present for D3 ledger |
-| `Antwort-an-Emir_03.md` | other assigned docs | no Page 08-owned item found; file remains present for D3 ledger |
+| `Anlagen/README-for-Emir.md` | §§ 1, 7 | arithmetic evidence for the twelve original cases retained; approved correction closes F03 |
+| Historical correspondence | `docs/03` Appendix D | single retirement ledger; exact F03 correction disposition preserved |
 
 ## 9. Explicit non-goals
 

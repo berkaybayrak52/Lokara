@@ -41,6 +41,10 @@ There is no manager agent. Coordination comes from the tracked sources of truth:
 `LAST_OUTPUT.md` is only Emir's short session summary. It does not coordinate work or define
 project status.
 
+For legal and calculation work, original Pages/annexes and the authoritative register feed the
+approved `docs/00`–`docs/16`; approved docs then control code. Retired correspondence is Git history,
+not a precedence layer. Its sole historical disposition ledger is `docs/03` Appendix D.
+
 ## 2. Trust model
 
 | Layer | Role |

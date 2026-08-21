@@ -16,17 +16,17 @@ Anlage-V lines, DATEV, archive/readiness rules or full financing KPIs.
 
 ## 1. Sources, precedence and settled corrections
 
-The transcription uses the complete Page 03, the current 180-row
-`Rechtsstand-Register.csv`, all 46 Page-03 entry notes, `Non-Goals V1`, the
-`README-for-Emir` arithmetic audit and all seven correspondence-retirement files. The CSV controls
+The transcription uses the complete original Page 03, the current 180-row
+`Rechtsstand-Register.csv`, all 46 Page-03 entry notes, `Non-Goals V1` and the
+`README-for-Emir` arithmetic audit. The CSV controls
 structured values and flags. The per-entry Markdown exports remain explanatory evidence but have
 stale flags for four rows.
 
-`Antwort-an-Emir_01b-Uebergabe.md` § 4b establishes why the refreshed export changed checked flags.
-The current CSV therefore controls: the residential rates 3%, 2% and 2.5%, plus the 15% rule, are
+The approved cross-source disposition in `docs/03` Appendix D records why the refreshed export
+changed checked flags. The current CSV therefore controls: the residential rates 3%, 2% and 2.5%, plus the 15% rule, are
 `geprüft`; the other 42 Page-03 rows remain `verify-before-production`. `geprüft` means the primary
-text was checked, not lawyer-approved. The later Antwort 03 changed heating-factor values and flags,
-not these four AfA rows.
+text was checked, not lawyer-approved. The superseded heating-factor pair did not change these four
+AfA rows.
 
 The dated Non-Goals note says self-use reduces the AfA basis. That sentence is superseded by Page 03
 R6–R9 and the settled D2 decision: self-use reduces **deductible AfA only**. It never reduces the
@@ -391,19 +391,10 @@ The complete Non-Goals V1 set is:
 Also outside this Page: inheritance/gift tax, VAT/input-tax allocation, checking whether an invoice
 is factually justified and tax advice.
 
-## 11. Exact seven-file correspondence ledger
+## 11. Historical source disposition
 
-These files remain unchanged until D3. Page 03 owns no deletion.
-
-| File | Page-03 disposition |
-| --- | --- |
-| `FEEDBACK-to-Berkay-01b.md` | § 4b/current-export explanation traced here; other sections remain with docs/03, docs/16 or history. |
-| `FRAGEN-an-Berkay-02.md` | No Page-03 calculation correction; owner/UVI questions remain mapped to docs/03/docs/16. |
-| `FRAGEN-an-Berkay-03.md` | No Page-03 calculation correction; heating corrections remain mapped to docs/03/docs/16. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` | § 4b confirms the refreshed checked flags; only the three AfA rates and 15% rule apply here. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` | No Page-03 delta; heating/UVI decisions are out of scope. |
-| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` | No Page-03 delta; later heating values do not override the current Page-03 CSV rows. |
-| `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` | Entirely owned by docs/15; no Page-03 content. |
+`docs/03` Appendix D is the single historical correspondence-retirement ledger. Page-03 authority
+comes from the original Page, the current register and the approved rules and fixtures here.
 
 ## 12. Source coverage gate
 
@@ -421,7 +412,6 @@ These files remain unchanged until D3. Page 03 owns no deletion.
 | Current register CSV + 46 entry notes | § 2 | 46 complete metadata tuples; 4 checked/42 blocked | complete |
 | Non-Goals V1 | § 10 | 13 exact identities | complete |
 | README-for-Emir audit | §§ 1, 7, 9 | arithmetic green without clearing flags | complete |
-| Antwort 01b § 4b | §§ 1–2 | current four checked flags | complete |
-| Seven-file correspondence scope | § 11 | exact seven-path tuple | complete |
+| Cross-source flag history | §§ 1–2 and `docs/03` Appendix D | current four checked flags | complete |
 
 This gate completes transcription only. It makes no production-readiness or implementation claim.

@@ -15,8 +15,8 @@ the Page 01 contract in `docs/08-statement-document.md`.
 
 ## 1. Source status and precedence
 
-The complete Page 02, its later answer, the authoritative register CSV, Non-Goals V1 and the audit
-note were reconciled on 17.08.2026. Structured values and flags would come from
+The complete original Page 02, the approved supersession recorded in `docs/08`, the authoritative
+register CSV, Non-Goals V1 and the audit note were reconciled on 17.08.2026. Structured values and flags would come from
 `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`, but the current 180-row CSV contains
 **no row assigned to Page 02** and no `09-K01`–`09-K11` entries. Therefore:
 
@@ -27,8 +27,8 @@ note were reconciled on 17.08.2026. Structured values and flags would come from
 - `berkay-work/` is not changed here. The missing register rows belong to a later authoritative
   register export.
 
-`Antwort-an-Emir_03.md` § 2 is later than the Page and settles the one relevant correction:
-`nichtUmlagefaehigGesamtCent` for the reference object is **100,800 cents**. The Page's old request
+Approved `docs/08` `08-F21` settles the one relevant correction:
+`nichtUmlagefaehigGesamtCent` for the reference object is **100,800 cents**. The original Page's request
 to leave Page 01 block (b) pending is superseded. D1 already carried this correction into `docs/08`
 and the `08-F21` oracle.
 
@@ -317,17 +317,14 @@ not current engine behavior.
 | Page 02 § 5 (`09-E01`–`09-E14`) | § 6 | complete |
 | Page 02 § 6 (`09-F01`–`09-F32`) | § 7 and golden oracle | exact cent values; long examples moved to tests |
 | Page 02 § 7 and Non-Goals addition | § 8 | current boundaries |
-| Page 02 open point 1 | §§ 1, 7 | superseded by Antwort 03 § 2 and D1 `08-F21` |
+| Page 02 open point 1 | §§ 1, 7 | superseded by approved `docs/08` `08-F21` |
 | Page 02 open point 2 | `docs/03`/D1 | superseded; D1 reconciled the cited conflict |
 | Page 02 open points 3–6 | §§ 1–2, 9 | unresolved and production-visible |
 | Page 02 open point 7 | § 1 | unresolved: current CSV still has no `09-K` rows |
 | `Rechtsstand-Register.csv` | §§ 1–2 | authoritative absence recorded; no flags invented |
 | `Anlagen/Non-Goals V1`, Page 02 | § 8 | current |
 | `Anlagen/README-for-Emir.md` | §§ 1, 3, 7 | arithmetic evidence and schema coupling retained |
-| `FEEDBACK-to-Berkay-01b.md` § 7 | §§ 4, 9 | current: existing screens must not infer a key before implementation |
-| `FRAGEN-an-Berkay-03.md` § 2 | §§ 1, 7 | superseded question |
-| `Antwort-an-Emir_03.md` § 2 | §§ 1, 7 | current correction: block (b) = 100,800 cents |
-| Other sections of the correspondence set | later assigned docs | no additional Page 02-owned rule |
+| Historical correspondence | `docs/03` Appendix D | single retirement ledger; no additional Page-02 rule |
 
 ## 8. Explicit non-goals and dependencies
 

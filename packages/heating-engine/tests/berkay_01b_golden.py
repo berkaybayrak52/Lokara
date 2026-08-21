@@ -1,4 +1,4 @@
-"""Cent-exact oracles transcribed from Berkay Page 01b and later Antworten.
+"""Cent-exact oracles transcribed from Page 01b and approved `docs/03`.
 
 This module is data only.  It deliberately does not import the implementation, so an
 implementer cannot make an oracle pass by deriving the expected value from the code under test.
@@ -7,10 +7,10 @@ Money is integer cents.  ``renter_totals`` plus ``owner_total`` always reconcile
 
 Source precedence applied here:
 
-* Antwort 03 § 6 replaces Page 01b R4/E3 and therefore re-expects F05.
+* Approved `docs/03` decision 3/R8 replaces Page 01b R4/E3 and re-expects F05.
 * The Rechtsstand CSV is authoritative for F02: Erdgas Hu 0.201, Ho 0.181,
-  conversion metadata 0.903, status geprüft, Rechtsstand 07/2026. The later
-  Antwort-an-Emir_01b-Uebergabe.md § 4a/4b confirms that Antwort 03's pair is stale.
+  conversion metadata 0.903, status geprüft, Rechtsstand 07/2026. Approved
+  `docs/03` decision 4 and Appendix C preserve that the conflicting pair is stale.
 * F31's two Cologne climate factors are placeholders.  Only its structural assertions and
   the real DWD import values are test oracles.
 """

@@ -19,8 +19,8 @@ band (20,34-24,11) that appears in no statute annex.
 ⚠️ Do not "fix" this back to the shortened table. The superseded section is kept
 and marked in `docs/03`; read it before touching `co2.py`.
 
-Amended by `Antwort-an-Emir_03.md` § 6: R4/E3 and the old `01b-F05` are
-superseded. The annualised value is rounded to one decimal before lookup, and
+Approved `docs/03` decision 3/R8 supersedes R4/E3 and the old `01b-F05`.
+The annualised value is rounded to one decimal before lookup, and
 that same rounded value is printed.
 """
 
@@ -117,7 +117,7 @@ class TestStepBoundariesAreLeftClosed:
 
 
 class TestTheLookupUsesTheRoundedValue:
-    """E3/R4 are superseded by § 5 Abs. 1 S. 3 and Antwort 03 § 6."""
+    """E3/R4 are superseded by § 5 Abs. 1 S. 3 and approved `docs/03` R8."""
 
     def test_berkay_01b_f05_rounds_to_12_0_and_classifies_in_step_2(self) -> None:
         """2.327,9 kg / 194 m² = 11,999484535… -> 12,0 -> Stufe 2.

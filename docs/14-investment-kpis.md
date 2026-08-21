@@ -1,6 +1,6 @@
 # Investment KPIs — planning calculations and deterministic bank view
 
-**Status:** D2 transcription for review; not implemented
+**Status:** D2 transcription complete; approved and merged 21.08.2026; not implemented
 
 **Rechtsstand:** 07/2026
 
@@ -20,9 +20,9 @@ investment recommendation, tax export or promise of a tax result.
 
 ## 1. Sources, precedence, identifiers and audit
 
-The transcription uses the complete Page 07, all 18 Page-07 rows in the authoritative 180-row
+The transcription uses the complete original Page 07, all 18 Page-07 rows in the authoritative 180-row
 `Rechtsstand-Register.csv`, the eight Page-07 entries in `Non-Goals V1`, the
-`README-for-Emir.md` arithmetic audit and the exact seven-file correspondence ledger. The CSV
+`README-for-Emir.md` arithmetic audit and the historical disposition in `docs/03` Appendix D. The CSV
 controls structured values and flags.
 
 The source identifiers are normalized without changing their meaning:
@@ -341,9 +341,10 @@ calculation; purchase/ranking recommendations; and Bank-PDF valuation/credit/app
 - the target-return/default policy and every missing concept from the two absent source files; and
 - real AfA availability and financing provenance at the time a Prüfobjekt is evaluated.
 
-No new question file is created in D2. These gaps remain blocked before production.
+The Berkay-answerable missing sources and choices are routed to `FRAGEN-an-Berkay-04.md`. Legal
+verification and all remaining production blockers stay in this owning document.
 
-## 12. Source coverage and correspondence ledger
+## 12. Source coverage ledger
 
 | Source surface | Destination |
 | --- | --- |
@@ -357,13 +358,5 @@ No new question file is created in D2. These gaps remain blocked before producti
 | 18 register rows | §3 and `PAGE_07_REGISTER_ROWS` |
 | arithmetic audit | §1 and `ARITHMETIC_AUDIT` |
 
-The exact retirement ledger has seven paths. A repository search finds no Page-07 settlement in
-any of them, so each maps to “no Page-07 content”; none is deleted or edited here:
-
-1. `FEEDBACK-to-Berkay-01b.md`;
-2. `FRAGEN-an-Berkay-02.md`;
-3. `FRAGEN-an-Berkay-03.md`;
-4. `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md`;
-5. `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md`;
-6. `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md`; and
-7. `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md`.
+`docs/03` Appendix D is the single historical correspondence-retirement ledger. It records no
+Page-07 rule; current Page-07 authority is fully covered above.

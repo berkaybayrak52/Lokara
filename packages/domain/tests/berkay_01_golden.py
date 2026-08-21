@@ -1,10 +1,9 @@
 """Data-only, cent-exact oracles transcribed from Berkay Page 01.
 
 The module imports no production code.  It records exactly ``08-F01`` through
-``08-F24``.  Money is integer cents; later Antworten override the older Page
-wording where they made a method correction.  In particular, Antwort 03 section
-2 fixes F21 block (b) at 100,800 cents while the billable-cost residual in block
-(a) remains 17,531 cents.
+``08-F24``. Money is integer cents; approved `docs/08` method corrections control
+where they supersede the original Page. In particular, F21 block (b) is 100,800
+cents while the billable-cost residual in block (a) remains 17,531 cents.
 """
 
 from typing import Final

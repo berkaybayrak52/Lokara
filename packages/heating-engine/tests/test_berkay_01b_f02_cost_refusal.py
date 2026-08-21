@@ -1,6 +1,6 @@
 """`01b-F02` — missing supplier CO₂ cost is refused without choosing a factor.
 
-Source: Page 01b E1/F02 as corrected by Antwort 03 § 5. Transcription:
+Source: original Page 01b E1/F02 as corrected by approved `docs/03` § 7 item 5. Transcription:
 `docs/03-nk-heating-engines.md` §§ 0, 3, 4 H2, 6 E1 and 7 no. 5.
 Rechtsstand 08/2026.
 

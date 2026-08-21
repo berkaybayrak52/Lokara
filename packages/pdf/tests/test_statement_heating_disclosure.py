@@ -1378,7 +1378,7 @@ class TestCo2Berechnungsgrundlagen:
 
 
 class TestCo2S3FixedOneDecimalDisplay:
-    """Antwort 03 § 6: the rounded classified value is printed as `12,0`.
+    """Approved `docs/03` R8: the rounded classified value is printed as `12,0`.
 
     Both render sites are pinned because the generic number formatter suppresses
     trailing zeros. These stay red after the engine is fixed until the statement

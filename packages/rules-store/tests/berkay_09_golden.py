@@ -2,7 +2,7 @@
 
 This module imports no production code. It records exactly ``09-F01`` through
 ``09-F32`` plus the complete catalogue identity surface. Money is integer
-cents. The later Antwort 03 correction fixes the F19 non-allocable block at
+cents. Approved `docs/08`/`docs/09` fix the F19 non-allocable block at
 100,800 cents.
 """
 

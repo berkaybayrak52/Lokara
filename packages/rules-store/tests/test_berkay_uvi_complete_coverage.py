@@ -3,7 +3,6 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from berkay_uvi_golden import (
-    CORRESPONDENCE_RETIREMENT_LEDGER,
     DWD_ANNUAL_CLIMATE_FACTOR_PLZ_FIXTURES,
     DWD_ANNUAL_IMPORT_CONTRACT,
     DWD_LATEST_STATE,
@@ -37,7 +36,7 @@ def _text(case: dict[str, object], key: str) -> str:
     return value
 
 
-def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None:
+def test_complete_source_register_and_non_goal_surfaces() -> None:
     assert len(UVI_SOURCE_SECTIONS) == 20
     assert len(set(UVI_SOURCE_SECTIONS)) == 20
     assert tuple(row["csv_row"] for row in UVI_REGISTER_ROWS) == (
@@ -63,8 +62,6 @@ def test_complete_source_register_non_goal_and_correspondence_surfaces() -> None
         assert row["rechtsstand"]
     assert len(UVI_NON_GOALS) == 11
     assert len(set(UVI_NON_GOALS)) == 11
-    assert len(CORRESPONDENCE_RETIREMENT_LEDGER) == 7
-    assert len(set(CORRESPONDENCE_RETIREMENT_LEDGER)) == 7
 
 
 def test_blocks_a_and_b_match_the_annex_examples() -> None:
@@ -135,7 +132,7 @@ def test_block_d_normalizes_by_area_and_counts_target_in_three_valid_units() -> 
 
 
 def test_corrected_d2_compares_heat_with_heat_and_reconciles_exactly() -> None:
-    case = _case("antwort_02_block_d2_heat_only")
+    case = _case("approved_block_d2_heat_only")
     heat_only = _int(case, "heizspiegel_mittel_kwh_m2a") - _int(
         case, "warm_water_deduction_kwh_m2a"
     )
@@ -151,7 +148,7 @@ def test_corrected_d2_compares_heat_with_heat_and_reconciles_exactly() -> None:
     assert case["attribution"] == HEIZSPIEGEL_D2_CONTRACT["attribution"]
     old = SUPERSESSION_LEDGER["old_block_d2_result"]
     assert isinstance(old, dict)
-    assert old["status"] == "history_only_replaced_by_antwort_02_heat_only_example"
+    assert old["status"] == "history_only_replaced_by_approved_heat_only_example"
 
 
 def test_hkv_provisional_and_linear_interpolation_conventions_are_exact() -> None:

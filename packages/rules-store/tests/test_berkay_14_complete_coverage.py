@@ -10,8 +10,6 @@ from berkay_14_golden import (
     ARITHMETIC_AUDIT,
     COMPATIBILITY_ANCHORS,
     CONVENTION_IDS,
-    CORRESPONDENCE_DISPOSITION,
-    CORRESPONDENCE_RETIREMENT_FILES,
     EDGE_CASE_IDS,
     FIXTURE_IDS,
     FORMULA_IDS,
@@ -77,7 +75,7 @@ def test_identifier_alias_and_source_surfaces_are_exact() -> None:
     assert all(SOURCE_ALIASES[f"R{n}"] == f"R{n}" for n in range(1, 11))
 
 
-def test_register_non_goals_exclusions_correspondence_and_audit_are_exact() -> None:
+def test_register_non_goals_exclusions_and_audit_are_exact() -> None:
     assert len(PAGE_07_REGISTER_ROWS) == 18
     assert len({row[0] for row in PAGE_07_REGISTER_ROWS}) == 18
     assert all(len(row) == 9 for row in PAGE_07_REGISTER_ROWS)
@@ -109,18 +107,6 @@ def test_register_non_goals_exclusions_correspondence_and_audit_are_exact() -> N
         "purchase_ranking_recommendations",
         "bank_pdf_valuation_credit_and_application_claims",
     )
-    assert CORRESPONDENCE_RETIREMENT_FILES == (
-        "FEEDBACK-to-Berkay-01b.md",
-        "FRAGEN-an-Berkay-02.md",
-        "FRAGEN-an-Berkay-03.md",
-        "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md",
-        "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md",
-        "berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md",
-        "berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md",
-    )
-    assert {
-        path: "no_page_07_content" for path in CORRESPONDENCE_RETIREMENT_FILES
-    } == CORRESPONDENCE_DISPOSITION
     assert ARITHMETIC_AUDIT == {
         "fixture_count": 14,
         "fixture_range": "KPI-F01…KPI-F14",

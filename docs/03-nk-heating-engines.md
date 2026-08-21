@@ -8,11 +8,10 @@ full earlier arguments remain available with
 
 The authoritative heating source is
 `berkay-work/Spec-Seiten/01b · Heizkosten- & CO₂-Verteilung 3a95fd420731814e9e5be043028d4856.md`,
-read with the Page 01b Antworten, the authoritative 47 matching rows in
-`berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`, and the correspondence disposition
-ledger in Appendix D. The CSV wins for structured values and flags. Later Antworten may supersede a
-method; every such disposition is explicit below. `docs/08-statement-document.md` owns the document
-projection. This file owns the calculation.
+the authoritative 47 matching rows in
+`berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`, and the approved supersession history
+below. The CSV wins for structured values and flags. Appendix D is historical only.
+`docs/08-statement-document.md` owns the document projection. This file owns the calculation.
 
 ## Reading guide and status vocabulary
 
@@ -125,8 +124,8 @@ C implements the merged Page 02 contract:
 - `DIRECT`, `PERSONS`, `CONSUMPTION`, period validation, and end-to-end Page 02 fixtures remain Slice C
   closure work, even where current primitives already exist.
 
-The Page 08 bank-matching contract is **approved but unmerged** on `slice/docs-15-f03`. The
-authoritative patch resolves `BANKMATCH-F03`, and all thirteen oracle cases are executable. This
+The Page 08 bank-matching contract is **approved and merged** in `docs/15`. That approved doc and
+its oracle resolve `BANKMATCH-F03`, and all thirteen cases are executable. This
 specification status does not change any current NK or heating behavior.
 
 ## 3. Page 01b current decisions
@@ -673,28 +672,53 @@ here does not merge them.
 
 ## Appendix D — correspondence-retirement disposition ledger
 
-This is the full Page 01b retirement trace. It does not edit or retire a source file. A deferred
-disposition remains in the correspondence set until its target documentation and fixture exist.
+This is the single historical ledger for all seven files retired in D3. Git preserves their former
+contents; current authority comes from the original Pages and annexes, the Rechtsstand register and
+approved `docs/00`–`docs/16`. Every former section has one durable destination below. Exact retired
+filenames appear nowhere else in the live repository except the retirement checker denylist.
 
 | Source section | Canonical destination | Disposition |
 | --- | --- | --- |
-| `FEEDBACK-to-Berkay-01b.md` §§ 1–6 | §§ 3–9 and Appendices B/C | **Current**, except the old factor disagreement superseded by CSV `0.201 Hu / 0.181 Ho`; F19 correction, F16/F26 reading and K3 remain current |
-| `FEEDBACK-to-Berkay-01b.md` § 7 | `docs/09` | **Transcribed and merged in D2**; production still Slice C |
-| `FEEDBACK-to-Berkay-01b.md` § 8 | `docs/16` | **Transcribed and merged in D2**: DWD import, notice identity, K13 and UVI |
-| `FEEDBACK-to-Berkay-01b.md` § 9 | `docs/02`; §§ 5 and 9.2 | **Superseded question**: Antworten 02/03 fix one unconditional Liegenschafts-Residuum |
-| `Antwort-an-Emir_01b-Uebergabe.md` §§ 0–4 | §§ 3, 7, 9.5 and Appendices B/C | **Current**: F19 correction, F16/F26 confirmation and CSV precedence |
-| `Antwort-an-Emir_01b-Uebergabe.md` §§ 5–8 | `docs/16` | **Transcribed and merged in D2**: DWD/K12, § 6a notice and K13/D2; range/date conflict resolved, legal notice identity retained |
-| `Antwort-an-Emir_01b-Uebergabe.md` §§ 9–11 | this ledger and `docs/16` | **Current routing/history**; no calculation value introduced |
-| `FRAGEN-an-Berkay-02.md` § 1 and `Antwort-an-Emir_02.md` § 1 | `docs/02`; §§ 5 and 9.2; `docs/08` | **Current resolution**: owner is a residual, always exists, and may be negative |
-| `FRAGEN-an-Berkay-02.md` §§ 2–4 and `Antwort-an-Emir_02.md` §§ 2–4 | `docs/16` | **Transcribed and merged in D2**: heat-only comparison, over-500 fallback and source handling |
-| `FRAGEN-an-Berkay-02.md` § 5 and `Antwort-an-Emir_02.md` § 5 | Appendix C | **Current source rule**: one authoritative CSV; `geprüft` is not lawyer approval |
-| `Antwort-an-Emir_02.md` § 6 | §§ 7–8 and `docs/16` | **Current evidence**, split by ownership; no default inferred |
-| `FRAGEN-an-Berkay-03.md` § 1 and `Antwort-an-Emir_03.md` § 1 | § 9.2 | **Current method correction**: fixed residual destination; K9 direction remains flagged |
-| `FRAGEN-an-Berkay-03.md` § 2 and `Antwort-an-Emir_03.md` § 2 | `docs/08`, `08-F21` | **Current correction**: Page 01 block (b) is 100,800 ct |
-| `FRAGEN-an-Berkay-03.md` § 3 and `Antwort-an-Emir_03.md` § 3 | `docs/16` | **Transcribed and merged in D2**: D2 compares heat with heat; old heat+WW wording superseded |
-| `FRAGEN-an-Berkay-03.md` § 4 and `Antwort-an-Emir_03.md` § 4 | § 7 item 1 and Appendix C | **Superseded by CSV**: `0.2016 / 0.1820` and older flag do not control |
-| `FRAGEN-an-Berkay-03.md` § 5 and `Antwort-an-Emir_03.md` § 5 | §§ 3, 7 item 4 and 9.5 | **Current**: missing supplier CO₂ cost refuses; mass-only fallback survives |
-| `FRAGEN-an-Berkay-03.md` § 6 and `Antwort-an-Emir_03.md` § 6 | § 3 decision 3 and § 5 R8 | **Current**: annualise, round one decimal, classify and print the same value |
+| `FEEDBACK-to-Berkay-01b.md` summary and §§ 1–4 | §§ 3, 5, 7 and Appendices B/C | F19 correction, F16/F26 residual reading and K3 remain current; the older factor disagreement is superseded by CSV `0.201 Hu / 0.181 Ho` |
+| `FEEDBACK-to-Berkay-01b.md` § 5 | `CLAUDE.md` § 4 and this ledger | Historical transcription rationale; the old promise to keep the correspondence folder immutable is superseded by D3 |
+| `FEEDBACK-to-Berkay-01b.md` § 6 | Appendix B and committed fixtures | Historical demo delta; current K3 rule and exact arithmetic remain in approved fixtures |
+| `FEEDBACK-to-Berkay-01b.md` § 7 | `docs/09` §§ 4 and 9 | Current boundary: no inferred allocation key before the approved catalogue is implemented |
+| `FEEDBACK-to-Berkay-01b.md` § 8 item 1 | § 7 items 5/10 and § 9.5 | Superseded by the current supplier-cost refusal; no price-derived cost fallback exists |
+| `FEEDBACK-to-Berkay-01b.md` § 8 item 2 | § 7 item 9; `docs/16` §§ 2 and 16 | Notice evidence is preserved; legal identity remains in its owning legal-review ledger |
+| `FEEDBACK-to-Berkay-01b.md` § 8 item 3 | `docs/16` § 9 | Annual DWD importer source, corrections and fixtures are transcribed |
+| `FEEDBACK-to-Berkay-01b.md` § 8 item 4 | `docs/16` §§ 8 and 16 | K13/D2 source and remaining authority gaps are transcribed |
+| `FEEDBACK-to-Berkay-01b.md` § 9 | `docs/02` § 5; § 9.2; `docs/08` § 5 “Die Eigentümerzeile” | Superseded question: one unconditional Liegenschafts-Residuum always exists |
+| `FRAGEN-an-Berkay-02.md` § 1 | `docs/02` § 5; § 9.2; `docs/08` § 5 “Die Eigentümerzeile” | Superseded by the fixed unconditional owner-residual model |
+| `FRAGEN-an-Berkay-02.md` §§ 2–4 | `docs/16` §§ 1, 8 and 16 | Superseded by heat-only comparison, labelled over-500 fallback and approved source handling |
+| `FRAGEN-an-Berkay-02.md` § 5 | `CLAUDE.md` § 4 and Appendix C | Historical export-naming request; one canonical CSV and current `geprüft` semantics govern |
+| `FRAGEN-an-Berkay-02.md` “Was bei uns …” | §§ 3, 7 and 9.2; `docs/16` | Historical implementation checklist; durable rules are routed to their approved owners |
+| `FRAGEN-an-Berkay-03.md` § 1 | § 9.2 and Appendix C | Fixed residual destination is current; half-up direction remains flagged |
+| `FRAGEN-an-Berkay-03.md` § 2 | `docs/08` `08-F21`; `docs/09` `09-F19` | Superseded question; Page 01 block (b) is 100,800 ct |
+| `FRAGEN-an-Berkay-03.md` § 3 | `docs/16` §§ 8 and 16 | Superseded question; D2 compares heat with heat |
+| `FRAGEN-an-Berkay-03.md` § 4 | § 7 item 1 and Appendix C | Settled history: CSV values/flags control; the conflicting pair is superseded |
+| `FRAGEN-an-Berkay-03.md` § 5 | §§ 3, 7 item 5 and 9.5 | Missing supplier CO₂ cost refuses; mass-only fallback survives |
+| `FRAGEN-an-Berkay-03.md` § 6 | § 3 decision 3 and § 5 R8 | Annualise, round one decimal, classify and print the same value |
+| `FRAGEN-an-Berkay-03.md` “Was bei uns läuft” | § 9.2; `docs/08`; `docs/16` | Historical implementation checklist; settled rules and open implementation status remain with their owning docs |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` §§ 0–3 | §§ 3, 7 and 9.5; Appendices B/C | F19 correction and F16/F26 confirmation are current; task narration is historical |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` § 4a | § 3 decision 4 and Appendix C | Register values `0.201 Hu / 0.181 Ho` and reference selection control |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` § 4b | Appendix C; `docs/10` § 2; `docs/13` § 2 | Current CSV controls heating, AfA and § 556d flags; checked means primary text read, not lawyer approval |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` §§ 5–6 | `docs/16` §§ 2, 5–7, 9 and 16 | DWD importer correction and notice evidence transcribed; legal notice identity remains in its owning legal-review ledger |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` §§ 7–8 | §§ 7 and 9.5; `docs/16` §§ 8 and 16 | Supplier-cost rule and K13/D2 history transcribed; remaining source choices are current questions |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_01b-Uebergabe.md` §§ 9–11 | approved owning docs and this ledger | Old implementation tasks/package inventory are historical; no independent calculation authority remains |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` §§ 1–1.4 | `docs/02` § 5; § 9.2; `docs/08` § 5 “Die Eigentümerzeile” | One structural residual, always printed, no quote, with per-unit origin retained |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` §§ 2–2.4 | `docs/16` §§ 8.2, 12 and 16 | Heat-only deduction, heat-pump convention, guard and golden arithmetic transcribed |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 3 | `docs/16` §§ 8.2 and 16 | Missing over-500 values use the labelled 250–500 fallback; no extrapolation |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 4 | `docs/16` §§ 8.2 and 11 | Source label/licence decision transcribed; no independent permission claim is promoted |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 5 and `geprüft` section | `CLAUDE.md` § 4 and Appendix C | One canonical register; checked means primary text read, not lawyer approval |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` § 6 | §§ 7–8; `docs/16` §§ 8 and 12 | Arithmetic evidence split by owning rule; it does not clear flags |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_02.md` checklist | approved owning docs | Historical build checklist; no independent authority remains |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` process section | `CLAUDE.md`, `AGENTS.md` | Historical process advice superseded by current repository governance |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` §§ 1–3 | § 9.2; `docs/08` `08-F21`; `docs/16` §§ 8 and 16 | Residual, block-(b) and heat-only D2 corrections are current in approved docs |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` § 4 | § 7 item 1 and Appendix C | Superseded by the authoritative CSV values and flags |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` §§ 5–6 | §§ 3, 5, 7 and 9.5 | Cost fallback refuses; annualise then round/classify/print is current |
+| `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` summary | approved owning docs | Historical build checklist; every settled rule above has a durable owner |
+| `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` context and E12 amendment | `docs/15` §§ 1, 4 and 8 | Current correction: potential duplicate requires Review; identical provider ID dedupes before scoring |
+| `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` `BANKMATCH-F03` | `docs/15` § 7 and `packages/rules-store/tests/berkay_15_golden.py` | Exact executable F03 inputs, outcomes and summation checks preserved |
 
 ## Appendix E — compact supersession ledger
 
