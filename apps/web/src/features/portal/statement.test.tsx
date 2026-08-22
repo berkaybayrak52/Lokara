@@ -19,6 +19,10 @@ const RESULT: DemoStatementResponse = {
   heatingTotalEur: '0,00 €',
   heatingInputTotalCents: 0,
   heatingMissingReason: null,
+  // A self-billing run: the figures below are calculated by the engines, not
+  // passed through from a confirmed Messdienstleister statement.
+  heatingPath: 'SELF_BILLING',
+  heatingSourceNote: null,
   heatingReadiness: 'READY',
   heatingFindings: [
     {
@@ -86,6 +90,16 @@ const RESULT: DemoStatementResponse = {
   disclaimer: 'Keine Rechtsberatung.',
 };
 
+// The same run over a period that is not the seeded 2025 calendar year, with no
+// cost types entered. `rechtsstaende` moves with the period so this fixture
+// carries no other "2025" token — any that survives the render is hardcoded copy.
+const EMPTY_COSTS_2024: DemoStatementResponse = {
+  ...RESULT,
+  periodLabel: '01.01.2024 – 30.06.2024',
+  nkCosts: [],
+  rechtsstaende: ['Rechtsstand 06/2024'],
+};
+
 describe('StatementResult Page 01b projection', () => {
   it('renders evidence, raw annual fallback, and each 3-percent risk separately', () => {
     const html = renderToStaticMarkup(
@@ -97,5 +111,27 @@ describe('StatementResult Page 01b projection', () => {
     expect(html).toContain('role="img"');
     expect(html.match(/3-%-Risiko/g)).toHaveLength(2);
     expect(html).not.toContain('6-%-Risiko');
+  });
+
+  it('names the object and the period it computed', () => {
+    const html = renderToStaticMarkup(
+      <StatementResult data={RESULT} pdfUrl="/statement.pdf" accountId="acc-1" />,
+    );
+
+    // Objekt und Zeitraum sind auf diesem Screen wählbar. Ein Ergebnis, das
+    // seinen eigenen Bezug nicht nennt, lässt sich dem falschen Lauf zuordnen —
+    // genau der Fehler, den das Zurücksetzen bei jeder Auswahl verhindern soll.
+    expect(html).toContain('Musterhaus');
+    expect(html).toContain('Musterstraße 12, 10115 Berlin');
+    expect(html).toContain('Abrechnungszeitraum 01.01.2025 – 31.12.2025');
+  });
+
+  it('names the computed period in the empty-costs card, not a fixed year', () => {
+    const html = renderToStaticMarkup(
+      <StatementResult data={EMPTY_COSTS_2024} pdfUrl="/statement.pdf" accountId="acc-1" />,
+    );
+
+    expect(html).toContain('Für 01.01.2024 – 30.06.2024 sind noch keine Kostenarten erfasst');
+    expect(html).not.toContain('2025');
   });
 });

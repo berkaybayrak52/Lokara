@@ -54,11 +54,36 @@ The current render includes:
 These are **Shipped** capabilities. They do not turn the landlord overview into a complete
 Mieter-Einzelabrechnung.
 
+### Shipped Page 01 application path
+
+Slice B closed the application side of Page 01 — the persisted path from entered data to a projected
+result. These are **Shipped**, and each is a capability, not the finished tenant document:
+
+| Capability | What now exists |
+| --- | --- |
+| Real object and period selection | The statement route takes a `building_id` and a billing period instead of a demo preset. `period_to` is **inclusive** in the URL, as a human reads a billing period, and half-open internally; both dates or neither. |
+| D0 person-day denominator | The fictional vacancy occupancy is derived per run from persisted `person_count` history and the building's Fiktivbelegung mode, and reaches the engine as a landlord-side weight. Layering, modes and the waiver are owned by `docs/02` § 5 "D0 Fiktivbelegung". |
+| CONSUMPTION values reach the engine | A CONSUMPTION-keyed NK cost is allocated from persisted per-unit readings with its Maßeinheit, instead of being folded away unused. A unit without a usable value contributes no consumption row and the statement says so. |
+| Server-side audience projection | `OWNER`, `TENANT(tenancy_id)` and `TAX` are selected from the one computed result **before** rendering (`StatementProjection`). A `TENANT` projection carries no owner residual and no building-wide findings; a `TAX` projection carries only owner-side rows. |
+| German refusals for bad input | An invalid billing window (missing half, reversed dates, more than 12 months) and an overlapping occupancy both return `422` with a German sentence naming the defect and the landlord's next action. `404` stays for "no data" and for an unknown or zero-usage-day tenancy — a missing or foreign `tenancy_id` never falls back to the owner view. |
+
+Scope limits that this does **not** move:
+
+- **There is no tenant PDF.** The projection exists as API data only. The PDF route is landlord
+  audience and `to_pdf_data` deliberately has **no** audience parameter, because a
+  Mieter-Einzelabrechnung is a separate, independently rendered document (§ 3) and adding a flag to
+  the existing route is exactly the "render everything and hide rows" shape § 3 forbids.
+- **Page 01 cent figures that need renter-side half-up rounding remain deferred to Slice C.**
+  Production NK still uses its shipped largest-remainder path (`CLAUDE.md` § 8); only heating rounds
+  each renter share half-up against one owner residual.
+- Everything in the next section stays with M6.
+
 ### Specified Page 01 and M6 output
 
 The complete Page 01 contract and exact `08-F01…F24` data-only oracle are **Specified and approved**.
-M6 still owns actual paid advances, Saldo, immutable finalization, one isolated tenant document per
-eligible tenancy, document archives and delivery-safe output.
+M6 still owns actual paid advances, Saldo/Nachzahlung/Guthaben, immutable finalization, archived
+bytes and hashes, one isolated **rendered** tenant document per eligible tenancy, document archives,
+delivery-safe output, and the operator/numerator derivation that closes formal minimum #3.
 
 ### Future dependencies
 
@@ -117,7 +142,9 @@ invent their contracts.
   visible as `Rechnerischer Saldo`; a renter `Guthaben` remains payable. A landlord exception needs
   an explicit reason. Cadence and escalation belong to `docs/12`.
 - **Period boundary.** A shorter Rumpfperiode is day-exact. More than 12 months hard-blocks before an
-  engine run or render. Leap years keep their actual days.
+  engine run or render. Leap years keep their actual days. The NK engine enforces this as a
+  billing-window precondition (`08-F15`), so an over-long period fails before any cost is allocated;
+  no golden fixture may assert shares for one.
 - **Tenancy changes create separate documents.** Each uses only its own clipped dates, actual
   advances and result. Zero clipped usage days produces no tenant document or portal item and is not
   itself vacancy.
@@ -149,12 +176,18 @@ archived documents. A finalized version is never rebuilt from current mutable ro
 
 | Document | Audience | Contents | Delivery status |
 | --- | --- | --- | --- |
-| **Vermieter-Gesamtübersicht** | landlord/internal | all parties and the full reconciliation | **Shipped** live preview |
-| **Mieter-Einzelabrechnung** | exactly one covered tenancy | only that tenancy's share, advances, Saldo and notices | **Specified**, M6 |
-| **Leerstandsaufstellung** | landlord/tax evidence | origin-preserving vacancy/non-allocable/rounding blocks | **Specified**, M6/tax handoff |
+| **Vermieter-Gesamtübersicht** | landlord/internal | all parties and the full reconciliation | **Shipped** live preview, rendered |
+| **Mieter-Einzelabrechnung** | exactly one covered tenancy | only that tenancy's share, advances, Saldo and notices | **Capability shipped** as a server-side projection (API data only); the rendered document, advances and Saldo stay **Specified**, M6 |
+| **Leerstandsaufstellung** | landlord/tax evidence | origin-preserving vacancy/non-allocable/rounding blocks | **Capability shipped** as a server-side projection over owner-side rows; the rendered annex and the tax handoff stay **Specified**, M6/tax handoff |
 
 The server constructs each projection from the selected result before rendering. It never renders an
 all-renters PDF and crops, covers or hides rows afterward; hidden PDF structure is still a disclosure.
+
+The shipped projection enforces that boundary by type rather than by a flag: what a renderer is not
+given, it cannot leak. The `TENANT` projection contains no owner residual, no other party's line and
+none of the building-wide findings, and an unknown, foreign or zero-usage-day tenancy is refused
+instead of falling back to the owner view. Only the landlord audience is rendered today; the tenant
+PDF is M6 and needs the ledger before it may exist at all.
 
 #### Preview versus finalization (M6)
 
@@ -182,6 +215,11 @@ The page prints `Gesamtkosten`, the applied key, party `Bemessung`, `Gesamtbemes
 the euro share. It still must print the relationship
 `Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung` and derive a numerator such as
 `5.430 m²·Tage = 30 m² × 181 Tage`. Both gaps apply to NK and heating.
+
+Slice B did not move this marker. It closed the application path into the render (object/period
+selection, the D0 denominator, CONSUMPTION values and the audience projection) and changed nothing
+about what the page prints for a share. The operator and the numerator derivation remain missing and
+stay with M6.
 
 ### #4 is blocked on the M6 ledger, by decision
 

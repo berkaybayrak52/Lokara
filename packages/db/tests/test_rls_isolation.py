@@ -32,10 +32,14 @@ from lokara_db import (
     DbSettings,
     HeatingCostEntry,
     Landlord,
+    MdlBranch,
+    MdlStatement,
+    MdlStatementPosition,
     Membership,
     Meter,
     MeterReading,
     Person,
+    PersonCount,
     Renter,
     Role,
     SelfUseKind,
@@ -118,6 +122,31 @@ class _Seed:
         self.leaked_unit_b = new_id()
         self.leaked_meter_b = new_id()
         self.leaked_assignment_b = new_id()
+        # Personenschlüssel rows (Page 01 § 3.5 / docs/02 § 5). Created per test
+        # by the `person_count_rows` fixture, not here, so the module-wide
+        # "B sees zero rows" assertions above keep meaning what they say — but
+        # the ids live on the seed so the teardown below can sweep them even if
+        # a leaked insert commits, exactly like `leaked_assignment_b`.
+        self.person_count_a = new_id()
+        self.leaked_person_count_b = new_id()
+        self.cross_tenancy_person_count_b = new_id()
+        # Confirmed Messdienstleister statements (migration 0008, docs/03 H7).
+        # Same arrangement as the Personenschlüssel ids above: the rows live in a
+        # per-test fixture, the ids live here so the module teardown can sweep
+        # anything a broken policy or a broken FK let through.
+        self.mdl_statement_a = new_id()
+        self.mdl_position_a = new_id()
+        self.leaked_mdl_statement_b = new_id()
+        self.leaked_mdl_position_b = new_id()
+        self.cross_building_mdl_statement_b = new_id()
+        self.cross_tenancy_mdl_position_b = new_id()
+        self.cross_statement_mdl_position_b = new_id()
+        # Rows B creates *legitimately* inside the cross-parent transactions, so
+        # that only ONE link in the asserted row crosses accounts. They roll back
+        # with the rejection; the ids exist for the sweep.
+        self.own_mdl_statement_b = new_id()
+        self.own_unit_b = new_id()
+        self.own_tenancy_b = new_id()
 
 
 @pytest.fixture(scope="module")
@@ -254,6 +283,18 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
     yield ids
     with Session(owner) as session, session.begin():
         for model, row_id in (
+            # MDL first: positions hang off statements, statements off
+            # `building_b` — which this same tuple drops a few lines down.
+            (MdlStatementPosition, ids.cross_statement_mdl_position_b),
+            (MdlStatementPosition, ids.cross_tenancy_mdl_position_b),
+            (MdlStatementPosition, ids.leaked_mdl_position_b),
+            (MdlStatementPosition, ids.mdl_position_a),
+            (MdlStatement, ids.cross_building_mdl_statement_b),
+            (MdlStatement, ids.leaked_mdl_statement_b),
+            (MdlStatement, ids.own_mdl_statement_b),
+            (MdlStatement, ids.mdl_statement_a),
+            (Tenancy, ids.own_tenancy_b),
+            (Unit, ids.own_unit_b),
             # Rows TestCrossAccountForeignKeys leaks while the composite FKs are
             # missing; no-ops once the database rejects those inserts.
             (Meter, ids.leaked_meter_b),
@@ -268,7 +309,11 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
             (CostEntry, ids.cost_a),
             (Statement, ids.statement_a),
             (BuildingAssignment, ids.assignment_a),
-            # FK order: party → tenancy → unit, before renter/building can go.
+            # FK order: party/person_count → tenancy → unit, before
+            # renter/building can go.
+            (PersonCount, ids.cross_tenancy_person_count_b),
+            (PersonCount, ids.leaked_person_count_b),
+            (PersonCount, ids.person_count_a),
             (TenancyParty, ids.tenancy_party_a),
             (Tenancy, ids.tenancy_a),
             (Unit, ids.unit_a),
@@ -902,3 +947,444 @@ class TestGlobalPersonIsolation:
             ).one()
         assert row.relrowsecurity, "person: RLS is not ENABLEd"
         assert row.relforcerowsecurity, "person: RLS is not FORCEd — the owner bypasses it"
+
+
+# ── Slice B — Personenschlüssel: person_count isolation (Page 01 § 3.5, docs/02 § 5). ──
+#
+# `person_count` arrives with migration 0007 already ENABLEd, FORCEd and policied,
+# so what follows closes check 4 of `scripts/check_rls_coverage.py` — the policy is
+# exercised, not merely present — plus the composite-FK edge the policy cannot see.
+
+
+@pytest.fixture
+def person_count_rows(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[str]:
+    """One PersonCount on account A's tenancy — created per test, never in the
+    module seed, for the same reason `identity_rows` is: the existing
+    `test_cross_account_read_is_blocked` / `test_own_context_sees_own_rows` pair
+    must keep asserting exactly the rows it was written to assert.
+
+    The two leaked ids the write tests below aim at are swept here as well. Those
+    inserts must be rejected and rolled back, so the deletes are normally no-ops —
+    but if a policy or the composite FK is ever dropped, the suite has to fail on
+    the assertion instead of poisoning `tenancy` teardown for every later run.
+    """
+    owner, _ = engines
+    with Session(owner) as session, session.begin():
+        session.add(
+            PersonCount(
+                id=seed.person_count_a,
+                account_id=seed.account_a,
+                tenancy_id=seed.tenancy_a,
+                count=2,
+                valid_from=date(2025, 1, 1),
+                valid_to=None,
+            )
+        )
+    yield seed.person_count_a
+    with Session(owner) as session, session.begin():
+        for row_id in (
+            seed.cross_tenancy_person_count_b,
+            seed.leaked_person_count_b,
+            seed.person_count_a,
+        ):
+            obj = session.get(PersonCount, row_id)
+            if obj is not None:
+                session.delete(obj)
+
+
+class TestPersonCountIsolation:
+    """`person_count` is a denominator, which is what makes it worth its own tests.
+
+    A Personenzahl is not a display field: it forms the person-day denominator of
+    every person-keyed cost type (docs/02 § 5). A row written into account A's
+    tenancy therefore moves money on A's Abrechnung — silently, and on a document
+    that goes to a real Mieter — without the writer ever reading one of A's rows.
+    """
+
+    def test_cross_account_read_is_blocked(
+        self, engines: tuple[Engine, Engine], seed: _Seed, person_count_rows: str
+    ) -> None:
+        """B's context must not see how many people live in A's flats. The count
+        is household data about named renters, not just an allocation input."""
+        _, app = engines
+        with account_scoped_session(app, seed.account_b) as session:
+            assert session.scalars(select(PersonCount)).all() == []
+
+    def test_own_context_sees_own_rows(
+        self, engines: tuple[Engine, Engine], seed: _Seed, person_count_rows: str
+    ) -> None:
+        """Non-vacuous control: the same query under A's context finds the row, so
+        the empty result above is the policy at work and not a fixture that never
+        inserted anything."""
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            assert session.scalars(select(PersonCount.id)).all() == [person_count_rows]
+
+    def test_cross_account_insert_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, person_count_rows: str
+    ) -> None:
+        """WITH CHECK: B's context cannot stamp a count onto A's tenancy.
+
+        INSERT is the whole of this table's isolation in practice — the count is
+        history (`valid_from`/`valid_to`), so a correction is a new row rather
+        than an UPDATE. A blind write of a large count would inflate A's
+        person-day denominator and shrink every other renter's share, and no
+        later read by A would reveal where it came from."""
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                PersonCount(
+                    id=seed.leaked_person_count_b,
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    count=99,
+                    valid_from=date(2025, 1, 1),
+                    valid_to=None,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_tenancy_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, person_count_rows: str
+    ) -> None:
+        """The composite FK, which is the half `WITH CHECK` cannot reach.
+
+        This row stamps `account_id = B` and so passes the policy; only
+        `tenancy_id` crosses into A. Postgres checks foreign keys with RLS
+        bypassed, so nothing but the pair
+        `(tenancy_id, account_id) → tenancy (id, account_id)` refuses it.
+
+        `match=` names that constraint on purpose. A generic "foreign key
+        constraint" would also be satisfied by `person_count_account_id_fkey` —
+        a different failure with a different meaning — and the test would pass
+        while proving nothing."""
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="person_count_tenancy_id_fkey"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                PersonCount(
+                    id=seed.cross_tenancy_person_count_b,
+                    account_id=seed.account_b,
+                    tenancy_id=seed.tenancy_a,
+                    count=3,
+                    valid_from=date(2025, 1, 1),
+                    valid_to=None,
+                )
+            )
+            session.flush()
+
+
+# ── Slice B — confirmed Messdienstleister statements (migration 0008, docs/03 H7). ──
+#
+# `mdl_statement` and `mdl_statement_position` arrive ENABLEd, FORCEd and policied,
+# so what follows closes check 4 of `scripts/check_rls_coverage.py` — the policy is
+# exercised, not merely present — plus the two composite-FK edges the policy cannot
+# see. `MdlStatement` / `MdlStatementPosition` are named as the mapped classes on
+# purpose: that is what the coverage gate matches on, and it is also what the API
+# writes through.
+
+
+@pytest.fixture
+def mdl_rows(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[tuple[str, str]]:
+    """One confirmed statement on account A's building, with one position on A's
+    tenancy — created per test, never in the module seed, so the module-wide
+    "B sees zero rows" assertions keep meaning exactly what they say.
+
+    The ids the write tests below aim at are swept in the module teardown rather
+    than here, because two of those transactions also create B-owned parents
+    (a building, a unit, a tenancy) that have to go in FK order with everything
+    else. All of it is normally a no-op: the inserts must be rejected and rolled
+    back, and if a policy or a composite FK is ever dropped the suite has to fail
+    on the assertion instead of poisoning teardown for every later run.
+    """
+    owner, _ = engines
+    with Session(owner) as session, session.begin():
+        session.add(
+            MdlStatement(
+                id=seed.mdl_statement_a,
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                branch=MdlBranch.NET,
+                period_from=date(2025, 1, 1),
+                period_to=date(2026, 1, 1),  # exclusive in storage
+                confirmed_total_cents=120_000,
+                owner_position_cents=20_000,
+                source_ref="MDL-Abrechnung 2025 · Beleg 4711",
+                version=1,
+            )
+        )
+    with Session(owner) as session, session.begin():
+        session.add(
+            MdlStatementPosition(
+                id=seed.mdl_position_a,
+                account_id=seed.account_a,
+                mdl_statement_id=seed.mdl_statement_a,
+                tenancy_id=seed.tenancy_a,
+                amount_cents=100_000,
+            )
+        )
+    yield seed.mdl_statement_a, seed.mdl_position_a
+    with Session(owner) as session, session.begin():
+        position = session.get(MdlStatementPosition, seed.mdl_position_a)
+        if position is not None:
+            session.delete(position)
+    with Session(owner) as session, session.begin():
+        statement = session.get(MdlStatement, seed.mdl_statement_a)
+        if statement is not None:
+            session.delete(statement)
+
+
+class TestMdlStatementIsolation:
+    """A confirmed Messdienstleister statement is money and a named renter.
+
+    `docs/03` H7 — "validate and pass through; never recompute MDL amounts" —
+    means every cent in these two tables reaches a real Mieter's Abrechnung
+    unchanged. A row visible across an account boundary discloses what a
+    third-party document said about somebody else's tenants; a row *writable*
+    across one puts a foreign figure on this account's statement, and because
+    nothing recomputes it, no later arithmetic would contradict it.
+
+    Both tables are covered here. The position table is not merely a child: it
+    carries the per-renter amount and the tenancy it belongs to, which is the
+    part a reader of the statement actually sees.
+    """
+
+    def test_cross_account_read_is_blocked(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """THE gate for these tables: B's context sees neither the confirmation
+        nor its positions."""
+        _, app = engines
+        with account_scoped_session(app, seed.account_b) as session:
+            assert session.scalars(select(MdlStatement)).all() == []
+            assert session.scalars(select(MdlStatementPosition)).all() == []
+
+    def test_own_context_sees_own_rows(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """Non-vacuous control: the same two queries under A's context find the
+        rows, so the empty results above are the policy at work and not a fixture
+        that never inserted anything."""
+        statement_id, position_id = mdl_rows
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            assert session.scalars(select(MdlStatement.id)).all() == [statement_id]
+            assert session.scalars(select(MdlStatementPosition.id)).all() == [position_id]
+
+    def test_cross_account_statement_insert_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """WITH CHECK: B's context cannot file a confirmation into account A.
+
+        INSERT is where this table's isolation is decided, because a correction
+        is a new version rather than an UPDATE (`CLAUDE.md` § 3.2): a blind write
+        of a higher `version` for A's building period is what the reader would
+        then bill from, and A never had to read anything for that to happen.
+        """
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                MdlStatement(
+                    id=seed.leaked_mdl_statement_b,
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    branch=MdlBranch.NET,
+                    period_from=date(2025, 1, 1),
+                    period_to=date(2026, 1, 1),
+                    confirmed_total_cents=999_000,
+                    owner_position_cents=0,
+                    source_ref="untergeschobene Abrechnung",
+                    version=2,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_position_insert_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """The same check on the child, which is where the per-renter amount is.
+
+        Every link in this row is internally consistent — A's statement, A's
+        tenancy — and only the writer is foreign, so nothing but `WITH CHECK`
+        refuses it. Without the policy, B could add a position to a confirmed
+        document of A's and change what one of A's renters owes.
+        """
+        statement_id, _ = mdl_rows
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                MdlStatementPosition(
+                    id=seed.leaked_mdl_position_b,
+                    account_id=seed.account_a,
+                    mdl_statement_id=statement_id,
+                    tenancy_id=seed.tenancy_a,
+                    amount_cents=500_000,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_building_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """The composite FK, which is the half `WITH CHECK` cannot reach.
+
+        This statement stamps `account_id = B` and so passes the policy; only
+        `building_id` crosses into A. Postgres checks foreign keys with RLS
+        bypassed, so nothing but the pair
+        `(building_id, account_id) → building (id, account_id)` refuses it.
+
+        `match=` names that constraint on purpose. A generic "foreign key
+        constraint" would also be satisfied by `mdl_statement_account_id_fkey` —
+        a different failure with a different meaning — and the test would pass
+        while proving nothing.
+
+        The period is 2024 rather than the fixture's 2025 so that the *unique*
+        constraint on `(building_id, period_from, period_to, version)` cannot
+        fire first. That constraint is not account-scoped — it does not need to
+        be, since a `building_id` belongs to exactly one account — but a
+        colliding period would make Postgres reject this row for the wrong
+        reason and leave the composite FK unexercised.
+        """
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="mdl_statement_building_id_fkey"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                MdlStatement(
+                    id=seed.cross_building_mdl_statement_b,
+                    account_id=seed.account_b,
+                    building_id=seed.building_a,
+                    branch=MdlBranch.NET,
+                    period_from=date(2024, 1, 1),
+                    period_to=date(2025, 1, 1),
+                    confirmed_total_cents=120_000,
+                    owner_position_cents=20_000,
+                    source_ref="fremdes Objekt",
+                    version=1,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_tenancy_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """A position whose only foreign link is the renter it names.
+
+        B builds its own house and files its own confirmation in the same
+        transaction, so `account_id` and `mdl_statement_id` are both clean and
+        the row passes `WITH CHECK`. Only `tenancy_id` points into A — one of A's
+        Mietverhältnisse would then appear on B's statement with an amount B
+        chose. `(tenancy_id, account_id) → tenancy (id, account_id)` is the
+        single constraint that refuses it, and naming it keeps a rejection of the
+        Building or the MdlStatement from satisfying this test instead.
+        """
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="mdl_statement_position_tenancy_id_fkey"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                Building(
+                    id=seed.building_b,
+                    account_id=seed.account_b,
+                    name="Haus B",
+                    street="Bahnhofstraße 2",
+                    postal_code="20095",
+                    city="Hamburg",
+                )
+            )
+            session.add(
+                MdlStatement(
+                    id=seed.own_mdl_statement_b,
+                    account_id=seed.account_b,
+                    building_id=seed.building_b,
+                    branch=MdlBranch.NET,
+                    period_from=date(2025, 1, 1),
+                    period_to=date(2026, 1, 1),
+                    confirmed_total_cents=80_000,
+                    owner_position_cents=10_000,
+                    source_ref="eigene Abrechnung B",
+                    version=1,
+                )
+            )
+            session.add(
+                MdlStatementPosition(
+                    id=seed.cross_tenancy_mdl_position_b,
+                    account_id=seed.account_b,
+                    mdl_statement_id=seed.own_mdl_statement_b,
+                    tenancy_id=seed.tenancy_a,
+                    amount_cents=70_000,
+                )
+            )
+            session.flush()
+
+    def test_cross_account_statement_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """The mirror image: the renter is B's own, the document is A's.
+
+        B builds a house, a unit and a tenancy of its own, so `tenancy_id` is
+        clean and the policy is satisfied — and hangs the position off A's
+        confirmed statement. That edge would let B read A's document by joining
+        to it and, worse, alter the control sum of a statement A has already
+        sent. Only `(mdl_statement_id, account_id) → mdl_statement (id,
+        account_id)` refuses it.
+        """
+        statement_id, _ = mdl_rows
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="mdl_statement_position_mdl_statement_id_fkey"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                Building(
+                    id=seed.building_b,
+                    account_id=seed.account_b,
+                    name="Haus B",
+                    street="Bahnhofstraße 2",
+                    postal_code="20095",
+                    city="Hamburg",
+                )
+            )
+            session.add(
+                Unit(
+                    id=seed.own_unit_b,
+                    account_id=seed.account_b,
+                    building_id=seed.building_b,
+                    label="WE B1",
+                    area_sqm_x100=6_000,
+                )
+            )
+            session.add(
+                Tenancy(
+                    id=seed.own_tenancy_b,
+                    account_id=seed.account_b,
+                    unit_id=seed.own_unit_b,
+                    valid_from=date(2025, 1, 1),
+                    valid_to=None,
+                    base_rent_cents=70_000,
+                    advance_payment_cents=12_000,
+                )
+            )
+            session.add(
+                MdlStatementPosition(
+                    id=seed.cross_statement_mdl_position_b,
+                    account_id=seed.account_b,
+                    mdl_statement_id=statement_id,
+                    tenancy_id=seed.own_tenancy_b,
+                    amount_cents=60_000,
+                )
+            )
+            session.flush()

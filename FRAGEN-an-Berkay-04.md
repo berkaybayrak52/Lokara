@@ -5,6 +5,31 @@ Emir · Stand 21.08.2026 · nach Abschluss des Dokumentationsprogramms D1–D3
 Diese Liste enthält nur Entscheidungen oder fehlende Quelldateien, die du liefern kannst. Die
 genannten Zieldokumente behalten bis dahin den offenen Status und alle Produktionssperren.
 
+## Seite 01 — Fiktivbelegung und Eigennutzung
+
+Owning doc: `docs/02-data-model.md` § 5 „D0 Fiktivbelegung“, Unterabschnitt
+„Assumption, not a transcribed rule: self-use overlapping a vacancy“.
+
+1. Was gilt, wenn eine **anteilige** Eigennutzung (`SelfUsePeriod` ist eine Fläche in m², kein
+   Flag) auf einen Leerstandszeitraum derselben Einheit trifft? Seite 01 § 3.5, § 4 D0 und die
+   Edge Cases E17–E19 enthalten dazu keine Regel, und im Register gibt es keinen Eintrag dafür.
+   Bitte entscheide zwischen drei Möglichkeiten und liefere die Quelle dazu:
+   a) die Fiktivbelegung entfällt anteilig zur eigengenutzten Fläche;
+   b) die Fiktivbelegung entfällt für diese Tage vollständig;
+   c) die Fiktivbelegung bleibt für diese Tage unverändert bestehen.
+
+   Lokara rechnet derzeit nach c) — als ausdrücklich gekennzeichnete Annahme, nicht als
+   Quellregel. Begründung der gewählten Richtung: bei a) oder b) müsste eine flächengewichtete
+   Personenzahl erfunden werden bzw. die Mieter trügen die personenbezogenen Fixkosten allein,
+   was BGH VIII ZR 159/05 und LG Krefeld 2 S 56/09 gerade ablehnen. Eine **volle**
+   Eigennutzung nimmt die Tage dagegen aus dem Leerstand heraus; das folgt bereits aus der
+   Definition „weder vermietet noch eigengenutzt“ und ist keine Annahme.
+
+2. Falls c) bestätigt wird: soll der Hinweis auf dem Dokument stehen bleiben, und wenn ja, mit
+   welchem Wortlaut? Lokara gibt derzeit aus: „<Einheit>: Teil-Eigennutzung (<Fläche> m² von
+   <Gesamtfläche> m²) vom <TT.MM.JJJJ> bis <TT.MM.JJJJ>. Leerstandstage in diesem Zeitraum werden
+   mit Fiktivbelegung gerechnet; die anteilige Eigennutzung ist nicht abgegrenzt.“
+
 ## Seite 01b — Heizkosten und CO₂
 
 Owning docs: `docs/03-nk-heating-engines.md` § 7 Punkte 12 und 14 sowie

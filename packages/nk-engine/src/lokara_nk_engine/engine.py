@@ -14,9 +14,11 @@ from datetime import date
 from decimal import Decimal
 
 from lokara_domain import (
+    ZERO_CENTS,
     AllocationKey,
     MeasurementUnit,
     Occupancy,
+    OccupancyOverlapError,
     Segment,
     build_unit_segments,
     cents,
@@ -25,6 +27,7 @@ from lokara_domain import (
 )
 
 from .inputs import (
+    BillingWindowTooLongError,
     ConsumptionValue,
     CostItem,
     NkInput,
@@ -51,7 +54,32 @@ def calculate_nk_statement(nk_input: NkInput) -> NkResult:
         parties = _parties_for_cost(cost, nk_input, window_from, window_to)
         weights = [p.weight for p in parties]
         if not weights or sum(weights) == 0:
-            raise NkInputError(f"Cost {cost.cost_id}: no positive allocation weights")
+            # 08-F12 / docs/08: "A zero consumption denominator gives renters 0
+            # and leaves the cost with the owner; it never silently changes to
+            # an area key." Refusing the cost was wrong in both directions: it
+            # blocked a statement that Page 01 says must render, and the only
+            # alternative a caller had was to re-key it. Every recorded party
+            # keeps its rendered 0,00 EUR line and the pot goes to the owner.
+            lines.extend(
+                ShareLine(
+                    cost_id=cost.cost_id,
+                    unit_id=party.unit_id,
+                    tenancy_id=party.tenancy_id,
+                    weight=party.weight,
+                    amount=ZERO_CENTS,
+                )
+                for party in parties
+            )
+            lines.append(
+                ShareLine(
+                    cost_id=cost.cost_id,
+                    unit_id=None,
+                    tenancy_id=None,
+                    weight=Decimal(0),
+                    amount=cost.amount,
+                )
+            )
+            continue
         amounts = distribute_cents(cost.amount, weights)
         lines.extend(
             ShareLine(
@@ -96,7 +124,29 @@ def _resolve_consumption_unit(
 def _billing_window(nk_input: NkInput) -> tuple[date, date]:
     if nk_input.billing_period.valid_to is None:
         raise NkInputError("Billing period must be bounded (valid_to is required)")
-    return nk_input.billing_period.valid_from, nk_input.billing_period.valid_to
+    window_from = nk_input.billing_period.valid_from
+    window_to = nk_input.billing_period.valid_to
+    # docs/02 § 5 step 1 and docs/08 "Period boundary": more than 12 months
+    # hard-blocks BEFORE an engine run or render. It lives here, in the window
+    # precondition, rather than in the per-cost loop: an over-long period is
+    # wrong even for a statement that happens to carry no costs at all.
+    #
+    # Day-exact and calendar-based, never 365: an Abrechnungszeitraum is bounded
+    # by the same day of the month twelve months on, so a leap year keeps its
+    # actual 366 days (08-F20) and no special money rule appears anywhere.
+    maximum_to = _twelve_months_after(window_from)
+    if window_to > maximum_to:
+        raise BillingWindowTooLongError(window_from, window_to, maximum_to)
+    return window_from, window_to
+
+
+def _twelve_months_after(day: date) -> date:
+    """The same calendar day one year on, clamped for 29 February."""
+    try:
+        return day.replace(year=day.year + 1)
+    except ValueError:
+        # 29.02. in a leap year has no counterpart in the following year.
+        return day.replace(year=day.year + 1, month=3, day=1)
 
 
 def _parties_for_cost(
@@ -134,10 +184,34 @@ def _unit_value_parties(
 ) -> list[_Party]:
     parties: list[_Party] = []
     for unit in nk_input.units:
-        segments = build_unit_segments(unit.unit_id, nk_input.occupancies, window_from, window_to)
         key_value = _unit_key_value(cost, unit)
+        try:
+            segments = build_unit_segments(
+                unit.unit_id, nk_input.occupancies, window_from, window_to
+            )
+        except OccupancyOverlapError as overlap:
+            # The timeline builder is key-agnostic, so it measures in
+            # Einheiten·Tage. Only here is the applied key known, so this is
+            # where docs/08 "Reference totals" de-scaling happens — once.
+            raise overlap.rescaled(_display_key_value(cost, key_value)) from overlap
         parties.extend(_segment_parties(unit.unit_id, segments, key_value))
     return parties
+
+
+def _display_key_value(cost: CostItem, key_value: int) -> Decimal:
+    """The unit's key value in the key's printed unit (docs/08 "Reference totals").
+
+    `36.500 m²·Tage` must never render as `3.650.000`, so the fixed-point scale
+    comes off before the figure reaches a human. UNITS is already a count.
+    """
+    divisor = _KEY_DISPLAY_DIVISORS.get(cost.key)
+    return Decimal(key_value) if divisor is None else Decimal(key_value) / divisor
+
+
+_KEY_DISPLAY_DIVISORS: dict[AllocationKey, Decimal] = {
+    AllocationKey.AREA: Decimal(100),
+    AllocationKey.MEA: Decimal(10000),
+}
 
 
 def _segment_parties(unit_id: str, segments: tuple[Segment, ...], key_value: int) -> list[_Party]:
@@ -171,6 +245,14 @@ def _persons_parties(
         days = overlap_days(row.period, window_from, window_to)
         if days == 0:
             continue
+        if row.tenancy_id is None:
+            # D0 Fiktivbelegung (docs/02 § 5, Page 01 § 4 D0): the fictional
+            # occupancy of what stood empty. It is added to the denominator
+            # BEFORE any share is formed, and it lands on the landlord side —
+            # a weight, never a party, never a Renter. The count itself was
+            # derived by the caller; the engine only weights it by days.
+            parties.append(_Party(row.unit_id, None, Decimal(row.count * days)))
+            continue
         if row.tenancy_id not in unit_by_tenancy:
             raise NkInputError(
                 f"Cost {cost.cost_id}: person count references unknown tenancy {row.tenancy_id}"
@@ -184,11 +266,10 @@ def _persons_parties(
 def _consumption_parties(cost: CostItem, nk_input: NkInput) -> list[_Party]:
     if not nk_input.consumptions:
         raise NkInputError(f"Cost {cost.cost_id}: CONSUMPTION key requires consumption values")
-    return [
-        _Party(row.unit_id, row.tenancy_id, row.value)
-        for row in nk_input.consumptions
-        if row.value > 0
-    ]
+    # A recorded zero is a reading, not a missing row. docs/08: "Every cost line
+    # receives engine output" — a renter whose meter read 0 gets a rendered
+    # 0,00 EUR share, never a row the document layer has to invent (08-F12).
+    return [_Party(row.unit_id, row.tenancy_id, row.value) for row in nk_input.consumptions]
 
 
 def _direct_parties(

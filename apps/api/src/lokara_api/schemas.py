@@ -233,12 +233,21 @@ class StatementNkCost(ApiModel):
 
 
 class StatementHeatingLine(ApiModel):
+    """One party's heating share.
+
+    The four column figures are `None` on a confirmed Messdienstleister
+    passthrough: that document states a total per party and no §§ 7/8/9 column
+    split, and `docs/03` H7 forbids recomputing one. Nullable rather than
+    `"0,00 €"` or `"—"`, because a money field that carries a placeholder is
+    indistinguishable from a real zero to everything downstream.
+    """
+
     party_label: str
     is_landlord: bool
-    heating_base_eur: str
-    heating_consumption_eur: str
-    ww_base_eur: str
-    ww_consumption_eur: str
+    heating_base_eur: str | None
+    heating_consumption_eur: str | None
+    ww_base_eur: str | None
+    ww_consumption_eur: str | None
     total_cents: int
     total_eur: str
 
@@ -585,6 +594,13 @@ class DemoStatementResponse(ApiModel):
     # Set when the heating inputs are incomplete: heating_lines is then empty
     # and this German sentence says what is missing. Never a silent zero.
     heating_missing_reason: str | None
+    # Which input produced the heating figures. `docs/08`: "MDL pass-through and
+    # self-billing are different inputs" — the reader has to be able to tell,
+    # because one was calculated here and the other was confirmed from a
+    # third-party document.
+    heating_path: Literal["SELF_BILLING", "MDL_NET", "MDL_GROSS"] | None
+    # German sentence naming the confirmed source document, on the MDL paths.
+    heating_source_note: str | None
     heating_readiness: Literal["READY", "BLOCKED"]
     heating_findings: list[StatementFinding]
     heating_provenance: list[StatementProvenance]
@@ -594,3 +610,114 @@ class DemoStatementResponse(ApiModel):
     co2: StatementCo2 | None
     rechtsstaende: list[str]
     disclaimer: str
+
+
+class StatementProjectionParty(ApiModel):
+    """One party line of one cost, as the selected audience may see it."""
+
+    party_label: str
+    is_landlord: bool
+    weight_display: str
+    amount_cents: int
+    amount_eur: str
+
+
+class StatementProjectionCost(ApiModel):
+    cost_id: str
+    label: str
+    key_label: str
+    total_cents: int
+    total_eur: str
+    lines: list[StatementProjectionParty]
+
+
+class StatementProjectionResponse(ApiModel):
+    """One calculation projected to one audience (Page 01 § 4 D1, docs/02 § 5).
+
+    Deliberately not `DemoStatementResponse` with a filter flag: the tenant view
+    must be built from the selected result, never rendered whole and cropped
+    (`docs/08` § 3). A field that is absent here cannot be leaked by a client
+    that forgets to hide it.
+
+    Advances, Saldo, Nachzahlung and Guthaben are absent on purpose — minimum #4
+    is blocked on the M6 ledger by decision, and this projection is shape and
+    selection only, not a finished Mieter-Einzelabrechnung.
+    """
+
+    audience: Literal["OWNER", "TENANT", "TAX"]
+    tenancy_id: str | None
+    building_name: str
+    building_address: str
+    period_label: str
+    costs: list[StatementProjectionCost]
+    heating_lines: list[StatementHeatingLine]
+    # OWNER and TAX only; a renter's document carries no Eigentümeranteil.
+    owner_residual_cents: int | None
+    findings: list[str]
+    rechtsstaende: list[str]
+    disclaimer: str
+
+
+class MdlPositionIn(ApiModel):
+    """One renter's amount as the Messdienstleister document states it."""
+
+    tenancy_id: str
+    amount_cents: int = Field(ge=0)
+
+
+class MdlStatementCreate(ApiModel):
+    """A confirmed Messdienstleister statement (docs/03 H7, docs/08 § 8).
+
+    Every figure here is transcribed from a document a human read and
+    confirmed — Lokara validates and passes it through, and never recomputes
+    it. The control sum is checked server-side, which is what turns an OCR
+    decimal shift into a block instead of a wrong statement (`01b-F29`).
+
+    The CO₂ triple is required for the GROSS branch and forbidden for NET: a
+    net document already had the landlord's share deducted, and deducting again
+    is the defect `01b-F28a` exists to prevent.
+    """
+
+    branch: Literal["NET", "GROSS"]
+    period_from: date
+    period_to: date  # inclusive in the request, like every other period here
+    confirmed_total_cents: int = Field(ge=0)
+    owner_position_cents: int = Field(ge=0)
+    positions: list[MdlPositionIn]
+    source_ref: str = Field(min_length=1, max_length=200)
+    co2_kg_x1000: int | None = None
+    co2_cost_cents: int | None = None
+    heated_area_sqm_x100: int | None = None
+    co2_evidence_present: bool = True
+
+    @model_validator(mode="after")
+    def check_shape(self) -> "MdlStatementCreate":
+        if self.period_to < self.period_from:
+            raise ValueError("Das Ende des Abrechnungszeitraums liegt vor seinem Anfang.")
+        if not self.positions:
+            raise ValueError("Eine MDL-Abrechnung braucht mindestens eine Mieterposition.")
+        seen = {position.tenancy_id for position in self.positions}
+        if len(seen) != len(self.positions):
+            raise ValueError("Jedes Mietverhältnis darf nur eine Position haben.")
+        co2 = (self.co2_kg_x1000, self.co2_cost_cents, self.heated_area_sqm_x100)
+        if self.branch == "GROSS" and any(value is None for value in co2):
+            raise ValueError(
+                "Eine Brutto-MDL-Abrechnung braucht CO₂-Menge, CO₂-Kosten und beheizte Fläche."
+            )
+        if self.branch == "NET" and any(value is not None for value in co2):
+            raise ValueError(
+                "Eine Netto-MDL-Abrechnung enthält den Vermieteranteil bereits; "
+                "CO₂-Werte dürfen hier nicht erneut angesetzt werden."
+            )
+        return self
+
+
+class MdlStatementOut(ApiModel):
+    id: str
+    branch: Literal["NET", "GROSS"]
+    period_label: str
+    confirmed_total_cents: int
+    owner_position_cents: int
+    position_count: int
+    source_ref: str
+    version: int

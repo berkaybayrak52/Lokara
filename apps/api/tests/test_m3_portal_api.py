@@ -190,6 +190,13 @@ class TestPathReauthorization:
             f"/a/{DEMO_ACCOUNT_ID}/summary",
             f"/a/{DEMO_ACCOUNT_ID}/statements/demo",
             f"/a/{DEMO_ACCOUNT_ID}/statements/demo/pdf",
+            # The Page 01 audience projection. Every audience, including the
+            # tenant one that names a tenancy id: knowing an id is not
+            # authorization either (`docs/02` § 5 step 4).
+            f"/a/{DEMO_ACCOUNT_ID}/buildings/bld_demo_muster12/statement",
+            f"/a/{DEMO_ACCOUNT_ID}/buildings/bld_demo_muster12/statement?audience=TAX",
+            f"/a/{DEMO_ACCOUNT_ID}/buildings/bld_demo_muster12/statement"
+            "?audience=TENANT&tenancy_id=ten_demo_b1",
         ):
             assert client.get(path, headers=headers).status_code == 403, path
 

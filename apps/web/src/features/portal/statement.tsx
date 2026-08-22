@@ -7,6 +7,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Input,
+  Label,
+  Select,
   StatusNote,
   Table,
   TableBody,
@@ -22,39 +25,115 @@ import React, { useState } from 'react';
 import { API_URL, ApiError } from '@/lib/api';
 import type { DemoStatementResponse } from '@/lib/contracts';
 
-import { useDemoStatement } from './queries';
+import { useBuildings } from '../objekte/queries';
+
+import { useStatement } from './queries';
 
 /**
  * Abrechnung erstellen (docs/04 M3 page 6, docs/06 Scenario 1+2): run the
  * NK + heating/CO₂ statement, show the computed shares + the cent-exact
  * reconciliation, download the PDF the API renders.
  */
+/** The seeded demo period, and the value the pickers open on. */
+const DEFAULT_PERIOD_FROM = '2025-01-01';
+const DEFAULT_PERIOD_TO = '2025-12-31';
+
 export function StatementPage({ accountId }: { accountId: string }) {
   const [requested, setRequested] = useState(false);
-  const statement = useDemoStatement(accountId, requested);
-  const pdfUrl = `${API_URL}/a/${accountId}/statements/demo/pdf`;
+  const buildings = useBuildings(accountId);
+  const [buildingId, setBuildingId] = useState('');
+  const [periodFrom, setPeriodFrom] = useState(DEFAULT_PERIOD_FROM);
+  const [periodTo, setPeriodTo] = useState(DEFAULT_PERIOD_TO);
+
+  // The first object is the opening selection, not a fallback the run uses: a
+  // statement is always computed for the object the user can see selected.
+  const options = buildings.data?.buildings ?? [];
+  const selectedId = buildingId || options[0]?.id || '';
+
+  const statement = useStatement(
+    accountId,
+    { buildingId: selectedId, periodFrom, periodTo },
+    requested && selectedId !== '',
+  );
+  const pdfQuery = new URLSearchParams({
+    building_id: selectedId,
+    period_from: periodFrom,
+    period_to: periodTo,
+  });
+  const pdfUrl = `${API_URL}/a/${accountId}/statements/pdf?${pdfQuery}`;
+
+  // Changing the selection invalidates the run that is on screen — showing last
+  // period's figures under this period's heading is the one thing this screen
+  // must never do.
+  const reselect = (apply: () => void) => {
+    apply();
+    setRequested(false);
+  };
 
   return (
     <main className="px-8 py-10">
       <header className="mb-8">
         <h1 className="font-display text-3xl font-bold">Abrechnung erstellen</h1>
         <p className="mt-2 max-w-prose text-slate">
-          Betriebs- und Heizkostenabrechnung 01.01.2025 – 31.12.2025. Die Anteile berechnen die
-          geprüften Engines — jede Kostenart stimmt centgenau mit dem Gesamtbetrag überein.
+          Betriebs- und Heizkostenabrechnung für ein Objekt und einen Abrechnungszeitraum. Die
+          Anteile berechnen die geprüften Engines — jede Kostenart stimmt centgenau mit dem
+          Gesamtbetrag überein.
         </p>
       </header>
 
       {!requested ? (
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Abrechnung 2025 berechnen</CardTitle>
+            <CardTitle>Abrechnung berechnen</CardTitle>
             <CardDescription>
-              Müllabfuhr 1.200,00&nbsp;€ nach Wohnfläche, Heiz- und Warmwasserkosten
-              10.300,00&nbsp;€ inkl. CO₂-Aufteilung nach CO2KostAufG.
+              Objekt und Abrechnungszeitraum wählen. Der Zeitraum ist tagesgenau und darf
+              höchstens 12 Monate umfassen; Anfang und Ende zählen mit.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button onClick={() => setRequested(true)}>Abrechnung berechnen</Button>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="statement-building">Objekt</Label>
+              <Select
+                id="statement-building"
+                value={selectedId}
+                disabled={options.length === 0}
+                onChange={(event) => reselect(() => setBuildingId(event.target.value))}
+              >
+                {options.map((building) => (
+                  <option key={building.id} value={building.id}>
+                    {building.name} — {building.street}, {building.postalCode} {building.city}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="statement-from">Zeitraum von</Label>
+                <Input
+                  id="statement-from"
+                  type="date"
+                  value={periodFrom}
+                  onChange={(event) => reselect(() => setPeriodFrom(event.target.value))}
+                />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="statement-to">Zeitraum bis</Label>
+                <Input
+                  id="statement-to"
+                  type="date"
+                  value={periodTo}
+                  onChange={(event) => reselect(() => setPeriodTo(event.target.value))}
+                />
+              </div>
+            </div>
+            {options.length === 0 ? (
+              <StatusNote kind="warning" label="Noch kein Objekt angelegt.">
+                Zuerst unter „Objekte“ ein Gebäude anlegen oder das Demo-Szenario laden.
+              </StatusNote>
+            ) : null}
+            <Button disabled={selectedId === ''} onClick={() => setRequested(true)}>
+              Abrechnung berechnen
+            </Button>
           </CardContent>
         </Card>
       ) : statement.isPending ? (
@@ -67,10 +146,16 @@ export function StatementPage({ accountId }: { accountId: string }) {
           <StatusNote kind="danger" label="Berechnung fehlgeschlagen.">
             {statement.error instanceof ApiError && statement.error.status === 404
               ? 'Keine Daten im Konto — bitte zuerst das Demo-Szenario auf der Übersicht laden.'
-              : 'Bitte API und Datenbank prüfen, dann erneut versuchen.'}
+              : // A 422 is entered data the landlord can fix (zu langer Zeitraum,
+                // überschneidende Mietverhältnisse), and the API already says which
+                // in German — `detail`, not `message`, which is the technical
+                // "API request failed: 422 …" string.
+                statement.error instanceof ApiError && statement.error.detail
+                ? statement.error.detail
+                : 'Bitte API und Datenbank prüfen, dann erneut versuchen.'}
           </StatusNote>
-          <Button variant="outline" onClick={() => statement.refetch()}>
-            Erneut versuchen
+          <Button variant="outline" onClick={() => setRequested(false)}>
+            Auswahl ändern
           </Button>
         </div>
       ) : (
@@ -89,8 +174,23 @@ export function StatementResult({
   pdfUrl: string;
   accountId: string;
 }) {
+  // A confirmed Messdienstleister statement is passed through, not recomputed
+  // (docs/03 H7), so its table has party totals and no §§ 7/8/9 split. The
+  // branch is decided here once, from the path the API reports.
+  const isMdl = data.heatingPath === 'MDL_NET' || data.heatingPath === 'MDL_GROSS';
+
   return (
     <div className="max-w-4xl space-y-8">
+      {/* The object and the period are selectable, so the result has to name
+          which ones it computed — figures under the wrong heading is exactly
+          what `reselect` above exists to prevent. */}
+      <header>
+        <h2 className="font-display text-2xl font-bold">{data.buildingName}</h2>
+        <p className="mt-1 text-sm text-slate">
+          {data.buildingAddress} · Abrechnungszeitraum {data.periodLabel}
+        </p>
+      </header>
+
       <section aria-labelledby="nk-heading">
         <h2 id="nk-heading" className="mb-3 font-display text-xl font-bold">
           Betriebskosten
@@ -100,7 +200,8 @@ export function StatementResult({
             <CardHeader>
               <CardTitle>Keine Betriebskosten im Zeitraum</CardTitle>
               <CardDescription>
-                Für 2025 sind noch keine Kostenarten erfasst. Erfassen Sie sie unter{' '}
+                Für {data.periodLabel} sind noch keine Kostenarten erfasst. Erfassen Sie sie
+                unter{' '}
                 <Link
                   href={`/a/${accountId}/kosten`}
                   className="text-green underline underline-offset-4"
@@ -181,45 +282,83 @@ export function StatementResult({
           <>
             <Card>
               <CardContent className="pt-6">
-                <Table>
-                  <TableCaption>
-                    Aufteilung der Heiz- und Warmwasserkosten nach §§ 7–9 HeizkostenV
-                  </TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Partei</TableHead>
-                      <TableHead className="text-right">Grundk. Heizung</TableHead>
-                      <TableHead className="text-right">Verbrauch Heizung</TableHead>
-                      <TableHead className="text-right">Grundk. Warmwasser</TableHead>
-                      <TableHead className="text-right">Verbrauch Warmwasser</TableHead>
-                      <TableHead className="text-right">Summe</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.heatingLines.map((line) => (
-                      <TableRow key={line.partyLabel}>
-                        <TableCell className={line.isLandlord ? 'text-slate' : undefined}>
-                          {line.partyLabel}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {line.heatingBaseEur}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {line.heatingConsumptionEur}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{line.wwBaseEur}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {line.wwConsumptionEur}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">
-                          {line.totalEur}
-                        </TableCell>
+                {isMdl ? (
+                  // A confirmed Messdienstleister statement discloses one amount
+                  // per party and no §§ 7/8/9 column split, so the columns are
+                  // dropped rather than filled with placeholders — Lokara does
+                  // not recompute a split the source document does not state.
+                  <Table>
+                    <TableCaption>
+                      Bestätigte Abrechnung des Messdienstleisters — Beträge unverändert übernommen
+                    </TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Partei</TableHead>
+                        <TableHead className="text-right">Summe</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data.heatingLines.map((line) => (
+                        <TableRow key={line.partyLabel}>
+                          <TableCell className={line.isLandlord ? 'text-slate' : undefined}>
+                            {line.partyLabel}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">
+                            {line.totalEur}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Table>
+                    <TableCaption>
+                      Aufteilung der Heiz- und Warmwasserkosten nach §§ 7–9 HeizkostenV
+                    </TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Partei</TableHead>
+                        <TableHead className="text-right">Grundk. Heizung</TableHead>
+                        <TableHead className="text-right">Verbrauch Heizung</TableHead>
+                        <TableHead className="text-right">Grundk. Warmwasser</TableHead>
+                        <TableHead className="text-right">Verbrauch Warmwasser</TableHead>
+                        <TableHead className="text-right">Summe</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.heatingLines.map((line) => (
+                        <TableRow key={line.partyLabel}>
+                          <TableCell className={line.isLandlord ? 'text-slate' : undefined}>
+                            {line.partyLabel}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {line.heatingBaseEur}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {line.heatingConsumptionEur}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {line.wwBaseEur}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {line.wwConsumptionEur}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">
+                            {line.totalEur}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
+
+            {data.heatingSourceNote ? (
+              <p className="mt-3 max-w-prose rounded-lg bg-mint p-4 text-sm leading-6">
+                {data.heatingSourceNote}
+              </p>
+            ) : null}
 
             {data.co2 ? (
               <p className="mt-3 max-w-prose rounded-lg bg-mint p-4 text-sm leading-6">

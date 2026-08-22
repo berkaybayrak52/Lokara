@@ -35,7 +35,7 @@ from ..schemas import (
     MeterReadingCreate,
     MeterReadingOut,
 )
-from ..statement_service import BILLING_END, BILLING_START, PERIOD_LABEL
+from ..statement_service import BILLING_END, BILLING_PERIOD, BILLING_START, period_label
 
 router = APIRouter(prefix="/a/{account_id}")
 
@@ -164,7 +164,7 @@ def list_meters(
             )
             for meter in meters
         ],
-        period_label=PERIOD_LABEL,
+        period_label=period_label(BILLING_PERIOD),
     )
 
 

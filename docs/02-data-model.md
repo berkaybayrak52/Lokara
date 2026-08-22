@@ -49,21 +49,24 @@ Person ──< Membership >── Account ──< Landlord ──< Building ─�
 
 Building ──< CostEntry ──< AllocationKeyAssignment
          ├──< HeatingCostEntry
+         ├──< MdlStatement ──< MdlStatementPosition >── Tenancy
          └──< Statement
+Tenancy ──< PersonCount
 Meter ──< MeterReading
 ```
 
 The outer `Person` links are deliberate global-table exceptions. Every edge between
-account-scoped tables carries the same `account_id`; section 3 lists all 17 enforced edges.
+account-scoped tables carries the same `account_id`; section 3 lists all 22 enforced edges.
 
 | Model area | Current shape | Status |
 | --- | --- | --- |
 | Identity and access | `Person`, `Account`, `Membership`, `BuildingAssignment`, `Landlord`, `Renter` | **Shipped** |
-| Property and occupancy | `Building`, `Unit`, `Tenancy`, `TenancyParty`, `SelfUsePeriod` | **Shipped** |
+| Property and occupancy | `Building` (with `fiktivbelegung_mode` and `fiktivbelegung_waiver_note`), `Unit`, `Tenancy`, `TenancyParty`, `SelfUsePeriod`, `PersonCount` | **Shipped** |
 | Operating-cost inputs | `CostEntry`, `AllocationKeyAssignment` | **Shipped** |
 | Metering and heating inputs | `Meter`, `MeterReading`, `HeatingCostEntry` | **Shipped** |
+| Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total and optional content hash | **Shipped**, but not the complete Page 01 snapshot/finalization contract |
-| Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Specified** |
+| Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Capability shipped** — server-side selection exists (`OWNER`/`TENANT`/`TAX`); the immutable finalized snapshot does not |
 | Temporal advance schedule, receivables, payment ledger and immutable finalization | M6 handoff described below | **Future** |
 | Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
@@ -186,7 +189,7 @@ is **shipped**:
 
 - `building_assignment.account_id` exists, is non-null and is constrained against both its
   membership and building;
-- all **17** tenant-to-tenant foreign keys carry `account_id`;
+- all **22** tenant-to-tenant foreign keys carry `account_id`;
 - all scoped parents expose the matching pair;
 - [`scripts/check_fk_isolation.py`](../scripts/check_fk_isolation.py) guards future edges and is
   green on the migrated database.
@@ -213,6 +216,10 @@ The complete shipped tenant-to-tenant edge set is:
 | 16 | `building_assignment` → `membership` | `(membership_id, account_id)` | required; delete cascades |
 | 17 | `building_assignment` → `building` | `(building_id, account_id)` | required |
 | 18 | `meter_reading` → `tenancy` | `(tenancy_id, account_id)` | optional Page 01b segment target |
+| 19 | `person_count` → `tenancy` | `(tenancy_id, account_id)` | required |
+| 20 | `mdl_statement` → `building` | `(building_id, account_id)` | required |
+| 21 | `mdl_statement_position` → `mdl_statement` | `(mdl_statement_id, account_id)` | required |
+| 22 | `mdl_statement_position` → `tenancy` | `(tenancy_id, account_id)` | required |
 
 `building_assignment.account_id` is intentional denormalization. Deriving scope only through
 `membership` cannot prove that the assigned building belongs to the same account. The two composite
@@ -257,6 +264,9 @@ Building 1 ── N Unit 1 ── N Tenancy N ── N Renter
 | `Tenancy` | Dated lease; several renters attach through `TenancyParty`. | **Shipped** |
 | `TenancyParty` | Account-scoped tenancy-to-renter join; supports multi-party leases. | **Shipped** |
 | `SelfUsePeriod` | Dated area (`sqm_x100`) and kind; never represented by a renter. | **Shipped** |
+| `PersonCount` | Dated Personenzahl per tenancy; half-open validity, never a scalar on the unit. Vacancy is deliberately absent — D0 is derived per run. | **Shipped** |
+| `MdlStatement` | A confirmed third-party Messdienstleister statement, append-only and versioned per building period. | **Shipped** |
+| `MdlStatementPosition` | One renter's amount on that statement, stored as delivered and never recomputed. | **Shipped** |
 | `AdvancePaymentPeriod` | Dated contractual advance amount replacing the tenancy scalar. | **Future**, M6 |
 
 Shipped validity and cost ranges use half-open dates: `valid_from` or `period_from` is included and
@@ -265,11 +275,14 @@ must convert that boundary explicitly instead of mixing the two conventions.
 
 | Shipped entity | Key fields | Constraints and meaning |
 | --- | --- | --- |
-| `Building` | account, optional landlord, name and address | Composite optional landlord edge; account-scoped root for property calculations. |
+| `Building` | account, optional landlord, name and address, `fiktivbelegung_mode`, nullable `fiktivbelegung_waiver_note` | Composite optional landlord edge; account-scoped root for property calculations. The mode defaults to `LETZTE_BELEGUNG` (spelling note below) and `CheckConstraint ck_building_fiktivbelegung_waiver_logged` refuses `KEINE` unless a waiver note is present. |
 | `Unit` | building, label, `area_sqm_x100` | Integer area; composite building edge. |
 | `Tenancy` | unit, `valid_from`, nullable `valid_to`, base rent, `advance_payment_cents` | One lease identity over time; composite unit edge. Overlap refusal is a domain invariant. |
 | `TenancyParty` | tenancy, renter | Unique `(tenancy_id, renter_id)` join permits several renters on one lease without duplicating the tenancy. |
 | `SelfUsePeriod` | unit, `sqm_x100`, kind, note, validity | Partial-area self-use over time; composite unit edge. |
+| `PersonCount` | tenancy, `count`, `valid_from`, nullable `valid_to` | Half-open Personenzahl history; composite tenancy edge. `CheckConstraint ck_person_count_non_negative` allows `0` (an empty but running lease) and rejects negatives. |
+| `MdlStatement` | building, `branch`, `period_from`, exclusive `period_to`, `confirmed_total_cents`, `owner_position_cents`, nullable `co2_kg_x1000` / `co2_cost_cents` / `heated_area_sqm_x100`, `co2_evidence_present`, `source_ref`, `version`, `confirmed_at` | Composite building edge. Unique `(building_id, period_from, period_to, version)`; a correction inserts `version + 1` and the earlier row stays, so nothing UPDATEs a confirmed row. `source_ref` is required: a passed-through figure whose origin nobody can name is not evidence. |
+| `MdlStatementPosition` | `mdl_statement_id`, `tenancy_id`, `amount_cents` | Composite statement and tenancy edges; unique `(mdl_statement_id, tenancy_id)`; amount non-negative. Stored as delivered — `docs/03` H7 validates and passes through, never recomputes. |
 
 ### Eigennutzung (self-use) is NOT a Renter
 
@@ -392,6 +405,105 @@ applicable owner-side basis:
 | Persons | The approved fictional-person occupancy is added before forming person-days. |
 | Consumption | No invented consumption is added. A vacant unit with no consumption can contribute `0.00 EUR` to this cost type. |
 | Zero denominator | Every renter share is zero; the complete amount remains in the owner residual with the required “no consumption values recorded” warning. The cost is not silently re-keyed. |
+
+#### D0 Fiktivbelegung — the vacancy person count is derived, and it is a flagged convention
+
+Source: original Page 01 § 3.5, § 4 D0 and edge cases E17/E18/E19, plus the register row
+`Fiktivbelegung bei Leerstand`. **Rechtsstand 07/2026**, `Rechtsnatur: Konvention`, status
+`verify-before-production`. It is a Lokara convention over split instance case law, not settled law,
+and no output may present it as settled law.
+
+| Item | Rule |
+| --- | --- |
+| Inputs | each vacancy period of a unit (derived — the days no tenancy covers, never stored), the unit's last known person count, and the building's Fiktivbelegung mode. |
+| Modes | `letzteBelegung` (default), `immer1`, `keine`. |
+| Count | `letzteBelegung` → `max(1, last known person count of that unit)`; `immer1` → `1`; `keine` → `0`, permitted only with a logged confirmation after the E18 hard warning naming the case law. |
+| Formula | `fictional person-days = count × vacancy days`, day-exact, added to the person-day denominator **before** any share is formed. |
+| Destination | the owner residual. The fictional occupancy is a denominator weight only: never a party line, never a `Renter`, never a `SelfUsePeriod`. |
+| Other bases | Area, Units and Consumption are untouched by D0 — see the table above. |
+| Legal basis | BGH VIII ZR 159/05 (the vacant unit stays in the Gesamtverteiler); LG Krefeld 2 S 56/09 (fictional occupancy under the person key). BGH VIII ZR 180/12 expressly treats the Ansatz as a Tatfrage of the individual case and does **not** settle it. Literature splits between “1 Person” (Schmidt-Futterer § 556a Rn. 76) and the unit's average occupancy (AG Köln WuM 2002, 28; Sternel NZM 2006, 811). |
+| Edge cases | an unknown or zero last count yields `1`, so the derived branch can never collapse to the `keine` denominator; a unit vacant for the whole period has no in-period history, so its last count comes from **before** the billing period; `keine` makes the renters carry the whole person-keyed fixed cost, which is the constellation the cited decisions reject. |
+
+Fixtures: `08-F21` (31 vacancy days × 2 persons = 62 person-days), `08-F22` (`2.006` → `2.068`
+person-days) and `08-F23` (`730` of `2.190` person-days).
+
+**One rule, two spellings — the mapping is fixed here so they cannot drift.** The source and the
+prose above use the Page 01 names; the shipped `FiktivbelegungMode` enum in
+[`models.py`](../packages/db/src/lokara_db/models.py) uses the repository's UPPER convention. Neither
+spelling is changed — this table is the only permitted translation between them:
+
+| Page 01 / register / prose | Database enum member and stored value |
+| --- | --- |
+| `letzteBelegung` (default) | `LETZTE_BELEGUNG` |
+| `immer1` | `IMMER_1` |
+| `keine` | `KEINE` |
+
+The mode sits on `Building` (Page 01 § 3.5 `objekt.fiktivbelegungModus`), not on a unit or a run,
+because one object bills one way. `KEINE` requires `Building.fiktivbelegung_waiver_note`, enforced by
+`CheckConstraint ck_building_fiktivbelegung_waiver_logged` — the E18 log is a precondition of the
+mode, not a step a caller can skip.
+
+**Decided in Slice B — the adapter derives, the engine receives.** The layer was left open when the
+rule was transcribed. It is now settled as shape 1 of the two that were recorded:
+
+1. **Adapter derives, engine receives** — chosen. `PersonCountPeriod.tenancy_id` is `str | None`
+   and carries an optional `unit_id`, exactly as `ConsumptionValue` already attributes a value to
+   the landlord. The engine weights the supplied count by days and puts it on the landlord side;
+   the mode, the `max(1, …)` minimum and the `keine` confirmation live in the composition layer
+   that can read history.
+2. **Engine derives** — rejected. It would put the mode and the unit's last known count into
+   `NkInput`, which makes a *required* history input out of something the engine cannot obtain: a
+   unit vacant for a whole period needs a count from **before** the billing period. That is a
+   persistence dependency inside a package whose purity rule exists to forbid exactly that.
+
+Why it was not a free choice: the count is derived from a person-count history, and the engine is
+framework- and history-free by contract (`CLAUDE.md` § 3.1). Shape 2 would have had the pure
+package depend on a lookup it cannot perform. Shape 1 keeps one versioned `Rechtsstand` on the
+convention by keeping the whole convention — mode, minimum, waiver — in one composition module
+rather than splitting it across the boundary.
+
+What this does **not** relax: the count is still derived, never a magic number a caller invents,
+and no fixture may hand the engine a bare fictional count as one. Fixtures pin the outcome — the
+composition of the person-day denominator and the fact that the fictional weight lands on the
+landlord side — and only the one helper that builds the landlord row names an input field.
+
+Persistence: `person_count` rows are per tenancy. The D0 landlord rows are **derived per run and
+never stored**, which is what "the adapter derives" means. A unit vacant for the whole period still
+resolves, because the tenancy that ended before the period keeps its `person_count` rows.
+
+##### Assumption, not a transcribed rule: self-use overlapping a vacancy
+
+`SelfUsePeriod` stores an **area** (`sqm_x100`), not unit-level occupancy, so a self-use row can
+cover part of a unit. Original Page 01 § 3.5, § 4 D0 and edge cases E17–E19 contain **no rule** for
+a partial self-use overlapping a vacancy, and the register has no row for it. What ships is
+therefore a **Lokara assumption**, `Rechtsnatur: Annahme`, status `verify-before-production`,
+awaiting source confirmation. It has no legal source of its own: it inherits the surrounding D0
+convention's **Rechtsstand 07/2026** and was recorded in 08/2026. It is not settled law, it is not
+a transcribed source rule, and no output may present it as either.
+
+Source trace: derived from `docs/02` § 4, which defines `VACANT` as "neither rented nor self-used",
+read together with original Page 01 § 4 D0, which runs "for each Leerstandsperiode". Shipped in
+`apps/api/src/lokara_api/person_counts.py`. Raised as an open source question in
+`FRAGEN-an-Berkay-04.md` → "Seite 01 — Fiktivbelegung und Eigennutzung".
+
+| Constellation | Shipped behavior | Why this direction |
+| --- | --- | --- |
+| **Full-unit** self-use (`sqm_x100 >= unit.area_sqm_x100`) | Those days are removed from the derived D0 vacancy: a self-used day is not a vacancy day and receives no fictional occupancy. | Follows directly from the two cited definitions; unambiguous, and the only inference in it is that the areas are comparable. |
+| **Partial** self-use (`sqm_x100 < unit.area_sqm_x100`) | The day stays a vacancy day, so the fiction still applies to it, and the document carries a German finding saying the partial self-use was not separated out. | The conservative direction, deliberately chosen: dropping the fiction would hand the renters the whole person-keyed fixed cost, which is the constellation BGH VIII ZR 159/05 and LG Krefeld 2 S 56/09 reject. Apportioning it would invent an area-weighted person count that no source defines. |
+
+The finding is landlord-facing copy and stays in German. Fixed parts verbatim, interpolated parts in
+angle brackets:
+
+```text
+<Einheit>: Teil-Eigennutzung (<Fläche> m² von <Gesamtfläche> m²) vom <TT.MM.JJJJ> bis <TT.MM.JJJJ>. Leerstandstage in diesem Zeitraum werden mit Fiktivbelegung gerechnet; die anteilige Eigennutzung ist nicht abgegrenzt.
+```
+
+An open-ended self-use row (`valid_to IS NULL`) is clipped to the billing window rather than treated
+as infinite. That part is the ordinary half-open temporal rule of § 4, not an assumption.
+
+What a confirmed source rule would have to settle: whether a partial self-use suppresses the fiction
+pro rata, suppresses it entirely, or leaves it untouched as shipped. Until then the assumption
+stands and the finding is the disclosure that it was applied.
 
 The landlord overview displays one aggregate owner line, but the immutable data retains why it
 exists:

@@ -11,6 +11,7 @@ from .routers import (
     demo,
     extraction,
     health,
+    mdl,
     me,
     meters,
     portal,
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(buildings.router)
     app.include_router(costs.router)
     app.include_router(meters.router)
+    app.include_router(mdl.router)
     app.include_router(extraction.router)
     app.include_router(statements.router)
     return app

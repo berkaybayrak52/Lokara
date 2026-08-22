@@ -229,7 +229,11 @@ def _nk_section(data: StatementData) -> str:
 def _heating_section(data: StatementData) -> str:
     heating = data.heating_result
     if heating is None:
-        return _page01b_section(data.page01b_result)
+        # A confirmed Messdienstleister statement has party totals but no
+        # §§ 7/8/9 column split, so it gets its own table rather than an empty
+        # five-column one. `heating_result is None` alone still means "nothing
+        # to print" — the MDL table only appears when the values are there.
+        return _mdl_section(data) + _page01b_section(data.page01b_result)
     rows = []
     # Resolved once and handed to the disclosure blocks: the same label names a
     # party in the money table, in Block B and in Block C, so a reader can follow
@@ -353,6 +357,72 @@ def _heating_section(data: StatementData) -> str:
   {co2_block}
   {"".join(notes)}
   {_page01b_section(data.page01b_result)}"""
+
+
+def _party_by_tenancy(labels: Mapping[PartyKey, str], tenancy_id: str) -> str:
+    """The label for a tenancy whose unit the caller does not know.
+
+    A confirmed MDL statement names parties by tenancy and says nothing about
+    units, so the unit half of the `PartyKey` has to be recovered rather than
+    assumed. Falls back to the raw id: an unlabelled row is a visible defect,
+    while a silently dropped one is not.
+    """
+    for (_, key_tenancy), label in labels.items():
+        if key_tenancy == tenancy_id:
+            return label
+    return tenancy_id
+
+
+def _mdl_section(data: StatementData) -> str:
+    """Party totals as the Messdienstleister document states them.
+
+    Four columns short of the self-billing table on purpose. `docs/03` H7:
+    "validate and pass through; never recompute MDL amounts" — the document
+    discloses one amount per party, so printing Grundkosten/Verbrauch columns
+    would mean Lokara invented a split that nothing in the source supports.
+    The sentence under the table says so, because a reader comparing this page
+    with a self-billed one is owed the reason the columns are missing.
+
+    The Eigentümer row is printed unconditionally, at `0,00 €` too — the same
+    rule as every other statement here (`docs/08` "Die Eigentümerzeile").
+    """
+    page = data.page01b_result
+    if page is None or page.values is None or page.values.path not in ("MDL_NET", "MDL_GROSS"):
+        return ""
+    values = page.values
+    rows = "".join(
+        "<tr>"
+        f"<td>{escape(_party_by_tenancy(data.party_labels, tenancy_id))}</td>"
+        f'<td class="num">{escape(format_eur(total))}</td>'
+        "</tr>"
+        for tenancy_id, total in zip(values.renter_ids, values.renter_totals, strict=True)
+    )
+    rows += (
+        "<tr>"
+        f"<td>{escape(OWNER_LABEL)}</td>"
+        f'<td class="num">{escape(format_eur(values.owner_total))}</td>'
+        "</tr>"
+    )
+    branch_label = (
+        "Nettoabrechnung — der Vermieteranteil nach CO2KostAufG ist bereits abgezogen."
+        if values.path == "MDL_NET"
+        else "Bruttoabrechnung — die Positionen wurden nach Abzug des Vermieteranteils skaliert."
+    )
+    return f"""
+  <h2>{escape(data.heating_cost_label)}</h2>
+  <table>
+    <thead>
+      <tr><th>Partei</th><th class="num">Summe</th></tr>
+    </thead>
+    <tbody>{rows}</tbody>
+    <tfoot>
+      <tr><td>Bestätigte Gesamtsumme</td>
+      <td class="num">{escape(format_eur(values.source_total))}</td></tr>
+    </tfoot>
+  </table>
+  <p class="note">Bestätigte Abrechnung des Messdienstleisters. Die Beträge wurden geprüft und
+  unverändert übernommen; eine Aufteilung in Grund- und Verbrauchskosten weist das Dokument nicht
+  aus und wird hier nicht nachgerechnet. {escape(branch_label)}</p>"""
 
 
 def _page01b_section(page: Page01bStatementResult | None) -> str:
