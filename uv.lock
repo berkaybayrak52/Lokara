@@ -13,6 +13,7 @@ members = [
     "lokara-db",
     "lokara-domain",
     "lokara-heating-engine",
+    "lokara-matching-engine",
     "lokara-nk-engine",
     "lokara-pdf",
     "lokara-rules-store",
@@ -26,6 +27,7 @@ dev = [
     { name = "lokara-db", editable = "packages/db" },
     { name = "lokara-domain", editable = "packages/domain" },
     { name = "lokara-heating-engine", editable = "packages/heating-engine" },
+    { name = "lokara-matching-engine", editable = "packages/matching-engine" },
     { name = "lokara-nk-engine", editable = "packages/nk-engine" },
     { name = "lokara-pdf", editable = "packages/pdf" },
     { name = "lokara-rules-store", editable = "packages/rules-store" },
@@ -420,6 +422,17 @@ source = { editable = "packages/domain" }
 name = "lokara-heating-engine"
 version = "0.1.0"
 source = { editable = "packages/heating-engine" }
+dependencies = [
+    { name = "lokara-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lokara-domain", editable = "packages/domain" }]
+
+[[package]]
+name = "lokara-matching-engine"
+version = "0.1.0"
+source = { editable = "packages/matching-engine" }
 dependencies = [
     { name = "lokara-domain" },
 ]

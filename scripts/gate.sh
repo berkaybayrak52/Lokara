@@ -84,7 +84,8 @@ case "$LEVEL" in
     # Engines and domain only: pure, no DB, no Chromium. Fast enough for a tight loop.
     run "pytest (pure packages)" uv run pytest -q \
       packages/domain/tests packages/nk-engine/tests \
-      packages/heating-engine/tests packages/rules-store/tests
+      packages/heating-engine/tests packages/rules-store/tests \
+      packages/matching-engine/tests
     ;;
   full|demo)
     # LOKARA_REQUIRE_DB / LOKARA_REQUIRE_PDF turn an unreachable Postgres or a missing

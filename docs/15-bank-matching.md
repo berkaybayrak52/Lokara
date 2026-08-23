@@ -10,8 +10,10 @@
 **Fixtures:** exactly thirteen executable cases, `BANKMATCH-F01`–`BANKMATCH-F13`, in
 `packages/rules-store/tests/berkay_15_golden.py`
 
-**Implementation status:** specification only. No matching engine, receivable model or payment
-ledger is implemented.
+**Implementation status:** the pure matching engine is implemented in
+`packages/matching-engine` (M6-C1), and all thirteen fixtures run through it as executable tests.
+No receivable model, payment ledger, adapter rewrite or endpoint exists yet — that is M6-C2/C3.
+The § 4 E2E signal is inert; see § 4 below.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
 contract for incoming renter payments. Matching is a proposal mechanism. It does not create a
@@ -171,11 +173,21 @@ remove spaces and special characters, and test codes as substrings. Then calcula
 | `amount_cents == open_cents` | 30 |
 | purpose contains payment code | 15 |
 | otherwise purpose contains surname | 10 |
-| E2E or mandate reference matches stored reference | 15 |
+| E2E or mandate reference matches stored reference | 15 — **inert, see below** |
 | purpose contains the receivable period token | 5 |
 
 Code and surname are mutually exclusive; take 15 or 10, not both. Confidence is
 `min(100, sum(signals))`. There is no amount tolerance.
+
+The "stored reference" this table scores against is **named here and defined nowhere in § 3**:
+neither `Receivable` (§ 3.2) nor `RenterMatchingProfile` (§ 3.3) carries such a field. No fixture
+exercises the signal — index 3 is 0 in all thirteen cases — so the oracle cannot settle it either.
+Binding it to any existing field would be an invented matching convention, and +15 is not
+cosmetic: it lifts a candidate from 25 to 40, which is Unmatched to Review. The implemented engine
+therefore returns 0 for this signal. The question is open in `FRAGEN-an-Berkay-05.md`; M6-C2 adds
+the real field with the `receivable` table and makes the signal live. This does not affect the
+§ 5.3 reversal lookup, which resolves an original match by E2E/mandate reference and is
+source-backed and fixture-covered.
 
 Decision order:
 
@@ -335,5 +347,7 @@ migration, API, engine, UI or PDF source.
 All thirteen cases, register rows, model boundaries and correspondence coverage are fully
 transcribed. Emir approved the transcription on 20.08.2026. The focused data-only checks may verify
 source coverage and arithmetic, but they do not prove production bank-matching behavior or approve
-any legal or product convention. The specification is merged, but bank matching, payment ledger and
-finAPI M6 implementation remain paused; the separate `docs/16` D2 transcription is approved and merged.
+any legal or product convention. The specification is merged and the pure matching engine (M6-C1) is
+implemented against it; the payment ledger, persistence, finAPI adapter rewrite and endpoints
+remain paused for M6-C2/C3, and the § 4 stored-reference signal stays inert until its source gap is
+answered. The separate `docs/16` D2 transcription is approved and merged.
