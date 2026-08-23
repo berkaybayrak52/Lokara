@@ -1,7 +1,7 @@
 """Red contract for the sole pre-account-context database read.
 
 The specification is ``docs/02-data-model.md`` → "The bootstrap contexts read".
-The implementation is intentionally absent when this fixture is written: migration 0006
+The implementation is intentionally absent when this fixture is written: migration 0014
 must add one bounded ``SECURITY DEFINER`` function, ``app_bootstrap_contexts(text)``.
 """
 

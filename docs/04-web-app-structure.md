@@ -74,7 +74,7 @@ caller's visible relationship and enters the account portal; it is not one of th
 There is one FastAPI application. Its current route families are:
 
 - `/health` and the environment-gated `/auth/dev-token`;
-- token-context `/me`, `/demo/{load,reset,summary}` and `/calc/nk` routes;
+- subject-only `/me`, fixed-account `/demo/{load,reset}` and `/calc/nk` routes;
 - `/a/{accountId}` summary and fixed demo-statement/PDF routes;
 - `/a/{accountId}` building, unit, tenancy, cost/allocation-key, meter/reading, heating-cost and
   extraction routes.
@@ -86,11 +86,11 @@ inside Python; Pydantic validates the backend boundary.
 
 - JWT verification accepts the web's HttpOnly `lokara_access_token` cookie or a Bearer token through
   the same API dependency. Future mobile uses that Bearer path with secure storage.
-- JWTs still require an `account_id` claim. For every `/a/{accountId}/…` route, authorization instead
-  takes account context from the URL, verifies a live Membership for the caller and that account,
-  and sets the transaction-local RLS context from the URL value.
-- `/me`, `/demo/*` and `/calc/nk` remain token-context exceptions. `/me` can expose at most the one
-  account selected by the token; listing all relationships and account switching are not shipped.
+- JWTs carry only the verified Person subject. For every `/a/{accountId}/…` route, authorization
+  comes from the URL and a live database Membership, never a token account claim. The request then
+  sets its transaction-local RLS context from that URL value.
+- `/me`, fixed-account demo bootstrap and `/calc/nk` remain bounded exceptions. `/me` can expose all
+  live account contexts for its verified subject but grants none. Account switching is not shipped.
 - Current authorization checks Membership existence and revocation only. It does not enforce
   `OWNER`, `EMPLOYEE` or `TAX_ADVISOR` behavior, and it does not enforce employee building
   assignments.
@@ -104,7 +104,7 @@ wired. Demo load/reset also require their explicit flag and operate on the fixed
 
 ## Prepared but unmerged identity foundation
 
-**Prepared but unmerged:** `app_bootstrap_contexts(text)` and migration `0006` exist only on
+**Prepared but unmerged:** `app_bootstrap_contexts(text)` and migration `0014` exist only on
 `slice/m5-bootstrap-contexts`, not on `main`. They define one bounded pre-context identity read; they
 do not ship an account switcher, new dashboard or renter portal. `docs/02-data-model.md` owns the
 detailed function, role, policy, privilege and call-site contract.

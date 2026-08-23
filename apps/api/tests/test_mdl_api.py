@@ -29,6 +29,7 @@ LOKARA_REQUIRE_DB (set in CI) forbids the skip.
 """
 
 import os
+import time
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
@@ -239,16 +240,24 @@ def no_confirmations(client: TestClient) -> Iterator[None]:
     engine.dispose()
 
 
-def _token(person_id: str, account_id: str) -> dict[str, str]:
+def _token(person_id: str) -> dict[str, str]:
+    now = int(time.time())
     encoded = jwt.encode(
-        {"sub": person_id, "account_id": account_id},
+        {
+            "sub": person_id,
+            "iss": str(ApiSettings().supabase_jwt_issuer),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + 3600,
+        },
         ApiSettings().supabase_jwt_secret,
         algorithm="HS256",
     )
     return {"Authorization": f"Bearer {encoded}"}
 
 
-DEMO = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+DEMO = _token(DEMO_PERSON_ID)
 
 
 def _post(client: TestClient, body: dict[str, Any]) -> Any:
@@ -430,7 +439,7 @@ class TestPathReauthorization:
     def test_a_member_of_another_account_cannot_confirm_or_read(
         self, client: TestClient, no_confirmations: None
     ) -> None:
-        headers = _token(ISO_PERSON_ID, ISO_ACCOUNT_ID)  # a perfectly valid session
+        headers = _token(ISO_PERSON_ID)  # a perfectly valid session
 
         assert client.post(BASE, headers=headers, json=NET_BODY).status_code == 403
         assert client.get(BASE, headers=headers).status_code == 403
@@ -442,7 +451,7 @@ class TestPathReauthorization:
         """403 before the building is ever looked up. If a real object answered
         differently from an invented one, the endpoint would enumerate another
         account's portfolio to anyone holding any valid token."""
-        headers = _token(ISO_PERSON_ID, ISO_ACCOUNT_ID)
+        headers = _token(ISO_PERSON_ID)
         real = client.get(BASE, headers=headers)
         invented = client.get(
             f"/a/{DEMO_ACCOUNT_ID}/buildings/bld_gibt_es_nicht/mdl-statements", headers=headers

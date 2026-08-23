@@ -158,7 +158,7 @@ class TestDemoReset:
         self, client: TestClient
     ) -> None:
         """Immutable demo costs stay; a separate rehearsal tenancy does not."""
-        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        headers = _token(DEMO_PERSON_ID)
         base = f"/a/{DEMO_ACCOUNT_ID}"
         before = client.get(f"{base}/buildings/bld_demo_muster12/costs", headers=headers)
         assert before.status_code == 200

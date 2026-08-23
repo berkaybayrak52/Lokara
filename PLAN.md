@@ -457,8 +457,8 @@ bypassing review or tenant-document isolation. The Round-4 Block-(c) correction 
 - JWT auth carries only the verified Person subject.
 - Expiry, issuer, exact audience and authenticated role are validated.
 - Account context is never trusted from the token.
-- Its migration is currently numbered `0006` and conflicts with Slice A's merged-order slot. Rebase
-  the paused branch after Slice A and renumber the bootstrap migration before resuming M5.
+- Its migration is `0014`, following Slice C's `0013`; it is rebased onto current local `main` and
+  remains unmerged.
 - `GET /me` returns all live account contexts from the database.
 - The token-scoped account session and `/demo/summary` are retired.
 - The demo summary now uses `/a/{accountId}/summary`.

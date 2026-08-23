@@ -1,16 +1,16 @@
-# Last output — Slice C technical closure
+# Last output — M5 bootstrap foundation rebased
 
-HEAD `206f029` on `slice/c-page02-m1-reconciliation` · `23.08.2026`
-Status: Complete
+HEAD `e356d98` on `slice/m5-bootstrap-contexts` · `23.08.2026`
+Status: Partial
 
 ## Wanted
-Make Slice C green without turning Page 02 into legal-production approval.
+Rebase and verify the prepared M5 bootstrap foundation after Slice C without merging or pushing.
 
 ## Done
-Full and non-fresh demo gates are green (922 tests); PDF fingerprint is unchanged; boundary and statement reviews are clean for Slice C.
+Rebased onto local `main` at `5c034a9`, renumbered the migration to `0014`, passed 207 focused tests, the `0013` to `0014` upgrade, full and non-fresh demo gates (993 tests), and the boundary review.
 
 ## Not done
-No commit, merge or push. `09-K01`–`09-K11`, Trinkwasser and administration-cost authority remain production blocks; M6 formal-statement blocks remain.
+The statement review found two pre-existing PDF/spec mismatches; it found no M5 regression, but the foundation is not cleanly closed.
 
 ## Optional next step
 None.

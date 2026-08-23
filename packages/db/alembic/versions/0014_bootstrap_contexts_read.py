@@ -5,8 +5,8 @@ its local Person and live account Memberships.  It is intentionally the only
 ``SECURITY DEFINER`` function in ``public``: the owner is a dedicated NOLOGIN,
 non-bypass role which can SELECT exactly the three identity tables involved.
 
-Revision ID: 0006
-Revises: 0005
+Revision ID: 0014
+Revises: 0013
 Create Date: 2026-08-16
 """
 
@@ -14,8 +14,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0006"
-down_revision: str | None = "0005"
+revision: str = "0014"
+down_revision: str | None = "0013"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
