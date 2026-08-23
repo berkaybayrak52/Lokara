@@ -121,8 +121,8 @@ top to bottom.
 
 ## Read order
 
-`LAST_OUTPUT.md` sits outside this read order. It is Emir's short, gitignored summary window after a
-session. It is not an input for agent work and never overrides Git or the tracked documentation.
+`LAST_OUTPUT.md` sits outside this read order. It is Emir's short tracked summary window after a
+session. It does not coordinate work or override Git, `PLAN.md` or the living specifications.
 
 1. **`CLAUDE.md`** — the operating contract (auto-read by Claude Code). The 3 hard rules + the locked
    tech decisions + the two Definitions of Done.
@@ -134,10 +134,11 @@ session. It is not an input for agent work and never overrides Git or the tracke
    (`scripts/check_red_sentinel.py`): announced at `fast`, fatal at `full`.
    Gates are trusted; agents are not.
 3. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
-   M0–M4 are built and green; work since then follows PLAN's **execution order** — ranked by *what
-   closes the legally-required surface first* — rather than the milestone numbering. **It carries no
-   deadline on purpose:** dates in `lokara-arch.md` are communication events (when something gets
-   shown), never planning inputs, and they do not reorder the work.
+   M0–M5 and M6-A/M6-B/M6-C1/M6-C2/M6-C3-0 are built and green; M6-C3 is the next feature slice.
+   Work follows PLAN's **execution order** — ranked by *what closes the legally-required surface
+   first* — rather than the milestone numbering. **It carries no deadline on purpose:** dates in
+   `lokara-arch.md` are communication events (when something gets shown), never planning inputs,
+   and they do not reorder the work.
 4. **`lokara-arch.md`** — canonical current architecture (v4); `PLAN.md` owns delivery order.
 5. **`DEMO-RUNBOOK.md`** — the demo walkthrough beat by beat, plus the traps that have bitten before.
 6. **`docs/`** — modular specs:
@@ -168,7 +169,8 @@ session. It is not an input for agent work and never overrides Git or the tracke
      sensitivity axes and deterministic Bank-PDF view, with exactly 14 data-only fixtures;
      conventions and missing concept sources remain blocked.
    - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,
-     reversal and duplicate-handling contract, with all 13 source-backed fixtures transcribed.
+     reversal and duplicate-handling contract, with all 13 source-backed fixtures plus the current
+     M6-C1/M6-C2/M6-C3-0 implementation boundary.
    - `16-uvi.md` — UVI monthly-consumption, comparison, DWD import, Heizspiegel fallback,
      tenant-document and delivery-evidence contract, with source-named data-only fixtures.
 

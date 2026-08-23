@@ -67,7 +67,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 22 enfo
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
-| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger and matching remain future M6 |
+| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence is shipped, while workflow wiring remains M6-C3 |
 | Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
@@ -412,10 +412,11 @@ Page 02 is merged in [`docs/09-betrkv-catalogue.md`](09-betrkv-catalogue.md) wit
 integration, but this is not production closure or legal approval: missing register rows and
 unresolved classifications remain `verify-before-production`.
 
-The Page 08 bank-matching contract is **complete, approved and merged** in `docs/15`. That approved
-doc and its oracle resolve `BANKMATCH-F03` as E12 and distinguish potential-duplicate Review from
-silent same-ID re-import dedupe. The thirteen-case oracle supplies
-no current receivable, ledger or bank-matching implementation.
+The Page 08 bank-matching contract is **complete, approved and merged** in `docs/15`. All thirteen
+cases run through the M6-C1 engine. M6-C2 ships the receivable, bank, matching-evidence and
+payment-ledger schema, adapter and owner-scoped endpoints; M6-C3-0 closes the audited database
+invariants through migration `0020`. The matching service, jobs and landlord *Zahlungen* screen
+remain M6-C3 work.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
 
@@ -628,7 +629,7 @@ One normalized calculation must produce one immutable result and explicit audien
 | Calculation identity | Account, building, inclusive period and calculation/version identity. Basic persisted fields exist; the exact Page 01 input is not complete. |
 | Property header | Legal landlord, object address, total area, unit count, creation date, engine/rule versions and every applicable register `Rechtsstand`. |
 | Covered tenancy | `tenancy_id`, renters/addressee, delivery address, unit, clipped usage dates and days, person/area/consumption inputs. M6-B freezes the selected address and isolated archive; renter delivery remains incomplete. |
-| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; matching-ledger cash work remains open. Confirmed zero is valid. |
+| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; the ledger exists, while automatic matching-to-reconciliation wiring remains open in M6-C3. Confirmed zero is valid. |
 | Operating-cost result | Cost identity/classification, total, key, numerator, denominator, measurement unit, rounded renter share, § 35a inputs/result, warnings and provenance. |
 | Heating and CO₂ result | Every required block, ratio, numerator/denominator, device evidence, CO₂ figures, warnings and provenance defined in `docs/03`. |
 | Vacancy result | Origin unit/dates, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c) and evidence. The residual contract is settled; the full annex is not implemented. |
@@ -802,16 +803,19 @@ could settle renter 2's debt from renter 1's cash, an allocation could exceed th
 entry carried, a negative component cancelled inside the components-sum check and then fed Page 01
 a negative advance, a `REVERSAL` could be positive or filed twice, `iban_history` was freely
 rewritable and needed no confirmation, and two tables documented immutable were not. A boundary
-audit on 23.08.2026 found all six. Migration `0019` is the answer:
+audit on 23.08.2026 found all six. Migration `0019` was the answer, and a second audit on
+the same day found that four of its mechanisms were missing or wrong; migration `0020`
+repairs them. The table below describes the schema **as of `0020`**:
 
 | Invariant | Mechanism |
 | --- | --- |
 | A row may not name a parent that contradicts its siblings — `docs/15` § 6, *"a match never moves money between renters"* | Four `BEFORE INSERT OR UPDATE` triggers: a receivable's renter must be a `tenancy_party` of its tenancy; a proposal's renter must be the debt's renter; a ledger entry's proposal must be for its own transaction; an allocation's debt must belong to the entry's renter. |
-| An allocation may not settle money that never arrived | `ck_payment_allocation_no_negative_components`, `uq_payment_allocation_entry_receivable`, and a cap trigger mirroring `enforce_advance_allocation_cap`. |
-| A reversal has a shape — § 5.3 and `F06` net to zero | `ck_payment_ledger_reversal_shape` (a `REVERSAL` is negative and names its original; a `PAYMENT` is non-negative and names none) plus a partial unique index so one payment has at most one reversal. |
-| A learned IBAN exists only because it was confirmed — § 3.3 and `F09` | `ck_iban_history_requires_confirmation`, a composite FK to `match_confirmation`, a partial unique index on the active mapping, and a trigger permitting exactly one change: closing an open period. |
+| An allocation may not settle money that never arrived | `uq_payment_allocation_entry_receivable` and a **signed, kind-aware** cap trigger taking `FOR UPDATE`. A `PAYMENT` allocation is non-negative and may not exceed its entry; a `REVERSAL` allocation is non-positive and may not give back more than its entry carried. `0019` used a blanket non-negative CHECK and compared against `abs(amount_cents)`, which rejected `reversal.py`'s own compensating rows while granting a −108.000 reversal a +108.000 budget — and returned NEW when the entry was not found, so it failed **open**. |
+| A reversal has a shape — § 5.3 and `F06` net to zero | `ck_payment_ledger_reversal_shape`, a partial unique index so one payment has at most one reversal, and (`0020`) an `enforce_ledger_entry_evidence` arm requiring the reversed entry to be a `PAYMENT` in the same account whose amount is negated **exactly**. Nothing ties the two entries' `bank_transaction_id` together: § 5.3 makes the return a distinct provider movement resolved by E2E or mandate reference, so requiring one shared id would make the real shape unrepresentable. |
+| A learned IBAN exists only because it was confirmed — § 3.3 and `F09` | `ck_iban_history_requires_confirmation`, a composite FK to `match_confirmation`, a trigger permitting exactly one change (closing an open period), and (`0020`) `enforce_iban_history_confirmation`: the cited confirmation must have `outcome = 'CONFIRMED'` and its proposal must name **this** renter. `0019` asserted only that a confirmation id was present, so a rejected review — or renter 1's confirmation — could mint the +60 unique-IBAN signal for renter 2. The active-mapping index is keyed `(account_id, renter_id, normalized_iban)`, not `(account_id, normalized_iban)`: § 3.3 requires two active renters to be able to share one IBAN and each receive the ambiguous signal (`F07`), which `0019` made unrepresentable. |
 | Evidence documented immutable now is — § 4 and § 147 AO | `bank_transaction`, `match_proposal` and `match_confirmation` are append-only, joining `payment_ledger_entry` and `payment_allocation` from `0017`. One proposal can be confirmed once. |
-| A receivable's § 367 projection columns must agree with `status` | `ck_receivable_open_components` and `ck_receivable_settled_has_nothing_open`, plus `uq_receivable_source` so the Page-01 handoff cannot double-bill through a check-then-insert race. |
+| A receivable's § 367 projection columns must agree with `status` | `ck_receivable_open_components` — `open_principal_cents = open_cents` (equality, not a three-way sum: `settlement.py` computes `open_after = open_cents - principal`, so `open_cents` **is** the open principal, and a sum rule would contradict the fixture-verified engine) and `open_cents <= expected_cents`. `open_costs_cents`/`open_interest_cents` are bounded below only; nothing in `docs/15` bounds them above and they arrive from Page 05 in M9. Plus `ck_receivable_settled_has_nothing_open`. |
+| The Page-01 handoff cannot double-bill | `uq_receivable_source`, and (`0020`) `uq_receivable_nk_nachzahlung_period` on `(account_id, tenancy_id, period) WHERE category = 'nk_nachzahlung'`. A correction statement is a new `source_id`, so the first index does not cover it, and the router's period guard is a bare SELECT-then-INSERT. |
 
 Migration `0018` limits the components-sum check to `category = 'rent'`. An `nk_nachzahlung` has no
 rent, garage or advance component, and § 5.2 makes the cost concrete: the paid NK-advance component
@@ -825,7 +829,29 @@ writes it, and `_end_to_end_signal` returns 0. The open question is in `FRAGEN-a
 Binding the signal to a guessed field is the invented convention M6-C1 removed, and re-enabling it
 without the answer restores it.
 
-| Future record | Minimum contract and owner |
+#### Closed on `0020`: six invariants the second audit re-run found
+
+**Status:** found 23.08.2026 on `slice/m6-c3-0-invariant-repair`. As of 24.08.2026 all six
+findings are repaired and proved on a fresh `0020`: R13–R18 pass, all 21 trigger functions
+are hardened, and the full focused repair/RLS set is green. The verified function and trigger
+hand-delta and the one missing mixed-sign CHECK are also applied to development. The focused,
+full and non-fresh demo gates are green, and the PDF is unchanged. No new legal value is
+introduced and no `Rechtsstand` changes.
+
+The distinction matters here more than usual. `0019` was reported complete while two of its
+central claims were false, and that is why this slice exists. A migration whose SQL has been
+written is not a migration that works.
+
+| Finding | Clause it breaks | Defect proved by the audit | Fixture |
+| --- | --- | --- | --- |
+| H1 | `docs/15` § 6, "a match never moves money between renters" | The first `enforce_payment_allocation_renter` draft treated a reversal's own proposal and its reversed entry as alternatives, so the proposal could shadow the original renter. The repaired rule makes the reversed payment decide and requires any proposal on the return to agree; § 5.3's valid return shape remains representable. | `M6C3R-R13` |
+| H2 | `CLAUDE.md` § 3.3; `docs/15` § 6 | The 21 trigger functions inherited the caller's `search_path`, so `pg_temp` could shadow parent tables. All 21 now set `pg_catalog, public, pg_temp`; the six amended lookup bodies also use `public.*`. | `M6C3R-R14`, `M6C3R-R15` |
+| M3-a | `docs/15` § 3.3 | The first confirmation trigger did not tie `learned_from_transaction_id` to the confirmed proposal's transaction. It now requires that exact provenance. Whether `normalized_iban` must equal the movement's `counterpart_iban` remains **not decided** because normalization belongs to the adapter and no source fixes the SQL comparison. | `M6C3R-R16`, `M6C3R-R17` |
+| M4 | `CLAUDE.md` § 3.3, "`check_rls_coverage.py` must never be weakened" | **Repaired 24.08.2026.** Check 5's `_DEF = re.compile(r"\n(?:    )?def ")` split only at `def`, so a test's chunk swallowed whatever followed it: a table named only in the next class's docstring was reported write-tested, and `async def test_…` was not a split point at all, so a genuine refused cross-account write was invisible. Test bodies now come from `ast`, so a chunk ends where the test ends. Two regex boundaries leaked before this; a `def` is where the *next* thing starts, not where this one ends. All 38 tenant tables remain covered, so no table's coverage had been resting on glue. | `M6C3R-R20`, `M6C3R-R21` |
+| M5 | `docs/15` § 6; `CLAUDE.md` § 3.3 | `BEFORE` parent triggers masked the `payment_allocation` and `iban_history` RLS policies. The three affected triggers now run `AFTER`, so `WITH CHECK` refuses a foreign write first while the triggers still fail closed for same-account defects; the cap retains its `FOR UPDATE` lock. | `M6C3R-R18` |
+| M6 | `docs/15` § 5.1 | Repaired in this slice: the settled-receivable test tripped `ck_receivable_open_components` first and matched the word "settled" in the failing row's DETAIL, so `ck_receivable_settled_has_nothing_open` was never exercised. It now uses `open_cents = open_principal_cents = 0` with open costs and asserts the constraint name. | `M6C3R-R19` |
+
+| Financial record | Current contract and owner |
 | --- | --- |
 | `AdvancePaymentPeriod` | Shipped M6-A: account, tenancy, amount, effective dates and version/declaration evidence. |
 | `Receivable` | Shipped M6-B as `StatementSettlement`: account, finalized statement/version, tenancy, amount and immutable origin; it is not a cash event. |
@@ -856,7 +882,9 @@ approved `docs/11` adds no schema or API.
 | Page 02 catalogue, classifications, NK half-up rounding and owner residual | Technically implemented by Slice C; flagged authority remains production-blocking | Slice C |
 | Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |
 | M6-A temporal advances/confirmed actual advances and M6-B Saldo, settlements, finalization and owner-only archives | **Shipped** technical scope; no renter delivery or legal-production approval | M6-A/M6-B |
-| Payment ledger, bank matching, matching evidence and delivery/portal work | **Future** | M6/M10 |
+| Payment ledger, bank matching and matching evidence | **Shipped** engine/schema/adapter/owner-endpoint scope; migration `0020` invariants verified | M6-C1/M6-C2/M6-C3-0 |
+| Matching service, jobs and landlord *Zahlungen* screen | **Future** | M6-C3 |
+| Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Complete transcription approved and merged 21.08.2026; no production implementation | D2 / `docs/11-tax-export.md` |

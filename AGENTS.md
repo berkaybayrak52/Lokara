@@ -220,6 +220,14 @@ or external adapters.
 Use `statement-reviewer` after changes to the PDF, statement data, calculation engines or any
 landlord-facing screen.
 
+A read-only auditor proves a finding **inside a transaction that is rolled back**. It never leaves
+a probe row behind, and it never disables a trigger to place or remove one. This is not style. The
+23.08.2026 pass proved two findings with *committed* probe rows in append-only tables; those rows
+then blocked the very migration that forbids them, and clearing them cost a database rebuild. The
+same pass did it correctly for a third finding, so the rule is achievable. If a finding genuinely
+cannot be shown without committed evidence, report it as unproven and name what would prove it —
+do not commit the row.
+
 Use `docs-reconciler` at milestone close or when code and documentation may have drifted.
 
 For any slice that claims the rendered document changed or stayed unchanged, record the output of

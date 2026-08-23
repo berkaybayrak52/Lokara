@@ -10,10 +10,11 @@
 **Fixtures:** exactly thirteen executable cases, `BANKMATCH-F01`–`BANKMATCH-F13`, in
 `packages/rules-store/tests/berkay_15_golden.py`
 
-**Implementation status:** the pure matching engine is implemented in
-`packages/matching-engine` (M6-C1), and all thirteen fixtures run through it as executable tests.
-No receivable model, payment ledger, adapter rewrite or endpoint exists yet — that is M6-C2/C3.
-The § 4 E2E signal is inert; see § 4 below.
+**Implementation status:** M6-C1 ships the pure matching engine and all thirteen fixtures run
+through it. M6-C2 ships the normalized bank adapter, nine account-scoped bank/receivable/matching/
+ledger tables and owner-scoped import/list/Page-01-handoff endpoints. M6-C3-0 closes the audited
+database invariants in migration `0020`. The matching service, jobs and landlord *Zahlungen* screen
+remain M6-C3. The § 4 E2E signal is deliberately inert; see § 4 below.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
 contract for incoming renter payments. Matching is a proposal mechanism. It does not create a
@@ -39,7 +40,8 @@ supplies the thirteenth case and its own summation checks. Neither source clears
 `verify-before-production` flag. The CSV controls structured values, legal nature, source and flag;
 the original Page and this approved contract supply the expanded method where the CSV row is shorthand. Emir approved
 this transcription on 20.08.2026, and the slice was merged into `main` with a no-fast-forward merge.
-No bank-matching, payment-ledger or finAPI M6 implementation is approved. M6-A/M6-B technical
+The M6-C1/M6-C2/M6-C3-0 implementation boundary above is technically verified; finAPI remains
+stubbed, the legal/product conventions retain their flags, and M6-A/M6-B technical
 advance/finalization archives do not change this contract.
 
 ## 2. Legal rules versus matching conventions
@@ -370,17 +372,45 @@ learned IBAN is a constraint and the row is versioned rather than rewritable; an
 `bank_transaction`, `match_proposal` and `match_confirmation` are append-only, as § 4 and § 147 AO
 already said they were.
 
-M6-C3 remains open: the landlord *Zahlungen* screen, the three job entrypoints and this document's
-implementation-status closure. It also inherits the recorded shape gaps in `PLAN.md` § M6-C —
+Migration `0020` repairs `0019`. A second boundary audit on 23.08.2026 found that the fourth
+parent-scope trigger `docs/02` § 6 documents had never been written — an allocation could still
+settle another renter's debt, which is the one rule § 6 states outright — and that three of
+`0019`'s constraints contradicted this document or the engine: the blanket non-negative check
+rejected `reversal.py`'s compensating rows, `abs(amount_cents)` gave a negative reversal a positive
+budget and failed open when the entry was missing, and `uq_iban_history_active` made the `F07`
+shared-IBAN state unrepresentable. `0020` adds the fourth trigger, makes the cap signed and
+kind-aware under `FOR UPDATE`, ties a learned IBAN to a `CONFIRMED` proposal for that renter,
+re-keys the active-IBAN index per renter, constrains a reversal to negate a `PAYMENT` exactly, and
+adds one `nk_nachzahlung` per tenancy period. `docs/02` § 6 holds the full table.
+
+**A third audit, 24.08.2026, reopened `0020`.** The pass over `0020` itself — which the previous
+handoff recorded as never having run — found two HIGH and five MEDIUM defects in the repair. The
+fourth trigger resolved the wrong renter when a reversal carried its own proposal, which § 5.3
+permits. No trigger function pinned `search_path`; a learned IBAN could cite no transaction; and
+two isolation tests passed on the wrong refusal. The amended `0020` is now proved on a fresh
+database and the complete hand-delta is applied to development. R13–R18, the focused RLS checks,
+the full gate and the non-fresh demo gate pass; the PDF is unchanged. `docs/02` § 6 "Closed on
+`0020`" carries the per-finding table and fixture ids.
+
+The same audit found `scripts/check_rls_coverage.py`'s write-assertion matcher vacuous: it split
+the isolation suite only at method indentation, so a module-level fixture's body was glued onto an
+unrelated test and all nine tables inherited its markers. Repaired, it immediately named four more
+tables predating this slice, whose assertions were added rather than grandfathered. That repair was
+itself incomplete — splitting at the next `def` still glued a following class header onto the last
+test body, and never matched `async def`. Test bodies now come from `ast`, so a chunk ends where the
+test ends; all 38 tenant tables stayed covered, so none had been resting on glue.
+
+M6-C3 remains open: the matching service, landlord *Zahlungen* screen and three job entrypoints. It
+also inherits the recorded shape gaps in `PLAN.md` § M6-C —
 `ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
 reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.
 
 ## 11. Approval and implementation boundary
 
 All thirteen cases, register rows, model boundaries and correspondence coverage are fully
-transcribed. Emir approved the transcription on 20.08.2026. The focused data-only checks may verify
-source coverage and arithmetic, but they do not prove production bank-matching behavior or approve
-any legal or product convention. The specification is merged and the pure matching engine (M6-C1) is
-implemented against it; the payment ledger, persistence, finAPI adapter rewrite and endpoints
-remain paused for M6-C2/C3, and the § 4 stored-reference signal stays inert until its source gap is
-answered. The separate `docs/16` D2 transcription is approved and merged.
+transcribed. Emir approved the transcription on 20.08.2026. M6-C1/M6-C2/M6-C3-0 technically verify
+the engine, persistence, normalized stub adapter, owner endpoints and database invariants; they do
+not approve production bank-matching behavior or any legal/product convention. finAPI, the matching
+service, jobs and landlord *Zahlungen* screen remain unshipped, and the § 4 stored-reference signal
+stays inert until its source gap is answered. The separate `docs/16` D2 transcription is approved
+and merged.

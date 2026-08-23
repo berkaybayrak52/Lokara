@@ -22,6 +22,7 @@
 | **Shipped** | One fixed `SOLO` owner account; the six-screen seeded path; Scenarios 1–5; the 2025 landlord calculation and PDF |
 | **Shipped** | The secure M5 bootstrap read; it changes identity lookup, not onboarding or the visible demo |
 | **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
+| **Shipped outside the six-screen demo** | M6-C1/M6-C2 bank-matching engine, persistence, adapter and owner endpoints plus M6-C3-0 invariant repair; no *Zahlungen* screen or matching jobs |
 | **Future** | Scenario 6, the five-persona identity demo, role-aware account switching, renter/tax-adviser portals, investment entitlement and mobile |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for
@@ -163,8 +164,9 @@ including its `Rechtsstand` and the required tool-not-advice disclaimer.
 
 M6-A/M6-B ship the owner-only technical archive boundary: actual paid advances, Saldo, immutable
 finalization and one isolated archive per eligible tenancy. It does not change the demo PDF or add
-renter delivery/portal. The temporal schedule is not an actual-payment ledger. The statement period
-contract also remains in `docs/08`: a shorter
+renter delivery/portal. The separate M6-C payment ledger exists, but the matching service, jobs and
+landlord *Zahlungen* screen are not part of this six-screen path. The statement period contract also
+remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
 
 ## Future demo

@@ -1559,12 +1559,15 @@ class Receivable(Base):
         CheckConstraint(
             "open_cents >= 0 AND open_cents <= expected_cents", name="ck_receivable_open_range"
         ),
-        # Migration 0019. § 5.1 step 3 walks costs, then interest, then principal —
-        # with these unconstrained the settlement engine and the arrears guard read
-        # different totals from the same row.
+        # Migration 0020 (0019 asserted only `<=`). `settlement.py:140` computes
+        # `open_after = open_cents - principal`: only the principal component reduces
+        # `open_cents`, so `open_cents` **is** the open principal and the relation is
+        # equality, not a three-way sum. Costs and interest are bounded below only —
+        # nothing in docs/15 bounds them above, and they arrive from Page 05 in M9.
         CheckConstraint(
             "open_costs_cents >= 0 AND open_interest_cents >= 0"
-            " AND open_principal_cents >= 0 AND open_principal_cents <= open_cents",
+            " AND open_principal_cents >= 0 AND open_principal_cents = open_cents"
+            " AND open_cents <= expected_cents",
             name="ck_receivable_open_components",
         ),
         CheckConstraint(
@@ -1576,6 +1579,28 @@ class Receivable(Base):
         CheckConstraint("category IN ('rent', 'nk_nachzahlung')", name="ck_receivable_category"),
         Index("ix_receivable_account", "account_id"),
         Index("ix_receivable_due", "account_id", "renter_id", "due_date"),
+        # Migration 0019. The Page 01 handoff's "already created" guard was a SELECT
+        # then an INSERT: two concurrent requests both passed it and both inserted.
+        Index(
+            "uq_receivable_source",
+            "account_id",
+            "source_type",
+            "source_id",
+            "tenancy_id",
+            unique=True,
+            postgresql_where=text("source_id IS NOT NULL"),
+        ),
+        # Migration 0020. A correction statement carries a *new* source_id, so the
+        # index above does not cover it — one tenancy could be billed the same
+        # period's Nachzahlung twice.
+        Index(
+            "uq_receivable_nk_nachzahlung_period",
+            "account_id",
+            "tenancy_id",
+            "period",
+            unique=True,
+            postgresql_where=text("category = 'nk_nachzahlung'"),
+        ),
     )
 
 
@@ -1633,6 +1658,20 @@ class IbanHistory(Base):
         _scoped_fk("iban_history", "confirmed_match_id", "match_confirmation"),
         Index("ix_iban_history_account", "account_id"),
         Index("ix_iban_history_lookup", "account_id", "normalized_iban"),
+        # Migration 0020, docs/15 § 3.3 `F07`: uniqueness is per **renter**. Two
+        # active renters must be able to share one IBAN — spouses on a joint account —
+        # so each receives the ambiguous signal and the result is Review. 0019's
+        # per-account index made that state unrepresentable. What survives is the
+        # narrower guarantee: one renter may not hold the same IBAN active twice,
+        # because history is versioned and the predecessor's valid_to is closed first.
+        Index(
+            "uq_iban_history_active_renter",
+            "account_id",
+            "renter_id",
+            "normalized_iban",
+            unique=True,
+            postgresql_where=text("valid_to IS NULL"),
+        ),
     )
 
 
@@ -1739,6 +1778,14 @@ class PaymentLedgerEntry(Base):
         CheckConstraint("credit_cents >= 0", name="ck_payment_ledger_credit_positive"),
         Index("ix_payment_ledger_account", "account_id"),
         Index("ix_payment_ledger_transaction", "account_id", "bank_transaction_id"),
+        # Migration 0019. Two reversals of one payment reopen twice the debt of a
+        # renter who paid once, and the ledger is append-only.
+        Index(
+            "uq_payment_ledger_one_reversal",
+            "reverses_entry_id",
+            unique=True,
+            postgresql_where=text("reverses_entry_id IS NOT NULL"),
+        ),
     )
 
 
@@ -1774,15 +1821,21 @@ class PaymentAllocation(Base):
             "resulting_status IN ('open', 'partial', 'settled')",
             name="ck_payment_allocation_status",
         ),
-        # Migration 0019. A negative component cancels inside the sum check above and
-        # passes it, which makes § 5.2's "must sum exactly to P" meaningless and feeds
-        # Page 01 a negative NK advance. The per-entry cap is a trigger, not a check,
-        # because it must see the entry's other allocations.
+        # The kind-dependent sign rule is not a CHECK and cannot be one: whether a
+        # component may be negative depends on the parent entry's `kind`, which a CHECK
+        # cannot read. `reversal.py:112-123` negates every component, so 0019's blanket
+        # non-negative check rejected the engine's own output; migration 0020 moved that
+        # rule into `enforce_payment_allocation_cap`, which also owns the signed cap and
+        # row lock. One kind-independent residue remains a CHECK: positive and negative
+        # components may never cancel inside one allocation.
         CheckConstraint(
-            "costs_cents >= 0 AND interest_cents >= 0 AND principal_cents >= 0"
-            " AND base_rent_cents >= 0 AND nk_advance_cents >= 0"
-            " AND heating_advance_cents >= 0 AND garage_cents >= 0",
-            name="ck_payment_allocation_no_negative_components",
+            "NOT ((costs_cents > 0 OR interest_cents > 0 OR principal_cents > 0"
+            " OR base_rent_cents > 0 OR nk_advance_cents > 0"
+            " OR heating_advance_cents > 0 OR garage_cents > 0)"
+            " AND (costs_cents < 0 OR interest_cents < 0 OR principal_cents < 0"
+            " OR base_rent_cents < 0 OR nk_advance_cents < 0"
+            " OR heating_advance_cents < 0 OR garage_cents < 0))",
+            name="ck_payment_allocation_no_negative_component_beside_a_positive",
         ),
         UniqueConstraint(
             "ledger_entry_id", "receivable_id", name="uq_payment_allocation_entry_receivable"

@@ -2559,20 +2559,50 @@ class TestM6C2BankBoundaries:
                 resulting_status="partial",
             ),
         )
+        # M6C3R-R18 — finding M5 of the 23.08.2026 boundary audit re-run.
+        #
+        # `(ProgrammingError, IntegrityError)` for all nine was too wide to prove
+        # anything about two of them. `payment_allocation` is refused with "payment
+        # allocation names no ledger entry in its own account" and `iban_history` with
+        # "iban history cites no confirmation in its own account" — both CheckViolation,
+        # i.e. IntegrityError, raised by a BEFORE trigger of 0019/0020. Drop either RLS
+        # policy and this loop still passes, so it never covered their WITH CHECK.
+        #
+        # Both now have to come back as the policy itself, the way
+        # `TestIdentityAndAgreementCrossAccountWrites` below already requires. Verified
+        # ordering (PostgreSQL 16, non-superuser role, FORCE RLS): a BEFORE ROW trigger
+        # runs before `WCO_RLS_INSERT_CHECK`, an AFTER ROW trigger after it. So the
+        # honest repair is the trigger's timing, not its strength — the trigger must
+        # keep failing closed when it cannot see the parent.
+        #
+        # `receivable` stays deliberately wide: its 0019 parent-scope trigger is a
+        # BEFORE trigger whose RLS-scoped tenancy_party lookup finds nothing in B's
+        # context, so the row dies on "renter is not a party to its tenancy". That is
+        # defence in depth working, and this slice does not re-time it.
+        policy_must_refuse = ("payment_allocation", "iban_history")
+        refusals: dict[str, str] = {}
         for build in builders:
-            # `receivable` is refused one step earlier than the others: its 0019
-            # parent-scope trigger is a BEFORE trigger, and it runs before the RLS
-            # WITH CHECK is evaluated. In B's context the tenancy_party lookup inside
-            # that trigger is itself RLS-scoped and finds nothing, so the row dies on
-            # "renter is not a party to its tenancy". Still refused, one layer up —
-            # which is the defence in depth working, not a gap.
-            expected: tuple[type[Exception], ...] = (ProgrammingError, IntegrityError)
+            row = build()
+            table = type(row).__tablename__
             with (
-                pytest.raises(expected),
+                pytest.raises((ProgrammingError, IntegrityError)) as refused,
                 account_scoped_session(app, seed.account_b) as session,
             ):
-                session.add(build())
+                session.add(row)
                 session.flush()
+            refusals[table] = str(refused.value)
+        # Every table is refused; for these two it has to be the policy that says so.
+        trigger_refused = {
+            table: refusals[table].splitlines()[0]
+            for table in policy_must_refuse
+            if "row-level security" not in refusals[table]
+        }
+        assert not trigger_refused, (
+            f"refused by a trigger, not by RLS: {trigger_refused}. Drop either "
+            f"isolation policy and this insert is still rejected, so nothing here "
+            f"covers its WITH CHECK. A BEFORE ROW trigger runs before "
+            f"WCO_RLS_INSERT_CHECK; an AFTER ROW trigger runs after it."
+        )
 
 
 class TestPage02CrossAccountWrites:
@@ -2622,6 +2652,149 @@ class TestPage02CrossAccountWrites:
             ):
                 session.add(build())
                 session.flush()
+
+
+class TestIdentityAndAgreementCrossAccountWrites:
+    """The write side of the last four policies that only ever had read coverage.
+
+    Same reason as `TestPage02CrossAccountWrites` above: the 23.08.2026 repair of
+    `check_rls_coverage.py`'s write matcher named these four next. Their policies
+    were correct all along; nothing proved it.
+
+    `building_assignment` is the instructive one. It *looked* covered by
+    `test_cross_account_building_assignment_is_rejected` — but that row stamps
+    `account_id`/`membership_id` with B, so its `WITH CHECK` **passes** and only the
+    composite FK on `(building_id, account_id)` refuses it. That is an FK-isolation
+    test. The row below stamps A instead, so the policy is what has to refuse it.
+
+    Every assertion here therefore matches on `row-level security` rather than
+    accepting any `IntegrityError`: two of these rows would also duplicate a
+    seeded unique pair (see the individual docstrings), and a matcher wide enough
+    to accept a unique violation would go green with the policy dropped — the exact
+    false positive this class exists to remove. Nothing is committed: each insert is
+    refused and its transaction rolls back.
+    """
+
+    def test_membership_rejects_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """A membership is the authorization row itself: writing one into another
+        account grants a person a role there. `person` is deliberately not
+        account-scoped, so `person_a` is a legitimate FK parent from either context
+        and `account_id` is the only thing that crosses.
+
+        `(person_a, account_a)` is also the seeded unique pair, so this row could not
+        commit even without RLS — but the policy's `WITH CHECK` is evaluated before
+        any index entry is written, so `row-level security` is what comes back, and
+        it is the only outcome this test accepts. A second Person cannot be created
+        to avoid the duplicate: `person` carries SELECT-only policies, so no context
+        may insert one.
+        """
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                Membership(
+                    id=new_id(),
+                    person_id=seed.person_a,
+                    account_id=seed.account_a,
+                    role=Role.EMPLOYEE,
+                )
+            )
+            session.flush()
+
+    def test_building_assignment_rejects_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """The half `test_cross_account_building_assignment_is_rejected` does not
+        reach. Both FK parents are A's own (`membership_a`, `building_a`), so both
+        composite FKs to `(id, account_id)` are satisfied and the stamped
+        `account_id` = A is the single fact B's context may not write.
+
+        `(membership_a, building_a)` is the seeded assignment's unique pair, and the
+        seed exposes no second building or membership in A to vary it — so, as with
+        `membership` above, this asserts the RLS message specifically rather than any
+        integrity error.
+        """
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                BuildingAssignment(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    membership_id=seed.membership_a,
+                    building_id=seed.building_a,
+                )
+            )
+            session.flush()
+
+    def test_operating_cost_agreement_rejects_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """Contract facts decide what may be allocated at all (docs/02 → Umlage-
+        vereinbarung), so a forged agreement in a foreign account is a forged lease
+        term. `tenancy_a` is A's tenancy and the period sits after the seeded row's
+        `valid_from`, so nothing but `account_id` is wrong: no unique pair, no
+        `revises_id`, and the ordered-period check constraint holds.
+        """
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                OperatingCostAgreement(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    allocation_agreed=True,
+                    mehrbelastung_clause=False,
+                    valid_from=date(2026, 1, 1),
+                    valid_to=None,
+                )
+            )
+            session.flush()
+
+    def test_confirmed_cost_classification_rejects_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """The table is append-only by trigger, which covers rewriting a confirmation
+        but says nothing about who may append one. Both parents are A's
+        (`cost_a`, `key_assignment_a`), the row reconciles
+        (`source = allocable + non_allocable`) and the id is fresh, so the append is
+        valid in every respect except the account it claims.
+        """
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                ConfirmedCostClassification(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    cost_entry_id=seed.cost_a,
+                    allocation_key_assignment_id=seed.key_assignment_a,
+                    catalogue_id="muellbeseitigung",
+                    rule_source="BetrKV / Page 02",
+                    rule_rechtsstand="Rechtsstand 07/2026",
+                    source_amount_cents=120000,
+                    allocable_cents=120000,
+                    non_allocable_cents=0,
+                    labour_cents=None,
+                    key=AllocationKey.AREA,
+                    key_source="test",
+                    findings=["verify-before-production"],
+                    special_rule_evidence={},
+                    production_blocked=True,
+                )
+            )
+            session.flush()
 
 
 class TestM6C2MoneyInvariants:
@@ -2904,12 +3077,24 @@ class TestM6C2MoneyInvariants:
     def test_a_settled_receivable_cannot_still_be_open(
         self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
     ) -> None:
-        """§ 5.1 walks costs, then interest, then principal. With the projection
-        columns unconstrained, the settlement engine and the arrears guard read
-        different totals from the same row."""
+        """M6C3R-R19 — § 5.1 walks costs, then interest, then principal. A row that
+        calls itself `settled` while 500,00 € of costs are still open makes the
+        settlement engine and the arrears guard read different totals from it.
+
+        Finding M6 of the 23.08.2026 boundary audit re-run: this test was vacuous.
+        Its old row carried `open_cents=0` with `open_principal_cents=108_000`, which
+        `0020`'s `ck_receivable_open_components` (`open_principal_cents = open_cents`)
+        rejects **first**, and `match="settled"` then matched the word "settled" in the
+        failing row's DETAIL line rather than any constraint name — so
+        `ck_receivable_settled_has_nothing_open` could be dropped and this stayed green.
+
+        The shape below is discriminating: `open_cents = open_principal_cents = 0`
+        satisfies the components check, so the only rule left to refuse it is the
+        settled rule, and the match is on the constraint's own name.
+        """
         owner, _ = engines
         with (
-            pytest.raises(IntegrityError, match="settled"),
+            pytest.raises(IntegrityError, match="ck_receivable_settled_has_nothing_open"),
             Session(owner) as session,
             session.begin(),
         ):
@@ -2933,7 +3118,7 @@ class TestM6C2MoneyInvariants:
                     garage_cents=0,
                     open_costs_cents=50_000,
                     open_interest_cents=0,
-                    open_principal_cents=108_000,
+                    open_principal_cents=0,
                     stored_reference=None,
                 )
             )

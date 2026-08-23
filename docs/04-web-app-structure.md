@@ -128,7 +128,7 @@ finalization, history and stored-document download. The separate tenant archive 
 rendered and isolated, but is not a renter route, portal item, email/delivery feature or
 legal-production approval. The live demo PDF remains unchanged.
 
-## Shipped M6-C2 bank and payment boundary
+## Shipped M6-C2/M6-C3-0 bank and payment boundary
 
 Four owner-only routes, all under `/a/{accountId}` and all behind `require_owner` on top of the
 membership check the path session already performs. The URL naming an account is never
@@ -150,6 +150,11 @@ handoff asks for the date and refuses without it rather than making that convent
 answer on every statement.
 
 Neither the *Zahlungen* screen nor any client route consumes these yet; that is M6-C3.
+
+Migration `0020` closes the M6-C3-0 invariant repair below these routes: signed and locked
+allocation caps, renter-consistent reversals, confirmed transaction provenance for learned IBANs,
+qualified trigger lookups, and observable RLS `WITH CHECK` enforcement. It changes no HTTP route or
+public model. The pure engine is still not joined to these tables by an application service.
 
 ## Shipped Beleg-Upload boundary
 

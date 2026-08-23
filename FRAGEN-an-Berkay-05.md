@@ -77,6 +77,59 @@ Beide Punkte bleiben `verify-before-production` und blockieren nichts anderes. D
 Matching-Gewichte und die Schwellen 40/79 bleiben unabhängig davon Lokara-Konvention und sind
 keine rechtliche Grundlage für einen Treffer.
 
+## Seite 08 — Folgefragen aus der Umsetzung (M6-C3)
+
+Owning doc: `docs/15-bank-matching.md` §§ 3.2, 4 und 5.1.
+
+Diese drei Punkte sind erst bei der Umsetzung von M6-C2/M6-C3 aufgetreten. Sie stehen in keiner
+Quelle. **Lokara handhabt sie vorläufig so, wie unten beschrieben, und ist dadurch nicht
+blockiert** — aber jede dieser Zwischenlösungen ist eine Lokara-Entscheidung ohne Quellgrundlage
+und muss mit Berkay geklärt werden, bevor sie produktiv gilt. Alle drei bleiben
+`verify-before-production`.
+
+1. **Gesamtschuldnerische Mietverhältnisse — Aufteilung einer Nachzahlung.** § 3.2 legt die
+   Forderung je Mieter an, `TenancyParty` lässt jedoch mehrere Mieter auf einem Mietvertrag zu
+   (Ehepaar, WG), und keine Quelle sagt, wie **eine** Nachzahlung aus Seite 01 auf sie verteilt
+   wird. Bitte entscheide zwischen:
+   a) Gesamtschuld nach § 421 BGB: **eine** Forderung über den vollen Betrag, jeder Mieter haftet
+      auf das Ganze;
+   b) Aufteilung nach Kopfteilen auf je eine Forderung pro Mieter;
+   c) eine andere, von dir vorgegebene Regel.
+
+   Lokara **verweigert derzeit** die Erzeugung (HTTP 409) und wählt keinen Mieter aus. Der Grund
+   ist konkret: `Session.scalar()` hätte einen beliebigen Ehepartner genommen und die übrigen
+   stillschweigend verworfen — dann findet die Zahlung des anderen Ehepartners keine Forderung und
+   landet ohne Warnung auf `Unmatched`. § 421 BGB ist die wahrscheinliche Antwort, aber Lokara
+   setzt sie nicht ohne deine Bestätigung um.
+
+2. **Mieterguthaben aus Überzahlung — spätere Verwendung.** § 5.1 sagt, dass ein Restbetrag nach
+   vollständiger Tilgung zu Mieterguthaben wird und **nicht ausgezahlt** wird (V1, § 9). Ob dieses
+   Guthaben eine **später entstehende** Forderung automatisch mindert, sagt keine Quelle. `F04`
+   erzeugt genau diesen Fall mit 4.000 Cent Restguthaben. Bitte entscheide:
+   a) Das Guthaben wird bei der nächsten fällig werdenden Forderung automatisch verrechnet.
+   b) Das Guthaben bleibt stehen, bis der Vermieter es ausdrücklich verrechnet.
+   c) Das Guthaben wird nur nachrichtlich geführt und nie verrechnet.
+
+   Lokaras Engine- und Persistenzvertrag folgt derzeit c): das Guthaben wird in
+   `payment_ledger_entry.credit_cents` festgeschrieben und mindert keine spätere Forderung von
+   selbst. Der *Zahlungen*-Bildschirm ist noch nicht implementiert; die spätere Anzeige darf diese
+   Zwischenlösung nur sichtbar machen, nicht erweitern. Eine automatische Verrechnung würde
+   Mietergeld ohne Quellregel bewegen.
+
+3. **Ablehnung eines Vorschlags und manuelle Zuordnung.** § 4 beschreibt nur die *Bestätigung*
+   („Confirmation records the actor and time"). Nicht beschrieben ist, (i) was eine **Ablehnung**
+   auslöst und ob die Buchung danach erneut bewertet werden darf, und (ii) ob der Vermieter eine
+   `Unmatched`-Buchung **von Hand** einer beliebigen offenen Forderung zuordnen darf. `F05` ist
+   genau dieser Fall: zwei Kandidaten mit je 30 Punkten, `Unmatched`, nichts zugewiesen.
+
+   Lokaras Engine- und Persistenzvertrag sieht derzeit vor: eine spätere Ablehnung schreibt
+   `match_confirmation.outcome` fort und verrechnet **nichts**; die Forderung bleibt unberührt.
+   Matching-Service und *Zahlungen*-Bildschirm sind noch nicht implementiert, daher kann heute
+   niemand dort ablehnen oder manuell zuordnen. Eine frei wählbare Zuordnung wäre ein Tilgungsweg
+   ohne Quelle, also genau die erfundene Konvention, die in M6-C1 aus § 4 entfernt wurde. Für den
+   Vermieter würde das in V1 bedeuten, dass er einen erkannten Zahlungseingang nicht selbst
+   zuordnen kann — bitte sag, ob das so bleiben soll.
+
 ## Nicht erneut erfragt
 
 Runde 4 hat die dort genannten Entscheidungen und Lieferungen zu Seite 01b, Seite 02, AfA,

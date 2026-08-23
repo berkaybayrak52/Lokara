@@ -418,9 +418,10 @@ Page 05 excludes all ten items listed by both the Page and Non-Goals V1:
 9. limitation periods for additional claims under § 195 BGB; and
 10. legal advice or legally binding declarations.
 
-`docs/16` depends on W4's cadence but owns UVI calculation, content and document isolation. M6's
-payment ledger supplies W3 payment events and may consume Page-05 costs/interest under the approved
-bank contract. `docs/13` owns future clause selection, risk results and action-workflow routing, but
+`docs/16` depends on W4's cadence but owns UVI calculation, content and document isolation. The
+shipped M6-C2 payment ledger will supply W3 payment events once the M6-C3 workflow is wired and may
+consume Page-05 costs/interest under the approved bank contract. `docs/13` owns future clause
+selection, risk results and action-workflow routing, but
 Page 06 supplies no complete clause or letter bodies. M9 owns actual reminders, e-mail, push and
 checklists. All external providers stay behind adapters.
 
