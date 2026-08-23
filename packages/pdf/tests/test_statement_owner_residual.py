@@ -114,7 +114,7 @@ class TestTheRowRenders:
             "closes every column is unprinted (docs/08 § 1, Seite 01 D12)"
         )
 
-    def test_it_is_the_last_row_and_there_is_exactly_one(self) -> None:
+    def test_it_is_the_last_money_row_and_there_is_exactly_one(self) -> None:
         """Last, because it is the reconciling line: the reader adds the rows
         above and the last one closes the column. Exactly one, because § 1.2
         collapses every derived landlord party into a single Liegenschafts-
@@ -123,7 +123,14 @@ class TestTheRowRenders:
         rows = _body_rows(_heating_table(data, statement_html(data)))
         owner_rows = [i for i, row in enumerate(rows) if _text(row).strip().startswith(OWNER_LABEL)]
         assert len(owner_rows) == 1, f"expected one Eigentümeranteil row, found {len(owner_rows)}"
-        assert owner_rows[0] == len(rows) - 1, "the Eigentümeranteil row must render last"
+        # Round-4 Block (c), where non-zero, is an audit *subline* directly
+        # below this residual rather than another money/allocation row.  The
+        # owner residual itself remains the final row with all five money
+        # columns; `test_statement_rounding_difference.py` owns the subline.
+        following = rows[owner_rows[0] + 1 :]
+        assert all(_text(row).strip().startswith("davon Rundungsdifferenz") for row in following), (
+            "the owner residual may only be followed by its Block-(c) audit subline"
+        )
 
     def test_the_old_per_unit_landlord_row_is_gone_from_the_heating_table(self) -> None:
         """The vacancy no longer gets a *party* row here. It is still named in

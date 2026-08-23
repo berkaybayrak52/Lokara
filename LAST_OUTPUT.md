@@ -1,15 +1,15 @@
-# Last output — Page 01b §12 reductions
+# Last output — Slice B Block-(c) correction
 
-HEAD `c4c72c8` on `slice/page01b-section12-reductions` · `23.08.2026`
-Status: Partial
+HEAD `d62000a` on `slice/page01b-block-c-pdf` · `23.08.2026`
+Status: Complete
 
 ## Done
-- §12 is implemented as a pure, audit-only Page 01b engine result with independent 15/3/3-percent
-  components, an explicit incomplete MDL result, and unchanged warning-only application projections.
-- Focused tests, Ruff, strict mypy, and the full gate checks pass; the required statement review
-  reported no new statement-facing finding.
+- Page 01b §12 reductions are locally merged as a pure, audit-only engine result with unchanged
+  warning-only application projections.
+- Block (c) now renders as the conditional `davon Rundungsdifferenz` audit subline. Full and demo
+  gates are green (898 Python tests); the statement review found no new issue. Its demo fingerprint
+  is unchanged at `a45fa3d1e3d69957948e58885b4ab797` (149280 bytes).
 
 ## Not done
-- The green §12 slice still needs its authorized local commit and no-fast-forward merge.
-- Slice B's narrow Block-(c) PDF correction, demo verification, and final closeout remain next.
+- Slice B is complete and locally merged; nothing was pushed.
 - `Antwort-an-Emir_04.md` remains untracked at the repository root pending a separate filing decision.
