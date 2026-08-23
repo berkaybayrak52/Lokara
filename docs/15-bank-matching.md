@@ -321,26 +321,27 @@ categorize outgoing bank transactions/invoices, decide tax treatment or infer ob
 the movement. Page 05 creates costs/interest that this contract may consume. Object context comes
 from the confirmed renter/tenancy relationship. V1 is AIS-only; the renter pushes the payment.
 
-## 10. Current adapter/model drift and future M6 work
+## 10. Adapter and model status
 
-The existing `packages/adapters/src/lokara_adapters/bank.py` is a useful AIS boundary but not this
-contract:
+`packages/adapters/src/lokara_adapters/bank.py` implements this contract as of M6-C2. It carries
+the § 3.1 record in full — signed `amount_cents`, the three separate dates, the nullable
+counterpart/reference/provider fields and `is_potential_duplicate` — and
+`cents_from_provider_amount` does the Decimal ×100 `ROUND_HALF_UP` conversion, refusing `float` at
+the boundary. `BANKMATCH-F10` is executed there rather than in the engine, because the conversion
+is an import rule. `StubBankGateway` now honours its `bank_account_id`, so provider-ID uniqueness
+and account isolation are provable rather than asserted. finAPI itself stays stubbed (`docs/01` D7).
 
-- its immutable transaction has only ID, booking date, positive cents plus direction, non-null
-  counterpart name/IBAN/purpose;
-- it lacks `account_id`, bank-account identity, finAPI/value dates, nullable provider fields, E2E
-  and mandate references, transaction code/type and potential-duplicate metadata;
-- no real adapter yet proves Decimal float-to-cent conversion;
-- the stub ignores its `bank_account_id` argument and cannot prove account isolation or provider-ID
-  uniqueness.
+`packages/db/src/lokara_db/models.py` carries the nine account-scoped tables of § 6 with migration
+`0017`: `bank_account`, `bank_transaction`, `receivable`, `renter_matching_profile`,
+`iban_history`, `match_proposal`, `match_confirmation`, `payment_ledger_entry` and
+`payment_allocation`. RLS is ENABLEd and FORCEd on each with an isolation policy, every reference
+is a composite `(id, account_id)` edge, and the payment-ledger tables are append-only by trigger.
+`docs/02` § 6 holds the persisted shape.
 
-`packages/db/src/lokara_db/models.py` has no bank-transaction, renter-matching-profile, versioned
-IBAN, match-proposal, confirmation or payment-ledger model. M6-A/B do ship temporal advances and
-owner-only immutable Saldo settlements, but these are neither bank matching nor cash events. There
-is still no matching-ledger reversal or provider-backed Page-01 handoff.
-
-These are remaining future M6 gaps only. This specification slice itself changes no adapter, model,
-migration, API, engine, UI or PDF source.
+What M6-C2 does **not** yet ship: the Page-01 handoff that turns a finalized `RECEIVABLE`
+`StatementSettlement` into an `nk_nachzahlung` receivable (`F12`), and the owner-scoped endpoints.
+The § 4 stored-reference signal remains inert — `receivable.stored_reference` exists as a column,
+nothing writes it, and it stays that way until the source question is answered.
 
 ## 11. Approval and implementation boundary
 

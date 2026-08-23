@@ -8,7 +8,13 @@ SDK (CLAUDE.md). ``TODO(provider)`` marks where each real EU+AVV implementation
 plugs in.
 """
 
-from .bank import BankGateway, BankTransaction, StubBankGateway, TransactionDirection
+from .bank import (
+    BankGateway,
+    BankTransaction,
+    StubBankGateway,
+    cents_from_provider_amount,
+    normalize_transaction,
+)
 from .datev import (
     DatevDeliveryReference,
     DatevExportFile,
@@ -89,8 +95,9 @@ __all__ = [
     "StubMeterGateway",
     "StubPriceIndexGateway",
     "StubVisionGateway",
-    "TransactionDirection",
     "VisionGateway",
+    "cents_from_provider_amount",
     "consumption_by_meter",
     "device_reading_segments",
+    "normalize_transaction",
 ]

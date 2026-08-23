@@ -28,7 +28,6 @@ from lokara_adapters import (
     StubMeterGateway,
     StubPriceIndexGateway,
     StubVisionGateway,
-    TransactionDirection,
     VisionGateway,
 )
 from lokara_domain import Cents
@@ -42,31 +41,25 @@ _ALL_CERTAIN = FieldConfidences(
 
 
 class TestBankPort:
+    """Port conformance only. The docs/15 § 3.1 normalization contract and the
+    BANKMATCH-F10 conversion live in test_bank_normalization.py."""
+
     def test_stub_transactions_flow_through_the_port(self) -> None:
         gateway: BankGateway = StubBankGateway()
         transactions = gateway.list_transactions(
             "bank_acc_demo", date(2025, 1, 1), date(2026, 1, 1)
         )
 
-        assert [t.id for t in transactions] == [
+        assert [t.provider_transaction_id for t in transactions] == [
             "tx_stub_001",
             "tx_stub_002",
             "tx_stub_003",
             "tx_stub_004",
         ]
         january = transactions[0]
-        assert january.booking_date == date(2025, 1, 3)  # § 11 EStG payment date
-        assert january.amount == 117000
-        assert isinstance(january.amount, int)  # Cents, never float
-        assert january.direction is TransactionDirection.CREDIT
-
-    def test_window_is_half_open(self) -> None:
-        gateway: BankGateway = StubBankGateway()
-        # [Jan 3, Jan 5): includes the Jan 3 booking, excludes both Jan 5 ones.
-        assert [
-            t.id for t in gateway.list_transactions("acc", date(2025, 1, 3), date(2025, 1, 5))
-        ] == ["tx_stub_001"]
-        assert gateway.list_transactions("acc", date(2024, 1, 1), date(2025, 1, 1)) == ()
+        assert january.bank_booking_date == date(2025, 1, 3)  # § 11 EStG payment date
+        assert january.amount_cents == 117000
+        assert isinstance(january.amount_cents, int)  # integer cents, never float
 
 
 class TestVisionPort:
