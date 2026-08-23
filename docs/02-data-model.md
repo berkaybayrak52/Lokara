@@ -796,6 +796,28 @@ foreign keys (migration `0017`):
 | `PaymentLedgerEntry` | `docs/15` § 5.3, append-only by database trigger. A reversal appends a compensating entry linked through `reverses_entry_id`; nothing is edited or deleted. |
 | `PaymentAllocation` | `docs/15` §§ 5.1–5.2: what one entry paid on one debt, split by § 367 BGB order and then by nominal component (database check: the four components sum to `principal_cents`). Append-only by the same trigger. |
 
+**Isolation was never the gap; everything inside one account was.** `0017` got RLS and the
+composite `(id, account_id)` edges right, and constrained nothing else — so a `payment_allocation`
+could settle renter 2's debt from renter 1's cash, an allocation could exceed the cents its ledger
+entry carried, a negative component cancelled inside the components-sum check and then fed Page 01
+a negative advance, a `REVERSAL` could be positive or filed twice, `iban_history` was freely
+rewritable and needed no confirmation, and two tables documented immutable were not. A boundary
+audit on 23.08.2026 found all six. Migration `0019` is the answer:
+
+| Invariant | Mechanism |
+| --- | --- |
+| A row may not name a parent that contradicts its siblings — `docs/15` § 6, *"a match never moves money between renters"* | Four `BEFORE INSERT OR UPDATE` triggers: a receivable's renter must be a `tenancy_party` of its tenancy; a proposal's renter must be the debt's renter; a ledger entry's proposal must be for its own transaction; an allocation's debt must belong to the entry's renter. |
+| An allocation may not settle money that never arrived | `ck_payment_allocation_no_negative_components`, `uq_payment_allocation_entry_receivable`, and a cap trigger mirroring `enforce_advance_allocation_cap`. |
+| A reversal has a shape — § 5.3 and `F06` net to zero | `ck_payment_ledger_reversal_shape` (a `REVERSAL` is negative and names its original; a `PAYMENT` is non-negative and names none) plus a partial unique index so one payment has at most one reversal. |
+| A learned IBAN exists only because it was confirmed — § 3.3 and `F09` | `ck_iban_history_requires_confirmation`, a composite FK to `match_confirmation`, a partial unique index on the active mapping, and a trigger permitting exactly one change: closing an open period. |
+| Evidence documented immutable now is — § 4 and § 147 AO | `bank_transaction`, `match_proposal` and `match_confirmation` are append-only, joining `payment_ledger_entry` and `payment_allocation` from `0017`. One proposal can be confirmed once. |
+| A receivable's § 367 projection columns must agree with `status` | `ck_receivable_open_components` and `ck_receivable_settled_has_nothing_open`, plus `uq_receivable_source` so the Page-01 handoff cannot double-bill through a check-then-insert race. |
+
+Migration `0018` limits the components-sum check to `category = 'rent'`. An `nk_nachzahlung` has no
+rent, garage or advance component, and § 5.2 makes the cost concrete: the paid NK-advance component
+feeds the annual actual-advance total Page 01 consumes, so parking a Nachzahlung there to satisfy
+the arithmetic would double-count it as an advance that was never paid.
+
 **`Receivable.stored_reference` is a placeholder, not a contract.** `docs/15` § 4 awards 15 points
 when a transaction's E2E or mandate reference matches a "stored reference", but §§ 3.2–3.3 define
 no such field. The column exists so the field has a home the moment the source answers; nothing

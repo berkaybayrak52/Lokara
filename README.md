@@ -129,7 +129,10 @@ session. It is not an input for agent work and never overrides Git or the tracke
 2. **`AGENTS.md`** — how work is actually executed here: six agents with **disjoint write scopes**
    (no agent may both write a test and satisfy it), and the deterministic gates underneath them —
    `scripts/gate.sh`, `scripts/verify_demo_path.sh`, and the engine-purity / RLS-coverage /
-   FK-isolation / PDF-fingerprint checks. Gates are trusted; agents are not.
+   FK-isolation / PDF-fingerprint checks. A slice declares the red window that the
+   no-agent-writes-both rule makes unavoidable in `.lokara-red`
+   (`scripts/check_red_sentinel.py`): announced at `fast`, fatal at `full`.
+   Gates are trusted; agents are not.
 3. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
    M0–M4 are built and green; work since then follows PLAN's **execution order** — ranked by *what
    closes the legally-required surface first* — rather than the milestone numbering. **It carries no

@@ -35,15 +35,21 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 ### Shipped
 
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
-- The Page 08 bank-matching transcription is merged in `docs/15`; `BANKMATCH-F03` is resolved in
-  its complete thirteen-case oracle. Production bank matching remains M6 work.
+- Page 08 bank matching is implemented. `packages/matching-engine` runs all thirteen
+  `BANKMATCH` cases through real code (M6-C1), and M6-C2 adds the nine account-scoped bank,
+  receivable, IBAN-history, proposal and payment-ledger tables, the `docs/15` § 3.1 adapter and the
+  owner-scoped endpoints including the Page-01 handoff. The landlord *Zahlungen* screen and the
+  job entrypoints are M6-C3. The § 4 stored-reference signal is deliberately inert: the field it
+  scores against is named by § 4 and defined nowhere in § 3.
 
 ### Specified
 
 - Page 01 and Page 01b contracts and their data-only or capability evidence live in `docs/02`,
   `docs/03` and `docs/08`; their named implementation gaps remain open.
 - M6-A/M6-B ship temporal/actual advances, Saldo settlements, immutable owner-only finalization and
-  separately rendered tenant archives. Bank matching, payment ledger and renter delivery/portal remain open.
+  separately rendered tenant archives; M6-C1/M6-C2 ship the matching engine, its persistence and
+  the owner-scoped endpoints. The *Zahlungen* screen and job entrypoints (M6-C3) and renter
+  delivery/portal (M10) remain open.
 - Real external providers stay behind adapter contracts and require their own integration,
   security and compliance evidence.
 
@@ -64,6 +70,7 @@ Browser
        -> packages/nk-engine -----------\
        -> packages/heating-engine -------+-> normalized calculation result
        -> packages/rules-store ----------/
+       -> packages/matching-engine -> deterministic match proposal + settlement
        -> packages/pdf -> Playwright/Chromium document
        -> packages/adapters -> stub or real external provider
 ```
@@ -79,6 +86,10 @@ backend.
 - `packages/nk-engine` and `packages/heating-engine` depend only on the domain layer. They accept
   normalized inputs and return deterministic results. They do not import FastAPI, SQLAlchemy,
   Postgres, vendor SDKs or the PDF package.
+- `packages/matching-engine` is the `docs/15` decision layer: signal scoring, the six-step decision
+  order, § 366/§ 367 settlement, the Largest-Remainder principal split and reversal. It imports the
+  standard library only — not even the domain package — and refuses `float` at its one import
+  boundary. It stores nothing; `packages/db` holds what it read and what it decided.
 - `packages/rules-store` resolves dated legal and convention values. Engines receive resolved
   values; they do not reach into the store.
 - `packages/adapters` normalizes bank, meter/MDL, Vision, email, Destatis and DATEV edges. Only an

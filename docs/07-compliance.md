@@ -95,7 +95,8 @@ archived.
 - A correction appends `vN+1`, retains and supersedes `vN`, and preserves the referenced inputs and
   archived bytes or immutable storage keys needed to reproduce every version.
 - Confirmed actual advances, Saldo, settlements and the statement archive handoff are shipped in
-  M6-A/M6-B. The payment ledger, bank-matching evidence and renter delivery/portal remain M6/M10
+  M6-A/M6-B. The payment ledger and bank-matching evidence shipped in M6-C2 as append-only rows
+  (migrations `0017`/`0019`); the Zahlungen screen is M6-C3 and renter delivery/portal remain M10
   work. Tax/export archives remain M7 work and depend on
   approved `docs/10` and `docs/11`; delivery evidence and contract/IBAN histories arrive with their
   owning later milestones.

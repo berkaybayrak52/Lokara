@@ -26,6 +26,7 @@ lokara/
 │  ├─ nk-engine/              # pure Python NK allocation
 │  ├─ heating-engine/         # pure Python heating/CO₂ calculation
 │  ├─ rules-store/            # versioned rule data resolved by callers
+│  ├─ matching-engine/        # pure Python docs/15 bank matching and settlement
 │  ├─ adapters/               # ports plus current stubs/adapters
 │  ├─ db/                     # SQLAlchemy, Alembic and RLS
 │  ├─ pdf/                    # HTML→PDF through Playwright Chromium
@@ -79,7 +80,8 @@ There is one FastAPI application. Its current route families are:
 - subject-only `/me`, fixed-account `/demo/{load,reset}` and `/calc/nk` routes;
 - `/a/{accountId}` summary and fixed demo-statement/PDF routes;
 - `/a/{accountId}` building, unit, tenancy, cost/allocation-key, meter/reading, heating-cost and
-  extraction routes.
+  extraction routes;
+- `/a/{accountId}` bank, receivable and Page-01-handoff routes (M6-C2, owner-only).
 
 There is no shipped bootstrap API route. JSON uses camelCase at the client boundary and snake_case
 inside Python; Pydantic validates the backend boundary.
@@ -125,6 +127,29 @@ M6-A/M6-B ship owner-only controls for confirmed actual advances, Saldo, immutab
 finalization, history and stored-document download. The separate tenant archive is independently
 rendered and isolated, but is not a renter route, portal item, email/delivery feature or
 legal-production approval. The live demo PDF remains unchanged.
+
+## Shipped M6-C2 bank and payment boundary
+
+Four owner-only routes, all under `/a/{accountId}` and all behind `require_owner` on top of the
+membership check the path session already performs. The URL naming an account is never
+authorization by itself, and every relationship the URL carries is verified — the bank account in
+the import route is looked up under the RLS-scoped session and 404s when it belongs to someone
+else.
+
+| Route | Contract |
+| --- | --- |
+| `POST /a/{accountId}/statements/{statementId}/receivables` | `BANKMATCH-F12`: a finalized `RECEIVABLE` settlement becomes an `nk_nachzahlung` receivable at exactly the settled cents. Copied, never recomputed. Refuses a second run for the same statement, a correcting version for a tenancy period that already has one, and a joint tenancy with more than one party. |
+| `GET /a/{accountId}/receivables` | Open debts, ordered by due date. |
+| `POST /a/{accountId}/bank-accounts/{bankAccountId}/transactions/import` | Pulls normalized transactions from the AIS adapter. An exact re-import of `provider_transaction_id` is skipped, not rejected. |
+| `GET /a/{accountId}/bank-transactions` | Imported movements, signed cents. |
+
+**The due date is a request field with no default.** `docs/08` flags *Zahlungsfrist bei
+Nachzahlung* `verify-before-production`: the register records no statutory deadline — the claim
+falls due on receipt of a proper statement — and the customary 30 days is a `Konvention`. The
+handoff asks for the date and refuses without it rather than making that convention Lokara's
+answer on every statement.
+
+Neither the *Zahlungen* screen nor any client route consumes these yet; that is M6-C3.
 
 ## Shipped Beleg-Upload boundary
 

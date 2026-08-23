@@ -182,14 +182,20 @@ uv run python scripts/check_agent_parity.py
 uv run python scripts/check_rls_coverage.py
 uv run python scripts/check_fk_isolation.py
 uv run python scripts/check_pre_context_reads.py
+uv run python scripts/check_red_sentinel.py
 ```
 
 - `check_engine_purity.py` protects pure, deterministic engine packages.
 - `check_agent_parity.py` protects the `.claude` and `.codex` mirror.
-- `check_rls_coverage.py` requires every tenant table to have RLS and isolation-test coverage.
+- `check_rls_coverage.py` requires every tenant table to be ENABLEd, FORCEd and policied **with a
+  `WITH CHECK` clause**, and to appear in a test that actually attempts a refused cross-account
+  **write**. It used to accept the table merely being *named* in the isolation test, which an
+  `import` line satisfies — the M6-C2 boundary audit of 23.08.2026 found six defects behind that
+  gap, and strengthening the check immediately surfaced three more tables that predated it.
 - `check_fk_isolation.py` rejects unsafe cross-account foreign keys.
 - `check_pre_context_reads.py` enforces the sole bounded pre-account identity read, including its
   function, role, policies, privileges and API call sites.
+- `check_red_sentinel.py` reports a declared red window; see § 4 "The red window".
 - `verify_demo_path.sh` validates migration, seed, statement, PDF and rendered figures.
 
 `scripts/verify_demo_path.sh --fresh` destroys local Postgres data. Run it only with Emir's explicit

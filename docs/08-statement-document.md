@@ -333,7 +333,8 @@ single-unit timelines preserve origin.
 #### 3a — The party-totals block gets one Eigentümer row, not two
 
 The final owner summary row adds all NK and heating residuals. Slice C applies the Page-02 residual
-model to NK; any final tenant-document presentation remains M6 work.
+model to NK. M6-B ships the tenant document as an owner-only technical archive; presenting it *to*
+a renter is M10 delivery/portal work, not M6.
 
 #### 4 — Required rendered text (Gesamtübersicht)
 

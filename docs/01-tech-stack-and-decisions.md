@@ -15,7 +15,7 @@ planned or mentioned in the architecture.
 | Workspace | Exact current members |
 | --- | --- |
 | Bun/Turborepo | `apps/web`, `packages/ui` |
-| uv | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/adapters`, `packages/db`, `packages/pdf` |
+| uv | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/matching-engine`, `packages/adapters`, `packages/db`, `packages/pdf` |
 
 Future members are separate:
 

@@ -50,7 +50,11 @@ The canonical 2025 fixture is:
 - Musterstraße 12 with units A/B/C of **50/30/20 m²**;
 - units A and C rented all year;
 - unit B's renter leaves on **30.06.2025**, so the landlord carries the vacancy from 01.07.;
-- one **1.200,00 € Müllabfuhr** `CostEntry`, allocated by `AREA`.
+- one **1.200,00 € Müllabfuhr** `CostEntry`, allocated by `AREA`;
+- one connected `bank_account` — *Mietkonto Musterstraße 12*, id `bank_acc_demo` — added by M6-C2.
+  It exists because `StubBankGateway` serves exactly that id and the composite
+  `(bank_account_id, account_id)` foreign key needs a real target; without it the transaction
+  import has nothing to import into. It changes no statement figure and appears in no document.
 
 | Party | Expected share |
 | --- | ---: |
