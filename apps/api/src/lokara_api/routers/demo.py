@@ -57,11 +57,14 @@ def reset(auth: RequireAuth) -> DemoLoadResponse:
     return DemoLoadResponse(ok=True, account_id=DEMO_ACCOUNT_ID)
 
 
-def summary_response(session: Session, account: Account | None) -> DemoSummaryResponse:
+def summary_response(
+    session: Session, account: Account | None, *, building_id: str | None = None
+) -> DemoSummaryResponse:
     """Shared builder — also serves the URL-scoped /a/{account_id}/summary."""
-    building = session.scalars(
-        select(Building).order_by(Building.created_at, Building.id).limit(1)
-    ).first()
+    query = select(Building).order_by(Building.created_at, Building.id).limit(1)
+    if building_id is not None:
+        query = select(Building).where(Building.id == building_id).limit(1)
+    building = session.scalars(query).first()
     if account is None or building is None:
         raise HTTPException(
             status_code=404, detail="No demo data — run `uv run lokara-seed-demo` first."

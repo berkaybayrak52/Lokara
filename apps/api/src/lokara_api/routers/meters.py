@@ -23,6 +23,7 @@ from lokara_domain import MeasurementUnit, MeterKind, cents, format_eur
 from lokara_pdf import format_number_de
 from sqlalchemy import select
 
+from ..authorization import require_building, require_resource_building
 from ..deps import PathAccountSession
 from ..meter_gateway import VALUE_SCALE, DbMeterGateway
 from ..schemas import (
@@ -75,10 +76,7 @@ def _scaled(value_x1000: int) -> Decimal:
 
 
 def _building_or_404(session: PathAccountSession, building_id: str) -> Building:
-    building = session.get(Building, building_id)
-    if building is None:  # unknown OR invisible under RLS — same answer
-        raise HTTPException(status_code=404, detail="Building not found")
-    return building
+    return require_building(session, building_id)
 
 
 def _meter_out(meter: Meter, consumption_display: str | None, today: date) -> MeterOut:
@@ -218,6 +216,7 @@ def delete_meter(account_id: str, meter_id: str, session: PathAccountSession) ->
     meter = session.get(Meter, meter_id)
     if meter is None:
         raise HTTPException(status_code=404, detail="Meter not found")
+    require_resource_building(session, meter.building_id)
     for reading in list(meter.readings):
         session.delete(reading)
     session.delete(meter)
@@ -235,6 +234,7 @@ def create_reading(
     meter = session.get(Meter, meter_id)
     if meter is None:
         raise HTTPException(status_code=404, detail="Meter not found")
+    require_resource_building(session, meter.building_id)
     if body.tenancy_id is not None:
         tenancy = session.get(Tenancy, body.tenancy_id)
         if tenancy is None or meter.unit_id is None or tenancy.unit_id != meter.unit_id:
@@ -337,4 +337,5 @@ def delete_heating_cost(account_id: str, heating_cost_id: str, session: PathAcco
     row = session.get(HeatingCostEntry, heating_cost_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Heating cost not found")
+    require_resource_building(session, row.building_id)
     session.delete(row)

@@ -31,6 +31,7 @@ from lokara_db import Building, CostEntry
 from lokara_domain import AllocationKey, cents, format_eur
 from sqlalchemy import select
 
+from ..authorization import require_building
 from ..deps import PathAccountSession
 from ..schemas import (
     ExtractionDuplicate,
@@ -152,12 +153,7 @@ def _duplicate(
 
 
 def _get_building(session: PathAccountSession, building_id: str) -> Building:
-    building = session.scalar(
-        select(Building).where(Building.id == building_id, Building.archived_at.is_(None))
-    )
-    if building is None:  # unknown, archived, or invisible under RLS
-        raise HTTPException(status_code=404, detail="Building not found")
-    return building
+    return require_building(session, building_id)
 
 
 def _read_upload(file: UploadFile) -> SourceDocument:

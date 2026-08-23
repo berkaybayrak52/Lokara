@@ -18,7 +18,14 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
-from lokara_db import DbSettings, Membership, account_scoped_session, create_db_engine
+from lokara_db import (
+    BuildingAssignment,
+    DbSettings,
+    Membership,
+    Role,
+    account_scoped_session,
+    create_db_engine,
+)
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
@@ -61,6 +68,25 @@ def account_session_for_path(
             raise HTTPException(
                 status_code=403, detail="Caller holds no membership in this account"
             )
+        if membership.role is Role.TAX_ADVISOR:
+            raise HTTPException(
+                status_code=403, detail="Tax advisor portal routes are not available yet"
+            )
+        assignment_ids = frozenset(
+            session.scalars(
+                select(BuildingAssignment.building_id).where(
+                    BuildingAssignment.membership_id == membership.id
+                )
+            ).all()
+        )
+        # Local import avoids a dependency cycle: authorization needs the
+        # PathAccountSession alias while this dependency creates it.
+        from .authorization import PortalScope
+
+        session.info["portal_scope"] = PortalScope(
+            role=membership.role,
+            building_ids=assignment_ids if membership.role is Role.EMPLOYEE else frozenset(),
+        )
         yield session
 
 
