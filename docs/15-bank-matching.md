@@ -37,8 +37,8 @@ supplies the thirteenth case and its own summation checks. Neither source clears
 `verify-before-production` flag. The CSV controls structured values, legal nature, source and flag;
 the original Page and this approved contract supply the expanded method where the CSV row is shorthand. Emir approved
 this transcription on 20.08.2026, and the slice was merged into `main` with a no-fast-forward merge.
-No M6 implementation is approved. The approved, merged `docs/16` D2 transcription does not change
-this contract.
+No bank-matching, payment-ledger or finAPI M6 implementation is approved. M6-A/M6-B technical
+advance/finalization archives do not change this contract.
 
 ## 2. Legal rules versus matching conventions
 
@@ -322,19 +322,18 @@ contract:
 - the stub ignores its `bank_account_id` argument and cannot prove account isolation or provider-ID
   uniqueness.
 
-`packages/db/src/lokara_db/models.py` has no bank-transaction, receivable, renter-matching-profile,
-versioned IBAN, match-proposal, confirmation, renter-credit or payment-ledger model. `Tenancy`
-currently stores only one `base_rent_cents` and one scalar `advance_payment_cents`; it has no
-separate heating/garage components and the advance is not temporal. There is no immutable reversal
-or Page 01 Nachzahlung handoff.
+`packages/db/src/lokara_db/models.py` has no bank-transaction, renter-matching-profile, versioned
+IBAN, match-proposal, confirmation or payment-ledger model. M6-A/B do ship temporal advances and
+owner-only immutable Saldo settlements, but these are neither bank matching nor cash events. There
+is still no matching-ledger reversal or provider-backed Page-01 handoff.
 
-These are recorded future M6 gaps only. This slice changes no adapter, model, migration, API,
-engine, UI or PDF source.
+These are remaining future M6 gaps only. This specification slice itself changes no adapter, model,
+migration, API, engine, UI or PDF source.
 
 ## 11. Approval and implementation boundary
 
 All thirteen cases, register rows, model boundaries and correspondence coverage are fully
 transcribed. Emir approved the transcription on 20.08.2026. The focused data-only checks may verify
 source coverage and arithmetic, but they do not prove production bank-matching behavior or approve
-any legal or product convention. The specification is merged, but M6 implementation remains paused;
-the separate `docs/16` D2 transcription is approved and merged.
+any legal or product convention. The specification is merged, but bank matching, payment ledger and
+finAPI M6 implementation remain paused; the separate `docs/16` D2 transcription is approved and merged.

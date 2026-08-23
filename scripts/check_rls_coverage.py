@@ -60,6 +60,15 @@ EXEMPT: dict[str, str] = {
     "account": "IS the isolation boundary — its own id is the account id; policy compares id",
 }
 
+# M6-B's public ORM names deliberately distinguish the two archive audiences
+# from their SQL table names.  The isolation suite selects these classes by
+# their public names, so the coverage checker must use the same vocabulary.
+MODEL_NAME_OVERRIDES = {
+    "tenancy_delivery_address": "DeliveryAddress",
+    "owner_payment_credit_instruction": "PaymentInstruction",
+    "statement_document_archive": "StatementArchive",
+}
+
 
 def _model_name(table: str) -> str:
     """`allocation_key_assignment` -> `AllocationKeyAssignment`.
@@ -67,7 +76,7 @@ def _model_name(table: str) -> str:
     The isolation test selects mapped classes, not table names, so a literal search for
     the snake_case name reports covered tables as uncovered.
     """
-    return "".join(part.capitalize() for part in table.split("_"))
+    return MODEL_NAME_OVERRIDES.get(table, "".join(part.capitalize() for part in table.split("_")))
 
 
 def _is_named(table: str, test_src: str) -> bool:

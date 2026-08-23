@@ -10,6 +10,10 @@ import {
   DemoSummaryResponseSchema,
   MeResponseSchema,
   StatementProjectionResponseSchema,
+  DeliveryAddressSchema,
+  FinalizeStatementSchema,
+  PaymentInstructionSchema,
+  StatementHistorySchema,
   TenancyPreviewChoiceSchema,
 } from '@/lib/contracts';
 
@@ -142,5 +146,62 @@ export function useConfirmAdvanceReconciliation(accountId: string, buildingId: s
       });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
+  });
+}
+
+export function useDeliveryAddresses(accountId: string, buildingId: string, tenancyId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'delivery-addresses', tenancyId],
+    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/delivery-addresses`, DeliveryAddressSchema.array()),
+    enabled: buildingId !== '' && tenancyId !== '', retry: false,
+  });
+}
+
+export function useCreateDeliveryAddress(accountId: string, buildingId: string, tenancyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { addressee: string; street: string; postalCode: string; city: string; country: string; validFrom: string }) =>
+      api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/delivery-addresses`, z.object({ id: z.string() }), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'delivery-addresses', tenancyId] }),
+  });
+}
+
+export function usePaymentInstructions(accountId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'payment-credit-instructions'],
+    queryFn: () => api(`/a/${accountId}/payment-credit-instructions`, PaymentInstructionSchema.array()),
+    retry: false,
+  });
+}
+
+export function useCreatePaymentInstruction(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { paymentText: string; creditText: string; validFrom: string }) =>
+      api(`/a/${accountId}/payment-credit-instructions`, z.object({ id: z.string() }), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'payment-credit-instructions'] }),
+  });
+}
+
+export function useStatementHistory(accountId: string, buildingId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'statement-history', buildingId],
+    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/statements/history`, StatementHistorySchema.array()),
+    enabled: buildingId !== '', retry: false,
+  });
+}
+
+export function useFinalizeStatement(accountId: string, buildingId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { periodStart: string; periodEnd: string; supersedesStatementId?: string; latePositiveExceptionReason?: string }) =>
+      api(`/a/${accountId}/buildings/${buildingId}/statements/finalize`, FinalizeStatementSchema, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'statement-history', buildingId] }),
   });
 }

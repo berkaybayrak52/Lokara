@@ -959,6 +959,13 @@ class Statement(Base):
     status: Mapped[StatementStatus] = mapped_column(default=StatementStatus.DRAFT)
     total_cents: Mapped[int]
     content_hash: Mapped[str | None]  # SHA-256 of the rendered document, set on finalize (GoBD)
+    # Written once by M6-B finalization.  It is the normalized calculation and
+    # selected address/instruction evidence, never a pointer back to live rows.
+    finalized_snapshot: Mapped[dict[str, object]] = mapped_column(
+        JSON, server_default=text("'{}'::json")
+    )
+    finalized_at: Mapped[datetime | None]
+    supersedes_statement_id: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     building: Mapped["Building"] = relationship(
@@ -969,8 +976,120 @@ class Statement(Base):
 
     __table_args__ = (
         _scoped_fk("statement", "building_id", "building"),
+        _scoped_fk("statement", "supersedes_statement_id", "statement"),
+        _scoped_pair("statement"),
         UniqueConstraint("building_id", "period_start", "period_end", "version"),
         Index("ix_statement_account", "account_id"),
+    )
+
+
+class DeliveryAddress(Base):
+    """Append-only tenancy delivery address selected verbatim at finalization."""
+
+    __tablename__ = "tenancy_delivery_address"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    addressee: Mapped[str]
+    street: Mapped[str]
+    postal_code: Mapped[str]
+    city: Mapped[str]
+    country: Mapped[str]
+    version: Mapped[int]
+    valid_from: Mapped[date]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("tenancy_delivery_address", "tenancy_id", "tenancy"),
+        _scoped_pair("tenancy_delivery_address"),
+        UniqueConstraint("tenancy_id", "version", name="uq_tenancy_delivery_address_version"),
+        Index("ix_tenancy_delivery_address_account", "account_id"),
+    )
+
+
+class PaymentInstruction(Base):
+    """Append-only owner payment/credit copy, not a bank-matching interface."""
+
+    __tablename__ = "owner_payment_credit_instruction"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    version: Mapped[int]
+    instruction_text: Mapped[str]
+    valid_from: Mapped[date]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_pair("owner_payment_credit_instruction"),
+        UniqueConstraint(
+            "account_id", "version", name="uq_owner_payment_credit_instruction_version"
+        ),
+        Index("ix_owner_payment_credit_instruction_account", "account_id"),
+    )
+
+
+class StatementArchive(Base):
+    """Stored final bytes.  A renter archive always names exactly one tenancy."""
+
+    __tablename__ = "statement_document_archive"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    statement_id: Mapped[str]
+    audience: Mapped[str]
+    tenancy_id: Mapped[str | None]
+    content_bytes: Mapped[bytes]
+    sha256: Mapped[str]
+    mime_type: Mapped[str]
+    filename: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("statement_document_archive", "statement_id", "statement"),
+        _scoped_fk("statement_document_archive", "tenancy_id", "tenancy"),
+        _scoped_pair("statement_document_archive"),
+        UniqueConstraint(
+            "statement_id", "audience", "tenancy_id", name="uq_statement_archive_audience"
+        ),
+        CheckConstraint(
+            "(audience = 'OWNER' AND tenancy_id IS NULL) OR "
+            "(audience = 'TENANT' AND tenancy_id IS NOT NULL)",
+            name="ck_statement_archive_audience_tenancy",
+        ),
+        CheckConstraint("length(sha256) = 64", name="ck_statement_archive_sha256"),
+        Index(
+            "uq_statement_document_archive_owner",
+            "statement_id",
+            "audience",
+            unique=True,
+            postgresql_where=text("audience = 'OWNER' AND tenancy_id IS NULL"),
+        ),
+        Index("ix_statement_document_archive_account", "account_id"),
+    )
+
+
+class StatementSettlement(Base):
+    """One immutable Saldo consequence per finalized tenant statement."""
+
+    __tablename__ = "statement_settlement"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    statement_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    amount_cents: Mapped[int]
+    origin_saldo_cents: Mapped[int]
+    kind: Mapped[str]  # RECEIVABLE or CREDIT_REFUND
+    late_positive_exception_reason: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("statement_settlement", "statement_id", "statement"),
+        _scoped_fk("statement_settlement", "tenancy_id", "tenancy"),
+        _scoped_pair("statement_settlement"),
+        UniqueConstraint("statement_id", "tenancy_id", name="uq_statement_settlement_tenancy"),
+        CheckConstraint("amount_cents > 0", name="ck_statement_settlement_positive"),
+        CheckConstraint(
+            "kind IN ('RECEIVABLE', 'CREDIT_REFUND')", name="ck_statement_settlement_kind"
+        ),
+        Index("ix_statement_settlement_account", "account_id"),
     )
 
 
@@ -1329,11 +1448,15 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "advance_allocation",
     "advance_reconciliation",
     "advance_reconciliation_allocation",
+    "tenancy_delivery_address",
+    "owner_payment_credit_instruction",
     "person_count",
     "mdl_statement",
     "mdl_statement_position",
     "self_use_period",
     "statement",
+    "statement_document_archive",
+    "statement_settlement",
     "cost_entry",
     "allocation_key_assignment",
     "operating_cost_agreement",

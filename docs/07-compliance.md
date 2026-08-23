@@ -55,16 +55,15 @@ Every status below describes repository delivery, not legal certainty:
 - The least-privilege pre-context bootstrap read is shipped on `main` through migration `0014`. It is
   the sole deployed identity path before account context, not permission to bypass account context.
 
-### Specified and Future
+### Shipped and Future
 
-- Membership roles exist in the shipped model, but role-aware behavior, assigned-building
-  enforcement, the account switcher and nested-building authorization remain M5 work and are not
-  shipped.
+- Membership roles, role-aware behavior, assigned-building enforcement, the account switcher and
+  nested-building authorization are shipped in M5.
 - Renter activation, `/renter/{tenancyId}` context and renter-portal isolation remain future work.
   A hidden navigation link is never authorization.
-- Each tenant document must be selected by one account- and building-valid tenancy before rendering.
-  It must contain no other renter's name, amount or hidden document data, and it must never share
-  the landlord overview's delivery channel. This is the specified M6 contract, not current output.
+- Each M6-B tenant archive is selected by one account- and building-valid tenancy before rendering.
+  It contains no other renter's name, amount or hidden document data, and never shares the landlord
+  overview's delivery channel. It is owner-only technical archive output, not renter delivery.
 - Logs, exports and provider requests must contain only the personal data required for their stated
   purpose. Production logging and export implementations still have to prove this per data flow.
 
@@ -77,16 +76,16 @@ Every status below describes repository delivery, not legal certainty:
 - Tenancies have a create-only API path. A meter-reading correction appends a new reading for the
   same date and has no direct update path, although deleting its parent meter can currently delete
   the readings. These are bounded capabilities, not a database-wide immutability claim.
-- The shipped `Statement` row has account/building scope, period, version, status, total, an optional
-  content-hash field and a uniqueness constraint for building/period/version. Those fields do not
-  enforce the complete finalization lifecycle or preserve a complete calculation snapshot.
+- M6-B ships an account/building-scoped finalized statement, immutable normalized snapshot,
+  append-only version transition and stored archive bytes/hashes. It is limited to owner-only
+  technical archives and does not establish legal-production approval or renter delivery.
 - Draft/demo statement rendering is a live recomputation. It creates no immutable archive.
 
-Current input APIs still include destructive paths, and the complete finalized-statement transition
-is not enforced. Lokara therefore does not claim that all legally relevant records are already
-immutable, reproducible or archived.
+Current input APIs still include destructive paths outside the M6-B archive boundary. Lokara
+therefore does not claim that all legally relevant records are already immutable, reproducible or
+archived.
 
-### Specified M6 contract
+### Shipped M6-A/M6-B technical archive boundary
 
 - Finalization creates one immutable, versioned snapshot containing normalized inputs, calculation
   results, engine/rule versions, each applicable `Rechtsstand`, timestamps and content hashes.
@@ -95,8 +94,9 @@ immutable, reproducible or archived.
   it.
 - A correction appends `vN+1`, retains and supersedes `vN`, and preserves the referenced inputs and
   archived bytes or immutable storage keys needed to reproduce every version.
-- Actual paid advances, Saldo, receivables, the payment ledger, bank-matching evidence and the
-  statement archive handoff remain M6 work. Tax/export archives remain M7 work and depend on
+- Confirmed actual advances, Saldo, settlements and the statement archive handoff are shipped in
+  M6-A/M6-B. The payment ledger, bank-matching evidence and renter delivery/portal remain M6/M10
+  work. Tax/export archives remain M7 work and depend on
   approved `docs/10` and `docs/11`; delivery evidence and contract/IBAN histories arrive with their
   owning later milestones.
 
@@ -171,8 +171,8 @@ The rendered-output compatibility checks for these claims live in
 
 - The current PDF is the landlord's internal `Vermieter-Gesamtübersicht`: a building-wide
   calculation and QA view. It must not be sent to a renter.
-- Separate `Mieter-Einzelabrechnung` documents, actual advances and Saldo, audience-isolated
-  finalization and archive evidence are specified for M6 and are not shipped.
+- M6-B ships owner-only, audience-isolated technical archives with actual advances, Saldo and
+  finalization evidence. They are not renter delivery, portal publication or legal-production output.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the four formal minimums and
   records exactly what the current PDF does and does not render.
 - A period longer than 12 months is a specified hard block before calculation or rendering; a

@@ -69,20 +69,22 @@ result. These are **Shipped**, and each is a capability, not the finished tenant
 
 Scope limits that this does **not** move:
 
-- **There is no tenant PDF.** The projection exists as API data only. The PDF route is landlord
-  audience and `to_pdf_data` deliberately has **no** audience parameter, because a
+- **The existing live PDF route has no tenant PDF.** M6-B separately renders owner-only tenant
+  archives from frozen data. The live PDF route is landlord audience and `to_pdf_data` deliberately
+  has **no** audience parameter, because a
   Mieter-Einzelabrechnung is a separate, independently rendered document (§ 3) and adding a flag to
   the existing route is exactly the "render everything and hide rows" shape § 3 forbids.
 - **Slice C applies renter-side half-up rounding and one owner residual to NK.** Its applicable
   Page-02 authority remains production-blocking; heating uses the same rounding shape.
 - Everything in the next section stays with M6.
 
-### Specified Page 01 and M6 output
+### Specified Page 01 and shipped M6-A/M6-B archive output
 
 The complete Page 01 contract and exact `08-F01…F24` data-only oracle are **Specified and approved**.
-M6 still owns actual paid advances, Saldo/Nachzahlung/Guthaben, immutable finalization, archived
-bytes and hashes, one isolated **rendered** tenant document per eligible tenancy, document archives,
-delivery-safe output, and the operator/numerator derivation that closes formal minimum #3.
+M6-A/M6-B ship confirmed actual advances, Saldo/Nachzahlung/Guthaben branches, immutable
+finalization, archived bytes/hashes, isolated rendered tenant archives and the formal-minimum #3
+carrier. Bank matching, ledger/cash events and renter delivery/portal remain open. These archives
+are owner-only technical records, not legal-production or renter delivery output.
 
 ### Future dependencies
 
@@ -184,7 +186,7 @@ archived documents. A finalized version is never rebuilt from current mutable ro
 | Document | Audience | Contents | Delivery status |
 | --- | --- | --- | --- |
 | **Vermieter-Gesamtübersicht** | landlord/internal | all parties and the full reconciliation | **Shipped** live preview, rendered |
-| **Mieter-Einzelabrechnung** | exactly one covered tenancy | only that tenancy's share, advances, Saldo and notices | **Capability shipped** as a server-side projection (API data only); the rendered document, advances and Saldo stay **Specified**, M6 |
+| **Mieter-Einzelabrechnung archive** | exactly one covered tenancy | only that tenancy's share, advances, Saldo and notices | **Shipped** as an owner-only M6-B technical archive; no renter portal/delivery or legal-production approval |
 | **Leerstandsaufstellung** | landlord/tax evidence | origin-preserving vacancy/non-allocable/rounding blocks | **Capability shipped** as a server-side projection over owner-side rows; the rendered annex and the tax handoff stay **Specified**, M6/tax handoff |
 
 The server constructs each projection from the selected result before rendering. It never renders an
@@ -193,8 +195,9 @@ all-renters PDF and crops, covers or hides rows afterward; hidden PDF structure 
 The shipped projection enforces that boundary by type rather than by a flag: what a renderer is not
 given, it cannot leak. The `TENANT` projection contains no owner residual, no other party's line and
 none of the building-wide findings, and an unknown, foreign or zero-usage-day tenancy is refused
-instead of falling back to the owner view. Only the landlord audience is rendered today; the tenant
-PDF is M6 and needs the ledger before it may exist at all.
+instead of falling back to the owner view. The live demo still renders only the landlord audience.
+M6-B independently renders tenant archives from frozen data; it does not create a renter route,
+portal item or delivery.
 
 #### Preview versus finalization (M6)
 
@@ -211,8 +214,8 @@ PDF is M6 and needs the ledger before it may exist at all.
 | --- | --- | --- |
 | 1 | **Zusammenstellung der Gesamtkosten** per cost type | ✅ rendered |
 | 2 | **Angabe und Erläuterung des Verteilerschlüssels** | ✅ rendered |
-| 3 | **Berechnung des Anteils des Mieters** | ◐ figures, key, numerator and denominator render; the operator and numerator derivation are missing |
-| 4 | **Abzug der geleisteten Vorauszahlungen → Saldo** | ❌ absent; blocked on M6 actual payments |
+| 3 | **Berechnung des Anteils des Mieters** | ◐ live preview remains unchanged; M6-B final archive prints the operator/numerator carrier |
+| 4 | **Abzug der geleisteten Vorauszahlungen → Saldo** | ❌ live preview remains unchanged; M6-A/M6-B final archive uses confirmed actual advances and Saldo |
 
 Markers describe the current PDF only. The approved Page 01 specification contains all four.
 
@@ -758,14 +761,50 @@ M6 must add, without reinterpreting Page 01:
 - one isolated document per eligible tenancy;
 - immutable snapshot, archived bytes/keys and hashes.
 
+### M6-B final renderer and archive boundary
+
+**Status:** shipped technical archive boundary. **Rechtsstand:** 08/2026. This closes the technical
+carriers for formal minimum #3 (operator/numerator derivation) and #4 (deduction of confirmed
+actual advances), but does not clear the register's `verify-before-production` labels or authorize
+delivery. The current live landlord preview and demo PDF remain unchanged; M6-B introduces a
+separate final-document renderer only.
+
+The renderer receives one preselected final snapshot, not live account rows. It independently renders
+the owner archive and each tenant archive. It must never build an all-renters PDF and redact/crop it
+afterwards.
+
+| Archive | Required contents | Forbidden contents |
+| --- | --- | --- |
+| Owner overview | complete owner overview; landlord-only vacancy schedule; every covered party/reconciliation line; zero-day tenancy footnote; applicable notices/disclaimer/`Rechtsstand` | tenant delivery address or another tenant's isolated letter as a substitute for the owner view |
+| Tenant document | exactly one eligible tenancy's addressee and creation date; object/period; that tenancy's cost lines and `Anteil`; printed operator and numerator derivation; meter evidence and provenance; confirmed actual advances; Saldo branch; payment/credit instruction; applicable notices; disclaimer; `Rechtsstand` | owner residual, vacancy schedule, building-wide findings, another tenancy's identity, address, advances, share, Saldo or document metadata |
+
+The tenant Saldo branch is determined from the frozen confirmed advances and party subtotal:
+
+- positive, timely: show `Nachzahlung` and the frozen payment instruction; archive one
+  `RECEIVABLE` settlement;
+- zero: show `Saldo 0,00 €`; create no settlement;
+- negative: show payable `Guthaben` and the frozen credit instruction; archive one
+  `CREDIT_REFUND` settlement;
+- late positive without an explicit finalization exception reason: show only `Rechnerischer Saldo`;
+  create no receivable or payment-demand wording;
+- late positive with a non-blank explicit exception reason: preserve that reason in the snapshot and
+  settlement, then use the positive branch. The reason is an auditable override, not a legal answer.
+
+The required calculation carrier is visible per allocated line:
+`Anteil = Gesamtkosten × Bemessung ÷ Gesamtbemessung`; where day weighting applies, it also shows the
+numerator derivation such as `5.430 m²·Tage = 30 m² × 181 Tage`. All figures come from the frozen
+result; document code performs no new money calculation. Meter evidence/provenance is printed as
+provided by the final result, including source and consistency state, rather than inferred during
+rendering.
+
 Page 01b additionally requires supplier-fallback provenance, device evidence, readiness/reduction
 risks, WW central/unit difference notices, MDL confirmation and § 6a annual information as specified
 in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto-deducted.
 
 ## 9. Open dependencies — not permission to invent
 
-- **M6:** actual advances, Saldo, ledger, immutable finalization, tenant isolation, archives.
-- **Page 01 #3:** operator and numerator derivation remain missing from the current PDF.
+- **Remaining M6:** bank matching, payment ledger/cash events, matching evidence and renter delivery/portal.
+- **Live demo PDF:** operator/numerator derivation and actual-advance Saldo remain absent; M6-B's separate archive has them.
 - **Meters:** start/end readings and their consistency path are not carried to the statement.
 - **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in
   `docs/03`; different §§ 7/8 shares need a future input shape.
@@ -816,6 +855,27 @@ closure.
 | `08-F22` | fictional occupancy moves `1.858` to owner; total `62.000` |
 | `08-F23` | full-year vacancy remains in denominators: owner `37.381` tax, `20.667` waste |
 | `08-F24` | self-billing: heating `338.218`, allocated `1.076.002`, owner `20.816` |
+
+### M6-B executable fixture map
+
+These M6-B fixtures are green implementation evidence. They extend, rather than replace, the
+Page-01 data oracle above. They are technical archive fixtures; green results do not approve legal
+production or delivery.
+
+| Fixture | Required result |
+| --- | --- |
+| `M6B-F02` | A tenant subtotal/confirmed advances of `28.857/28.000` freezes Saldo `857`, produces a timely `RECEIVABLE`, and archives owner plus that tenant document. |
+| `M6B-F03` | `28.857/28.857` freezes zero Saldo and creates no settlement. |
+| `M6B-F04` | `28.857/30.000` freezes Saldo `−1.143`, prints `Guthaben`, and produces `CREDIT_REFUND` for `1.143`. |
+| `M6B-F10` | Missing reconciliation hard-blocks all writes; an explicitly confirmed empty allocation set is valid zero. |
+| `M6B-F14` | A 275-day clipped tenancy archives its own `22.800` share/`1.800` Saldo and carries the visible numerator derivation. |
+| `M6B-F16` | Mid-period tenancies produce separate documents; each serialized tenant PDF contains neither the other tenancy's identity nor financial data. |
+| `M6B-F17` | A zero-clipped-day tenancy has no archive/settlement and no portal item; the owner archive contains the zero-day footnote. |
+| `M6B-F18` | A late positive `577` has only `Rechnerischer Saldo` and no settlement unless a non-blank exception reason is frozen. |
+| `M6B-F19` | A late negative `−3.993` remains a payable `Guthaben` and creates `CREDIT_REFUND` `3.993`. |
+| `M6B-IMM` | Snapshot, archive bytes/hash/MIME/filename and selected address/instruction values remain byte-for-byte unchanged after later source versions. |
+| `M6B-CORR` | Only an explicit correction of the latest final version yields `vN+1`; predecessor snapshots/documents stay readable and the predecessor is `SUPERSEDED`. |
+| `M6B-ISO` | RLS/composite edges and owner-only endpoints refuse foreign account/building/tenancy access; an employee or renter has no finalization/history/download/address/instruction access. |
 
 ## Appendix B — Page 01 register inventory
 

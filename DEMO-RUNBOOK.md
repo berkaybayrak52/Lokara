@@ -141,8 +141,8 @@ Slow down here.
 - Say: *"Heating uses degree days. Unit B splits 583,3/416,7 ‰: €776,52 to the renter and €554,74 to
   the landlord. CO₂ uses the 10-step model, and the Rechtsstand is printed."*
 - Say: *"This PDF is the landlord's building-wide calculation and QA overview. It must never be sent
-  to a renter. M6 finalization will independently create one isolated statement per eligible
-  tenancy, including actual advances and balance."*
+  to a renter. M6-B separately creates owner-only technical archives per eligible tenancy with
+  confirmed advances and balance; it is not renter delivery or legal-production approval."*
 
 ---
 

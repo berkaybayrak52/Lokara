@@ -169,6 +169,13 @@ class StatementBundle:
     # labels in its own slice, together with the web copy that renders them.
     rechtsstaende: tuple[str, ...]
     rechtsstand_entries: tuple[str, ...]
+    # The exact normalized engine inputs used for this live calculation.  M6-B
+    # serializes this alongside the result at finalization; preview otherwise
+    # keeps it in memory only.
+    normalized_inputs: dict[str, object]
+    # Confirmed Page-02 amounts that stay with the owner.  They are not NK
+    # engine costs, but the M6-B vacancy annex must preserve them by cost type.
+    non_allocable_costs: tuple[tuple[str, int], ...]
 
 
 def _party_labels(units: list[Unit], window: Period) -> dict[PartyKey, str]:
@@ -343,7 +350,13 @@ def _co2_input(rows: tuple[HeatingCostEntry, ...]) -> Co2Input | None:
 
 def _nk_costs(
     session: Session, building_id: str, window: Period, tenancies: tuple[Tenancy, ...]
-) -> tuple[tuple[CostItem, ...], tuple[TenancyIneligibilityPeriod, ...], tuple[str, ...], bool]:
+) -> tuple[
+    tuple[CostItem, ...],
+    tuple[TenancyIneligibilityPeriod, ...],
+    tuple[str, ...],
+    bool,
+    tuple[tuple[str, int], ...],
+]:
     """Entered costs overlapping the billing period, each with the key from its
     LATEST assignment — the cost row itself never carries a key, so re-keying
     changes only what the engine is told, never what the user typed."""
@@ -363,6 +376,7 @@ def _nk_costs(
     ineligible: list[TenancyIneligibilityPeriod] = []
     findings: list[str] = []
     production_blocked = False
+    non_allocable: list[tuple[str, int]] = []
     agreements = session.scalars(select(OperatingCostAgreement)).all()
     agreements_by_tenancy: dict[str, list[OperatingCostAgreement]] = {}
     revised_ids = {row.revises_id for row in agreements if row.revises_id is not None}
@@ -387,6 +401,8 @@ def _nk_costs(
         production_blocked = production_blocked or classification.production_blocked
         if classification.production_blocked:
             findings.append(f"Page-02-Position gesperrt: {row.label}")
+        if classification.non_allocable_cents:
+            non_allocable.append((row.label, classification.non_allocable_cents))
         items.append(
             CostItem(
                 cost_id=row.id,
@@ -409,7 +425,13 @@ def _nk_costs(
                 new_cost=row.new_cost,
             ):
                 ineligible.append(period)
-    return tuple(items), tuple(ineligible), tuple(dict.fromkeys(findings)), production_blocked
+    return (
+        tuple(items),
+        tuple(ineligible),
+        tuple(dict.fromkeys(findings)),
+        production_blocked,
+        tuple(non_allocable),
+    )
 
 
 def _agreement_failure_periods(
@@ -513,9 +535,13 @@ def compute_statement(
         for tenancy in unit.tenancies
     )
     tenancies = tuple(tenancy for unit in units for tenancy in unit.tenancies)
-    nk_costs, ineligible_tenancy_periods, page02_findings, page02_production_blocked = _nk_costs(
-        session, building.id, window, tenancies
-    )
+    (
+        nk_costs,
+        ineligible_tenancy_periods,
+        page02_findings,
+        page02_production_blocked,
+        non_allocable_costs,
+    ) = _nk_costs(session, building.id, window, tenancies)
 
     facts = _meter_facts(DbMeterGateway(session), building.id, window)
     persons = person_count_inputs(
@@ -527,17 +553,16 @@ def compute_statement(
     )
     consumptions, consumption_findings = _nk_consumptions(units, occupancies, facts, window)
 
-    nk_result = calculate_nk_statement(
-        NkInput(
-            billing_period=window,
-            units=tuple(UnitBasis(unit_id=u.id, area_sqm_x100=u.area_sqm_x100) for u in units),
-            occupancies=occupancies,
-            costs=nk_costs,
-            person_counts=persons.rows,
-            consumptions=consumptions,
-            ineligible_tenancy_periods=ineligible_tenancy_periods,
-        )
+    nk_input = NkInput(
+        billing_period=window,
+        units=tuple(UnitBasis(unit_id=u.id, area_sqm_x100=u.area_sqm_x100) for u in units),
+        occupancies=occupancies,
+        costs=nk_costs,
+        person_counts=persons.rows,
+        consumptions=consumptions,
+        ineligible_tenancy_periods=ineligible_tenancy_periods,
     )
+    nk_result = calculate_nk_statement(nk_input)
     nk_findings = (*persons.findings, *consumption_findings, *page02_findings)
 
     split_bounds = get_rule(HEATING_SPLIT_BOUNDS, RULES_AS_OF)
@@ -550,6 +575,7 @@ def compute_statement(
 
     heating_result: HeatingResult | None = None
     page01b_result: Page01bStatementResult | None = None
+    page01b_input: MdlStatementInput | SelfBillingStatementInput | None = None
     # A confirmed Messdienstleister statement replaces the self-billing run
     # rather than competing with it: `docs/08` — "MDL pass-through and
     # self-billing are different inputs", and `docs/03` H7 forbids recomputing
@@ -558,7 +584,8 @@ def compute_statement(
     mdl = _confirmed_mdl(session, building.id, window)
     missing = None if mdl is not None else _heating_missing_reason(heating_costs, facts)
     if mdl is not None:
-        page01b_result = calculate_page01b_statement(mdl_statement_input(mdl, co2_table, window))
+        page01b_input = mdl_statement_input(mdl, co2_table, window)
+        page01b_result = calculate_page01b_statement(page01b_input)
         if page01b_result.readiness != "READY":
             missing = page01b_result.findings[0].message_de
         # `heating_result` stays None by design: a passed-through statement has
@@ -601,30 +628,29 @@ def compute_statement(
             ),
             co2=_co2_input(heating_costs),
         )
-        page01b_result = calculate_page01b_statement(
-            SelfBillingStatementInput(
-                heating=heating_input,
-                invoice_costs=tuple(
-                    InvoiceCostInput(
-                        kind="other",
-                        amount=cents(row.amount_cents),
-                        period_from=row.period_from,
-                        period_to=row.period_to,
-                    )
-                    for row in heating_costs
+        page01b_input = SelfBillingStatementInput(
+            heating=heating_input,
+            invoice_costs=tuple(
+                InvoiceCostInput(
+                    kind="other",
+                    amount=cents(row.amount_cents),
+                    period_from=row.period_from,
+                    period_to=row.period_to,
+                )
+                for row in heating_costs
+            ),
+            devices=facts.devices,
+            device_spans=facts.device_spans,
+            annual_comparison=AnnualComparisonInput(
+                current_heat=sum(facts.heat_by_unit.values(), Decimal(0)),
+                previous_heat=None,
+                current_warm_water=(
+                    sum(facts.ww_by_unit.values(), Decimal(0)) if facts.has_warm_water else None
                 ),
-                devices=facts.devices,
-                device_spans=facts.device_spans,
-                annual_comparison=AnnualComparisonInput(
-                    current_heat=sum(facts.heat_by_unit.values(), Decimal(0)),
-                    previous_heat=None,
-                    current_warm_water=(
-                        sum(facts.ww_by_unit.values(), Decimal(0)) if facts.has_warm_water else None
-                    ),
-                    previous_warm_water=None,
-                ),
-            )
+                previous_warm_water=None,
+            ),
         )
+        page01b_result = calculate_page01b_statement(page01b_input)
         if page01b_result.readiness == "READY":
             assert page01b_result.values is not None
             heating_result = page01b_result.values.heating_result
@@ -665,6 +691,8 @@ def compute_statement(
         page02_production_blocked=page02_production_blocked,
         rechtsstaende=stamps,
         rechtsstand_entries=entries,
+        normalized_inputs={"nk": nk_input, "page01b": page01b_input},
+        non_allocable_costs=non_allocable_costs,
     )
 
 
@@ -727,6 +755,7 @@ class StatementProjection:
     owner_residual: OwnerResidual | None
     party_labels: dict[PartyKey, str]
     findings: tuple[str, ...]
+    non_allocable_costs: tuple[tuple[str, int], ...]
 
 
 def project_statement(
@@ -756,6 +785,7 @@ def project_statement(
             owner_residual=owner_residual,
             party_labels=bundle.party_labels,
             findings=bundle.nk_findings,
+            non_allocable_costs=bundle.non_allocable_costs,
         )
     if audience is StatementAudience.TAX:
         return StatementProjection(
@@ -774,6 +804,7 @@ def project_statement(
                 key: label for key, label in bundle.party_labels.items() if key[1] is None
             },
             findings=bundle.nk_findings,
+            non_allocable_costs=bundle.non_allocable_costs,
         )
 
     if tenancy_id is None:
@@ -810,6 +841,7 @@ def project_statement(
         # The findings are building-wide operational notes naming other units,
         # so they stay on the landlord's side of the boundary.
         findings=(),
+        non_allocable_costs=(),
     )
 
 

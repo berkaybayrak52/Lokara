@@ -21,7 +21,7 @@
 | --- | --- |
 | **Shipped** | One fixed `SOLO` owner account; the six-screen seeded path; Scenarios 1–5; the 2025 landlord calculation and PDF |
 | **Shipped** | The secure M5 bootstrap read; it changes identity lookup, not onboarding or the visible demo |
-| **Specified** | The M6 Page 01 tenant output: actual advances, Saldo, immutable finalization and one isolated document per eligible tenancy |
+| **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
 | **Future** | Scenario 6, the five-persona identity demo, role-aware account switching, renter/tax-adviser portals, investment entitlement and mobile |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for
@@ -157,9 +157,10 @@ The current PDF is the fixed-2025 landlord **`Vermieter-Gesamtübersicht`**. It 
 statement and must not be sent to a renter. It shows the building-wide calculation and QA view,
 including its `Rechtsstand` and the required tool-not-advice disclaimer.
 
-M6 owns the **Specified** remainder: actual paid advances, Saldo, immutable finalization and one
-isolated tenant document per eligible tenancy. The scalar planned advance in the current tenancy row
-is not an actual-payment ledger. The statement period contract also remains in `docs/08`: a shorter
+M6-A/M6-B ship the owner-only technical archive boundary: actual paid advances, Saldo, immutable
+finalization and one isolated archive per eligible tenancy. It does not change the demo PDF or add
+renter delivery/portal. The temporal schedule is not an actual-payment ledger. The statement period
+contract also remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
 
 ## Future demo
