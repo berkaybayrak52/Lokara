@@ -153,6 +153,8 @@ def create_receivables_from_statement(
     if already is not None:
         # Running the handoff twice would double a renter's debt, and no later
         # reconciliation could tell the second row from a genuine second claim.
+        # `uq_receivable_source` (migration 0019) is what actually enforces this —
+        # this check is only here to turn the race into a clean 409.
         raise HTTPException(
             status_code=409,
             detail="Für diese Abrechnung wurden bereits Forderungen erzeugt.",
@@ -168,15 +170,53 @@ def create_receivables_from_statement(
     period = f"{statement.period_end:%Y-%m}"
     created: list[Receivable] = []
     for settlement in settlements:
-        renter_id = session.scalar(
-            select(TenancyParty.renter_id).where(TenancyParty.tenancy_id == settlement.tenancy_id)
-        )
-        if renter_id is None:
+        # All parties, not the first one. `tenancy_party` is unique on
+        # (tenancy_id, renter_id), so a couple on one Mietvertrag is two rows and
+        # entirely normal. `Session.scalar()` would return one and discard the rest
+        # with no error and no ORDER BY — the Nachzahlung would land on an arbitrary
+        # spouse, and a payment from the other one would then find no receivable and
+        # fall to Unmatched with nothing warning anyone.
+        parties = session.scalars(
+            select(TenancyParty.renter_id)
+            .where(TenancyParty.tenancy_id == settlement.tenancy_id)
+            .order_by(TenancyParty.renter_id)
+        ).all()
+        if len(parties) != 1:
+            # Same refusal posture as the missing due date: docs/15 says nothing about
+            # splitting one Nachzahlung across joint renters, so Lokara does not choose.
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    "Zum Mietverhältnis dieser Abrechnung ist kein Mieter hinterlegt; "
-                    "die Forderung wird nicht erzeugt."
+                    "Dieses Mietverhältnis hat keinen oder mehr als einen Mieter. "
+                    "Die Aufteilung einer Nachzahlung auf mehrere Mieter ist nicht "
+                    "festgelegt; die Forderung wird nicht erzeugt."
+                ),
+            )
+        renter_id = parties[0]
+
+        # A correction is a new statement id, so keying the guard above only on
+        # statement_id let v2 of the same period bill this renter a second time for
+        # the same Saldo. Scoped per tenancy, not per period: two tenancies in one
+        # building period each legitimately get their own Nachzahlung. Superseding an
+        # existing receivable needs a supersede path M6-C2 does not have, so this
+        # refuses rather than guessing.
+        if (
+            session.scalar(
+                select(Receivable.id).where(
+                    Receivable.source_type == _PAGE01_SOURCE,
+                    Receivable.category == "nk_nachzahlung",
+                    Receivable.tenancy_id == settlement.tenancy_id,
+                    Receivable.period == period,
+                )
+            )
+            is not None
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Für dieses Mietverhältnis und diesen Abrechnungszeitraum besteht "
+                    "bereits eine Nachzahlungsforderung. Eine Korrekturabrechnung "
+                    "ersetzt sie nicht automatisch."
                 ),
             )
         created.append(

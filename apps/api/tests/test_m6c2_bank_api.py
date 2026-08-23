@@ -31,7 +31,6 @@ from lokara_api import create_app
 from lokara_api.settings import ApiSettings
 from lokara_db import (
     Account,
-    BankTransaction,
     Building,
     DbSettings,
     Membership,
@@ -154,6 +153,10 @@ def live(request: pytest.FixtureRequest) -> Iterator[tuple[TestClient, _Fixture]
         session.merge(
             TenancyParty(id="tp_m6c2", account_id=ACCOUNT_ID, tenancy_id=TENANCY, renter_id=RENTER)
         )
+        # Receivables are ordinary projection rows, and a run whose cleanup did not
+        # finish leaves this tenancy's Nachzahlung behind — which the per-tenancy
+        # supersede guard then correctly refuses. Clear this fixture's own rows.
+        session.execute(delete(Receivable).where(Receivable.tenancy_id == TENANCY))
         # Statements are append-only: a previous run's fixture statement cannot be
         # deleted, and the (building, period, version) key would collide. Take the
         # next free version rather than a fixed one.
@@ -164,11 +167,6 @@ def live(request: pytest.FixtureRequest) -> Iterator[tuple[TestClient, _Fixture]
                 Statement.period_end == date(2025, 12, 31),
             )
         ).all()
-        # Bank transactions are ordinary rows, so a rerun starts from a clean
-        # import — otherwise the idempotency test's first call reports zero.
-        session.execute(
-            delete(BankTransaction).where(BankTransaction.bank_account_id == BANK_ACCOUNT)
-        )
         session.add(
             Statement(
                 id=statement_id,
@@ -197,14 +195,12 @@ def live(request: pytest.FixtureRequest) -> Iterator[tuple[TestClient, _Fixture]
         )
 
     def _cleanup() -> None:
-        # Receivables and bank transactions are ordinary projection rows. The
-        # statement and its settlement are append-only evidence and stay, exactly
-        # as the RLS suite retains its graph.
+        # Receivables are ordinary projection rows and this run's are removable. The
+        # statement, its settlement and — since migration 0019 — every imported bank
+        # transaction are append-only evidence and stay, exactly as the RLS suite
+        # retains its graph.
         with Session(owner) as session, session.begin():
             session.execute(delete(Receivable).where(Receivable.source_id == statement_id))
-            session.execute(
-                delete(BankTransaction).where(BankTransaction.bank_account_id == BANK_ACCOUNT)
-            )
         owner.dispose()
 
     request.addfinalizer(_cleanup)
@@ -328,7 +324,10 @@ class TestBankTransactionImport:
             json={"window_from": "2025-01-01", "window_to": "2026-01-01"},
         )
         assert first.status_code == 200, first.text
-        assert first.json()["imported"] == 4
+        # Bank transactions are append-only as of 0019, so a rerun may find them
+        # already imported. Every stub row is accounted for either way; the claim
+        # under test is that the *second* call adds nothing.
+        assert first.json()["imported"] + first.json()["skipped_as_duplicate"] == 4
 
         second = client.post(
             url,

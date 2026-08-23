@@ -1559,6 +1559,19 @@ class Receivable(Base):
         CheckConstraint(
             "open_cents >= 0 AND open_cents <= expected_cents", name="ck_receivable_open_range"
         ),
+        # Migration 0019. § 5.1 step 3 walks costs, then interest, then principal —
+        # with these unconstrained the settlement engine and the arrears guard read
+        # different totals from the same row.
+        CheckConstraint(
+            "open_costs_cents >= 0 AND open_interest_cents >= 0"
+            " AND open_principal_cents >= 0 AND open_principal_cents <= open_cents",
+            name="ck_receivable_open_components",
+        ),
+        CheckConstraint(
+            "(status = 'settled')"
+            " = (open_cents = 0 AND open_costs_cents = 0 AND open_interest_cents = 0)",
+            name="ck_receivable_settled_has_nothing_open",
+        ),
         CheckConstraint("status IN ('open', 'partial', 'settled')", name="ck_receivable_status"),
         CheckConstraint("category IN ('rent', 'nk_nachzahlung')", name="ck_receivable_category"),
         Index("ix_receivable_account", "account_id"),
@@ -1610,6 +1623,14 @@ class IbanHistory(Base):
         _scoped_fk("iban_history", "learned_from_transaction_id", "bank_transaction"),
         _scoped_pair("iban_history"),
         CheckConstraint("valid_to IS NULL OR valid_to >= valid_from", name="ck_iban_history_span"),
+        # Migration 0019, docs/15 § 3.3 and F09: a non-null IBAN is learned only after
+        # a user confirms a Review proposal. Without this the +60 unique-IBAN signal
+        # could be created by anything able to insert.
+        CheckConstraint(
+            "confirmed_match_id IS NOT NULL AND confirmed_by IS NOT NULL",
+            name="ck_iban_history_requires_confirmation",
+        ),
+        _scoped_fk("iban_history", "confirmed_match_id", "match_confirmation"),
         Index("ix_iban_history_account", "account_id"),
         Index("ix_iban_history_lookup", "account_id", "normalized_iban"),
     )
@@ -1676,6 +1697,9 @@ class MatchConfirmation(Base):
             "outcome IN ('CONFIRMED', 'REJECTED', 'DUPLICATE')",
             name="ck_match_confirmation_outcome",
         ),
+        # Migration 0019: M6-C3 drives ledger entries off confirmations, so one
+        # proposal confirmed twice is one payment booked twice.
+        UniqueConstraint("account_id", "match_proposal_id", name="uq_match_confirmation_proposal"),
         Index("ix_match_confirmation_account", "account_id"),
     )
 
@@ -1703,6 +1727,15 @@ class PaymentLedgerEntry(Base):
         _scoped_fk("payment_ledger_entry", "reverses_entry_id", "payment_ledger_entry"),
         _scoped_pair("payment_ledger_entry"),
         CheckConstraint("kind IN ('PAYMENT', 'REVERSAL')", name="ck_payment_ledger_kind"),
+        # Migration 0019, docs/15 § 5.3 and F06: the ledger nets to zero. A positive
+        # REVERSAL, or one naming no original, cannot do that — and the table is
+        # append-only, so nothing corrects it afterwards.
+        CheckConstraint(
+            "(kind = 'REVERSAL') = (reverses_entry_id IS NOT NULL)"
+            " AND (kind <> 'REVERSAL' OR amount_cents < 0)"
+            " AND (kind <> 'PAYMENT' OR amount_cents >= 0)",
+            name="ck_payment_ledger_reversal_shape",
+        ),
         CheckConstraint("credit_cents >= 0", name="ck_payment_ledger_credit_positive"),
         Index("ix_payment_ledger_account", "account_id"),
         Index("ix_payment_ledger_transaction", "account_id", "bank_transaction_id"),
@@ -1740,6 +1773,19 @@ class PaymentAllocation(Base):
         CheckConstraint(
             "resulting_status IN ('open', 'partial', 'settled')",
             name="ck_payment_allocation_status",
+        ),
+        # Migration 0019. A negative component cancels inside the sum check above and
+        # passes it, which makes § 5.2's "must sum exactly to P" meaningless and feeds
+        # Page 01 a negative NK advance. The per-entry cap is a trigger, not a check,
+        # because it must see the entry's other allocations.
+        CheckConstraint(
+            "costs_cents >= 0 AND interest_cents >= 0 AND principal_cents >= 0"
+            " AND base_rent_cents >= 0 AND nk_advance_cents >= 0"
+            " AND heating_advance_cents >= 0 AND garage_cents >= 0",
+            name="ck_payment_allocation_no_negative_components",
+        ),
+        UniqueConstraint(
+            "ledger_entry_id", "receivable_id", name="uq_payment_allocation_entry_receivable"
         ),
         Index("ix_payment_allocation_account", "account_id"),
         Index("ix_payment_allocation_receivable", "account_id", "receivable_id"),
