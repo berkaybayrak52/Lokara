@@ -143,6 +143,23 @@ LAYERS: tuple[Layer, ...] = (
             }
         ),
     ),
+    # The matching engine (docs/15) is the same crown-jewel shape: domain only. Bank
+    # matching is deterministic arithmetic over integer cents, so it never reaches the
+    # provider edge — the adapter normalizes floats to cents before this layer sees them.
+    Layer(
+        "packages/matching-engine/src",
+        forbidden_internal=frozenset(
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+            }
+        ),
+    ),
     # rules-store is data + resolution. It may know domain shapes, nothing above.
     Layer(
         "packages/rules-store/src",
