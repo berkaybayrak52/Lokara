@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — M5 complete; no push
+# LEAD-HANDOFF.md — M5 merged
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. The dated material below is preserved as historical evidence. This current
@@ -6,18 +6,19 @@ update overrides its pre-review and pre-transcription status claims.
 
 ## Current update — 23.08.2026
 
-- M5 is complete on the uncommitted `slice/m5-account-switcher` branch: `/` auto-enters a sole
-  owner/employee context and otherwise presents live `/me` contexts as URL links; the shell offers
-  the same multi-context switcher. TAX_ADVISOR gets only the German preparation state, and EMPLOYEE
-  has no building-create/demo controls. The focused API/RLS suite (68 tests), full gate (1,012
-  Python and 41 web tests) and statement/UI review are green. No migration, API contract, tax route,
-  renter portal, PDF change, commit, merge or push is included.
-- M5's bootstrap foundation was locally merged into `main` as `1300db1`; no push occurred. It adds
-  only subject-scoped bootstrap contexts and the `0014` bounded identity read, not the M5 UI remainder.
-- M5's backend role and assigned-building guard was locally merged into `main` as `99ac47e`; no push
-  occurred. It covers OWNER, EMPLOYEE and TAX_ADVISOR behaviour across current `/a/{accountId}/…`
-  routes, with `404` for inaccessible building resources. The switcher, renter portal and tax routes
-  remain separate work.
+- M5 is complete and merged into `main` as `a748729` (account-switching commit `81cd6a2`); both
+  `main` and `origin/main` name that commit. `/` auto-enters a sole owner/employee context and
+  otherwise presents live `/me` contexts as URL links; the shell offers the same multi-context
+  switcher. TAX_ADVISOR gets only the German preparation state, and EMPLOYEE has no
+  building-create/demo controls. The focused API/RLS suite (68 tests), full gate (1,012 Python and
+  41 web tests) and statement/UI review are green. No migration, API contract, tax route, renter
+  portal or PDF change is included.
+- M5's bootstrap foundation was merged into `main` as `1300db1`. It adds only subject-scoped
+  bootstrap contexts and the `0014` bounded identity read, not the M5 UI remainder.
+- M5's backend role and assigned-building guard was merged into `main` as `99ac47e`. Together with
+  `a748729`, it covers OWNER, EMPLOYEE and TAX_ADVISOR behaviour across current
+  `/a/{accountId}/…` routes, with `404` for inaccessible building resources and a URL-based account
+  chooser/switcher. Renter portal and tax routes remain separate work.
 - Its full and non-fresh demo gates are green (993 Python tests) and its boundary audit is clean. The
   statement review found two pre-existing Page-01 PDF/spec mismatches but no M5 regression; `PLAN.md`
   records the separate follow-up.

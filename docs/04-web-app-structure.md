@@ -106,12 +106,12 @@ inside Python; Pydantic validates the backend boundary.
 Local login still uses the explicitly enabled dev-token route; no real Supabase Auth project is
 wired. Demo load/reset also require their explicit flag and operate on the fixed demo account.
 
-## Shipped M5 identity and locally prepared portal entry
+## Shipped M5 identity and portal entry
 
 **Shipped on `main`:** `app_bootstrap_contexts(text)` and migration `0014` define one bounded
-pre-context identity read. **Prepared locally in the M5 slice:** `GET /me` supplies the live
-contexts for the URL-based chooser and switcher; no account is stored in the token or client
-session. A tax-adviser URL deliberately shows “Steuerfunktionen werden vorbereitet” rather than
+pre-context identity read. `GET /me` supplies the live contexts for the URL-based chooser and
+switcher; no account is stored in the token or client session. M5 account switching was merged as
+`a748729`. A tax-adviser URL deliberately shows “Steuerfunktionen werden vorbereitet” rather than
 owner navigation or content. `docs/02-data-model.md` owns the detailed function, role, policy,
 privilege and call-site contract.
 
