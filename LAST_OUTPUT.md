@@ -1,18 +1,17 @@
-# Last output — M5 account switching merged
+# Last output — environment-guard test isolated
 
-HEAD `a748729` on `main` · `23.08.2026`
+HEAD `47fdeb7` on `fix/environment-guard-test` · `23.08.2026`
 Status: Complete
 
 ## Wanted
-Correct the merged M5 status.
+Correct the missing-ENVIRONMENT guard test without changing production settings.
 
 ## Done
-M5 account switching was committed as `81cd6a2` and merged no-fast-forward into local `main` as
-`a748729`. The chooser/switcher, role and URL-authorization verification passed before the merge.
+The test now disables dotenv while proving that no effective source supplies `ENVIRONMENT`.
+The focused suite passes; production configuration is unchanged.
 
 ## Not done
-No push was performed for this status update. `main` and `origin/main` both name `a748729`.
-Renter portal remains M10; adviser profile, mapping and tax functions remain M7.
+No push was performed.
 
 ## Optional next step
-M6 is the next implementation milestone.
+Merge this test-only correction locally, then resume M6-A.

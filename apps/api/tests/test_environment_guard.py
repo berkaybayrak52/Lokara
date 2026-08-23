@@ -48,7 +48,9 @@ class TestEnvironmentIsRequired:
         _base_env(monkeypatch)
         monkeypatch.delenv("ENVIRONMENT", raising=False)
         with pytest.raises(ValidationError):
-            ApiSettings()
+            # The developer's .env is an input source too. Disable it so this
+            # proves that no effective source supplies ENVIRONMENT.
+            ApiSettings(_env_file=None)
 
     def test_an_unknown_environment_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """`local | ci | staging | production`, and nothing else. A typo'd `prod` must not
