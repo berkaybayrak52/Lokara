@@ -6,6 +6,11 @@ update overrides its pre-review and pre-transcription status claims.
 
 ## Current update — 23.08.2026
 
+- M5's bootstrap foundation was locally merged into `main` as `1300db1`; no push occurred. It adds
+  only subject-scoped bootstrap contexts and the `0014` bounded identity read, not the M5 UI remainder.
+- Its full and non-fresh demo gates are green (993 Python tests) and its boundary audit is clean. The
+  statement review found two pre-existing Page-01 PDF/spec mismatches but no M5 regression; `PLAN.md`
+  records the separate follow-up.
 - Round 4 was transcribed and merged locally into `main` (`d9b3ace`, `24e5818`, `bff2e68`).
   `Antwort-an-Emir_04.md` remains untracked at the repository root pending Emir's filing decision.
 - Slice B is review-complete: the boundary audit found no confirmed isolation or immutability issue;

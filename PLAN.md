@@ -47,9 +47,8 @@ before UI. Dates are communication events, not planning inputs.
   21.08.2026. Slice B is complete and locally merged after the Round-4 Block-(c) correction;
   the separate §12 pure-engine result remains audit-only and the round-four transcription is
   preserved. No slice was pushed.
-- M5 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
-  but the slice is not merged yet.
-- That M5 foundation has not added a new dashboard, portal or account switcher.
+- M5's secure bootstrap foundation was locally merged on 23.08.2026 as `1300db1`. It has not added a
+  new dashboard, portal or account switcher; those remain paused M5 work.
 
 ---
 
@@ -450,21 +449,22 @@ bypassing review or tenant-document isolation. The Round-4 Block-(c) correction 
 
 ---
 
-## 4. M5 remainder — paused until Slices A–C close
+## 4. M5 remainder — bootstrap foundation locally merged
 
-### Prepared on the unmerged `slice/m5-bootstrap-contexts`
+### Locally merged bootstrap foundation (`1300db1`)
 
 - JWT auth carries only the verified Person subject.
 - Expiry, issuer, exact audience and authenticated role are validated.
 - Account context is never trusted from the token.
-- Its migration is `0014`, following Slice C's `0013`; it is rebased onto current local `main` and
-  remains unmerged.
+- Its migration is `0014`, following Slice C's `0013`.
 - `GET /me` returns all live account contexts from the database.
 - The token-scoped account session and `/demo/summary` are retired.
 - The demo summary now uses `/a/{accountId}/summary`.
-- The branch's `git show slice/m5-bootstrap-contexts:scripts/check_pre_context_reads.py` checker and
-  40 mutation tests enforce the boundary; the checker is not present on `main` yet.
-- Full gate, demo path and boundary audit are green.
+- The pre-context checker and 40 mutation tests enforce the boundary.
+- Full and non-fresh demo gates are green (993 Python tests); the boundary audit has no finding.
+- The statement review found two pre-existing Page-01 document/PDF mismatches (the output title/scope
+  and heating demo totals). It found no M5 UI regression; reconcile those separately before claiming
+  the current PDF is a formal tenant statement.
 
 This work added no new dashboard, portal or account switcher.
 

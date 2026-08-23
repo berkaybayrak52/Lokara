@@ -1,16 +1,16 @@
-# Last output — M5 bootstrap foundation rebased
+# Last output — M5 bootstrap foundation merged
 
-HEAD `e356d98` on `slice/m5-bootstrap-contexts` · `23.08.2026`
-Status: Partial
+HEAD `1300db1` on `main` · `23.08.2026`
+Status: Complete
 
 ## Wanted
-Rebase and verify the prepared M5 bootstrap foundation after Slice C without merging or pushing.
+Commit and locally merge the verified M5 bootstrap foundation after Slice C.
 
 ## Done
-Rebased onto local `main` at `5c034a9`, renumbered the migration to `0014`, passed 207 focused tests, the `0013` to `0014` upgrade, full and non-fresh demo gates (993 tests), and the boundary review.
+Rebased onto `5c034a9`, renumbered the migration to `0014`, passed focused tests, the upgrade, full and non-fresh demo gates (993 tests), and merged locally as `1300db1`.
 
 ## Not done
-The statement review found two pre-existing PDF/spec mismatches; it found no M5 regression, but the foundation is not cleanly closed.
+No push. The M5 role UI, account switcher and nested-route remainder remain open; the recorded PDF/spec mismatches are separate Page-01 follow-up.
 
 ## Optional next step
 None.
