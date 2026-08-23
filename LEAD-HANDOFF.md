@@ -1,9 +1,21 @@
-# LEAD-HANDOFF.md — Slice B implemented and green, not reviewed; new Berkay source unprocessed
+# LEAD-HANDOFF.md — Slice B review-complete; Block-(c) follow-up pending
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
-`git log` before acting. Two things in this file are more important than the rest: Slice B has
-**not** been reviewed, and `Antwort-an-Emir_04.md` **supersedes approved rules** you would otherwise
-plan against.
+`git log` before acting. The dated material below is preserved as historical evidence. This current
+update overrides its pre-review and pre-transcription status claims.
+
+## Current update — 23.08.2026
+
+- Round 4 was transcribed and merged locally into `main` (`d9b3ace`, `24e5818`, `bff2e68`).
+  `Antwort-an-Emir_04.md` remains untracked at the repository root pending Emir's filing decision.
+- Slice B is review-complete: the boundary audit found no confirmed isolation or immutability issue;
+  the statement review found no rendering/calculation regression and required the status correction
+  now recorded in `PLAN.md`.
+- Migration `0009` makes confirmed MDL rows append-only to the app role, rejects overlapping
+  `person_count` periods, and makes the Fiktivbelegung setting immutable. The full gate passed
+  with 875 Python and 33 web tests before this rebase.
+- Slice B remains pending the narrow Round-4 Block-(c) PDF correction. Do not implement §12
+  reductions in that follow-up; they require a separate Page-01b engine slice.
 
 ## Repository state — 22.08.2026
 
