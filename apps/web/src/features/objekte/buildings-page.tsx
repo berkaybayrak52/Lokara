@@ -25,6 +25,7 @@ import { useFormDraft } from '@/lib/form-draft';
 
 import { FormField } from './form-field';
 import { useBuildings, useCreateBuilding } from './queries';
+import { useMe } from '../portal/queries';
 
 const BuildingFormSchema = z.object({
   name: z.string().min(1, 'Pflichtfeld'),
@@ -36,9 +37,15 @@ type BuildingForm = z.infer<typeof BuildingFormSchema>;
 
 const EMPTY: BuildingForm = { name: '', street: '', postalCode: '', city: '' };
 
+export function showOwnerControls(role: string | undefined): boolean {
+  return role === 'OWNER';
+}
+
 /** Objekte (docs/04 M3 page 2): list → detail; create Building. */
 export function BuildingsPage({ accountId }: { accountId: string }) {
   const buildings = useBuildings(accountId);
+  const { data: me } = useMe();
+  const ownerControls = showOwnerControls(me?.accounts.find((account) => account.id === accountId)?.role);
 
   return (
     <main className="px-8 py-10">
@@ -63,8 +70,9 @@ export function BuildingsPage({ accountId }: { accountId: string }) {
               <CardHeader>
                 <CardTitle>Noch keine Objekte</CardTitle>
                 <CardDescription>
-                  Legen Sie rechts Ihr erstes Gebäude an — Einheiten und Mietverhältnisse folgen
-                  auf der Detailseite.
+                  {ownerControls
+                    ? 'Legen Sie rechts Ihr erstes Gebäude an — Einheiten und Mietverhältnisse folgen auf der Detailseite.'
+                    : 'Ihnen ist kein Objekt zugewiesen.'}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -104,7 +112,7 @@ export function BuildingsPage({ accountId }: { accountId: string }) {
           )}
         </section>
 
-        <CreateBuildingForm accountId={accountId} />
+        {ownerControls ? <CreateBuildingForm accountId={accountId} /> : null}
       </div>
     </main>
   );

@@ -3,6 +3,9 @@
 import { Button } from '@lokara/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import React from 'react';
+
+import type { MeAccount } from '@/lib/contracts';
 
 import { useMe } from './queries';
 
@@ -60,6 +63,36 @@ export function AppShell({
   const account = me?.accounts.find((a) => a.id === accountId);
 
   return (
+    <PortalShellContent
+      accountId={accountId}
+      account={account}
+      accounts={me?.accounts ?? []}
+      pathname={pathname}
+      isLoading={me === undefined}
+    >
+      {children}
+    </PortalShellContent>
+  );
+}
+
+export function PortalShellContent({
+  accountId,
+  account,
+  accounts,
+  pathname,
+  isLoading = false,
+  children,
+}: {
+  accountId: string;
+  account: MeAccount | undefined;
+  accounts: MeAccount[];
+  pathname: string;
+  isLoading?: boolean;
+  children: React.ReactNode;
+}) {
+  const taxAdvisor = account?.role === 'TAX_ADVISOR';
+
+  return (
     <div className="flex min-h-dvh">
       {/* sticky + h-dvh, not the stretched default: without it the aside grows
           to the full DOCUMENT height on a long page (Zähler is ~2700px), which
@@ -78,7 +111,7 @@ export function AppShell({
           <span className="font-display text-lg font-bold">Lokara</span>
         </Link>
 
-        <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
+        {!taxAdvisor && account ? <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
           {NAV_ITEMS.map((item) => {
             const href = item.href(accountId);
             const active =
@@ -120,7 +153,7 @@ export function AppShell({
               </span>
             </span>
           ))}
-        </nav>
+        </nav> : <div className="flex-1" />}
 
         {account ? (
           // shrink-0 so a long nav never squeezes it, and truncate so a long
@@ -133,6 +166,23 @@ export function AppShell({
             <p className="truncate text-xs text-slate">
               {ROLE_LABELS[account.role] ?? account.role}
             </p>
+            {accounts.length > 1 ? (
+              <div className="mt-3 border-t border-mint pt-3">
+                <p className="text-xs font-semibold text-slate">Konto wechseln</p>
+                <ul className="mt-1 space-y-1" aria-label="Konto wechseln">
+                  {accounts.filter((candidate) => candidate.id !== accountId).map((candidate) => (
+                    <li key={candidate.id}>
+                      <Link
+                        href={`/a/${candidate.id}`}
+                        className="block rounded px-1 py-1 text-xs text-green underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        {candidate.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </aside>
@@ -141,12 +191,26 @@ export function AppShell({
           screen the tables otherwise run to the far edge and the eye loses the
           row. Set here, once, so no page can drift from it. */}
       <div className="mx-auto min-w-0 w-full max-w-[1100px] flex-1">
-        {account === undefined && me !== undefined ? (
+        {isLoading ? (
+          <main className="mx-auto max-w-2xl px-8 py-16">
+            <div aria-hidden="true" className="h-32 animate-pulse rounded-xl bg-mint/60" />
+          </main>
+        ) : account === undefined ? (
           <main className="mx-auto max-w-2xl px-8 py-16">
             <h1 className="font-display text-2xl font-bold">Kein Zugriff auf dieses Konto</h1>
             <p className="mt-3 max-w-prose text-slate">
               Für dieses Konto besteht keine aktive Mitgliedschaft. Die Navigation zeigt nur, was
               existiert — jeder Zugriff wird serverseitig unabhängig geprüft.
+            </p>
+            <Button asChild className="mt-6">
+              <Link href="/">Zur Kontoauswahl</Link>
+            </Button>
+          </main>
+        ) : taxAdvisor ? (
+          <main className="mx-auto max-w-2xl px-8 py-16">
+            <h1 className="font-display text-2xl font-bold">Steuerfunktionen werden vorbereitet</h1>
+            <p className="mt-3 max-w-prose text-slate">
+              Dieser Bereich ist noch nicht verfügbar. Bitte wählen Sie ein anderes Konto aus.
             </p>
             <Button asChild className="mt-6">
               <Link href="/">Zur Kontoauswahl</Link>

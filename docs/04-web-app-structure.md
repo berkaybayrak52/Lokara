@@ -66,8 +66,10 @@ navigation changes.
 |    6 | Abrechnung erstellen   | `/a/{accountId}/abrechnung`                                        |
 |    7 | Beleg-Upload           | `/a/{accountId}/beleg`                                             |
 
-`/styleguide` is a separate shipped design-token/stack showcase, not page 8. `/` resolves the
-caller's visible relationship and enters the account portal; it is not one of the numbered pages.
+`/styleguide` is a separate shipped design-token/stack showcase, not page 8. `/` enters a sole
+`OWNER` or `EMPLOYEE` context and otherwise offers the caller's live contexts as URL links; it is
+not one of the numbered pages. A sole `TAX_ADVISOR` context is selected deliberately rather than
+entered automatically.
 
 ## Shipped API surface
 
@@ -89,11 +91,13 @@ inside Python; Pydantic validates the backend boundary.
 - JWTs carry only the verified Person subject. For every `/a/{accountId}/…` route, authorization
   comes from the URL and a live database Membership, never a token account claim. The request then
   sets its transaction-local RLS context from that URL value.
-- `/me`, fixed-account demo bootstrap and `/calc/nk` remain bounded exceptions. `/me` can expose all
-  live account contexts for its verified subject but grants none. Account switching is not shipped.
-- Current authorization checks Membership existence and revocation only. It does not enforce
-  `OWNER`, `EMPLOYEE` or `TAX_ADVISOR` behavior, and it does not enforce employee building
-  assignments.
+- `/me`, fixed-account demo bootstrap and `/calc/nk` remain bounded exceptions. `/me` exposes all
+  live account contexts for its verified subject but grants none. The web switcher uses only those
+  contexts as ordinary `/a/{accountId}` links, so every destination is authorized again by the API.
+- `OWNER` retains the owner portal. `EMPLOYEE` access is restricted to assigned buildings; zero
+  assignments expose no building data. `TAX_ADVISOR` may use `/me` but current owner-portal routes
+  are denied server-side and render the web preparation state instead. The web hides building
+  creation and demo load/reset for employees; this is usability, never authorization.
 - The web client performs one single-flight refresh for concurrent 401 responses and replays each
   failed request once. A second 401 is returned; it does not loop.
 - `ENVIRONMENT` is required. In `staging` and `production`, API startup refuses enabled dev-token
@@ -102,11 +106,14 @@ inside Python; Pydantic validates the backend boundary.
 Local login still uses the explicitly enabled dev-token route; no real Supabase Auth project is
 wired. Demo load/reset also require their explicit flag and operate on the fixed demo account.
 
-## Shipped bootstrap identity foundation
+## Shipped M5 identity and locally prepared portal entry
 
 **Shipped on `main`:** `app_bootstrap_contexts(text)` and migration `0014` define one bounded
-pre-context identity read. They do not ship an account switcher, new dashboard or renter portal.
-`docs/02-data-model.md` owns the detailed function, role, policy, privilege and call-site contract.
+pre-context identity read. **Prepared locally in the M5 slice:** `GET /me` supplies the live
+contexts for the URL-based chooser and switcher; no account is stored in the token or client
+session. A tax-adviser URL deliberately shows “Steuerfunktionen werden vorbereitet” rather than
+owner navigation or content. `docs/02-data-model.md` owns the detailed function, role, policy,
+privilege and call-site contract.
 
 ## Shipped statement boundary and Specified M6 work
 
@@ -135,7 +142,8 @@ catalogue-backed default-key suggestions remain unimplemented.
 ## Future architecture
 
 - M10 renter activation, `/renter/{tenancyId}`, renter-portal isolation and account-safe portal
-  access are **Future**.
+  access are **Future**. Adviser profile, account mapping and tax functions remain **Future** M7
+  work; the current adviser preparation state is not a tax route.
 - `apps/mobile` is **Future** at M10: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.

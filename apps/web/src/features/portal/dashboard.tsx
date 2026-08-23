@@ -14,12 +14,18 @@ import { useState } from 'react';
 
 import { ApiError } from '@/lib/api';
 
-import { useAccountSummary, useLoadDemo, useResetDemo } from './queries';
+import { useAccountSummary, useLoadDemo, useMe, useResetDemo } from './queries';
+
+export function showOwnerControls(role: string | undefined): boolean {
+  return role === 'OWNER';
+}
 
 /** Dashboard (docs/04 M3 page 1): overview cards + one-click demo scenario. */
 export function Dashboard({ accountId }: { accountId: string }) {
   const summary = useAccountSummary(accountId);
   const loadDemo = useLoadDemo();
+  const { data: me } = useMe();
+  const ownerControls = showOwnerControls(me?.accounts.find((account) => account.id === accountId)?.role);
 
   if (summary.isPending) {
     return (
@@ -42,7 +48,9 @@ export function Dashboard({ accountId }: { accountId: string }) {
             <CardTitle>{empty ? 'Noch keine Daten' : 'Fehler beim Laden'}</CardTitle>
             <CardDescription>
               {empty
-                ? 'Dieses Konto enthält noch kein Objekt. Laden Sie das Demo-Szenario: ein Gebäude, drei Einheiten, ein Auszug zur Jahresmitte — die Grundlage für die Abrechnung.'
+                ? ownerControls
+                  ? 'Dieses Konto enthält noch kein Objekt. Laden Sie das Demo-Szenario: ein Gebäude, drei Einheiten, ein Auszug zur Jahresmitte — die Grundlage für die Abrechnung.'
+                  : 'Ihnen ist kein Objekt zugewiesen.'
                 : 'Die Übersicht konnte nicht geladen werden. Läuft die API (uv run lokara-api)?'}
             </CardDescription>
           </CardHeader>
@@ -52,12 +60,12 @@ export function Dashboard({ accountId }: { accountId: string }) {
                 Bitte API und Datenbank prüfen, dann erneut versuchen.
               </StatusNote>
             ) : null}
-            <div>
+            {ownerControls ? <div>
               <Button onClick={() => loadDemo.mutate()} disabled={loadDemo.isPending}>
                 {loadDemo.isPending ? 'Wird geladen…' : 'Demo-Szenario laden'}
               </Button>
-            </div>
-            {loadDemo.isError ? (
+            </div> : null}
+            {ownerControls && loadDemo.isError ? (
               <StatusNote kind="danger" label="Laden fehlgeschlagen.">
                 Bitte erneut versuchen.
               </StatusNote>
@@ -114,7 +122,7 @@ export function Dashboard({ accountId }: { accountId: string }) {
             </Button>
           </CardContent>
         </Card>
-        <ResetDemoCard />
+        {ownerControls ? <ResetDemoCard /> : null}
       </div>
     </PageFrame>
   );

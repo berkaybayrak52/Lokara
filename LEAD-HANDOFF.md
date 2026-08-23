@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — Slice B review-complete; Block-(c) follow-up pending
+# LEAD-HANDOFF.md — M5 complete; no push
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. The dated material below is preserved as historical evidence. This current
@@ -6,6 +6,12 @@ update overrides its pre-review and pre-transcription status claims.
 
 ## Current update — 23.08.2026
 
+- M5 is complete on the uncommitted `slice/m5-account-switcher` branch: `/` auto-enters a sole
+  owner/employee context and otherwise presents live `/me` contexts as URL links; the shell offers
+  the same multi-context switcher. TAX_ADVISOR gets only the German preparation state, and EMPLOYEE
+  has no building-create/demo controls. The focused API/RLS suite (68 tests), full gate (1,012
+  Python and 41 web tests) and statement/UI review are green. No migration, API contract, tax route,
+  renter portal, PDF change, commit, merge or push is included.
 - M5's bootstrap foundation was locally merged into `main` as `1300db1`; no push occurred. It adds
   only subject-scoped bootstrap contexts and the `0014` bounded identity read, not the M5 UI remainder.
 - M5's backend role and assigned-building guard was locally merged into `main` as `99ac47e`; no push
