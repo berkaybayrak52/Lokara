@@ -14,6 +14,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException
 from lokara_adapters import StubBankGateway
 from lokara_db import (
+    BankAccount,
     BankTransaction,
     Receivable,
     Statement,
@@ -233,6 +234,20 @@ def import_bank_transactions(
     slice; that is where a port dependency belongs.
     """
     require_owner(session)
+
+    # CLAUDE.md § 3.3: this URL carries two relationships, and both are verified.
+    # `require_owner` covers the account; this covers the bank account. The lookup
+    # runs under the RLS-scoped session, so a bank account belonging to another
+    # account is simply not there.
+    #
+    # The composite (bank_account_id, account_id) FK from migration 0017 already
+    # makes the cross-account row unrepresentable, so isolation never depended on
+    # this check — but without it the caller gets a 500 from an unhandled
+    # IntegrityError instead of a 404, and the endpoint has trusted a path
+    # parameter it never verified. Relying on the stub returning nothing for an
+    # unknown id is not a substitute: that is the stub's behaviour, not the port's.
+    if session.get(BankAccount, bank_account_id) is None:
+        raise HTTPException(status_code=404, detail="Bankkonto nicht gefunden")
 
     known = set(
         session.scalars(

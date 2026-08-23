@@ -339,6 +339,28 @@ class TestBankTransactionImport:
         assert second.json()["imported"] == 0
         assert second.json()["skipped_as_duplicate"] == 4
 
+    def test_a_bank_account_of_another_account_is_not_found(
+        self, live: tuple[TestClient, _Fixture]
+    ) -> None:
+        """CLAUDE.md § 3.3: the endpoint verifies **every** relationship its URL
+        carries, not just the account.
+
+        The outsider legitimately owns their own account, so `require_owner` passes.
+        `bank_acc_demo` belongs to the demo account. Without an explicit check the
+        composite FK still blocks the write — isolation is not the thing at risk —
+        but the caller gets a 500 from an unhandled IntegrityError instead of a 404,
+        and the endpoint has trusted a path parameter it never verified. That it
+        looks harmless today is an accident of the stub returning nothing for an
+        unknown id; the real AISP adapter will not.
+        """
+        client, _ = live
+        response = client.post(
+            f"/a/{OUTSIDER_ACCOUNT_ID}/bank-accounts/{BANK_ACCOUNT}/transactions/import",
+            headers=_token(OUTSIDER_PERSON_ID),
+            json={"window_from": "2025-01-01", "window_to": "2026-01-01"},
+        )
+        assert response.status_code == 404, response.text
+
     def test_a_debit_keeps_its_negative_sign_through_the_boundary(
         self, live: tuple[TestClient, _Fixture]
     ) -> None:
