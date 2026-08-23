@@ -68,6 +68,20 @@ class ConsumptionValue:
 
 
 @dataclass(frozen=True)
+class TenancyIneligibilityPeriod:
+    """A confirmed period in which a tenancy has no operating-cost agreement.
+
+    This is deliberately a tenancy fact, rather than a catalogue fact.  The
+    unit's ordinary key weight remains in the object denominator; the renter
+    receives a visible zero line and the residual stays with the owner.
+    """
+
+    tenancy_id: str
+    period: Period
+    cost_id: str | None = None
+
+
+@dataclass(frozen=True)
 class CostItem:
     cost_id: str
     label: str
@@ -87,6 +101,7 @@ class NkInput:
     costs: tuple[CostItem, ...]
     person_counts: tuple[PersonCountPeriod, ...] = field(default=())
     consumptions: tuple[ConsumptionValue, ...] = field(default=())
+    ineligible_tenancy_periods: tuple[TenancyIneligibilityPeriod, ...] = field(default=())
 
 
 @dataclass(frozen=True)

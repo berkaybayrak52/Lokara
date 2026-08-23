@@ -147,6 +147,90 @@ class TestDemoReset:
         summary = client.get("/demo/summary", headers=headers).json()
         assert len(summary["tenancies"]) == 3
 
+    def test_reset_removes_a_stray_tenancy_graph_but_retains_page02_evidence(
+        self, client: TestClient
+    ) -> None:
+        """Immutable demo costs stay; a separate rehearsal tenancy does not."""
+        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        base = f"/a/{DEMO_ACCOUNT_ID}"
+        before = client.get(f"{base}/buildings/bld_demo_muster12/costs", headers=headers)
+        assert before.status_code == 200
+        evidence_ids = [cost["id"] for cost in before.json()["costs"]]
+        assert "cost_demo_garbage" in evidence_ids
+
+        building = client.post(
+            f"{base}/buildings",
+            headers=headers,
+            json={
+                "name": "Resetkette 9",
+                "street": "Resetweg 9",
+                "postalCode": "60313",
+                "city": "Frankfurt am Main",
+            },
+        )
+        assert building.status_code == 201
+        unit = client.post(
+            f"{base}/buildings/{building.json()['id']}/units",
+            headers=headers,
+            json={"label": "Wohnung Reset", "areaSqmX100": 5000},
+        )
+        assert unit.status_code == 201
+        tenancy = client.post(
+            f"{base}/units/{unit.json()['id']}/tenancies",
+            headers=headers,
+            json={
+                "renterName": "Reset Mieter",
+                "validFrom": "2025-01-01",
+                "validTo": None,
+                "baseRentCents": 70000,
+                "advancePaymentCents": 12000,
+            },
+        )
+        assert tenancy.status_code == 201
+        agreement = client.post(
+            f"{base}/tenancies/{tenancy.json()['id']}/operating-cost-agreements",
+            headers=headers,
+            json={
+                "allocationAgreed": True,
+                "mehrbelastungClause": False,
+                "namedOtherCosts": [],
+                "contractualKeys": {},
+                "validFrom": "2025-01-01",
+                "validTo": None,
+            },
+        )
+        assert agreement.status_code == 201
+        cost = client.post(
+            f"{base}/buildings/{building.json()['id']}/costs",
+            headers=headers,
+            json={
+                "label": "Resetkosten",
+                "catalogueId": "gebaeudereinigung",
+                "amountCents": 10000,
+                "periodFrom": "2025-01-01",
+                "periodTo": "2026-01-01",
+            },
+        )
+        assert cost.status_code == 201
+
+        assert client.post("/demo/reset", headers=headers).status_code == 200
+
+        buildings = client.get(f"{base}/buildings", headers=headers).json()["buildings"]
+        assert [row["name"] for row in buildings] == ["Musterstraße 12"]
+        after = client.get(f"{base}/buildings/bld_demo_muster12/costs", headers=headers)
+        assert after.status_code == 200
+        assert [cost["id"] for cost in after.json()["costs"]] == evidence_ids
+        engine = create_db_engine(DbSettings().direct_url)
+        try:
+            with Session(engine) as session:
+                retired = session.execute(
+                    text("SELECT voided_at FROM cost_entry WHERE id = :id"),
+                    {"id": cost.json()["id"]},
+                ).scalar_one()
+                assert retired is not None
+        finally:
+            engine.dispose()
+
     def test_reset_leaves_the_callers_own_access_intact(self, client: TestClient) -> None:
         """It must not wipe the Account/Membership it runs under — doing so
         would 403 the very session that pressed the button."""

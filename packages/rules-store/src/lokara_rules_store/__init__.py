@@ -38,3 +38,18 @@ __all__ = [
     "format_rechtsstand",
     "get_rule",
 ]
+from .betrkv_catalogue import (
+    CataloguePosition,
+    ClassificationResult,
+    ContractFacts,
+    classify_position,
+    resolve_rule,
+)
+
+__all__ = [
+    "CataloguePosition",
+    "ClassificationResult",
+    "ContractFacts",
+    "classify_position",
+    "resolve_rule",
+]

@@ -52,7 +52,11 @@ def _building_summary(building: Building) -> BuildingSummary:
 @router.get("/buildings")
 def list_buildings(account_id: str, session: PathAccountSession) -> BuildingListResponse:
     del account_id  # scoping happened in the dependency (RLS + membership)
-    buildings = session.scalars(select(Building).order_by(Building.created_at, Building.id)).all()
+    buildings = session.scalars(
+        select(Building)
+        .where(Building.archived_at.is_(None))
+        .order_by(Building.created_at, Building.id)
+    ).all()
     return BuildingListResponse(buildings=[_building_summary(b) for b in buildings])
 
 
@@ -74,7 +78,9 @@ def create_building(
 
 
 def _get_building(session: PathAccountSession, building_id: str) -> Building:
-    building = session.get(Building, building_id)
+    building = session.scalar(
+        select(Building).where(Building.id == building_id, Building.archived_at.is_(None))
+    )
     if building is None:  # unknown OR invisible under RLS — same answer
         raise HTTPException(status_code=404, detail="Building not found")
     return building

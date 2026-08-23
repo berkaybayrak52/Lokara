@@ -1,8 +1,8 @@
 """Day-weighted NK allocation over an Abrechnungszeitraum.
 
 Weights are built from the temporal rows (never scalars); any day a unit is
-not RENTED lands on the landlord side (vacancy/self-use); largest-remainder
-rounding reconciles every cost to the input to the cent.
+not RENTED stays in the denominator as vacancy/self-use. Renter lines round
+half-up individually; the one unweighted owner residual reconciles each cost.
 
 Line ordering is part of the contract: units in input order; within a unit,
 renter segments chronological, then one aggregated landlord line. Ordering is
@@ -10,8 +10,9 @@ deterministic because largest-remainder ties break toward the lowest index.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from itertools import pairwise
 
 from lokara_domain import (
     ZERO_CENTS,
@@ -19,10 +20,11 @@ from lokara_domain import (
     MeasurementUnit,
     Occupancy,
     OccupancyOverlapError,
+    Period,
     Segment,
     build_unit_segments,
     cents,
-    distribute_cents,
+    distribute_cents_owner_residual,
     overlap_days,
 )
 
@@ -34,6 +36,7 @@ from .inputs import (
     NkInputError,
     NkResult,
     ShareLine,
+    TenancyIneligibilityPeriod,
     UnitBasis,
 )
 
@@ -47,13 +50,18 @@ class _Party:
 
 def calculate_nk_statement(nk_input: NkInput) -> NkResult:
     window_from, window_to = _billing_window(nk_input)
+    _validate_ineligibility_periods(nk_input.ineligible_tenancy_periods)
     consumption_unit = _resolve_consumption_unit(nk_input.consumptions)
 
     lines: list[ShareLine] = []
     for cost in nk_input.costs:
         parties = _parties_for_cost(cost, nk_input, window_from, window_to)
-        weights = [p.weight for p in parties]
-        if not weights or sum(weights) == 0:
+        renter_parties = [party for party in parties if party.tenancy_id is not None]
+        owner_weight = sum(
+            (party.weight for party in parties if party.tenancy_id is None), Decimal(0)
+        )
+        weights = [party.weight for party in renter_parties]
+        if not weights or sum(weights, Decimal(0)) + owner_weight == 0:
             # 08-F12 / docs/08: "A zero consumption denominator gives renters 0
             # and leaves the cost with the owner; it never silently changes to
             # an area key." Refusing the cost was wrong in both directions: it
@@ -68,19 +76,21 @@ def calculate_nk_statement(nk_input: NkInput) -> NkResult:
                     weight=party.weight,
                     amount=ZERO_CENTS,
                 )
-                for party in parties
+                for party in renter_parties
             )
             lines.append(
                 ShareLine(
                     cost_id=cost.cost_id,
                     unit_id=None,
                     tenancy_id=None,
-                    weight=Decimal(0),
+                    weight=owner_weight,
                     amount=cost.amount,
                 )
             )
             continue
-        amounts = distribute_cents(cost.amount, weights)
+        amounts, owner_amount = distribute_cents_owner_residual(
+            cost.amount, weights, owner_weight=owner_weight
+        )
         lines.extend(
             ShareLine(
                 cost_id=cost.cost_id,
@@ -89,9 +99,18 @@ def calculate_nk_statement(nk_input: NkInput) -> NkResult:
                 weight=party.weight,
                 amount=amount,
             )
-            for party, amount in zip(parties, amounts, strict=True)
+            for party, amount in zip(renter_parties, amounts, strict=True)
         )
-        assert sum(a for a in amounts) == cost.amount  # reconciliation, per cost
+        lines.append(
+            ShareLine(
+                cost_id=cost.cost_id,
+                unit_id=None,
+                tenancy_id=None,
+                weight=owner_weight,
+                amount=owner_amount,
+            )
+        )
+        assert sum(a for a in amounts) + owner_amount == cost.amount  # reconciliation, per cost
 
     total = cents(sum(int(line.amount) for line in lines))
     return NkResult(lines=tuple(lines), total=total, consumption_unit=consumption_unit)
@@ -194,7 +213,15 @@ def _unit_value_parties(
             # Einheiten·Tage. Only here is the applied key known, so this is
             # where docs/08 "Reference totals" de-scaling happens — once.
             raise overlap.rescaled(_display_key_value(cost, key_value)) from overlap
-        parties.extend(_segment_parties(unit.unit_id, segments, key_value))
+        parties.extend(
+            _segment_parties(
+                unit.unit_id,
+                segments,
+                key_value,
+                nk_input.ineligible_tenancy_periods,
+                cost.cost_id,
+            )
+        )
     return parties
 
 
@@ -214,7 +241,13 @@ _KEY_DISPLAY_DIVISORS: dict[AllocationKey, Decimal] = {
 }
 
 
-def _segment_parties(unit_id: str, segments: tuple[Segment, ...], key_value: int) -> list[_Party]:
+def _segment_parties(
+    unit_id: str,
+    segments: tuple[Segment, ...],
+    key_value: int,
+    ineligible_periods: tuple[TenancyIneligibilityPeriod, ...] = (),
+    cost_id: str | None = None,
+) -> list[_Party]:
     """Renter lines chronological (consecutive same-tenancy segments merged),
     then one aggregated landlord line for the unit's vacancy/self-use days."""
     parties: list[_Party] = []
@@ -223,15 +256,20 @@ def _segment_parties(unit_id: str, segments: tuple[Segment, ...], key_value: int
         if segment.tenancy_id is None:
             landlord_days += segment.days
             continue
-        weight = Decimal(key_value * segment.days)
+        ineligible_days = _ineligible_days(segment.tenancy_id, segment, ineligible_periods, cost_id)
+        eligible_days = segment.days - ineligible_days
+        # The renter remains a printed party even where every day is
+        # ineligible.  Their ordinary days enter the owner denominator below.
+        weight = Decimal(key_value * eligible_days)
         last = parties[-1] if parties else None
         if last is not None and last.tenancy_id == segment.tenancy_id:
             parties[-1] = _Party(unit_id, segment.tenancy_id, last.weight + weight)
         else:
             parties.append(_Party(unit_id, segment.tenancy_id, weight))
+        landlord_days += ineligible_days
     if landlord_days > 0:
         parties.append(_Party(unit_id, None, Decimal(key_value * landlord_days)))
-    return [p for p in parties if p.weight > 0]
+    return parties
 
 
 def _persons_parties(
@@ -257,9 +295,25 @@ def _persons_parties(
             raise NkInputError(
                 f"Cost {cost.cost_id}: person count references unknown tenancy {row.tenancy_id}"
             )
-        parties.append(
-            _Party(unit_by_tenancy[row.tenancy_id], row.tenancy_id, Decimal(row.count * days))
+        ineligible_days = _ineligible_days_for_period(
+            row.tenancy_id,
+            row.period,
+            window_from,
+            window_to,
+            nk_input.ineligible_tenancy_periods,
+            cost.cost_id,
         )
+        parties.append(
+            _Party(
+                unit_by_tenancy[row.tenancy_id],
+                row.tenancy_id,
+                Decimal(row.count * (days - ineligible_days)),
+            )
+        )
+        if ineligible_days:
+            parties.append(
+                _Party(unit_by_tenancy[row.tenancy_id], None, Decimal(row.count * ineligible_days))
+            )
     return parties
 
 
@@ -269,7 +323,32 @@ def _consumption_parties(cost: CostItem, nk_input: NkInput) -> list[_Party]:
     # A recorded zero is a reading, not a missing row. docs/08: "Every cost line
     # receives engine output" — a renter whose meter read 0 gets a rendered
     # 0,00 EUR share, never a row the document layer has to invent (08-F12).
-    return [_Party(row.unit_id, row.tenancy_id, row.value) for row in nk_input.consumptions]
+    # Meter values have no sub-period in the current normalized input.  A
+    # confirmed ineligible period therefore conservatively withholds that
+    # tenancy's recorded value for this cost; it is still retained as owner
+    # denominator weight and yields the required zero renter line.
+    return [
+        _Party(
+            row.unit_id,
+            row.tenancy_id,
+            Decimal(0)
+            if row.tenancy_id is not None
+            and any(
+                p.tenancy_id == row.tenancy_id and (p.cost_id is None or p.cost_id == cost.cost_id)
+                for p in nk_input.ineligible_tenancy_periods
+            )
+            else row.value,
+        )
+        for row in nk_input.consumptions
+    ] + [
+        _Party(row.unit_id, None, row.value)
+        for row in nk_input.consumptions
+        if row.tenancy_id is not None
+        and any(
+            p.tenancy_id == row.tenancy_id and (p.cost_id is None or p.cost_id == cost.cost_id)
+            for p in nk_input.ineligible_tenancy_periods
+        )
+    ]
 
 
 def _direct_parties(
@@ -290,7 +369,13 @@ def _direct_parties(
         segments = build_unit_segments(
             cost.direct_unit_id, nk_input.occupancies, window_from, window_to
         )
-        return _segment_parties(cost.direct_unit_id, segments, key_value=1)
+        return _segment_parties(
+            cost.direct_unit_id,
+            segments,
+            key_value=1,
+            ineligible_periods=nk_input.ineligible_tenancy_periods,
+            cost_id=cost.cost_id,
+        )
     raise NkInputError(f"Cost {cost.cost_id}: DIRECT requires a target unit or tenancy")
 
 
@@ -300,3 +385,49 @@ def _unit_by_tenancy(occupancies: tuple[Occupancy, ...]) -> dict[str, str]:
         if occupancy.tenancy_id is not None and occupancy.tenancy_id not in mapping:
             mapping[occupancy.tenancy_id] = occupancy.unit_id
     return mapping
+
+
+def _ineligible_days(
+    tenancy_id: str,
+    segment: Segment,
+    periods: tuple[TenancyIneligibilityPeriod, ...],
+    cost_id: str | None,
+) -> int:
+    return sum(
+        overlap_days(row.period, segment.start, segment.start + timedelta(days=segment.days))
+        for row in periods
+        if row.tenancy_id == tenancy_id and (row.cost_id is None or row.cost_id == cost_id)
+    )
+
+
+def _ineligible_days_for_period(
+    tenancy_id: str,
+    period: Period,
+    window_from: date,
+    window_to: date,
+    periods: tuple[TenancyIneligibilityPeriod, ...],
+    cost_id: str | None,
+) -> int:
+    start = max(period.valid_from, window_from)
+    end = min(period.valid_to or window_to, window_to)
+    if end <= start:
+        return 0
+    return sum(
+        overlap_days(row.period, start, end)
+        for row in periods
+        if row.tenancy_id == tenancy_id and (row.cost_id is None or row.cost_id == cost_id)
+    )
+
+
+def _validate_ineligibility_periods(periods: tuple[TenancyIneligibilityPeriod, ...]) -> None:
+    by_tenancy: dict[tuple[str, str | None], list[Period]] = {}
+    for row in periods:
+        if row.period.valid_to is None:
+            raise NkInputError("Ineligible tenancy periods must be bounded")
+        by_tenancy.setdefault((row.tenancy_id, row.cost_id), []).append(row.period)
+    for (tenancy_id, _cost_id), tenancy_periods in by_tenancy.items():
+        ordered = sorted(tenancy_periods, key=lambda period: period.valid_from)
+        for earlier, later in pairwise(ordered):
+            assert earlier.valid_to is not None
+            if later.valid_from < earlier.valid_to:
+                raise NkInputError(f"Ineligible tenancy periods overlap for {tenancy_id}")

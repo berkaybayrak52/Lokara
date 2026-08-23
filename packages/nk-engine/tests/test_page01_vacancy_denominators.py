@@ -429,8 +429,9 @@ class TestF23WholePeriodVacancyStaysInTheDenominators:
         assert sum(line.weight for line in lines_of(vacant, "cost-tax")) == sum(
             line.weight for line in lines_of(fully_let, "cost-tax")
         )
-        # And WE-02 keeps a line of its own rather than disappearing from the run.
-        assert any(line.unit_id == "we-02" for line in lines_of(vacant, "cost-tax"))
+        # Vacancy stays in the single owner residual's denominator; it is not
+        # a separate owner party line for WE-02.
+        assert landlord_weight(vacant, "cost-tax") == Decimal(27_010 * 100)
 
     def test_the_vacant_unit_days_stay_in_the_unit_day_denominator(self) -> None:
         """`docs/02` § 5, Units row — the same rule on the `ANZ_WE` key.
@@ -557,11 +558,17 @@ class TestConsumptionAddsNothingForAVacantUnit:
         assert landlord_weight(with_zero_row, "cost-water") == Decimal(0)
         assert landlord_amount(with_zero_row, "cost-water") == 0
         assert any(
-            line.unit_id == "we-02" and line.tenancy_id is None
+            line.unit_id is None and line.tenancy_id is None
             for line in lines_of(with_zero_row, "cost-water")
         )
-        assert [int(line.amount) for line in lines_of(with_zero_row, "cost-water")][:2] == [
-            int(line.amount) for line in lines_of(without_row, "cost-water")
+        assert [
+            int(line.amount)
+            for line in lines_of(with_zero_row, "cost-water")
+            if line.tenancy_id is not None
+        ] == [
+            int(line.amount)
+            for line in lines_of(without_row, "cost-water")
+            if line.tenancy_id is not None
         ]
 
     def test_an_invented_landlord_consumption_would_change_every_renter_share(self) -> None:

@@ -300,8 +300,8 @@ class TestHeatingStatementFromRealReadings:
         assert [line["amountCents"] for line in garbage["lines"]] == [
             60000,
             17852,
-            18148,
             24000,
+            18148,
         ]
 
     def test_heating_costs_carry_no_umlageschluessel(self, client: TestClient) -> None:

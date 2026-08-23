@@ -7,7 +7,7 @@ Three properties define this router, and all three are deliberate:
    confirms — same validation, same integer cents, same append-only allocation
    key. An OCR miss can therefore never reach a statement without a human
    having looked at it.
-2. **It suggests no cost type.** The extracted ``cost_category`` becomes the
+2. **It suggests no legal cost type.** The extracted ``cost_category`` becomes the
    free-text label the manual form already takes. Mapping a category to a
    BetrKV type (and to that type's default Umlageschlüssel) needs the cost-type
    catalogue, which is a **pending spec** (docs/08) — guessing it here would
@@ -27,7 +27,7 @@ from lokara_adapters import (
     StubVisionGateway,
     VisionGateway,
 )
-from lokara_db import CostEntry
+from lokara_db import Building, CostEntry
 from lokara_domain import AllocationKey, cents, format_eur
 from sqlalchemy import select
 
@@ -151,6 +151,15 @@ def _duplicate(
     )
 
 
+def _get_building(session: PathAccountSession, building_id: str) -> Building:
+    building = session.scalar(
+        select(Building).where(Building.id == building_id, Building.archived_at.is_(None))
+    )
+    if building is None:  # unknown, archived, or invisible under RLS
+        raise HTTPException(status_code=404, detail="Building not found")
+    return building
+
+
 def _read_upload(file: UploadFile) -> SourceDocument:
     name = file.filename or "beleg"
     if not name.lower().endswith(ALLOWED_SUFFIXES):
@@ -182,6 +191,7 @@ def extract_invoice(
     below can only ever see this account's costs.
     """
     del account_id  # scoping happened in the dependency
+    _get_building(session, building_id)
     document = _read_upload(file)
     gateway: VisionGateway = StubVisionGateway()
     extracted = gateway.extract_invoice(document)
@@ -192,6 +202,10 @@ def extract_invoice(
         document_confidence_percent=_percent(extracted.confidence),
         fields=_fields(extracted),
         prefill=ExtractionPrefill(
+            # The OCR category is not allowed to choose a legal catalogue row.
+            # ``sonstige`` makes the reviewer provide that confirmation in the
+            # ordinary form before the item can become allocable.
+            catalogue_id="sonstige",
             label=extracted.cost_category,
             amount_cents=extracted.total_amount,
             period_from=BILLING_START,

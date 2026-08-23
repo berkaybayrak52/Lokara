@@ -67,8 +67,8 @@ class TestCanonicalGarbageCostFixture:
         assert shares_of(result.lines, "cost-garbage") == [
             ("unit-a", "ten-a", 60000),  # 50 m² × 365 d = 18,250 → €600.00
             ("unit-b", "ten-b", 17852),  # 30 m² × 181 d = 5,430 → €178.52
-            ("unit-b", None, 18148),  # VACANT Jul–Dec → landlord, €181.48
             ("unit-c", "ten-c", 24000),  # 20 m² × 365 d = 7,300 → €240.00
+            (None, None, 18148),  # one owner residual, including vacancy, €181.48
         ]
         assert sum(int(line.amount) for line in result.lines) == 120000
         assert result.total == 120000
@@ -93,8 +93,8 @@ class TestCanonicalGarbageCostFixture:
         assert [line.weight for line in result.lines] == [
             Decimal(5000 * 365),
             Decimal(3000 * 181),
-            Decimal(3000 * 184),
             Decimal(2000 * 365),
+            Decimal(3000 * 184),  # owner denominator, not a party share
         ]
 
 
@@ -116,7 +116,10 @@ class TestDirectAssignment:
                 ),
             )
         )
-        assert shares_of(result.lines, "cost-repair") == [("unit-c", "ten-c", 50000)]
+        assert shares_of(result.lines, "cost-repair") == [
+            ("unit-c", "ten-c", 50000),
+            (None, None, 0),
+        ]
 
     def test_direct_to_a_unit_is_day_weighted_within_that_unit_only(self) -> None:
         # €500 to unit B: renter 181 d, landlord (vacancy) 184 d; no other unit pays.
@@ -138,7 +141,7 @@ class TestDirectAssignment:
         )
         assert shares_of(result.lines, "cost-b-only") == [
             ("unit-b", "ten-b", 24795),
-            ("unit-b", None, 25205),
+            (None, None, 25205),
         ]
         assert sum(int(line.amount) for line in result.lines) == 50000
 
@@ -171,6 +174,7 @@ class TestPersonsKey:
             ("unit-a", "ten-a", 16982),
             ("unit-a", "ten-a", 25895),
             ("unit-c", "ten-c", 17123),
+            (None, None, 0),
         ]
         assert sum(int(line.amount) for line in result.lines) == 60000
 
@@ -201,6 +205,7 @@ class TestConsumptionKey:
             ("unit-a", "ten-a", 40950),
             ("unit-b", "ten-b", 27225),
             ("unit-c", "ten-c", 21825),
+            (None, None, 0),
         ]
         assert sum(int(line.amount) for line in result.lines) == 90000
 
@@ -222,9 +227,10 @@ class TestUnitsKey:
                 ),
             )
         )
-        # Weights: 365 / 181 / 184 / 365 days (1 per unit per day).
+        # Renter shares round individually; the final owner residual keeps all
+        # vacancy weight in the denominator without becoming a party.
         lines = shares_of(result.lines, "cost-fee")
-        assert [w for (_, _, w) in lines] == [10000, 4959, 5041, 10000]
+        assert [w for (_, _, w) in lines] == [10000, 4959, 10000, 5041]
         assert sum(int(line.amount) for line in result.lines) == 30000
 
 
@@ -254,8 +260,8 @@ class TestMeaKey:
         assert shares_of(result.lines, "cost-weg") == [
             ("unit-a", "ten-a", 60000),
             ("unit-b", "ten-b", 17852),
-            ("unit-b", None, 18148),
             ("unit-c", "ten-c", 24000),
+            (None, None, 18148),
         ]
 
 
@@ -304,8 +310,8 @@ class TestPeriodLengthIndependence:
         assert shares_of(result.lines, "cost-garbage") == [
             ("unit-a", "ten-a", 60000),
             ("unit-b", "ten-b", 17901),
-            ("unit-b", None, 18099),
             ("unit-c", "ten-c", 24000),
+            (None, None, 18099),
         ]
 
     def test_eleven_month_window_across_the_year_boundary(self) -> None:
@@ -333,8 +339,8 @@ class TestPeriodLengthIndependence:
         assert [line.weight for line in result.lines] == [
             Decimal(5000 * 334),
             Decimal(3000 * 150),
-            Decimal(3000 * 184),
             Decimal(2000 * 334),
+            Decimal(3000 * 184),
         ]
         # €1,200.00 × weight / 3,340,000, then largest remainder:
         #   A       1,670,000/3,340,000 = 1/2 -> 600.000000 exact
@@ -346,8 +352,8 @@ class TestPeriodLengthIndependence:
         assert shares_of(result.lines, "cost-garbage") == [
             ("unit-a", "ten-a", 60000),
             ("unit-b", "ten-b", 16168),
-            ("unit-b", None, 19832),
             ("unit-c", "ten-c", 24000),
+            (None, None, 19832),
         ]
         assert sum(int(line.amount) for line in result.lines) == 120000
 

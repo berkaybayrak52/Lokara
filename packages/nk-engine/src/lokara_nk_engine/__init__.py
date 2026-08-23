@@ -14,6 +14,7 @@ from .inputs import (
     NkResult,
     PersonCountPeriod,
     ShareLine,
+    TenancyIneligibilityPeriod,
     UnitBasis,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "NkResult",
     "PersonCountPeriod",
     "ShareLine",
+    "TenancyIneligibilityPeriod",
     "UnitBasis",
     "calculate_nk_statement",
 ]

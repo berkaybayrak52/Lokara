@@ -128,14 +128,14 @@ class TestDemoStatement:
         assert [(line["amountCents"], line["isLandlord"]) for line in garbage["lines"]] == [
             (60000, False),
             (17852, False),
-            (18148, True),  # the vacancy share lands on the Vermieter
             (24000, False),
+            (18148, True),  # the owner residual is printed last
         ]
         assert [line["weightDisplay"] for line in garbage["lines"]] == [
             "18.250",
             "5.430",
-            "5.520",
             "7.300",
+            "5.520",
         ]
         assert body["nkTotalCents"] == 120000
         assert body["nkTotalCents"] == body["nkInputTotalCents"]  # reconciles

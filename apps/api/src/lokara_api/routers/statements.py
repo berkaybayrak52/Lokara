@@ -13,6 +13,7 @@ from lokara_nk_engine import (
     NkInput,
     NkInputError,
     PersonCountPeriod,
+    TenancyIneligibilityPeriod,
     UnitBasis,
     calculate_nk_statement,
 )
@@ -62,6 +63,12 @@ def calculate_nk(body: NkCalcRequest, _auth: RequireAuth) -> NkCalcResponse:
                 measurement_unit=v.measurement_unit,
             )
             for v in body.consumptions
+        ),
+        ineligible_tenancy_periods=tuple(
+            TenancyIneligibilityPeriod(
+                tenancy_id=row.tenancy_id, period=_period(row.period), cost_id=row.cost_id
+            )
+            for row in body.ineligible_tenancy_periods
         ),
     )
     try:

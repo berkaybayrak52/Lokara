@@ -471,7 +471,14 @@ class TestF11CreditsStaySeparateNegativeLines:
         """Green self-check of the fixture: the gross cost alone already allocates."""
         gross_only = self._result(with_credit=False)
         weights = [line.weight for line in lines_of(gross_only, "cost-waste")]
-        assert weights == [Decimal(1_095), Decimal(424), Decimal(122), Decimal(365), Decimal(62)]
+        assert weights == [
+            Decimal(1_095),
+            Decimal(424),
+            Decimal(122),
+            Decimal(365),
+            Decimal(62),
+            Decimal(0),  # the mandatory owner residual is not a new denominator party
+        ]
         assert sum(weights) == Decimal(2_068)  # F22 person_days_with
         # ...and at that denominator the party at 365 Personen·Tage already
         # reaches the golden's gross figure; only the credit line is missing.

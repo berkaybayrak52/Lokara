@@ -28,6 +28,7 @@ from lokara_db import (
     AllocationKeyAssignment,
     Building,
     BuildingAssignment,
+    ConfirmedCostClassification,
     CostEntry,
     DbSettings,
     HeatingCostEntry,
@@ -38,6 +39,7 @@ from lokara_db import (
     Membership,
     Meter,
     MeterReading,
+    OperatingCostAgreement,
     Person,
     PersonCount,
     Renter,
@@ -109,6 +111,8 @@ class _Seed:
         self.assignment_a = new_id()
         self.cost_a = new_id()
         self.key_assignment_a = new_id()
+        self.agreement_a = new_id()
+        self.classification_a = new_id()
         self.meter_a = new_id()
         self.reading_a = new_id()
         self.heating_cost_a = new_id()
@@ -226,6 +230,37 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
             )
         )
         session.add(
+            OperatingCostAgreement(
+                id=ids.agreement_a,
+                account_id=ids.account_a,
+                tenancy_id=ids.tenancy_a,
+                allocation_agreed=True,
+                mehrbelastung_clause=False,
+                valid_from=date(2025, 1, 1),
+                valid_to=None,
+            )
+        )
+        session.add(
+            ConfirmedCostClassification(
+                id=ids.classification_a,
+                account_id=ids.account_a,
+                cost_entry_id=ids.cost_a,
+                allocation_key_assignment_id=ids.key_assignment_a,
+                catalogue_id="muellbeseitigung",
+                rule_source="BetrKV / Page 02",
+                rule_rechtsstand="Rechtsstand 07/2026",
+                source_amount_cents=120000,
+                allocable_cents=120000,
+                non_allocable_cents=0,
+                labour_cents=None,
+                key=AllocationKey.AREA,
+                key_source="test",
+                findings=["verify-before-production"],
+                special_rule_evidence={},
+                production_blocked=True,
+            )
+        )
+        session.add(
             HeatingCostEntry(
                 id=ids.heating_cost_a,
                 account_id=ids.account_a,
@@ -280,53 +315,10 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 source=ReadingSource.MDL,
             )
         )
+    # Confirmed classifications are append-only evidence. This live RLS suite
+    # retains its UUID-scoped fixture graph rather than deleting that evidence
+    # or its referenced cost/account parents.
     yield ids
-    with Session(owner) as session, session.begin():
-        for model, row_id in (
-            # MDL first: positions hang off statements, statements off
-            # `building_b` — which this same tuple drops a few lines down.
-            (MdlStatementPosition, ids.cross_statement_mdl_position_b),
-            (MdlStatementPosition, ids.cross_tenancy_mdl_position_b),
-            (MdlStatementPosition, ids.leaked_mdl_position_b),
-            (MdlStatementPosition, ids.mdl_position_a),
-            (MdlStatement, ids.cross_building_mdl_statement_b),
-            (MdlStatement, ids.leaked_mdl_statement_b),
-            (MdlStatement, ids.own_mdl_statement_b),
-            (MdlStatement, ids.mdl_statement_a),
-            (Tenancy, ids.own_tenancy_b),
-            (Unit, ids.own_unit_b),
-            # Rows TestCrossAccountForeignKeys leaks while the composite FKs are
-            # missing; no-ops once the database rejects those inserts.
-            (Meter, ids.leaked_meter_b),
-            (Unit, ids.leaked_unit_b),
-            (BuildingAssignment, ids.leaked_assignment_b),
-            (Membership, ids.membership_b),
-            (Building, ids.building_b),
-            (MeterReading, ids.reading_a),
-            (Meter, ids.meter_a),
-            (HeatingCostEntry, ids.heating_cost_a),
-            (AllocationKeyAssignment, ids.key_assignment_a),
-            (CostEntry, ids.cost_a),
-            (Statement, ids.statement_a),
-            (BuildingAssignment, ids.assignment_a),
-            # FK order: party/person_count → tenancy → unit, before
-            # renter/building can go.
-            (PersonCount, ids.cross_tenancy_person_count_b),
-            (PersonCount, ids.leaked_person_count_b),
-            (PersonCount, ids.person_count_a),
-            (TenancyParty, ids.tenancy_party_a),
-            (Tenancy, ids.tenancy_a),
-            (Unit, ids.unit_a),
-            (Renter, ids.renter_a),
-            (Building, ids.building_a),
-            (Membership, ids.membership_a),
-            (Person, ids.person_a),
-            (Account, ids.account_a),
-            (Account, ids.account_b),
-        ):
-            obj = session.get(model, row_id)
-            if obj is not None:
-                session.delete(obj)
 
 
 class TestRuntimeRole:
@@ -363,6 +355,8 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(BuildingAssignment)).all() == []
             assert session.scalars(select(CostEntry)).all() == []
             assert session.scalars(select(AllocationKeyAssignment)).all() == []
+            assert session.scalars(select(OperatingCostAgreement)).all() == []
+            assert session.scalars(select(ConfirmedCostClassification)).all() == []
             assert session.scalars(select(Meter)).all() == []
             assert session.scalars(select(MeterReading)).all() == []
             assert session.scalars(select(HeatingCostEntry)).all() == []
@@ -383,6 +377,10 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(CostEntry.id)).all() == [seed.cost_a]
             assert session.scalars(select(AllocationKeyAssignment.id)).all() == [
                 seed.key_assignment_a
+            ]
+            assert session.scalars(select(OperatingCostAgreement.id)).all() == [seed.agreement_a]
+            assert session.scalars(select(ConfirmedCostClassification.id)).all() == [
+                seed.classification_a
             ]
             assert session.scalars(select(Meter.id)).all() == [seed.meter_a]
             assert session.scalars(select(MeterReading.id)).all() == [seed.reading_a]
@@ -560,6 +558,70 @@ def membership_b(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[str]:
             obj = session.get(model, row_id)
             if obj is not None:
                 session.delete(obj)
+
+
+class TestPage02AppendOnlyAndForeignKeys:
+    def test_classification_rejects_direct_update_and_delete(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """Human confirmation is evidence: corrections append, never rewrite."""
+        _, app = engines
+        for sql in (
+            "UPDATE confirmed_cost_classification SET allocable_cents = 1 WHERE id = :id",
+            "DELETE FROM confirmed_cost_classification WHERE id = :id",
+        ):
+            with (
+                pytest.raises(IntegrityError, match="append-only"),
+                account_scoped_session(app, seed.account_a) as session,
+            ):
+                session.execute(text(sql), {"id": seed.classification_a})
+
+    def test_page02_parents_cannot_cross_accounts(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """Both Page-02 tables need composite FKs as well as their RLS policy."""
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="operating_cost_agreement_tenancy_id_fkey"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                OperatingCostAgreement(
+                    id=new_id(),
+                    account_id=seed.account_b,
+                    tenancy_id=seed.tenancy_a,
+                    allocation_agreed=True,
+                    mehrbelastung_clause=True,
+                    valid_from=date(2025, 1, 1),
+                    valid_to=None,
+                )
+            )
+            session.flush()
+        with (
+            pytest.raises(IntegrityError, match="confirmed_cost_classification_cost_entry_id_fkey"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                ConfirmedCostClassification(
+                    id=new_id(),
+                    account_id=seed.account_b,
+                    cost_entry_id=seed.cost_a,
+                    allocation_key_assignment_id=seed.key_assignment_a,
+                    catalogue_id="muellbeseitigung",
+                    rule_source="test",
+                    rule_rechtsstand="Rechtsstand 07/2026",
+                    source_amount_cents=100,
+                    allocable_cents=100,
+                    non_allocable_cents=0,
+                    labour_cents=None,
+                    key=AllocationKey.AREA,
+                    key_source="test",
+                    findings=[],
+                    special_rule_evidence={},
+                    production_blocked=True,
+                )
+            )
+            session.flush()
 
 
 class TestCrossAccountForeignKeys:

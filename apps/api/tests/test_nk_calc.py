@@ -53,8 +53,8 @@ class TestNkCalc:
         ] == [
             ("unit-a", "ten-a", 60000),
             ("unit-b", "ten-b", 17852),
-            ("unit-b", None, 18148),  # vacancy Jul–Dec falls on the landlord
             ("unit-c", "ten-c", 24000),
+            (None, None, 18148),  # one owner residual includes vacancy
         ]
         assert body["totalCents"] == 120000
         assert body["totalEur"] == f"1.200,00{NBSP}€"
