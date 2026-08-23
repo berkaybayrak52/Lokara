@@ -1547,9 +1547,13 @@ class Receivable(Base):
         _scoped_fk("receivable", "renter_id", "renter"),
         _scoped_fk("receivable", "tenancy_id", "tenancy"),
         _scoped_pair("receivable"),
+        # Rent only. An `nk_nachzahlung` is a settled Saldo with no rent, garage
+        # or advance component, and parking it in `nk_advance_cents` to satisfy the
+        # arithmetic would feed Page 01 an advance that was never paid as one
+        # (docs/15 § 5.2). Migration 0018 carries the full reasoning.
         CheckConstraint(
-            "base_rent_cents + nk_advance_cents + heating_advance_cents + garage_cents"
-            " = expected_cents",
+            "category <> 'rent' OR (base_rent_cents + nk_advance_cents"
+            " + heating_advance_cents + garage_cents = expected_cents)",
             name="ck_receivable_components_sum",
         ),
         CheckConstraint(

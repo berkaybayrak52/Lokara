@@ -27,6 +27,7 @@ from .models import (
     Account,
     AdvancePaymentPeriod,
     AllocationKeyAssignment,
+    BankAccount,
     Building,
     ConfirmedCostClassification,
     CostEntry,
@@ -47,6 +48,9 @@ from .settings import DbSettings
 
 DEMO_ACCOUNT_ID = "acc_demo_lokara"
 DEMO_PERSON_ID = "per_demo_owner"
+# The id StubBankGateway serves. Without a connected bank account row the
+# M6-C2 import has no valid FK target, so the demo cannot exercise it.
+DEMO_BANK_ACCOUNT_ID = "bank_acc_demo"
 
 _UNITS = (
     ("unit_demo_a", "Wohnung A (EG links)", 5000),
@@ -227,6 +231,16 @@ def seed_demo(session: Session) -> None:
                 area_sqm_x100=area,
             )
         )
+    session.merge(
+        BankAccount(
+            id=DEMO_BANK_ACCOUNT_ID,
+            account_id=DEMO_ACCOUNT_ID,
+            provider="finapi-stub",
+            provider_account_id="demo-mietkonto",
+            normalized_iban="DE02701500000000594937",
+            display_name="Mietkonto Musterstraße 12",
+        )
+    )
     for renter_id, legal_name in _RENTERS:
         session.merge(Renter(id=renter_id, account_id=DEMO_ACCOUNT_ID, legal_name=legal_name))
     for tenancy_id, unit_id, renter_id, valid_from, valid_to, rent, advance in _TENANCIES:
