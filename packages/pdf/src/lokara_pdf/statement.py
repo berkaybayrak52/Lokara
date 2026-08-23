@@ -277,6 +277,16 @@ def _heating_section(data: StatementData) -> str:
         f'<td class="num">{escape(format_eur(owner.total))}</td>'
         "</tr>"
     )
+    # Block (c) is audit context for the printed owner residual, not a further
+    # allocation.  The carried engine figure is shown only when non-zero and
+    # deliberately has no additional cost, weight, quota, or total columns.
+    if int(owner.rounding_difference) != 0:
+        rows.append(
+            "<tr>"
+            '<td colspan="5">davon Rundungsdifferenz</td>'
+            f'<td class="num">{escape(format_eur(owner.rounding_difference))}</td>'
+            "</tr>"
+        )
 
     co2_block = ""
     if heating.co2 is not None:
