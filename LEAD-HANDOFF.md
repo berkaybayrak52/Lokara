@@ -1,21 +1,43 @@
-# LEAD-HANDOFF.md — M6-C merged through C1; M6-C2 is the open work
+# LEAD-HANDOFF.md — M6-C2 complete and unmerged; M6-C3 is the open work
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting.
 
 ## Current state — 23.08.2026
 
-- `main` is at `8306b68` "merge: complete M6-C1 bank-matching engine". Two slices merged this
-  session: `slice/m6-workflow-correction` (`cc2f758`) and `slice/m6-c1-matching-engine`
-  (`8306b68`). Both slice branches are fully contained in `main` and have no unmerged work.
-- Local `main` is **15 commits ahead of `origin/main`** (`a748729`, the M5 merge). Nothing has been
-  pushed since M5. Do not push without Emir's explicit go-ahead.
-- `Antwort-an-Emir_04.md` stays untracked at repository root by Emir's decision. Keep it out of
-  every commit.
-- `scripts/gate.sh full` is green: 1077 Python tests, 43 web tests, `mypy --strict` clean, engine
-  purity clean, handoff clean.
-- `stash@{0}` ("m6c1-superseded-by-a203755") is fully superseded by the merged engine and can be
-  dropped. `stash@{1}` is an older M6-A rebase checkpoint; it was left alone.
+- `main` is at `e755b9c`, level with `origin/main` — Emir pushed it at 16:34. The working branch
+  is `slice/m6-c2a-bank-schema`, carrying M6-C2 in seven commits: `f1731f6` (schema + `0017`),
+  `a729bf9` (§ 3.1 adapter), `5af7897` (endpoints + `F12` + `0018`), `b0ff5af`/`6241f8d` (docs),
+  `043e70a` (URL-relationship fix) and `56b4c61` (the boundary-audit response + `0019`).
+- `Antwort-an-Emir_04.md` stays untracked at repository root by Emir's decision.
+- `scripts/gate.sh full` is green: 1119 Python tests, 43 web tests, `mypy --strict` clean, RLS 38
+  tenant tables `WITH CHECK` + cross-account-write tested, FK isolation 63 edges, engine purity
+  clean. `gate.sh demo` green; fingerprint `88eb8434eda65f8d7ff82826fc837a58` (149269 bytes).
+- The local database was rebuilt from empty twice on Emir's authorization. The second rebuild was
+  needed because the boundary auditor proved two findings with **committed** probe rows in
+  append-only tables, which then blocked the migration that forbids them. Worth fixing in the
+  agent's brief: prove a destructive finding inside a rolled-back transaction.
+
+## The boundary audit — read this before trusting M6-C2's shape
+
+Run 23.08.2026 over `e755b9c..043e70a`. **Six HIGH findings, all in code and fixtures written by
+one session.** `CLAUDE.md` § 10 wants the fixture author and the implementer to be different
+agents; that did not happen for any of M6-C2, and this is what it cost.
+
+`0017` got account isolation right and constrained nothing inside one account: an allocation could
+settle renter 2's debt from renter 1's cash, could exceed the cents its entry carried, and could
+carry a negative component that cancelled inside the sum check and then fed Page 01 a negative
+advance; a `REVERSAL` could be positive, name no original, or be filed twice; `iban_history` was
+rewritable and needed no confirmation; `bank_transaction` and `match_proposal` were documented
+immutable and were not. Migration `0019` fixes all of it, with fifteen new tests.
+
+**The gate that let it through has been strengthened.** `check_rls_coverage` accepted "the table is
+named in the isolation test", which an `import` line satisfies. It now requires a `WITH CHECK`
+clause and a real cross-account **write** assertion — and immediately found three more tables
+predating this slice (`cost_entry`, `heating_cost_entry`, `allocation_key_assignment`). Their
+assertions were added, not grandfathered. Verified the check fails when that coverage is removed.
+
+Findings recorded but deliberately not fixed are in `PLAN.md` § M6-C, and M6-C3 inherits them.
 
 ## The red window is now declarable
 
@@ -37,6 +59,31 @@ Two further fixes were measured and rejected — skipping the gate for read-only
 blocked zero times in 16 runs) and downgrading the reviewers to a cheaper model (~3 % of spend,
 against `statement-reviewer`'s ability to see the de-scaling defect class the suite cannot).
 `PLAN.md` § M6-C records both so they are not rediscovered.
+
+## M6-C2 — what shipped, and its two deliberate limits
+
+Nine account-scoped tables with migration `0017`, FORCEd RLS and composite `(id, account_id)`
+edges; the § 3.1 adapter rewrite with `BANKMATCH-F10` executed at the import boundary; and
+owner-scoped endpoints carrying the `F12` Page-01 handoff, which copies a finalized `RECEIVABLE`
+settlement into an `nk_nachzahlung` receivable at exact cents and refuses to run twice for one
+statement.
+
+1. **The Zahlungsfrist is asked for, never defaulted.** `docs/08` flags *Zahlungsfrist bei
+   Nachzahlung* `verify-before-production`, and the register is explicit: no statutory deadline
+   exists, the claim falls due on receipt of a proper statement, and the customary 30 days is a
+   `Konvention` anchored only in § 286 Abs. 3 BGB. The handoff therefore requires an explicit due
+   date and refuses without one. Do not add a default — it would make a flagged convention
+   Lokara's answer on every statement.
+2. **The § 4 stored-reference signal stays inert.** `receivable.stored_reference` exists so the
+   field has a home. Nothing writes it. Turning the signal on without Berkay's answer restores the
+   invented convention M6-C1 removed.
+
+Migration `0018` narrows the receivable component-sum check to `category = 'rent'`. `0017` applied
+it to every receivable, which is wrong for an `nk_nachzahlung`: it has no rent, garage or advance
+component, and § 5.2 says the paid NK-advance component feeds the annual actual-advance total Page
+01 consumes — so parking a Nachzahlung in `nk_advance_cents` to satisfy the arithmetic would
+double-count it as an advance that was never paid. Page 08 gives no split for `nk_nachzahlung`, so
+none was invented.
 
 ## M6-C1 — complete and merged
 
@@ -92,16 +139,17 @@ That is the separation working, and it is recorded here rather than buried.
 
 ## Next work, in order
 
-1. **M6-C2** — models, migration `0017`, RLS, the § 3.1 adapter rewrite and owner-scoped
-   endpoints. Add the stored-reference field to the `receivable` table there and only then make
-   the § 4 E2E signal live again.
-2. **M6-C3** — the German landlord *Zahlungen* screen, the three job entrypoints and the
-   `docs/15` implementation-status closure.
+1. **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed, the
+   three job entrypoints (bank sync, 180-day reconsent cleanup, deadline watchers, as service
+   functions behind a scheduler port), and the `docs/15` implementation-status closure. That
+   completes M6. It also inherits the recorded findings in `PLAN.md` § M6-C — the free-text
+   version columns, the polymorphic `source_id` with no composite FK, the adapter dataclass that
+   accepts a `float` outside its factory, and the unread PSD2 consent expiry.
+2. **Before M6-C3 writes any calculation**, note that the `docs/15` § 4 stored-reference signal is
+   still inert and still needs Berkay's answer. Turning it on without that answer restores the
+   invented convention M6-C1 removed.
 
-The workflow correction that `PLAN.md` § M6-C put before M6-C2 is **done and merged**:
-`.lokara-red` lets a slice declare the red window `CLAUDE.md` § 10 requires, announced and
-non-blocking at `gate.sh fast`, a hard failure at `full`/`demo`. `AGENTS.md` § 4 carries the
-brief and turn discipline and the measured baseline it is judged against.
+M6-C1, the workflow correction and M6-C2 are all merged.
 
 ## A correction worth keeping
 

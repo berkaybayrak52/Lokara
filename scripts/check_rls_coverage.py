@@ -14,9 +14,17 @@ Checks, for every table that carries an `account_id` column:
 1. `relrowsecurity`  — RLS is ENABLEd.
 2. `relforcerowsecurity` — RLS is FORCEd. Without FORCE the table owner bypasses every
    policy, which is exactly the connection a migration or a careless script uses.
-3. At least one policy exists on the table.
+3. At least one policy exists on the table, **with a WITH CHECK clause**. USING alone
+   filters reads; without WITH CHECK a scoped session can still INSERT a row stamped
+   with someone else's account_id.
 4. The table is named in `packages/db/tests/test_rls_isolation.py`, so the policy is
    not merely present but actually exercised.
+5. That mention is inside a test that actually attempts a **cross-account write**.
+   Checks 3 and 4 both passed for all nine M6-C2 tables while not one of them had a
+   write assertion — two of the four tests ran on the owner engine, which bypasses
+   RLS entirely, and an `import` line satisfied "named". The boundary audit of
+   23.08.2026 found six defects behind that gap. "Named" is weaker than "tested",
+   and this is the difference.
 
 Tables without `account_id` are out of scope **of this script**, not of isolation. `person`
 is the case that makes the distinction matter: it is global by design — one human, many
@@ -98,6 +106,29 @@ def _is_named(table: str, test_src: str) -> bool:
     )
 
 
+# The shapes a cross-account write assertion takes in the isolation suite: a scoped
+# session for another account, and an expectation that the write is refused. Both must
+# appear in the same test body as the table's model name.
+_WRITE_ASSERTION = re.compile(r"pytest\.raises\(")
+_SCOPED_SESSION = re.compile(r"account_scoped_session\(\s*app")
+
+
+def _write_tested(table: str, test_src: str) -> bool:
+    """Is this table named inside a test that attempts a refused cross-account write?
+
+    Split on `def ` at method indentation so each test body is considered on its own —
+    otherwise a `pytest.raises` anywhere in a 2,800-line file would vouch for every
+    table in it, which is the same too-loose matching this check exists to replace.
+    """
+    tokens = (table, _model_name(table))
+    for body in re.split(r"\n    def ", test_src):
+        if not any(re.search(rf"\b{re.escape(t)}\b", body) for t in tokens):
+            continue
+        if _WRITE_ASSERTION.search(body) and _SCOPED_SESSION.search(body):
+            return True
+    return False
+
+
 def _url() -> str:
     # The rest of the stack loads the root .env itself (alembic's env.py, ApiSettings via
     # pydantic-settings), so an operator who never exports DIRECT_URL still has a working
@@ -124,7 +155,9 @@ TENANT_TABLES = text(
     SELECT c.relname AS table_name,
            c.relrowsecurity AS enabled,
            c.relforcerowsecurity AS forced,
-           (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policies
+           (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policies,
+           (SELECT count(*) FROM pg_policy p
+             WHERE p.polrelid = c.oid AND p.polwithcheck IS NOT NULL) AS with_check_policies
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
@@ -170,7 +203,7 @@ def main() -> int:
 
     problems: list[str] = []
 
-    for name, enabled, forced, policies in tenant_rows:
+    for name, enabled, forced, policies, with_check_policies in tenant_rows:
         if not enabled:
             problems.append(f"{name}: has account_id but RLS is NOT ENABLEd — silent leak")
         if not forced:
@@ -179,10 +212,21 @@ def main() -> int:
             problems.append(
                 f"{name}: RLS enabled but no policy exists — denies everything or nothing"
             )
+        if policies and not with_check_policies:
+            problems.append(
+                f"{name}: policy has USING but no WITH CHECK — reads are filtered while a "
+                f"scoped session can still write a row stamped with another account"
+            )
         if test_src and not _is_named(name, test_src):
             problems.append(
                 f"{name}: not named in packages/db/tests/test_rls_isolation.py — "
                 f"the policy is untested"
+            )
+        elif test_src and not _write_tested(name, test_src):
+            problems.append(
+                f"{name}: named in the isolation test but never in a test that attempts a "
+                f"cross-account write — add one using account_scoped_session(app, other) "
+                f"plus pytest.raises, or the WITH CHECK side of the policy is unproven"
             )
 
     # A table with neither account_id nor an exemption is the more dangerous case:
@@ -203,7 +247,7 @@ def main() -> int:
 
     print(
         f"RLS coverage: clean — {len(tenant_rows)} tenant table(s) ENABLEd + FORCEd + "
-        f"policied + named in the isolation test; {len(EXEMPT)} exempt"
+        f"policied WITH CHECK + cross-account-write tested; {len(EXEMPT)} exempt"
     )
     return 0
 

@@ -321,26 +321,59 @@ categorize outgoing bank transactions/invoices, decide tax treatment or infer ob
 the movement. Page 05 creates costs/interest that this contract may consume. Object context comes
 from the confirmed renter/tenancy relationship. V1 is AIS-only; the renter pushes the payment.
 
-## 10. Current adapter/model drift and future M6 work
+## 10. Adapter and model status
 
-The existing `packages/adapters/src/lokara_adapters/bank.py` is a useful AIS boundary but not this
-contract:
+`packages/adapters/src/lokara_adapters/bank.py` implements this contract as of M6-C2. It carries
+the § 3.1 record in full — signed `amount_cents`, the three separate dates, the nullable
+counterpart/reference/provider fields and `is_potential_duplicate` — and
+`cents_from_provider_amount` does the Decimal ×100 `ROUND_HALF_UP` conversion, refusing `float` at
+the boundary. `BANKMATCH-F10` is executed there rather than in the engine, because the conversion
+is an import rule. `StubBankGateway` now honours its `bank_account_id`, so provider-ID uniqueness
+and account isolation are provable rather than asserted. finAPI itself stays stubbed (`docs/01` D7).
 
-- its immutable transaction has only ID, booking date, positive cents plus direction, non-null
-  counterpart name/IBAN/purpose;
-- it lacks `account_id`, bank-account identity, finAPI/value dates, nullable provider fields, E2E
-  and mandate references, transaction code/type and potential-duplicate metadata;
-- no real adapter yet proves Decimal float-to-cent conversion;
-- the stub ignores its `bank_account_id` argument and cannot prove account isolation or provider-ID
-  uniqueness.
+`packages/db/src/lokara_db/models.py` carries the nine account-scoped tables of § 6 with migration
+`0017`: `bank_account`, `bank_transaction`, `receivable`, `renter_matching_profile`,
+`iban_history`, `match_proposal`, `match_confirmation`, `payment_ledger_entry` and
+`payment_allocation`. RLS is ENABLEd and FORCEd on each with an isolation policy, every reference
+is a composite `(id, account_id)` edge, and the payment-ledger tables are append-only by trigger.
+`docs/02` § 6 holds the persisted shape.
 
-`packages/db/src/lokara_db/models.py` has no bank-transaction, renter-matching-profile, versioned
-IBAN, match-proposal, confirmation or payment-ledger model. M6-A/B do ship temporal advances and
-owner-only immutable Saldo settlements, but these are neither bank matching nor cash events. There
-is still no matching-ledger reversal or provider-backed Page-01 handoff.
+M6-C2 is complete. `apps/api/src/lokara_api/routers/payments.py` carries the owner-scoped
+endpoints — transaction import, the receivable and transaction lists, and the Page-01 handoff of
+`F12`, which copies a finalized `RECEIVABLE` `StatementSettlement` into an `nk_nachzahlung`
+receivable at exact cents and refuses to run twice for the same statement.
 
-These are remaining future M6 gaps only. This specification slice itself changes no adapter, model,
-migration, API, engine, UI or PDF source.
+Two limits ship with it, both deliberate:
+
+- **The Zahlungsfrist is asked for, never defaulted.** § 3.2 requires a `due_date`, but
+  `docs/08` marks *Zahlungsfrist bei Nachzahlung* `verify-before-production` and the register is
+  explicit — no statutory deadline exists, the claim falls due on receipt of a proper statement,
+  and the customary 30 days is a `Konvention`. The handoff therefore takes the date from the
+  caller and refuses without it rather than making that convention Lokara's answer.
+- **The § 4 stored-reference signal remains inert.** `receivable.stored_reference` exists as a
+  column so the field has a home; nothing writes it, and it stays that way until the source
+  question in `FRAGEN-an-Berkay-05.md` is answered.
+
+Migration `0018` limits the receivable component-sum check to `category = 'rent'`. An
+`nk_nachzahlung` has no rent, garage or advance component, and § 5.2 makes the reason concrete:
+the paid NK-advance component feeds the annual actual-advance total Page 01 consumes, so parking a
+Nachzahlung in `nk_advance_cents` to satisfy an arithmetic check would double-count it as an
+advance that was never paid as one. Page 08 gives no component split for `nk_nachzahlung`, so none
+is invented.
+
+Migration `0019` carries the invariants a boundary audit of 23.08.2026 found `0017` had left to
+the application: § 6's "a match never moves money between renters" is now four parent-scope
+triggers rather than a convention; an allocation cannot exceed the cents its ledger entry carried
+and its components cannot be negative; a `REVERSAL` must be negative, must name what it reverses
+and may be filed once, so `F06` can only net to zero; § 3.3's confirmation requirement for a
+learned IBAN is a constraint and the row is versioned rather than rewritable; and
+`bank_transaction`, `match_proposal` and `match_confirmation` are append-only, as § 4 and § 147 AO
+already said they were.
+
+M6-C3 remains open: the landlord *Zahlungen* screen, the three job entrypoints and this document's
+implementation-status closure. It also inherits the recorded shape gaps in `PLAN.md` § M6-C —
+`ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
+reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.
 
 ## 11. Approval and implementation boundary
 

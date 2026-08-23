@@ -41,6 +41,16 @@ EXPECTED_TABLES = {
     "meter",
     "meter_reading",
     "heating_cost_entry",
+    # M6-C2 bank matching (docs/15, docs/02 § 6, migration 0017).
+    "bank_account",
+    "bank_transaction",
+    "receivable",
+    "renter_matching_profile",
+    "iban_history",
+    "match_proposal",
+    "match_confirmation",
+    "payment_ledger_entry",
+    "payment_allocation",
 }
 
 

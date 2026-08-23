@@ -889,6 +889,15 @@ The 26 Page 01 rows are **11 `geprüft`** and **15 `verify-before-production`**.
 K9's rounding direction remains a flagged convention. Approved `docs/03` § 9.2 separately fixes
 the owner-residual destination as a model rule. Neither status erases the other.
 
+**Zahlungsfrist bei Nachzahlung — how the flag is honoured in code (M6-C2).** The register records
+no statutory deadline: the claim falls due on receipt of a proper statement, and the customary
+30 days is a `Konvention` anchored only in § 286 Abs. 3 BGB. The Page-01 handoff in
+`apps/api/src/lokara_api/routers/payments.py` therefore takes the due date from the caller and
+refuses the request without it, rather than defaulting the 30 days. A default would turn a flagged
+convention into Lokara's answer on every statement, silently and at scale, which is precisely what
+`verify-before-production` is meant to prevent. The flag stays open; only its consequence in code
+is now settled.
+
 ## Appendix C — historical source disposition
 
 `docs/03` Appendix D is the single historical correspondence-retirement ledger. Current statement

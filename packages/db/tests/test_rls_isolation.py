@@ -32,6 +32,8 @@ from lokara_db import (
     AdvanceReconciliation,
     AdvanceReconciliationAllocation,
     AllocationKeyAssignment,
+    BankAccount,
+    BankTransaction,
     Building,
     BuildingAssignment,
     ConfirmedCostClassification,
@@ -39,7 +41,10 @@ from lokara_db import (
     DbSettings,
     DeliveryAddress,
     HeatingCostEntry,
+    IbanHistory,
     Landlord,
+    MatchConfirmation,
+    MatchProposal,
     MdlBranch,
     MdlStatement,
     MdlStatementPosition,
@@ -47,10 +52,14 @@ from lokara_db import (
     Meter,
     MeterReading,
     OperatingCostAgreement,
+    PaymentAllocation,
     PaymentInstruction,
+    PaymentLedgerEntry,
     Person,
     PersonCount,
+    Receivable,
     Renter,
+    RenterMatchingProfile,
     Role,
     SelfUseKind,
     SelfUsePeriod,
@@ -378,6 +387,15 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(AdvanceAllocation)).all() == []
             assert session.scalars(select(AdvanceReconciliation)).all() == []
             assert session.scalars(select(AdvanceReconciliationAllocation)).all() == []
+            assert session.scalars(select(BankAccount)).all() == []
+            assert session.scalars(select(BankTransaction)).all() == []
+            assert session.scalars(select(Receivable)).all() == []
+            assert session.scalars(select(RenterMatchingProfile)).all() == []
+            assert session.scalars(select(IbanHistory)).all() == []
+            assert session.scalars(select(MatchProposal)).all() == []
+            assert session.scalars(select(MatchConfirmation)).all() == []
+            assert session.scalars(select(PaymentLedgerEntry)).all() == []
+            assert session.scalars(select(PaymentAllocation)).all() == []
             assert session.scalars(select(Account.id)).all() == [seed.account_b]
 
     def test_own_context_sees_own_rows(self, engines: tuple[Engine, Engine], seed: _Seed) -> None:
@@ -2105,3 +2123,817 @@ class TestMdlStatementIsolation:
                 )
             )
             session.flush()
+
+
+class _M6C2BankRows(NamedTuple):
+    bank_account_id: str
+    second_bank_account_id: str
+    transaction_id: str
+    receivable_id: str
+    profile_id: str
+    iban_history_id: str
+    proposal_id: str
+    confirmation_id: str
+    ledger_entry_id: str
+    allocation_id: str
+    provider_transaction_id: str
+
+
+@pytest.fixture(scope="module")
+def m6c2_bank_rows(engines: tuple[Engine, Engine], seed: _Seed) -> _M6C2BankRows:
+    """One complete A-side M6-C2 graph, so the RLS checks cannot pass vacuously.
+
+    Module-scoped and never torn down, for the same reason the seed graph is:
+    `payment_ledger_entry` and `payment_allocation` are append-only evidence, and
+    their trigger rejects the teardown DELETE exactly as it is supposed to. The ids
+    are UUIDs generated per run, so nothing collides across runs.
+    """
+    owner, _ = engines
+    ids = _M6C2BankRows(*(new_id() for _ in range(11)))
+    with Session(owner) as session, session.begin():
+        session.add_all(
+            [
+                BankAccount(
+                    id=ids.bank_account_id,
+                    account_id=seed.account_a,
+                    provider="finapi",
+                    provider_account_id=f"prov-{ids.bank_account_id}",
+                    normalized_iban="DE02120300000000202051",
+                    display_name="Mietkonto",
+                ),
+                BankAccount(
+                    id=ids.second_bank_account_id,
+                    account_id=seed.account_a,
+                    provider="finapi",
+                    provider_account_id=f"prov-{ids.second_bank_account_id}",
+                    normalized_iban="DE02500105170137075030",
+                    display_name="Zweitkonto",
+                ),
+                RenterMatchingProfile(
+                    id=ids.profile_id,
+                    account_id=seed.account_a,
+                    renter_id=seed.renter_a,
+                    payment_code="MIETE-A1",
+                    normalized_surname="beispiel",
+                ),
+                Receivable(
+                    id=ids.receivable_id,
+                    account_id=seed.account_a,
+                    renter_id=seed.renter_a,
+                    tenancy_id=seed.tenancy_a,
+                    source_type="RECURRING_RENT",
+                    source_id=None,
+                    period="2025-07",
+                    due_date=date(2025, 7, 3),
+                    expected_cents=108_000,
+                    open_cents=108_000,
+                    status="open",
+                    category="rent",
+                    base_rent_cents=85_000,
+                    nk_advance_cents=15_000,
+                    heating_advance_cents=8_000,
+                    garage_cents=0,
+                    open_costs_cents=0,
+                    open_interest_cents=0,
+                    open_principal_cents=108_000,
+                    stored_reference=None,
+                ),
+            ]
+        )
+        session.flush()
+        session.add(
+            BankTransaction(
+                id=ids.transaction_id,
+                account_id=seed.account_a,
+                bank_account_id=ids.bank_account_id,
+                provider_transaction_id=ids.provider_transaction_id,
+                amount_cents=108_000,
+                bank_booking_date=date(2025, 7, 2),
+                finapi_booking_date=date(2025, 7, 2),
+                value_date=date(2025, 7, 2),
+                counterpart_iban="DE02120300000000202051",
+                counterpart_name="Anna Beispiel",
+                purpose="Miete 2025-07",
+                end_to_end_reference="E2E-1",
+                counterpart_mandate_reference=None,
+                bank_transaction_code="SEPA-CT",
+                provider_type="CREDIT",
+                is_potential_duplicate=False,
+            )
+        )
+        session.flush()
+        session.add_all(
+            [
+                MatchProposal(
+                    id=ids.proposal_id,
+                    account_id=seed.account_a,
+                    bank_transaction_id=ids.transaction_id,
+                    receivable_id=ids.receivable_id,
+                    renter_id=seed.renter_a,
+                    signal_iban=60,
+                    signal_amount=30,
+                    signal_code_or_surname=15,
+                    signal_e2e=0,
+                    signal_period=5,
+                    confidence=100,
+                    decision="AUTO_MATCH",
+                    convention_version="docs/15 07/2026",
+                    reason_de="Eindeutige IBAN, exakter Betrag, Zahlungscode und Periode.",
+                ),
+            ]
+        )
+        session.flush()
+        session.add_all(
+            [
+                MatchConfirmation(
+                    id=ids.confirmation_id,
+                    account_id=seed.account_a,
+                    match_proposal_id=ids.proposal_id,
+                    outcome="CONFIRMED",
+                    confirmed_by=seed.person_a,
+                ),
+                PaymentLedgerEntry(
+                    id=ids.ledger_entry_id,
+                    account_id=seed.account_a,
+                    bank_transaction_id=ids.transaction_id,
+                    match_proposal_id=ids.proposal_id,
+                    kind="PAYMENT",
+                    amount_cents=108_000,
+                    credit_cents=0,
+                    ordering_version="§ 366/367 BGB",
+                    reverses_entry_id=None,
+                ),
+            ]
+        )
+        session.flush()
+        # docs/15 § 3.3 / F09: an IBAN is learned only *after* a confirmation exists,
+        # which is why this row is created here and cites `confirmation_id`.
+        session.add(
+            IbanHistory(
+                id=ids.iban_history_id,
+                account_id=seed.account_a,
+                renter_id=seed.renter_a,
+                normalized_iban="DE02120300000000202051",
+                valid_from=date(2025, 7, 2),
+                valid_to=None,
+                learned_from_transaction_id=ids.transaction_id,
+                confirmed_match_id=ids.confirmation_id,
+                confirmed_by=seed.person_a,
+            )
+        )
+        session.add(
+            PaymentAllocation(
+                id=ids.allocation_id,
+                account_id=seed.account_a,
+                ledger_entry_id=ids.ledger_entry_id,
+                receivable_id=ids.receivable_id,
+                costs_cents=0,
+                interest_cents=0,
+                principal_cents=108_000,
+                base_rent_cents=85_000,
+                nk_advance_cents=15_000,
+                heating_advance_cents=8_000,
+                garage_cents=0,
+                resulting_status="settled",
+            )
+        )
+    return ids
+
+
+class TestM6C2BankBoundaries:
+    """docs/15 § 6: every matching row is account-scoped, and money is append-only."""
+
+    def test_a_reads_its_bank_graph_and_b_sees_none_of_it(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            assert session.scalars(select(BankTransaction.id)).all() == [
+                m6c2_bank_rows.transaction_id
+            ]
+            assert session.scalars(select(Receivable.id)).all() == [m6c2_bank_rows.receivable_id]
+            assert session.scalars(select(RenterMatchingProfile.id)).all() == [
+                m6c2_bank_rows.profile_id
+            ]
+            assert session.scalars(select(IbanHistory.id)).all() == [m6c2_bank_rows.iban_history_id]
+            assert session.scalars(select(MatchProposal.id)).all() == [m6c2_bank_rows.proposal_id]
+            assert session.scalars(select(MatchConfirmation.id)).all() == [
+                m6c2_bank_rows.confirmation_id
+            ]
+            assert session.scalars(select(PaymentLedgerEntry.id)).all() == [
+                m6c2_bank_rows.ledger_entry_id
+            ]
+            assert session.scalars(select(PaymentAllocation.id)).all() == [
+                m6c2_bank_rows.allocation_id
+            ]
+            assert set(session.scalars(select(BankAccount.id)).all()) == {
+                m6c2_bank_rows.bank_account_id,
+                m6c2_bank_rows.second_bank_account_id,
+            }
+        with account_scoped_session(app, seed.account_b) as session:
+            assert session.scalars(select(BankAccount)).all() == []
+            assert session.scalars(select(BankTransaction)).all() == []
+            assert session.scalars(select(Receivable)).all() == []
+            assert session.scalars(select(RenterMatchingProfile)).all() == []
+            assert session.scalars(select(IbanHistory)).all() == []
+            assert session.scalars(select(MatchProposal)).all() == []
+            assert session.scalars(select(MatchConfirmation)).all() == []
+            assert session.scalars(select(PaymentLedgerEntry)).all() == []
+            assert session.scalars(select(PaymentAllocation)).all() == []
+
+    def test_provider_transaction_id_is_unique_per_bank_account_not_globally(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """docs/15 § 3.1: identity is (account_id, bank_account_id, provider_transaction_id).
+
+        Re-importing the same id on the same bank account is the dedupe case and must
+        be rejected. The same id on a *different* bank account is a different movement:
+        providers do not allocate ids globally, so a constraint on the id alone would
+        make one import collide with another's.
+        """
+        owner, _ = engines
+        with pytest.raises(IntegrityError), Session(owner) as session, session.begin():
+            session.add(
+                BankTransaction(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    bank_account_id=m6c2_bank_rows.bank_account_id,
+                    provider_transaction_id=m6c2_bank_rows.provider_transaction_id,
+                    amount_cents=108_000,
+                    bank_booking_date=date(2025, 7, 2),
+                    finapi_booking_date=date(2025, 7, 2),
+                    value_date=date(2025, 7, 2),
+                    is_potential_duplicate=False,
+                )
+            )
+
+        # Non-vacuous control: the identical provider id on the second bank account
+        # is accepted, so the rejection above is the composite key and not a blanket
+        # uniqueness on provider_transaction_id.
+        accepted = new_id()
+        with Session(owner) as session, session.begin():
+            session.add(
+                BankTransaction(
+                    id=accepted,
+                    account_id=seed.account_a,
+                    bank_account_id=m6c2_bank_rows.second_bank_account_id,
+                    provider_transaction_id=m6c2_bank_rows.provider_transaction_id,
+                    amount_cents=108_000,
+                    bank_booking_date=date(2025, 7, 2),
+                    finapi_booking_date=date(2025, 7, 2),
+                    value_date=date(2025, 7, 2),
+                    is_potential_duplicate=False,
+                )
+            )
+        # 0019 made bank_transaction append-only (§ 147 AO), so the accepted probe row
+        # is retained like the rest of this module's evidence graph. Its id and
+        # provider id are per-run UUIDs, so reruns never collide.
+
+    def test_payment_ledger_and_allocations_reject_update_and_delete(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """docs/15 § 5.3: the ledger is append-only. A reversal appends; it never edits."""
+        _, app = engines
+        for table, row_id in (
+            ("payment_ledger_entry", m6c2_bank_rows.ledger_entry_id),
+            ("payment_allocation", m6c2_bank_rows.allocation_id),
+        ):
+            for sql in (
+                f"UPDATE {table} SET id = id WHERE id = :id",
+                f"DELETE FROM {table} WHERE id = :id",
+            ):
+                with (
+                    account_scoped_session(app, seed.account_a) as session,
+                    pytest.raises(IntegrityError, match="append-only"),
+                ):
+                    session.execute(text(sql), {"id": row_id})
+
+    def test_cross_account_receivable_parent_is_rejected(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """The composite (receivable_id, account_id) edge makes a cross-account
+        allocation unrepresentable, not merely invisible: the insert below stamps
+        account B and points at account A's receivable."""
+        owner, _ = engines
+        with pytest.raises(IntegrityError), Session(owner) as session, session.begin():
+            session.add(
+                PaymentAllocation(
+                    id=new_id(),
+                    account_id=seed.account_b,
+                    ledger_entry_id=m6c2_bank_rows.ledger_entry_id,
+                    receivable_id=m6c2_bank_rows.receivable_id,
+                    costs_cents=0,
+                    interest_cents=0,
+                    principal_cents=1,
+                    base_rent_cents=1,
+                    nk_advance_cents=0,
+                    heating_advance_cents=0,
+                    garage_cents=0,
+                    resulting_status="partial",
+                )
+            )
+
+    def test_every_m6c2_table_rejects_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """The gap the boundary audit named: this slice asserted reads only.
+
+        Four earlier tests here proved B *reads* nothing and that the composite FKs
+        hold, but two of them ran on the owner engine, which bypasses RLS entirely.
+        Nothing exercised `WITH CHECK` on any of the nine tables — and
+        `check_rls_coverage.py` still passed, because it asks whether the class is
+        *named* in this file and an import line satisfies that. M6-A got this right
+        (`..._b_looks_up_nothing_and_cannot_write_it`); M6-C2 did not.
+
+        One insert per table, as `lokara_app` in B's context, stamped with A's
+        account. Every one must be refused by the policy, not by a foreign key.
+        """
+        _, app = engines
+        rows = m6c2_bank_rows
+        builders = (
+            lambda: BankAccount(
+                id=new_id(),
+                account_id=seed.account_a,
+                provider="finapi",
+                provider_account_id=new_id(),
+                normalized_iban="DE00",
+                display_name="Eingeschleust",
+            ),
+            lambda: BankTransaction(
+                id=new_id(),
+                account_id=seed.account_a,
+                bank_account_id=rows.bank_account_id,
+                provider_transaction_id=new_id(),
+                amount_cents=1,
+                bank_booking_date=date(2025, 7, 2),
+                finapi_booking_date=date(2025, 7, 2),
+                value_date=date(2025, 7, 2),
+                is_potential_duplicate=False,
+            ),
+            lambda: Receivable(
+                id=new_id(),
+                account_id=seed.account_a,
+                renter_id=seed.renter_a,
+                tenancy_id=seed.tenancy_a,
+                source_type="RECURRING_RENT",
+                source_id=None,
+                period="2025-08",
+                due_date=date(2025, 8, 3),
+                expected_cents=100,
+                open_cents=100,
+                status="open",
+                category="rent",
+                base_rent_cents=100,
+                nk_advance_cents=0,
+                heating_advance_cents=0,
+                garage_cents=0,
+                open_costs_cents=0,
+                open_interest_cents=0,
+                open_principal_cents=100,
+                stored_reference=None,
+            ),
+            lambda: RenterMatchingProfile(
+                id=new_id(),
+                account_id=seed.account_a,
+                renter_id=seed.renter_a,
+                payment_code=None,
+                normalized_surname="eingeschleust",
+            ),
+            lambda: IbanHistory(
+                id=new_id(),
+                account_id=seed.account_a,
+                renter_id=seed.renter_a,
+                normalized_iban="DE00",
+                valid_from=date(2025, 7, 2),
+                valid_to=None,
+                learned_from_transaction_id=None,
+                confirmed_match_id=rows.confirmation_id,
+                confirmed_by=seed.person_a,
+            ),
+            lambda: MatchProposal(
+                id=new_id(),
+                account_id=seed.account_a,
+                bank_transaction_id=rows.transaction_id,
+                receivable_id=rows.receivable_id,
+                renter_id=seed.renter_a,
+                signal_iban=0,
+                signal_amount=0,
+                signal_code_or_surname=0,
+                signal_e2e=0,
+                signal_period=0,
+                confidence=0,
+                decision="UNMATCHED",
+                convention_version="docs/15 07/2026",
+                reason_de="Eingeschleust.",
+            ),
+            lambda: MatchConfirmation(
+                id=new_id(),
+                account_id=seed.account_a,
+                match_proposal_id=rows.proposal_id,
+                outcome="REJECTED",
+                confirmed_by=seed.person_a,
+            ),
+            lambda: PaymentLedgerEntry(
+                id=new_id(),
+                account_id=seed.account_a,
+                bank_transaction_id=rows.transaction_id,
+                match_proposal_id=None,
+                kind="PAYMENT",
+                amount_cents=1,
+                credit_cents=0,
+                ordering_version="§ 366/367 BGB",
+                reverses_entry_id=None,
+            ),
+            lambda: PaymentAllocation(
+                id=new_id(),
+                account_id=seed.account_a,
+                ledger_entry_id=rows.ledger_entry_id,
+                receivable_id=rows.receivable_id,
+                costs_cents=0,
+                interest_cents=0,
+                principal_cents=1,
+                base_rent_cents=1,
+                nk_advance_cents=0,
+                heating_advance_cents=0,
+                garage_cents=0,
+                resulting_status="partial",
+            ),
+        )
+        for build in builders:
+            # `receivable` is refused one step earlier than the others: its 0019
+            # parent-scope trigger is a BEFORE trigger, and it runs before the RLS
+            # WITH CHECK is evaluated. In B's context the tenancy_party lookup inside
+            # that trigger is itself RLS-scoped and finds nothing, so the row dies on
+            # "renter is not a party to its tenancy". Still refused, one layer up —
+            # which is the defence in depth working, not a gap.
+            expected: tuple[type[Exception], ...] = (ProgrammingError, IntegrityError)
+            with (
+                pytest.raises(expected),
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.add(build())
+                session.flush()
+
+
+class TestPage02CrossAccountWrites:
+    """The write side of three policies that only ever had read coverage.
+
+    `check_rls_coverage.py` was strengthened on 23.08.2026 to require each tenant
+    table to appear in a test that actually attempts a refused cross-account write —
+    "named in the isolation test" turned out to be satisfied by an import line. It
+    immediately named these three, which predate M6-C2. Their policies were correct
+    all along; nothing proved it.
+    """
+
+    def test_cost_and_allocation_tables_reject_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        builders = (
+            lambda: CostEntry(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                label="Eingeschleust",
+                amount_cents=1,
+                period_from=date(2025, 1, 1),
+                period_to=date(2025, 12, 31),
+            ),
+            lambda: HeatingCostEntry(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                label="Eingeschleust",
+                amount_cents=1,
+                period_from=date(2025, 1, 1),
+                period_to=date(2025, 12, 31),
+            ),
+            lambda: AllocationKeyAssignment(
+                id=new_id(),
+                account_id=seed.account_a,
+                cost_entry_id=seed.cost_a,
+                key=AllocationKey.AREA,
+            ),
+        )
+        for build in builders:
+            with (
+                pytest.raises(ProgrammingError, match="row-level security"),
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.add(build())
+                session.flush()
+
+
+class TestM6C2MoneyInvariants:
+    """What the boundary audit found the schema was not enforcing (docs/15 §§ 5-6).
+
+    Account isolation was never the gap — RLS and the composite FKs hold. The gap is
+    everything *inside* one account: which parent a row may name, how much a payment
+    may settle, and what a reversal has to look like. M6-A already enforces the
+    equivalent rules (`enforce_advance_allocation_cap`,
+    `enforce_advance_payment_single_reversal`), so these are the same invariants one
+    ledger later.
+    """
+
+    def test_a_receivable_cannot_name_a_renter_who_is_not_a_party_to_its_tenancy(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """docs/15 § 6: a match never moves money between renters. A debt that cites
+        a lease the renter is not party to is where that starts."""
+        owner, _ = engines
+        stranger = new_id()
+        with Session(owner) as session, session.begin():
+            session.add(
+                Renter(id=stranger, account_id=seed.account_a, legal_name="Fremde Mieterin")
+            )
+        with (
+            pytest.raises(IntegrityError, match="tenancy"),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                Receivable(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    renter_id=stranger,
+                    tenancy_id=seed.tenancy_a,
+                    source_type="RECURRING_RENT",
+                    source_id=None,
+                    period="2025-09",
+                    due_date=date(2025, 9, 3),
+                    expected_cents=100,
+                    open_cents=100,
+                    status="open",
+                    category="rent",
+                    base_rent_cents=100,
+                    nk_advance_cents=0,
+                    heating_advance_cents=0,
+                    garage_cents=0,
+                    open_costs_cents=0,
+                    open_interest_cents=0,
+                    open_principal_cents=100,
+                    stored_reference=None,
+                )
+            )
+
+    def test_an_allocation_cannot_settle_more_than_its_entry_carried(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """The entry carried 108,000. A second allocation against it must not push the
+        settled total past that — otherwise a payment settles money that never arrived."""
+        owner, _ = engines
+        with (
+            pytest.raises(IntegrityError, match="allocation"),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                PaymentAllocation(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    ledger_entry_id=m6c2_bank_rows.ledger_entry_id,
+                    receivable_id=m6c2_bank_rows.receivable_id,
+                    costs_cents=0,
+                    interest_cents=0,
+                    principal_cents=500_000,
+                    base_rent_cents=500_000,
+                    nk_advance_cents=0,
+                    heating_advance_cents=0,
+                    garage_cents=0,
+                    resulting_status="settled",
+                )
+            )
+
+    def test_allocation_components_cannot_be_negative(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """A negative component cancels inside the sum check and passes it. § 5.2's
+        "the reconciled components must sum exactly to P" then means nothing, and the
+        negative NK-advance feeds Page 01's actual-advance total as a negative advance."""
+        owner, _ = engines
+        with (
+            pytest.raises(IntegrityError, match="negative"),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                PaymentAllocation(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    ledger_entry_id=m6c2_bank_rows.ledger_entry_id,
+                    receivable_id=m6c2_bank_rows.receivable_id,
+                    costs_cents=0,
+                    interest_cents=0,
+                    principal_cents=0,
+                    base_rent_cents=100_000,
+                    nk_advance_cents=-100_000,
+                    heating_advance_cents=0,
+                    garage_cents=0,
+                    resulting_status="partial",
+                )
+            )
+
+    def test_a_reversal_must_be_negative_and_must_name_what_it_reverses(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """docs/15 § 5.3 and F06: the ledger nets to zero. A positive REVERSAL, or one
+        that names no original, cannot do that."""
+        owner, _ = engines
+        for kwargs, match in (
+            ({"kind": "REVERSAL", "amount_cents": 108_000, "reverses_entry_id": None}, "reversal"),
+            ({"kind": "PAYMENT", "amount_cents": 1, "reverses_entry_id": None}, None),
+        ):
+            if match is None:
+                continue
+            with (
+                pytest.raises(IntegrityError, match=match),
+                Session(owner) as session,
+                session.begin(),
+            ):
+                session.add(
+                    PaymentLedgerEntry(
+                        id=new_id(),
+                        account_id=seed.account_a,
+                        bank_transaction_id=m6c2_bank_rows.transaction_id,
+                        match_proposal_id=None,
+                        credit_cents=0,
+                        ordering_version="§ 366/367 BGB",
+                        **kwargs,
+                    )
+                )
+
+    def test_one_payment_has_at_most_one_reversal(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """Two reversals of one payment reopen twice the debt against a renter who
+        paid once, and the ledger is append-only, so nothing can correct it after."""
+        owner, _ = engines
+        first = new_id()
+        with Session(owner) as session, session.begin():
+            session.add(
+                PaymentLedgerEntry(
+                    id=first,
+                    account_id=seed.account_a,
+                    bank_transaction_id=m6c2_bank_rows.transaction_id,
+                    match_proposal_id=None,
+                    kind="REVERSAL",
+                    amount_cents=-108_000,
+                    credit_cents=0,
+                    ordering_version="§ 366/367 BGB",
+                    reverses_entry_id=m6c2_bank_rows.ledger_entry_id,
+                )
+            )
+        with (
+            pytest.raises(IntegrityError),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                PaymentLedgerEntry(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    bank_transaction_id=m6c2_bank_rows.transaction_id,
+                    match_proposal_id=None,
+                    kind="REVERSAL",
+                    amount_cents=-108_000,
+                    credit_cents=0,
+                    ordering_version="§ 366/367 BGB",
+                    reverses_entry_id=m6c2_bank_rows.ledger_entry_id,
+                )
+            )
+
+    def test_a_learned_iban_cannot_exist_without_its_confirmation(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """docs/15 § 3.3 and F09: a non-null IBAN is learned only after a user confirms
+        a Review proposal. Without this the +60 unique-IBAN signal can be created by
+        anything that can insert."""
+        owner, _ = engines
+        with (
+            pytest.raises(IntegrityError, match="confirm"),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                IbanHistory(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    renter_id=seed.renter_a,
+                    normalized_iban="DE99999999999999999999",
+                    valid_from=date(2025, 7, 2),
+                    valid_to=None,
+                    learned_from_transaction_id=None,
+                    confirmed_match_id=None,
+                    confirmed_by=None,
+                )
+            )
+
+    def test_a_learned_iban_cannot_be_rewritten_or_deleted(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """CLAUDE.md § 3.2 names IBAN history in the immutable/versioned list. Flipping
+        one row redirects the unique-IBAN signal to another renter, so their next
+        payment Auto-Matches onto someone else's debt with no review step."""
+        _, app = engines
+        for sql in (
+            "UPDATE iban_history SET normalized_iban = 'DE00' WHERE id = :id",
+            "DELETE FROM iban_history WHERE id = :id",
+        ):
+            with (
+                account_scoped_session(app, seed.account_a) as session,
+                pytest.raises(IntegrityError, match="append-only"),
+            ):
+                session.execute(text(sql), {"id": m6c2_bank_rows.iban_history_id})
+
+    def test_closing_an_iban_period_is_the_one_permitted_update(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """Versioned, not frozen: a mapping ends by having its open period closed.
+        Everything else about the row stays put."""
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            session.execute(
+                text("UPDATE iban_history SET valid_to = :d WHERE id = :id"),
+                {"d": date(2026, 1, 1), "id": m6c2_bank_rows.iban_history_id},
+            )
+
+    def test_a_bank_transaction_and_a_proposal_cannot_be_rewritten(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """§ 147 AO: the provider fact and the reason a payment was auto-assigned must
+        be re-derivable years later. Both were freely mutable."""
+        _, app = engines
+        for sql, row_id in (
+            (
+                "UPDATE bank_transaction SET amount_cents = 999999 WHERE id = :id",
+                m6c2_bank_rows.transaction_id,
+            ),
+            (
+                "UPDATE match_proposal SET confidence = 100,"
+                " decision = 'AUTO_MATCH' WHERE id = :id",
+                m6c2_bank_rows.proposal_id,
+            ),
+        ):
+            with (
+                account_scoped_session(app, seed.account_a) as session,
+                pytest.raises(IntegrityError, match="append-only"),
+            ):
+                session.execute(text(sql), {"id": row_id})
+
+    def test_a_proposal_can_be_confirmed_only_once(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """M6-C3 will drive ledger entries off confirmations. One proposal confirmed
+        twice is one payment booked twice."""
+        owner, _ = engines
+        with (
+            pytest.raises(IntegrityError),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                MatchConfirmation(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    match_proposal_id=m6c2_bank_rows.proposal_id,
+                    outcome="REJECTED",
+                    confirmed_by=seed.person_a,
+                )
+            )
+
+    def test_a_settled_receivable_cannot_still_be_open(
+        self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows
+    ) -> None:
+        """§ 5.1 walks costs, then interest, then principal. With the projection
+        columns unconstrained, the settlement engine and the arrears guard read
+        different totals from the same row."""
+        owner, _ = engines
+        with (
+            pytest.raises(IntegrityError, match="settled"),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                Receivable(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    renter_id=seed.renter_a,
+                    tenancy_id=seed.tenancy_a,
+                    source_type="RECURRING_RENT",
+                    source_id=None,
+                    period="2025-10",
+                    due_date=date(2025, 10, 3),
+                    expected_cents=108_000,
+                    open_cents=0,
+                    status="settled",
+                    category="rent",
+                    base_rent_cents=108_000,
+                    nk_advance_cents=0,
+                    heating_advance_cents=0,
+                    garage_cents=0,
+                    open_costs_cents=50_000,
+                    open_interest_cents=0,
+                    open_principal_cents=108_000,
+                    stored_reference=None,
+                )
+            )

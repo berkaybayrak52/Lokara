@@ -1428,6 +1428,370 @@ class HeatingCostEntry(Base):
     )
 
 
+# ── Bank matching, receivables and the payment ledger (docs/15, M6-C2). ──
+#
+# The engine that consumes these lives in `packages/matching-engine` and is already
+# fixture-complete. This layer only stores what it reads and what it decided; no
+# scoring, ordering or settlement rule is re-expressed here.
+
+
+class BankAccount(Base):
+    """One connected landlord bank account behind the AIS adapter."""
+
+    __tablename__ = "bank_account"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    provider: Mapped[str]
+    provider_account_id: Mapped[str]
+    normalized_iban: Mapped[str]
+    display_name: Mapped[str]
+    consent_expires_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_pair("bank_account"),
+        UniqueConstraint(
+            "account_id", "provider", "provider_account_id", name="uq_bank_account_provider"
+        ),
+        Index("ix_bank_account_account", "account_id"),
+    )
+
+
+class BankTransaction(Base):
+    """docs/15 § 3.1: the immutable normalized provider movement.
+
+    `amount_cents` is signed — a negative amount is the reversal path (§ 5.3), a
+    positive one enters scoring, and zero is retained for import audit but ignored
+    by matching. `bank_booking_date`, **not** `finapi_booking_date`, decides whether
+    a receivable is due.
+
+    Two different mechanisms share the word "duplicate" and must not be merged:
+    `is_potential_duplicate` keeps the transaction and forces Review, while an exact
+    re-import of `provider_transaction_id` is deduplicated before scoring and creates
+    no second row at all. The unique constraint below is the second one.
+    """
+
+    __tablename__ = "bank_transaction"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    bank_account_id: Mapped[str]
+    provider_transaction_id: Mapped[str]
+    amount_cents: Mapped[int]
+    bank_booking_date: Mapped[date]
+    finapi_booking_date: Mapped[date]
+    value_date: Mapped[date]
+    counterpart_iban: Mapped[str | None]
+    counterpart_name: Mapped[str | None]
+    purpose: Mapped[str | None]
+    end_to_end_reference: Mapped[str | None]
+    counterpart_mandate_reference: Mapped[str | None]
+    bank_transaction_code: Mapped[str | None]
+    provider_type: Mapped[str | None]
+    is_potential_duplicate: Mapped[bool] = mapped_column(server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("bank_transaction", "bank_account_id", "bank_account"),
+        _scoped_pair("bank_transaction"),
+        # docs/15 § 6: a provider ID is unique only together with its account and
+        # bank-account identity. Providers do not allocate ids globally, so a
+        # constraint on the id alone would make one landlord's import collide
+        # with another's.
+        UniqueConstraint(
+            "account_id",
+            "bank_account_id",
+            "provider_transaction_id",
+            name="uq_bank_transaction_provider_identity",
+        ),
+        Index("ix_bank_transaction_account", "account_id"),
+        Index("ix_bank_transaction_booking", "account_id", "bank_booking_date"),
+    )
+
+
+class Receivable(Base):
+    """docs/15 § 3.2: one open debt of one renter.
+
+    The source calls its renter field `tenant_id`; CLAUDE.md § 7 normalizes that to
+    `renter_id`. The four nominal components sum to `expected_cents`.
+    """
+
+    __tablename__ = "receivable"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    renter_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    source_type: Mapped[str]
+    source_id: Mapped[str | None]
+    period: Mapped[str]
+    due_date: Mapped[date]
+    expected_cents: Mapped[int]
+    open_cents: Mapped[int]
+    status: Mapped[str]
+    category: Mapped[str]
+    base_rent_cents: Mapped[int]
+    nk_advance_cents: Mapped[int]
+    heating_advance_cents: Mapped[int]
+    garage_cents: Mapped[int]
+    open_costs_cents: Mapped[int] = mapped_column(server_default=text("0"))
+    open_interest_cents: Mapped[int] = mapped_column(server_default=text("0"))
+    open_principal_cents: Mapped[int] = mapped_column(server_default=text("0"))
+    # docs/15 § 4 awards 15 points when a transaction's E2E or mandate reference
+    # matches a "stored reference" that §§ 3.2-3.3 never define. The column exists
+    # so the field has a home the moment Berkay answers (FRAGEN-an-Berkay-05.md).
+    # Until then `_end_to_end_signal` returns 0 and nothing writes here: binding the
+    # signal to a guessed field is the invented convention M6-C1 removed.
+    stored_reference: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("receivable", "renter_id", "renter"),
+        _scoped_fk("receivable", "tenancy_id", "tenancy"),
+        _scoped_pair("receivable"),
+        # Rent only. An `nk_nachzahlung` is a settled Saldo with no rent, garage
+        # or advance component, and parking it in `nk_advance_cents` to satisfy the
+        # arithmetic would feed Page 01 an advance that was never paid as one
+        # (docs/15 § 5.2). Migration 0018 carries the full reasoning.
+        CheckConstraint(
+            "category <> 'rent' OR (base_rent_cents + nk_advance_cents"
+            " + heating_advance_cents + garage_cents = expected_cents)",
+            name="ck_receivable_components_sum",
+        ),
+        CheckConstraint(
+            "open_cents >= 0 AND open_cents <= expected_cents", name="ck_receivable_open_range"
+        ),
+        # Migration 0019. § 5.1 step 3 walks costs, then interest, then principal —
+        # with these unconstrained the settlement engine and the arrears guard read
+        # different totals from the same row.
+        CheckConstraint(
+            "open_costs_cents >= 0 AND open_interest_cents >= 0"
+            " AND open_principal_cents >= 0 AND open_principal_cents <= open_cents",
+            name="ck_receivable_open_components",
+        ),
+        CheckConstraint(
+            "(status = 'settled')"
+            " = (open_cents = 0 AND open_costs_cents = 0 AND open_interest_cents = 0)",
+            name="ck_receivable_settled_has_nothing_open",
+        ),
+        CheckConstraint("status IN ('open', 'partial', 'settled')", name="ck_receivable_status"),
+        CheckConstraint("category IN ('rent', 'nk_nachzahlung')", name="ck_receivable_category"),
+        Index("ix_receivable_account", "account_id"),
+        Index("ix_receivable_due", "account_id", "renter_id", "due_date"),
+    )
+
+
+class RenterMatchingProfile(Base):
+    """docs/15 § 3.3. `known_ibans` is derived from active IbanHistory rows and is
+    therefore not a column — a stored copy would be a second truth to keep in sync."""
+
+    __tablename__ = "renter_matching_profile"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    renter_id: Mapped[str]
+    payment_code: Mapped[str | None]
+    normalized_surname: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("renter_matching_profile", "renter_id", "renter"),
+        _scoped_pair("renter_matching_profile"),
+        UniqueConstraint("account_id", "renter_id", name="uq_renter_matching_profile_renter"),
+        Index("ix_renter_matching_profile_account", "account_id"),
+    )
+
+
+class IbanHistory(Base):
+    """docs/15 § 3.3: versioned, never overwritten (CLAUDE.md § 6).
+
+    A non-null IBAN is learned only after a user confirms a Review proposal; null is
+    never learned (`F09`).
+    """
+
+    __tablename__ = "iban_history"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    renter_id: Mapped[str]
+    normalized_iban: Mapped[str]
+    valid_from: Mapped[date]
+    valid_to: Mapped[date | None]
+    learned_from_transaction_id: Mapped[str | None]
+    confirmed_match_id: Mapped[str | None]
+    confirmed_by: Mapped[str | None]
+    confirmed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("iban_history", "renter_id", "renter"),
+        _scoped_fk("iban_history", "learned_from_transaction_id", "bank_transaction"),
+        _scoped_pair("iban_history"),
+        CheckConstraint("valid_to IS NULL OR valid_to >= valid_from", name="ck_iban_history_span"),
+        # Migration 0019, docs/15 § 3.3 and F09: a non-null IBAN is learned only after
+        # a user confirms a Review proposal. Without this the +60 unique-IBAN signal
+        # could be created by anything able to insert.
+        CheckConstraint(
+            "confirmed_match_id IS NOT NULL AND confirmed_by IS NOT NULL",
+            name="ck_iban_history_requires_confirmation",
+        ),
+        _scoped_fk("iban_history", "confirmed_match_id", "match_confirmation"),
+        Index("ix_iban_history_account", "account_id"),
+        Index("ix_iban_history_lookup", "account_id", "normalized_iban"),
+    )
+
+
+class MatchProposal(Base):
+    """docs/15 § 4: the stored proposal, including every component signal.
+
+    The signals are stored individually and not only as `confidence`, because a
+    confidence alone cannot be re-derived or audited later, and § 4's Review ranking
+    reads the components.
+    """
+
+    __tablename__ = "match_proposal"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    bank_transaction_id: Mapped[str]
+    receivable_id: Mapped[str | None]
+    renter_id: Mapped[str | None]
+    signal_iban: Mapped[int]
+    signal_amount: Mapped[int]
+    signal_code_or_surname: Mapped[int]
+    signal_e2e: Mapped[int]
+    signal_period: Mapped[int]
+    confidence: Mapped[int]
+    decision: Mapped[str]
+    convention_version: Mapped[str]
+    reason_de: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("match_proposal", "bank_transaction_id", "bank_transaction"),
+        _scoped_fk("match_proposal", "receivable_id", "receivable"),
+        _scoped_fk("match_proposal", "renter_id", "renter"),
+        _scoped_pair("match_proposal"),
+        CheckConstraint(
+            "decision IN ('AUTO_MATCH', 'NEEDS_REVIEW', 'UNMATCHED', 'DEDUPED')",
+            name="ck_match_proposal_decision",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 100", name="ck_match_proposal_confidence"
+        ),
+        Index("ix_match_proposal_account", "account_id"),
+        Index("ix_match_proposal_transaction", "account_id", "bank_transaction_id"),
+    )
+
+
+class MatchConfirmation(Base):
+    """docs/15 § 4: confirmation records the actor and time. It never rewrites the
+    proposal it confirms, which is why this is a separate row."""
+
+    __tablename__ = "match_confirmation"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    match_proposal_id: Mapped[str]
+    outcome: Mapped[str]
+    confirmed_by: Mapped[str]
+    confirmed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("match_confirmation", "match_proposal_id", "match_proposal"),
+        _scoped_pair("match_confirmation"),
+        CheckConstraint(
+            "outcome IN ('CONFIRMED', 'REJECTED', 'DUPLICATE')",
+            name="ck_match_confirmation_outcome",
+        ),
+        # Migration 0019: M6-C3 drives ledger entries off confirmations, so one
+        # proposal confirmed twice is one payment booked twice.
+        UniqueConstraint("account_id", "match_proposal_id", name="uq_match_confirmation_proposal"),
+        Index("ix_match_confirmation_account", "account_id"),
+    )
+
+
+class PaymentLedgerEntry(Base):
+    """docs/15 § 5.3: append-only. A reversal appends a compensating entry pointing
+    at the original through `reverses_entry_id`; nothing is ever edited or deleted.
+    The database trigger in migration 0017 is what actually enforces that."""
+
+    __tablename__ = "payment_ledger_entry"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    bank_transaction_id: Mapped[str]
+    match_proposal_id: Mapped[str | None]
+    kind: Mapped[str]
+    amount_cents: Mapped[int]
+    credit_cents: Mapped[int] = mapped_column(server_default=text("0"))
+    ordering_version: Mapped[str]
+    reverses_entry_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("payment_ledger_entry", "bank_transaction_id", "bank_transaction"),
+        _scoped_fk("payment_ledger_entry", "match_proposal_id", "match_proposal"),
+        _scoped_fk("payment_ledger_entry", "reverses_entry_id", "payment_ledger_entry"),
+        _scoped_pair("payment_ledger_entry"),
+        CheckConstraint("kind IN ('PAYMENT', 'REVERSAL')", name="ck_payment_ledger_kind"),
+        # Migration 0019, docs/15 § 5.3 and F06: the ledger nets to zero. A positive
+        # REVERSAL, or one naming no original, cannot do that — and the table is
+        # append-only, so nothing corrects it afterwards.
+        CheckConstraint(
+            "(kind = 'REVERSAL') = (reverses_entry_id IS NOT NULL)"
+            " AND (kind <> 'REVERSAL' OR amount_cents < 0)"
+            " AND (kind <> 'PAYMENT' OR amount_cents >= 0)",
+            name="ck_payment_ledger_reversal_shape",
+        ),
+        CheckConstraint("credit_cents >= 0", name="ck_payment_ledger_credit_positive"),
+        Index("ix_payment_ledger_account", "account_id"),
+        Index("ix_payment_ledger_transaction", "account_id", "bank_transaction_id"),
+    )
+
+
+class PaymentAllocation(Base):
+    """docs/15 §§ 5.1-5.2: what one ledger entry paid on one debt, split by
+    § 367 BGB order (costs, interest, principal) and then by nominal component."""
+
+    __tablename__ = "payment_allocation"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    ledger_entry_id: Mapped[str]
+    receivable_id: Mapped[str]
+    costs_cents: Mapped[int]
+    interest_cents: Mapped[int]
+    principal_cents: Mapped[int]
+    base_rent_cents: Mapped[int]
+    nk_advance_cents: Mapped[int]
+    heating_advance_cents: Mapped[int]
+    garage_cents: Mapped[int]
+    resulting_status: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("payment_allocation", "ledger_entry_id", "payment_ledger_entry"),
+        _scoped_fk("payment_allocation", "receivable_id", "receivable"),
+        _scoped_pair("payment_allocation"),
+        CheckConstraint(
+            "base_rent_cents + nk_advance_cents + heating_advance_cents + garage_cents"
+            " = principal_cents",
+            name="ck_payment_allocation_components_sum",
+        ),
+        CheckConstraint(
+            "resulting_status IN ('open', 'partial', 'settled')",
+            name="ck_payment_allocation_status",
+        ),
+        # Migration 0019. A negative component cancels inside the sum check above and
+        # passes it, which makes § 5.2's "must sum exactly to P" meaningless and feeds
+        # Page 01 a negative NK advance. The per-entry cap is a trigger, not a check,
+        # because it must see the entry's other allocations.
+        CheckConstraint(
+            "costs_cents >= 0 AND interest_cents >= 0 AND principal_cents >= 0"
+            " AND base_rent_cents >= 0 AND nk_advance_cents >= 0"
+            " AND heating_advance_cents >= 0 AND garage_cents >= 0",
+            name="ck_payment_allocation_no_negative_components",
+        ),
+        UniqueConstraint(
+            "ledger_entry_id", "receivable_id", name="uq_payment_allocation_entry_receivable"
+        ),
+        Index("ix_payment_allocation_account", "account_id"),
+        Index("ix_payment_allocation_receivable", "account_id", "receivable_id"),
+    )
+
+
 # Tables scoped by their own account_id column — the Alembic migration enables
 # FORCEd RLS on each of these plus `account`, which is scoped by its own id.
 # `building_assignment` joined this tuple with migration 0004: its scope used to be
@@ -1464,4 +1828,13 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "meter",
     "meter_reading",
     "heating_cost_entry",
+    "bank_account",
+    "bank_transaction",
+    "receivable",
+    "renter_matching_profile",
+    "iban_history",
+    "match_proposal",
+    "match_confirmation",
+    "payment_ledger_entry",
+    "payment_allocation",
 )

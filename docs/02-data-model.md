@@ -777,12 +777,38 @@ M6 owns the handoff in this order:
 4. The ledger, not the statement or receivable, feeds tax and deterministic exports through a
    year-versioned `TaxCategoryMapping`.
 
+### M6-C2 — bank matching, receivables and the payment ledger
+
+Approved `docs/15` owns the calculation contract; this section owns only the persisted shape.
+The engine in `packages/matching-engine` decides, and these tables store what it read and what
+it decided. Nine account-scoped tables, all with FORCEd RLS and composite `(id, account_id)`
+foreign keys (migration `0017`):
+
+| Record | Minimum contract |
+| --- | --- |
+| `BankAccount` | `id`, `account_id`, `provider`, `provider_account_id`, `normalized_iban`, `display_name`, nullable `consent_expires_at`. Unique per `(account_id, provider, provider_account_id)`. |
+| `BankTransaction` | `docs/15` § 3.1 in full: signed `amount_cents`, the three separate dates, nullable counterpart/reference/provider fields and `is_potential_duplicate`. Identity is `(account_id, bank_account_id, provider_transaction_id)` — **never the provider id alone**, because providers do not allocate ids globally. `bank_booking_date`, not `finapi_booking_date`, decides whether a receivable is due. |
+| `Receivable` | `docs/15` § 3.2. The four nominal components sum to `expected_cents` (database check). `0 ≤ open_cents ≤ expected_cents`. `category` is `rent` or `nk_nachzahlung`. Carries `stored_reference`, which is **unused** — see the note below. |
+| `RenterMatchingProfile` | `docs/15` § 3.3, one per `(account_id, renter_id)`. `known_ibans` is derived from active `IbanHistory` rows and is deliberately not a column: a stored copy would be a second truth to keep in sync. |
+| `IbanHistory` | `docs/15` § 3.3, temporal (`valid_from`/`valid_to`), never overwritten. A non-null IBAN is learned only after a user confirms a Review proposal; null is never learned. |
+| `MatchProposal` | `docs/15` § 4: every component signal stored individually, plus `confidence`, `decision`, `convention_version` and the German reason. The components are stored because a confidence alone cannot be re-derived or audited later, and the § 4 Review ranking reads them. |
+| `MatchConfirmation` | `docs/15` § 4: actor and time, as a separate row. Confirmation never rewrites the proposal it confirms. |
+| `PaymentLedgerEntry` | `docs/15` § 5.3, append-only by database trigger. A reversal appends a compensating entry linked through `reverses_entry_id`; nothing is edited or deleted. |
+| `PaymentAllocation` | `docs/15` §§ 5.1–5.2: what one entry paid on one debt, split by § 367 BGB order and then by nominal component (database check: the four components sum to `principal_cents`). Append-only by the same trigger. |
+
+**`Receivable.stored_reference` is a placeholder, not a contract.** `docs/15` § 4 awards 15 points
+when a transaction's E2E or mandate reference matches a "stored reference", but §§ 3.2–3.3 define
+no such field. The column exists so the field has a home the moment the source answers; nothing
+writes it, and `_end_to_end_signal` returns 0. The open question is in `FRAGEN-an-Berkay-05.md`.
+Binding the signal to a guessed field is the invented convention M6-C1 removed, and re-enabling it
+without the answer restores it.
+
 | Future record | Minimum contract and owner |
 | --- | --- |
 | `AdvancePaymentPeriod` | Shipped M6-A: account, tenancy, amount, effective dates and version/declaration evidence. |
 | `Receivable` | Shipped M6-B as `StatementSettlement`: account, finalized statement/version, tenancy, amount and immutable origin; it is not a cash event. |
-| Payment event/ledger entry | M6: payment date state, integer cents, direction, account, landlord/building/unit/renter dimensions as applicable, category state, source (`finAPI`, manual or invoice), receipt reference and version history. Missing date is red; missing category is yellow before tax export. |
-| Matching evidence | M6: normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
+| Payment event/ledger entry | Shipped M6-C2 as `PaymentLedgerEntry` + `PaymentAllocation` (append-only). Remaining M7 concerns: category state, integer cents, direction, account, landlord/building/unit/renter dimensions as applicable, category state, source (`finAPI`, manual or invoice), receipt reference and version history. Missing date is red; missing category is yellow before tax export. |
+| Matching evidence | Shipped M6-C2 as `BankTransaction`, `MatchProposal`, `MatchConfirmation` and `IbanHistory`: normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
 | `TaxCategoryMapping` | M7: tax-year category to Anlage-V line plus SKR03/SKR04, validity/source version and tax-adviser override provenance. All current lines/accounts remain blocked placeholders. |
 | Tax-adviser profile | M7: adviser/client number, chart, account length and fiscal-year start; write access is limited to these adviser-owned export parameters. |
 | Readiness result | M7: immutable ordered red/yellow findings, acknowledgements, input/mapping/profile versions and blocked/generated outcome. |
