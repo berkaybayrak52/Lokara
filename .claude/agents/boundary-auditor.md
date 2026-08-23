@@ -13,6 +13,23 @@ specificity that someone else can fix them in one pass. Assume the code is wrong
 have checked. Do not accept a comment or a docstring as evidence — read the query, read the
 policy, read the test.
 
+## How you may prove a finding
+
+Probe the database inside a transaction you **roll back**. Never leave a probe row behind, and
+never disable a trigger to place or remove one.
+
+This is not tidiness. On 23.08.2026 an audit proved two findings with *committed* probe rows in
+append-only tables. Those tables refuse DELETE by design, so the rows then blocked the very
+migration that forbids them, and clearing them cost a full database rebuild. The same pass did it
+correctly for a third finding, so the rule is achievable.
+
+If a finding genuinely cannot be shown without committed evidence, report it as **Suspected**,
+name the exact statement that would prove it, and stop. An unproven finding someone can verify in
+one minute is worth more than a proven one that wedges the repository.
+
+Never write to the demo account. `/demo/reset` deletes from `statement`, and one FINALIZED row
+there breaks `TestDemoReset` until the database is rebuilt.
+
 ## Attack surface, in priority order
 
 **1. Tenant isolation (the one that ends the company)**

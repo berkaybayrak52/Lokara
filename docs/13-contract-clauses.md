@@ -108,7 +108,7 @@ The complete Page-06 input inventory is:
 | `modernisierungskosten_wohnung` | integer cents | user input |
 | `staffel_schritte[]` | date plus absolute integer-cent amount | contract schedule |
 | `kleinrep_einzelgrenze`, `kleinrep_jahresgrenze` | integer cents | blocked rules-store conventions |
-| `rueckstand[]` | month, Soll cents, Ist cents | future payment ledger/open items; `docs/12` owns guard state |
+| `rueckstand[]` | month, Soll cents, Ist cents | shipped payment-ledger/open-item rows after future guard projection; `docs/12` owns guard state |
 | `mpb_ausnahme` | `keine`, `Vormiete`, `Neubau_ab_01.10.2014`, `umfassende_Modernisierung` | user self-declaration |
 | `mpb_erklaerung_ts` | timestamp | audit evidence |
 | `sepa_mandatsreferenz` | string, at most 35 characters | optional user input |

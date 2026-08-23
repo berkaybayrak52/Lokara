@@ -88,9 +88,11 @@ verification before customer documents are sent.
 Lokara consumes a licensed PSD2/AIS provider; it does not become an AISP. finAPI/Tink remain
 provider candidates behind the bank adapter. The current bank edge is a stub.
 
-The Page 08 matching contract is complete, approved and merged in `docs/15`. That approved doc and
-its oracle preserve `BANKMATCH-F03` as the two-part E12 duplicate case. No production bank matching,
-receivable or payment ledger exists.
+The Page 08 matching contract is complete, approved and merged in `docs/15`. Its oracle preserves
+`BANKMATCH-F03` as the two-part E12 duplicate case. M6-C1/M6-C2 ship the pure engine, normalized bank
+adapter, nine bank/receivable/matching/ledger tables and owner-scoped endpoints; M6-C3-0 hardens
+their database invariants. The real provider, matching service, jobs and landlord *Zahlungen*
+screen remain unshipped.
 
 ## D6 — Transactional email
 

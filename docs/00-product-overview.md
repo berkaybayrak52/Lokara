@@ -41,12 +41,13 @@ demo or sales copy may advertise that case as supported.
 
 The account model supports `SOLO` and `HAUSVERWALTUNG`, with roles on Membership rather than Account.
 The shipped demo uses one owner membership and one account. Employee role enforcement and account
-switching are shipped. Renter activation/portal, tax-adviser guest access, bank matching, tax export,
-contracts, billing and native apps remain future milestones in `PLAN.md`.
+switching are shipped. The pure bank-matching engine, bank/receivable/payment-ledger persistence,
+adapter and owner-scoped import/list/handoff endpoints are also shipped. Renter activation/portal,
+tax-adviser guest access, the landlord *Zahlungen* screen and matching jobs, tax export, contracts,
+billing and native apps remain future milestones in `PLAN.md`.
 
-Future product breadth includes the BetrKV catalogue, final tenant statements, UVI, a payment ledger,
-Anlage V/DATEV, guards/reminders and mobile clients. Those are roadmap dependencies, not shipped
-capabilities.
+Future product breadth includes renter delivery, UVI, Anlage V/DATEV, guards/reminders, the
+matching workflow/UI and mobile clients. Those are roadmap dependencies, not shipped capabilities.
 
 ## Competitive thesis
 

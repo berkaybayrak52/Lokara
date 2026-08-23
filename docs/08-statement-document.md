@@ -76,15 +76,17 @@ Scope limits that this does **not** move:
   the existing route is exactly the "render everything and hide rows" shape § 3 forbids.
 - **Slice C applies renter-side half-up rounding and one owner residual to NK.** Its applicable
   Page-02 authority remains production-blocking; heating uses the same rounding shape.
-- Everything in the next section stays with M6.
+- Remaining live-preview gaps stay separate from the shipped M6-B final archive described next.
 
 ### Specified Page 01 and shipped M6-A/M6-B archive output
 
 The complete Page 01 contract and exact `08-F01…F24` data-only oracle are **Specified and approved**.
 M6-A/M6-B ship confirmed actual advances, Saldo/Nachzahlung/Guthaben branches, immutable
 finalization, archived bytes/hashes, isolated rendered tenant archives and the formal-minimum #3
-carrier. Bank matching, ledger/cash events and renter delivery/portal remain open. These archives
-are owner-only technical records, not legal-production or renter delivery output.
+carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner endpoints, and
+M6-C3-0 verifies their database invariants. The matching service, jobs and landlord *Zahlungen*
+screen remain M6-C3; renter delivery/portal remains M10. These archives are owner-only technical
+records, not legal-production or renter delivery output.
 
 ### Future dependencies
 
@@ -231,13 +233,14 @@ selection, the D0 denominator, CONSUMPTION values and the audience projection) a
 about what the page prints for a share. The operator and the numerator derivation remain missing and
 stay with M6.
 
-### #4 is blocked on the M6 ledger, by decision
+### #4 technical implementation boundary
 
 Minimum #4 deducts **geleistete** Ist advances. `advance_payment_cents × months` is contractual Soll,
-fails for arrears, changes and partial periods, and is forbidden. The current bank stub does not
-separate rent from advances and no accepted payment allocation exists. M6 must supply actual
-allocations, temporal Soll periods, receivables and the immutable ledger handoff before the document
-may use `Saldo`, `Nachzahlung`, `Guthaben`, `zu zahlen`, `offener Betrag` or `fällig` as a result.
+fails for arrears, changes and partial periods, and is forbidden. M6-A/M6-B satisfy the final archive
+with frozen, explicitly confirmed actual advances. M6-C1/M6-C2 now supply matching logic,
+receivables, accepted-allocation persistence and the immutable ledger boundary, but the application
+service and jobs that populate that workflow remain M6-C3. The live landlord preview still omits
+minimum #4; the separate M6-B final archive prints its frozen Saldo branch.
 
 ## 5. Shared rendered-document rules
 
@@ -751,7 +754,7 @@ The complete calculation contract remains in `docs/03`. Its document projection 
 The BAnz notice identity under § 6a Abs. 3 S. 4 remains pre-legal. The UVI has a different
 no-omission contract owned by approved `docs/16`.
 
-M6 must add, without reinterpreting Page 01:
+The Page 01 contract required M6 to add, without reinterpreting Page 01:
 
 - addressee and creation date;
 - the rendered operator and numerator derivation needed to close minimum #3;
@@ -804,7 +807,8 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
 
 ## 9. Open dependencies — not permission to invent
 
-- **Remaining M6:** bank matching, payment ledger/cash events, matching evidence and renter delivery/portal.
+- **Remaining M6:** matching service, three job entrypoints and landlord *Zahlungen* screen.
+  Renter delivery/portal is M10.
 - **Live demo PDF:** operator/numerator derivation and actual-advance Saldo remain absent; M6-B's separate archive has them.
 - **Meters:** start/end readings and their consistency path are not carried to the statement.
 - **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in
@@ -812,7 +816,7 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
 - **Page 01b implementation:** derived-mass provenance, § 7 Abs. 4/readiness risks, device evidence
   and annual comparison remain exactly as `docs/03` records.
 - **D2 owners:** `docs/09` classification; `docs/11` tax mapping; `docs/12` guards; `docs/15` bank
-  matching; `docs/16` UVI/DWD and the unresolved § 6a notice identity.
+  matching rules and remaining workflow; `docs/16` UVI/DWD and the unresolved § 6a notice identity.
 - **Page 01 E16/E21:** tenant disclosure and tax timing remain unguessed and visibly open.
 
 ## Interim framing

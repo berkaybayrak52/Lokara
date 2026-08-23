@@ -43,6 +43,7 @@ Exit 0 = every tenant table is covered, exit 1 = a leak, exit 2 = could not reac
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import sys
@@ -112,19 +113,80 @@ def _is_named(table: str, test_src: str) -> bool:
 _WRITE_ASSERTION = re.compile(r"pytest\.raises\(")
 _SCOPED_SESSION = re.compile(r"account_scoped_session\(\s*app")
 
+# Test bodies are taken from the parse tree, not by splitting on `def`. Every regex
+# boundary tried here has leaked: `\n    def ` did not break at a module-level fixture,
+# and `\n(?:    )?def ` broke at the next `def` rather than at the end of the test — so a
+# following class header, its docstring or a module-level constant stayed glued onto the
+# last test body and inherited its markers. A `def` is where the *next* thing starts, not
+# where this one ends; only the parser knows the difference.
+
+# Both account names in one body. A same-account immutability test also holds a scoped
+# session and a `pytest.raises`; only the pair proves the write crossed a boundary.
+_ACCOUNT_A = re.compile(r"\baccount_a\b")
+_ACCOUNT_B = re.compile(r"\baccount_b\b")
+
+
+def _test_bodies(test_src: str) -> list[str]:
+    """The source of every `test_…` function, each ending where that function ends.
+
+    `ast.walk` reaches methods inside classes, which is where the isolation suite keeps
+    almost all of them, and `AsyncFunctionDef` is included because an `async def test_…`
+    is a test. Decorators are excluded by `get_source_segment`, which is correct here:
+    the four markers this gate looks for all live in the body.
+
+    A file that does not parse is a hard failure, not a silent zero. Returning `[]` would
+    report every table as uncovered, and the pressure that creates is exactly how a gate
+    gets weakened — the M6-C2 audit's six HIGH defects shipped behind this check.
+    """
+    try:
+        tree = ast.parse(test_src)
+    except SyntaxError as exc:  # pragma: no cover - a broken suite fails louder elsewhere
+        raise SystemExit(f"check_rls_coverage: cannot parse the isolation suite: {exc}") from exc
+
+    bodies: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        if not node.name.startswith("test_"):
+            continue
+        segment = ast.get_source_segment(test_src, node)
+        if segment is not None:
+            bodies.append(segment)
+    return bodies
+
 
 def _write_tested(table: str, test_src: str) -> bool:
     """Is this table named inside a test that attempts a refused cross-account write?
 
-    Split on `def ` at method indentation so each test body is considered on its own —
-    otherwise a `pytest.raises` anywhere in a 2,800-line file would vouch for every
-    table in it, which is the same too-loose matching this check exists to replace.
+    Three things have to line up in **one** `test_` body: the table's name, a scoped
+    session, and a refusal — across two different accounts.
+
+    The M6-C2 boundary audit is why each clause is here. `\n    def ` split only at
+    method indentation, so the module-level `m6c2_bank_rows` fixture — which names all
+    nine matching tables and writes them on the *owner* engine, asserting nothing — was
+    glued onto the end of an unrelated statement test that did carry both markers. All
+    nine tables were reported write-tested while not one had a cross-account write
+    assertion, and the six HIGH defects that audit found shipped behind a green gate.
+
+    Splitting on `def` was tried twice and leaked twice — see the note above `_TEST_DEF`.
+    The bodies now come from `ast`, so a chunk ends where the test ends. That also picks
+    up `async def test_…`, which the regex never matched: no isolation test is async
+    today, and the moment one is, its table would have silently lost coverage.
+
+    Both account names are still required, which is what separates a cross-account write
+    from a same-account immutability test.
+
+    `scripts/tests/test_rls_coverage_matcher.py` holds all four directions — the glued
+    fixture and the glued class docstring must not vouch, and a genuine assertion must,
+    whether it is `def` or `async def`.
     """
     tokens = (table, _model_name(table))
-    for body in re.split(r"\n    def ", test_src):
+    for body in _test_bodies(test_src):
         if not any(re.search(rf"\b{re.escape(t)}\b", body) for t in tokens):
             continue
-        if _WRITE_ASSERTION.search(body) and _SCOPED_SESSION.search(body):
+        if not (_WRITE_ASSERTION.search(body) and _SCOPED_SESSION.search(body)):
+            continue
+        if _ACCOUNT_A.search(body) and _ACCOUNT_B.search(body):
             return True
     return False
 
