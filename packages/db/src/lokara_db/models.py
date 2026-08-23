@@ -81,6 +81,37 @@ def _scoped_pair(parent: str) -> UniqueConstraint:
     return UniqueConstraint("id", "account_id", name=f"uq_{parent}_id_account")
 
 
+def _scoped_tenancy_fk(child: str, column: str, parent: str) -> ForeignKeyConstraint:
+    """Keep an advance edge on the parent payment/period's tenancy as well.
+
+    Account-scoped pairs stop cross-account links.  Advance corrections and
+    allocations also carry a tenancy, so their referenced row must be for that
+    same tenancy: accepting a same-account but different lease would attach
+    money to the wrong statement.
+    """
+    return ForeignKeyConstraint(
+        [column, "tenancy_id", "account_id"],
+        [f"{parent}.id", f"{parent}.tenancy_id", f"{parent}.account_id"],
+        name=f"{child}_{column}_fkey",
+        match="SIMPLE",
+    )
+
+
+def _scoped_account_pair_fk(child: str, column: str, parent: str) -> ForeignKeyConstraint:
+    """Retain the standard account-scoped edge beside a stricter tenancy edge.
+
+    The pair is the project-wide isolation vocabulary and remains visible to
+    schema tooling.  The matching three-column advance edge above additionally
+    rejects a same-account link to another tenancy.
+    """
+    return ForeignKeyConstraint(
+        [column, "account_id"],
+        [f"{parent}.id", f"{parent}.account_id"],
+        name=f"{child}_{column}_account_fkey",
+        match="SIMPLE",
+    )
+
+
 # A note on the explicit `primaryjoin=` / `foreign_keys=` on every relationship that
 # sits on a `_scoped_fk` below. Left to itself, SQLAlchemy reflects the composite
 # constraint and joins on **both** columns, which puts `account_id` into the local
@@ -474,7 +505,6 @@ class Tenancy(Base):
     valid_from: Mapped[date]
     valid_to: Mapped[date | None]
     base_rent_cents: Mapped[int]  # Kaltmiete
-    advance_payment_cents: Mapped[int]  # monthly NK Vorauszahlung
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     unit: Mapped["Unit"] = relationship(
@@ -497,12 +527,191 @@ class Tenancy(Base):
         primaryjoin="Tenancy.id == OperatingCostAgreement.tenancy_id",
         foreign_keys="OperatingCostAgreement.tenancy_id",
     )
+    advance_payment_periods: Mapped[list["AdvancePaymentPeriod"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == AdvancePaymentPeriod.tenancy_id",
+        foreign_keys="AdvancePaymentPeriod.tenancy_id",
+    )
+    advance_reconciliations: Mapped[list["AdvanceReconciliation"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == AdvanceReconciliation.tenancy_id",
+        foreign_keys="AdvanceReconciliation.tenancy_id",
+    )
 
     __table_args__ = (
         _scoped_fk("tenancy", "unit_id", "unit"),
         _scoped_pair("tenancy"),
         Index("ix_tenancy_account", "account_id"),
         Index("ix_tenancy_unit", "unit_id"),
+    )
+
+
+class AdvancePaymentPeriod(Base):
+    """Append-only contractual Soll schedule; its end is the next successor's start."""
+
+    __tablename__ = "advance_payment_period"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    amount_cents: Mapped[int]
+    valid_from: Mapped[date]
+    predecessor_id: Mapped[str | None]
+    declaration_ref: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="advance_payment_periods",
+        primaryjoin="Tenancy.id == AdvancePaymentPeriod.tenancy_id",
+        foreign_keys="AdvancePaymentPeriod.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("advance_payment_period", "tenancy_id", "tenancy", ondelete="CASCADE"),
+        _scoped_tenancy_fk("advance_payment_period", "predecessor_id", "advance_payment_period"),
+        _scoped_account_pair_fk(
+            "advance_payment_period", "predecessor_id", "advance_payment_period"
+        ),
+        _scoped_pair("advance_payment_period"),
+        UniqueConstraint(
+            "id", "tenancy_id", "account_id", name="uq_advance_payment_period_id_tenancy_account"
+        ),
+        CheckConstraint("amount_cents >= 0", name="ck_advance_payment_period_non_negative"),
+        UniqueConstraint(
+            "tenancy_id", "valid_from", name="uq_advance_payment_period_tenancy_start"
+        ),
+        Index("ix_advance_payment_period_account", "account_id"),
+        Index("ix_advance_payment_period_tenancy", "tenancy_id"),
+    )
+
+
+class AdvancePayment(Base):
+    """Manually accepted money evidence. Reversals are positive rows with a direction."""
+
+    __tablename__ = "advance_payment"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    amount_cents: Mapped[int]
+    payment_date: Mapped[date]
+    evidence_ref: Mapped[str]
+    accepted_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    reversal_of_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("advance_payment", "tenancy_id", "tenancy"),
+        _scoped_tenancy_fk("advance_payment", "reversal_of_id", "advance_payment"),
+        _scoped_account_pair_fk("advance_payment", "reversal_of_id", "advance_payment"),
+        _scoped_pair("advance_payment"),
+        UniqueConstraint(
+            "id", "tenancy_id", "account_id", name="uq_advance_payment_id_tenancy_account"
+        ),
+        CheckConstraint("amount_cents > 0", name="ck_advance_payment_positive"),
+        Index(
+            "uq_advance_payment_one_reversal",
+            "reversal_of_id",
+            unique=True,
+            postgresql_where=text("reversal_of_id IS NOT NULL"),
+        ),
+        Index("ix_advance_payment_account", "account_id"),
+        Index("ix_advance_payment_tenancy", "tenancy_id"),
+    )
+
+
+class AdvanceAllocation(Base):
+    """A payment's accepted allocation to one inclusive billing period."""
+
+    __tablename__ = "advance_allocation"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    payment_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    period_start: Mapped[date]
+    period_end: Mapped[date]
+    amount_cents: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_tenancy_fk("advance_allocation", "payment_id", "advance_payment"),
+        _scoped_account_pair_fk("advance_allocation", "payment_id", "advance_payment"),
+        _scoped_fk("advance_allocation", "tenancy_id", "tenancy"),
+        _scoped_pair("advance_allocation"),
+        CheckConstraint("amount_cents > 0", name="ck_advance_allocation_positive"),
+        CheckConstraint("period_end >= period_start", name="ck_advance_allocation_period_ordered"),
+        Index("ix_advance_allocation_account", "account_id"),
+        Index("ix_advance_allocation_tenancy_period", "tenancy_id", "period_start", "period_end"),
+    )
+
+
+class AdvanceReconciliation(Base):
+    """Append-only selected allocation snapshot, including an explicit empty confirmation."""
+
+    __tablename__ = "advance_reconciliation"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    period_start: Mapped[date]
+    period_end: Mapped[date]
+    version: Mapped[int]
+    total_cents: Mapped[int]
+    supersedes_id: Mapped[str | None]
+    confirmed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="advance_reconciliations",
+        primaryjoin="Tenancy.id == AdvanceReconciliation.tenancy_id",
+        foreign_keys="AdvanceReconciliation.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("advance_reconciliation", "tenancy_id", "tenancy"),
+        _scoped_tenancy_fk("advance_reconciliation", "supersedes_id", "advance_reconciliation"),
+        _scoped_account_pair_fk(
+            "advance_reconciliation", "supersedes_id", "advance_reconciliation"
+        ),
+        _scoped_pair("advance_reconciliation"),
+        UniqueConstraint(
+            "id", "tenancy_id", "account_id", name="uq_advance_reconciliation_id_tenancy_account"
+        ),
+        CheckConstraint(
+            "period_end >= period_start", name="ck_advance_reconciliation_period_ordered"
+        ),
+        UniqueConstraint(
+            "tenancy_id",
+            "period_start",
+            "period_end",
+            "version",
+            name="uq_advance_reconciliation_version",
+        ),
+        Index("ix_advance_reconciliation_account", "account_id"),
+        Index(
+            "ix_advance_reconciliation_tenancy_period", "tenancy_id", "period_start", "period_end"
+        ),
+    )
+
+
+class AdvanceReconciliationAllocation(Base):
+    __tablename__ = "advance_reconciliation_allocation"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    reconciliation_id: Mapped[str]
+    allocation_id: Mapped[str]
+
+    __table_args__ = (
+        _scoped_fk(
+            "advance_reconciliation_allocation", "reconciliation_id", "advance_reconciliation"
+        ),
+        _scoped_fk("advance_reconciliation_allocation", "allocation_id", "advance_allocation"),
+        _scoped_pair("advance_reconciliation_allocation"),
+        UniqueConstraint(
+            "reconciliation_id", "allocation_id", name="uq_advance_reconciliation_allocation"
+        ),
+        Index("ix_advance_reconciliation_allocation_account", "account_id"),
     )
 
 
@@ -1115,6 +1324,11 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "unit",
     "tenancy",
     "tenancy_party",
+    "advance_payment_period",
+    "advance_payment",
+    "advance_allocation",
+    "advance_reconciliation",
+    "advance_reconciliation_allocation",
     "person_count",
     "mdl_statement",
     "mdl_statement_position",

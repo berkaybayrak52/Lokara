@@ -98,6 +98,23 @@ export const TenancyOutSchema = z.object({
 });
 export type TenancyOut = z.infer<typeof TenancyOutSchema>;
 
+export const TenancyPreviewChoiceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+});
+
+export const StatementProjectionResponseSchema = z.object({
+  audience: z.enum(['OWNER', 'TENANT', 'TAX']),
+  tenancyId: z.string().nullable(),
+  subtotalCents: z.number().int().nullable(),
+  actualAdvancesCents: z.number().int().nullable(),
+  saldoCents: z.number().int().nullable(),
+  advanceReconciliationState: z.enum(['MISSING', 'CONFIRMED']).nullable(),
+  reconciliationId: z.string().nullable(),
+  reconciliationVersion: z.number().int().nullable(),
+});
+export type StatementProjectionResponse = z.infer<typeof StatementProjectionResponseSchema>;
+
 export const SelfUsePeriodOutSchema = z.object({
   kind: z.string(),
   validFrom: z.string(),

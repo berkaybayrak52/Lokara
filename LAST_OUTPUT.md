@@ -1,17 +1,16 @@
-# Last output — environment-guard test isolated
+# Last output — M6-A ready for final gates
 
-HEAD `47fdeb7` on `fix/environment-guard-test` · `23.08.2026`
-Status: Complete
+HEAD `53a8858` on `slice/m6-a-advances` · `23.08.2026`
+Status: Partial
 
 ## Wanted
-Correct the missing-ENVIRONMENT guard test without changing production settings.
+Close and locally merge M6-A before starting M6-B.
 
 ## Done
-The test now disables dotenv while proving that no effective source supplies `ENVIRONMENT`.
-The focused suite passes; production configuration is unchanged.
+Temporal advances, confirmed owner preview, RLS boundaries and the UI review fixes are implemented.
 
 ## Not done
-No push was performed.
+Final gates, repeated reviews, commit and local merge remain pending. No push was performed.
 
 ## Optional next step
-Merge this test-only correction locally, then resume M6-A.
+Complete the final M6-A gates and reviews.

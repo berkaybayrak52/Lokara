@@ -177,7 +177,6 @@ def session() -> Iterator[Session]:
                     valid_from=valid_from,
                     valid_to=valid_to,
                     base_rent_cents=50000,
-                    advance_payment_cents=10000,
                 )
             )
         for count_id, tenancy_id, count, valid_from, valid_to in _PERSON_COUNTS:

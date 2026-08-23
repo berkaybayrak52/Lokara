@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { api } from '@/lib/api';
 import {
@@ -8,6 +9,8 @@ import {
   DemoStatementResponseSchema,
   DemoSummaryResponseSchema,
   MeResponseSchema,
+  StatementProjectionResponseSchema,
+  TenancyPreviewChoiceSchema,
 } from '@/lib/contracts';
 
 /** The Person's relationships — drives the left nav (navigation only; every
@@ -89,5 +92,55 @@ export function useStatement(
     queryFn: () => api(`/a/${accountId}/statements?${query}`, DemoStatementResponseSchema),
     enabled,
     retry: false,
+  });
+}
+
+export function useBuildingTenancies(accountId: string, buildingId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['account', accountId, 'building', buildingId, 'tenancies'],
+    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/tenancies`, TenancyPreviewChoiceSchema.array()),
+    enabled: enabled && buildingId !== '',
+  });
+}
+
+export function useTenantPreview(
+  accountId: string,
+  selection: { buildingId: string; tenancyId: string; periodFrom: string; periodTo: string },
+  enabled: boolean,
+) {
+  const query = new URLSearchParams({
+    audience: 'TENANT',
+    tenancy_id: selection.tenancyId,
+    period_from: selection.periodFrom,
+    period_to: selection.periodTo,
+  });
+  return useQuery({
+    queryKey: ['account', accountId, 'tenant-preview', selection],
+    queryFn: () => api(`/a/${accountId}/buildings/${selection.buildingId}/statement?${query}`, StatementProjectionResponseSchema),
+    enabled: enabled && selection.buildingId !== '' && selection.tenancyId !== '',
+  });
+}
+
+export function useCreateAdvancePayment(accountId: string, buildingId: string, tenancyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { amountCents: number; paymentDate: string; evidenceRef: string; periodStart: string; periodEnd: string }) =>
+      api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/advance-payments`, z.object({ allocationId: z.string() }), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
+  });
+}
+
+export function useConfirmAdvanceReconciliation(accountId: string, buildingId: string, tenancyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { periodStart: string; periodEnd: string; allocationIds: string[] }) => {
+      const query = new URLSearchParams({ period_start: input.periodStart, period_end: input.periodEnd });
+      return api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/reconciliations?${query}`, z.object({ id: z.string() }), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allocationIds: input.allocationIds }),
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
   });
 }

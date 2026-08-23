@@ -1,10 +1,32 @@
 import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import type { DemoStatementResponse } from '@/lib/contracts';
+import type { DemoStatementResponse, StatementProjectionResponse } from '@/lib/contracts';
+
+const queryFixtures = vi.hoisted(() => ({
+  tenantPreview: {
+    data: undefined as StatementProjectionResponse | undefined,
+  },
+}));
+
+vi.mock('./queries', () => ({
+  useBuildingTenancies: () => ({ data: [] }),
+  useConfirmAdvanceReconciliation: () => ({ isPending: false, mutate: vi.fn() }),
+  useCreateAdvancePayment: () => ({ isPending: false, mutate: vi.fn() }),
+  useMe: () => ({ data: undefined }),
+  useStatement: () => ({ data: undefined }),
+  useTenantPreview: () => queryFixtures.tenantPreview,
+}));
 
 import { StatementResult } from './statement';
+
+function renderResult(node: React.ReactNode): string {
+  return renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider>,
+  );
+}
 
 const RESULT: DemoStatementResponse = {
   buildingName: 'Musterhaus',
@@ -100,10 +122,21 @@ const EMPTY_COSTS_2024: DemoStatementResponse = {
   rechtsstaende: ['Rechtsstand 06/2024'],
 };
 
+const CONFIRMED_TENANT_PREVIEW: StatementProjectionResponse = {
+  audience: 'TENANT',
+  tenancyId: 'tenancy-a',
+  subtotalCents: 48000,
+  actualAdvancesCents: 36000,
+  saldoCents: 12000,
+  advanceReconciliationState: 'CONFIRMED',
+  reconciliationId: 'reconciliation-confirmed-1',
+  reconciliationVersion: 2,
+};
+
 describe('StatementResult Page 01b projection', () => {
   it('renders evidence, raw annual fallback, and each 3-percent risk separately', () => {
-    const html = renderToStaticMarkup(
-      <StatementResult data={RESULT} pdfUrl="/statement.pdf" accountId="acc-1" />,
+    const html = renderResult(
+      <StatementResult data={RESULT} pdfUrl="/statement.pdf" accountId="acc-1" selection={{ buildingId: 'bld-1', periodFrom: '2025-01-01', periodTo: '2025-12-31' }} />,
     );
 
     expect(html).toContain('Geräte- und Ableseprotokoll');
@@ -114,8 +147,8 @@ describe('StatementResult Page 01b projection', () => {
   });
 
   it('names the object and the period it computed', () => {
-    const html = renderToStaticMarkup(
-      <StatementResult data={RESULT} pdfUrl="/statement.pdf" accountId="acc-1" />,
+    const html = renderResult(
+      <StatementResult data={RESULT} pdfUrl="/statement.pdf" accountId="acc-1" selection={{ buildingId: 'bld-1', periodFrom: '2025-01-01', periodTo: '2025-12-31' }} />,
     );
 
     // Objekt und Zeitraum sind auf diesem Screen wählbar. Ein Ergebnis, das
@@ -127,11 +160,51 @@ describe('StatementResult Page 01b projection', () => {
   });
 
   it('names the computed period in the empty-costs card, not a fixed year', () => {
-    const html = renderToStaticMarkup(
-      <StatementResult data={EMPTY_COSTS_2024} pdfUrl="/statement.pdf" accountId="acc-1" />,
+    const html = renderResult(
+      <StatementResult data={EMPTY_COSTS_2024} pdfUrl="/statement.pdf" accountId="acc-1" selection={{ buildingId: 'bld-1', periodFrom: '2024-01-01', periodTo: '2024-06-30' }} />,
     );
 
     expect(html).toContain('Für 01.01.2024 – 30.06.2024 sind noch keine Kostenarten erfasst');
     expect(html).not.toContain('2025');
+  });
+
+  it('keeps advance and reconciliation controls out of the default non-owner SSR result', () => {
+    const html = renderResult(
+      <StatementResult
+        data={RESULT}
+        pdfUrl="/statement.pdf"
+        accountId="acc-1"
+        selection={{ buildingId: 'bld-1', periodFrom: '2025-01-01', periodTo: '2025-12-31' }}
+      />,
+    );
+
+    expect(html).not.toContain('Vorauszahlungen und Saldo prüfen');
+    expect(html).not.toContain('Vorauszahlung übernehmen');
+    expect(html).not.toContain('Bestätigte Abstimmung');
+    expect(html).not.toContain('Saldo:');
+  });
+
+  it('renders confirmed reconciliation ID and version with the owner advance and saldo preview', () => {
+    queryFixtures.tenantPreview.data = CONFIRMED_TENANT_PREVIEW;
+
+    try {
+      const html = renderResult(
+        <StatementResult
+          data={RESULT}
+          pdfUrl="/statement.pdf"
+          accountId="acc-1"
+          selection={{ buildingId: 'bld-1', periodFrom: '2025-01-01', periodTo: '2025-12-31' }}
+          ownerControls
+        />,
+      );
+
+      expect(html).toContain('Vorauszahlungen und Saldo prüfen');
+      expect(html).toContain('Bestätigte Vorauszahlungen:');
+      expect(html).toContain('Saldo:');
+      expect(html).toContain('ID reconciliation-confirmed-1');
+      expect(html).toContain('Version 2');
+    } finally {
+      queryFixtures.tenantPreview.data = undefined;
+    }
   });
 });

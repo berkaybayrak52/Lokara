@@ -378,7 +378,8 @@ class TenancyCreate(ApiModel):
     valid_from: date
     valid_to: date | None = None  # exclusive; None = open-ended
     base_rent_cents: int = Field(ge=0)
-    advance_payment_cents: int = Field(ge=0)
+    initial_advance_payment_cents: int = Field(ge=0)
+    advance_declaration_ref: str = Field(min_length=1, max_length=500)
 
 
 class TenancyOut(ApiModel):
@@ -388,9 +389,57 @@ class TenancyOut(ApiModel):
     valid_to: date | None
     base_rent_cents: int
     base_rent_eur: str
-    advance_payment_cents: int
-    advance_payment_eur: str
+    advance_payment_schedule: list["AdvancePaymentPeriodOut"]
     active_today: bool
+
+
+class AdvancePaymentPeriodOut(ApiModel):
+    id: str
+    amount_cents: int
+    amount_eur: str
+    valid_from: date
+    valid_to: date | None
+    predecessor_id: str | None
+    declaration_ref: str
+
+
+class AdvancePaymentCreate(ApiModel):
+    amount_cents: int = Field(gt=0)
+    payment_date: date
+    evidence_ref: str = Field(min_length=1, max_length=500)
+    period_start: date
+    period_end: date
+
+
+class AdvanceScheduleSuccessorCreate(ApiModel):
+    amount_cents: int = Field(ge=0)
+    valid_from: date
+    declaration_ref: str = Field(min_length=1, max_length=500)
+
+
+class AdvancePaymentOut(ApiModel):
+    id: str
+    allocation_id: str
+    amount_cents: int
+    payment_date: date
+    evidence_ref: str
+    reversal_of_id: str | None
+
+
+class AdvanceReconciliationCreate(ApiModel):
+    allocation_ids: list[str] = Field(default_factory=list)
+
+
+class AdvanceReconciliationOut(ApiModel):
+    id: str
+    version: int
+    total_cents: int
+    allocation_ids: list[str]
+
+
+class TenancyPreviewChoice(ApiModel):
+    id: str
+    label: str
 
 
 class SelfUsePeriodOut(ApiModel):
@@ -706,9 +755,9 @@ class StatementProjectionResponse(ApiModel):
     (`docs/08` § 3). A field that is absent here cannot be leaked by a client
     that forgets to hide it.
 
-    Advances, Saldo, Nachzahlung and Guthaben are absent on purpose — minimum #4
-    is blocked on the M6 ledger by decision, and this projection is shape and
-    selection only, not a finished Mieter-Einzelabrechnung.
+    Advance evidence is owner-preview-only. An employee may calculate an
+    assigned building's projection, but must not receive its advance evidence,
+    reconciliation identity, or saldo.
     """
 
     audience: Literal["OWNER", "TENANT", "TAX"]
@@ -720,6 +769,12 @@ class StatementProjectionResponse(ApiModel):
     heating_lines: list[StatementHeatingLine]
     # OWNER and TAX only; a renter's document carries no Eigentümeranteil.
     owner_residual_cents: int | None
+    subtotal_cents: int | None
+    actual_advances_cents: int | None
+    saldo_cents: int | None
+    advance_reconciliation_state: Literal["MISSING", "CONFIRMED"] | None
+    reconciliation_id: str | None
+    reconciliation_version: int | None
     findings: list[str]
     rechtsstaende: list[str]
     disclaimer: str

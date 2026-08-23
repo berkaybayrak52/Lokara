@@ -204,7 +204,6 @@ def client() -> Iterator[TestClient]:
                     valid_from=date(2024, 1, 1),
                     valid_to=None,
                     base_rent_cents=80_000,
-                    advance_payment_cents=18_000,
                 )
             )
             session.merge(

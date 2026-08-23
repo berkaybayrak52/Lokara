@@ -25,6 +25,11 @@ from alembic import command
 from alembic.config import Config
 from lokara_db import (
     Account,
+    AdvanceAllocation,
+    AdvancePayment,
+    AdvancePaymentPeriod,
+    AdvanceReconciliation,
+    AdvanceReconciliationAllocation,
     AllocationKeyAssignment,
     Building,
     BuildingAssignment,
@@ -281,7 +286,6 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 valid_from=date(2025, 1, 1),
                 valid_to=None,
                 base_rent_cents=85_000,
-                advance_payment_cents=15_000,
             )
         )
         session.add(
@@ -360,6 +364,11 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(Meter)).all() == []
             assert session.scalars(select(MeterReading)).all() == []
             assert session.scalars(select(HeatingCostEntry)).all() == []
+            assert session.scalars(select(AdvancePaymentPeriod)).all() == []
+            assert session.scalars(select(AdvancePayment)).all() == []
+            assert session.scalars(select(AdvanceAllocation)).all() == []
+            assert session.scalars(select(AdvanceReconciliation)).all() == []
+            assert session.scalars(select(AdvanceReconciliationAllocation)).all() == []
             assert session.scalars(select(Account.id)).all() == [seed.account_b]
 
     def test_own_context_sees_own_rows(self, engines: tuple[Engine, Engine], seed: _Seed) -> None:
@@ -457,7 +466,6 @@ class TestCrossAccountIsolation:
                     valid_from=date(2025, 6, 1),
                     valid_to=None,
                     base_rent_cents=1,
-                    advance_payment_cents=1,
                 )
             )
             session.flush()
@@ -528,6 +536,284 @@ class TestCrossAccountIsolation:
         with account_scoped_session(app, seed.account_a) as session:
             building = session.get(Building, seed.building_a)
             assert building is not None and building.name == "Haus A"
+
+
+class _M6AdvanceRows(NamedTuple):
+    other_unit_id: str
+    other_tenancy_id: str
+    period_id: str
+    payment_id: str
+    allocation_id: str
+    reconciliation_id: str
+    reconciliation_allocation_id: str
+
+
+@pytest.fixture
+def m6_advance_rows(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[_M6AdvanceRows]:
+    """One complete A-side M6-A graph, so RLS checks cannot pass vacuously."""
+    owner, _ = engines
+    rows = _M6AdvanceRows(*(new_id() for _ in range(7)))
+    with Session(owner) as session, session.begin():
+        session.add(
+            Unit(
+                id=rows.other_unit_id,
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                label="M6-A Zweitwohnung",
+                area_sqm_x100=4_000,
+            )
+        )
+        session.flush()
+        session.add_all(
+            [
+                Tenancy(
+                    id=rows.other_tenancy_id,
+                    account_id=seed.account_a,
+                    unit_id=rows.other_unit_id,
+                    valid_from=date(2024, 1, 1),
+                    valid_to=None,
+                    base_rent_cents=70_000,
+                ),
+                AdvancePaymentPeriod(
+                    id=rows.period_id,
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    amount_cents=12_000,
+                    valid_from=date(2025, 1, 1),
+                    predecessor_id=None,
+                    declaration_ref="M6A live RLS fixture",
+                ),
+                AdvancePayment(
+                    id=rows.payment_id,
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    amount_cents=28_000,
+                    payment_date=date(2025, 12, 31),
+                    evidence_ref="M6A live RLS fixture",
+                    reversal_of_id=None,
+                ),
+            ]
+        )
+        session.flush()
+        session.add_all(
+            [
+                AdvanceAllocation(
+                    id=rows.allocation_id,
+                    account_id=seed.account_a,
+                    payment_id=rows.payment_id,
+                    tenancy_id=seed.tenancy_a,
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    amount_cents=28_000,
+                ),
+                AdvanceReconciliation(
+                    id=rows.reconciliation_id,
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    version=1,
+                    total_cents=28_000,
+                    supersedes_id=None,
+                ),
+            ]
+        )
+        session.flush()
+        session.add(
+            AdvanceReconciliationAllocation(
+                id=rows.reconciliation_allocation_id,
+                account_id=seed.account_a,
+                reconciliation_id=rows.reconciliation_id,
+                allocation_id=rows.allocation_id,
+            )
+        )
+    yield rows
+    with Session(owner) as session, session.begin():
+        for table, row_id in (
+            ("advance_reconciliation_allocation", rows.reconciliation_allocation_id),
+            ("advance_reconciliation", rows.reconciliation_id),
+            ("advance_allocation", rows.allocation_id),
+            ("advance_payment", rows.payment_id),
+            ("advance_payment_period", rows.period_id),
+            ("tenancy", rows.other_tenancy_id),
+            ("unit", rows.other_unit_id),
+        ):
+            session.execute(text(f"DELETE FROM {table} WHERE id = :id"), {"id": row_id})
+
+
+class TestM6AdvanceBoundaries:
+    """M6A-F08--F11: all five advance tables need non-vacuous live proof."""
+
+    def test_a_reads_its_complete_m6_graph_b_looks_up_nothing_and_cannot_write_it(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m6_advance_rows: _M6AdvanceRows,
+    ) -> None:
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            assert session.scalars(select(AdvancePaymentPeriod.id)).all() == [
+                m6_advance_rows.period_id
+            ]
+            assert session.scalars(select(AdvancePayment.id)).all() == [m6_advance_rows.payment_id]
+            assert session.scalars(select(AdvanceAllocation.id)).all() == [
+                m6_advance_rows.allocation_id
+            ]
+            assert session.scalars(select(AdvanceReconciliation.id)).all() == [
+                m6_advance_rows.reconciliation_id
+            ]
+            assert session.scalars(select(AdvanceReconciliationAllocation.id)).all() == [
+                m6_advance_rows.reconciliation_allocation_id
+            ]
+        with account_scoped_session(app, seed.account_b) as session:
+            for model in (
+                AdvancePaymentPeriod,
+                AdvancePayment,
+                AdvanceAllocation,
+                AdvanceReconciliation,
+                AdvanceReconciliationAllocation,
+            ):
+                assert session.scalars(select(model)).all() == []
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.add(
+                AdvancePayment(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    amount_cents=1,
+                    payment_date=date(2025, 12, 31),
+                    evidence_ref="foreign M6 write",
+                    reversal_of_id=None,
+                )
+            )
+            session.flush()
+
+    def test_same_account_cross_tenancy_payment_link_is_rejected(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m6_advance_rows: _M6AdvanceRows,
+    ) -> None:
+        """RLS accepts an A row; the payment and tenancy still must agree."""
+        _, app = engines
+        with (
+            account_scoped_session(app, seed.account_a) as session,
+            pytest.raises(IntegrityError, match="advance_allocation_payment_id_fkey"),
+        ):
+            session.add(
+                AdvanceAllocation(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    payment_id=m6_advance_rows.payment_id,
+                    tenancy_id=m6_advance_rows.other_tenancy_id,
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    amount_cents=1,
+                )
+            )
+            session.flush()
+
+    def test_allocations_cannot_exceed_their_positive_payment(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m6_advance_rows: _M6AdvanceRows,
+    ) -> None:
+        _, app = engines
+        with (
+            account_scoped_session(app, seed.account_a) as session,
+            pytest.raises(IntegrityError, match="advance allocation exceeds payment"),
+        ):
+            session.add(
+                AdvanceAllocation(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    payment_id=m6_advance_rows.payment_id,
+                    tenancy_id=seed.tenancy_a,
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    amount_cents=1,
+                )
+            )
+            session.flush()
+
+    def test_one_original_payment_has_at_most_one_reversal(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m6_advance_rows: _M6AdvanceRows,
+    ) -> None:
+        _, app = engines
+        first_reversal_id = new_id()
+        with account_scoped_session(app, seed.account_a) as session:
+            session.add(
+                AdvancePayment(
+                    id=first_reversal_id,
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    amount_cents=28_000,
+                    payment_date=date(2025, 12, 31),
+                    evidence_ref="first reversal",
+                    reversal_of_id=m6_advance_rows.payment_id,
+                )
+            )
+            session.commit()
+        try:
+            with (
+                account_scoped_session(app, seed.account_a) as session,
+                pytest.raises(IntegrityError, match="advance payment already reversed"),
+            ):
+                session.add(
+                    AdvancePayment(
+                        id=new_id(),
+                        account_id=seed.account_a,
+                        tenancy_id=seed.tenancy_a,
+                        amount_cents=28_000,
+                        payment_date=date(2025, 12, 31),
+                        evidence_ref="duplicate reversal",
+                        reversal_of_id=m6_advance_rows.payment_id,
+                    )
+                )
+                session.flush()
+        finally:
+            owner, _ = engines
+            with Session(owner) as session, session.begin():
+                reversal = session.get(AdvancePayment, first_reversal_id)
+                if reversal is not None:
+                    session.delete(reversal)
+
+    def test_m6_rows_reject_every_direct_update_and_delete_except_demo_reset_schedule(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m6_advance_rows: _M6AdvanceRows,
+    ) -> None:
+        _, app = engines
+        # The separate demo-reset API suite proves its sole exception: the app
+        # role may delete a schedule for a non-canonical demo building.  None
+        # of these ordinary rows (and no other evidence table) may inherit it.
+        for table, row_id in (
+            ("advance_payment_period", m6_advance_rows.period_id),
+            ("advance_payment", m6_advance_rows.payment_id),
+            ("advance_allocation", m6_advance_rows.allocation_id),
+            ("advance_reconciliation", m6_advance_rows.reconciliation_id),
+            (
+                "advance_reconciliation_allocation",
+                m6_advance_rows.reconciliation_allocation_id,
+            ),
+        ):
+            for sql in (
+                f"UPDATE {table} SET id = id WHERE id = :id",
+                f"DELETE FROM {table} WHERE id = :id",
+            ):
+                with (
+                    account_scoped_session(app, seed.account_a) as session,
+                    pytest.raises(IntegrityError, match="append-only"),
+                ):
+                    session.execute(text(sql), {"id": row_id})
 
 
 @pytest.fixture
@@ -1519,7 +1805,6 @@ class TestMdlStatementIsolation:
                     valid_from=date(2025, 1, 1),
                     valid_to=None,
                     base_rent_cents=70_000,
-                    advance_payment_cents=12_000,
                 )
             )
             session.add(

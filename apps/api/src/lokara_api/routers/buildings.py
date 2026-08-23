@@ -12,7 +12,7 @@ version, never UPDATE.
 from datetime import date
 
 from fastapi import APIRouter, HTTPException
-from lokara_db import Building, Renter, Tenancy, TenancyParty, Unit, new_id
+from lokara_db import AdvancePaymentPeriod, Building, Renter, Tenancy, TenancyParty, Unit, new_id
 from lokara_domain import Period, cents, format_eur, periods_overlap
 from sqlalchemy import select
 
@@ -24,6 +24,7 @@ from ..authorization import (
 )
 from ..deps import PathAccountSession
 from ..schemas import (
+    AdvancePaymentPeriodOut,
     BuildingCreate,
     BuildingDetailResponse,
     BuildingListResponse,
@@ -31,6 +32,7 @@ from ..schemas import (
     SelfUsePeriodOut,
     TenancyCreate,
     TenancyOut,
+    TenancyPreviewChoice,
     UnitCreate,
     UnitDetailResponse,
     UnitSummary,
@@ -117,6 +119,24 @@ def building_detail(
     )
 
 
+@router.get("/buildings/{building_id}/tenancies")
+def list_building_tenancies(
+    account_id: str, building_id: str, session: PathAccountSession
+) -> list[TenancyPreviewChoice]:
+    del account_id
+    building = _get_building(session, building_id)
+    return [
+        TenancyPreviewChoice(
+            id=tenancy.id,
+            label=(
+                f"{unit.label} — {', '.join(party.renter.legal_name for party in tenancy.parties)}"
+            ),
+        )
+        for unit in sorted(building.units, key=lambda item: item.label)
+        for tenancy in sorted(unit.tenancies, key=lambda item: item.valid_from)
+    ]
+
+
 @router.post("/buildings/{building_id}/units", status_code=201)
 def create_unit(
     account_id: str, building_id: str, body: UnitCreate, session: PathAccountSession
@@ -141,6 +161,7 @@ def create_unit(
 
 
 def _tenancy_out(tenancy: Tenancy) -> TenancyOut:
+    periods = sorted(tenancy.advance_payment_periods, key=lambda item: item.valid_from)
     return TenancyOut(
         id=tenancy.id,
         renter_names=[party.renter.legal_name for party in tenancy.parties],
@@ -148,8 +169,18 @@ def _tenancy_out(tenancy: Tenancy) -> TenancyOut:
         valid_to=tenancy.valid_to,
         base_rent_cents=tenancy.base_rent_cents,
         base_rent_eur=format_eur(cents(tenancy.base_rent_cents)),
-        advance_payment_cents=tenancy.advance_payment_cents,
-        advance_payment_eur=format_eur(cents(tenancy.advance_payment_cents)),
+        advance_payment_schedule=[
+            AdvancePaymentPeriodOut(
+                id=item.id,
+                amount_cents=item.amount_cents,
+                amount_eur=format_eur(cents(item.amount_cents)),
+                valid_from=item.valid_from,
+                valid_to=(periods[index + 1].valid_from if index + 1 < len(periods) else None),
+                predecessor_id=item.predecessor_id,
+                declaration_ref=item.declaration_ref,
+            )
+            for index, item in enumerate(periods)
+        ],
         active_today=_is_active_today(tenancy.valid_from, tenancy.valid_to),
     )
 
@@ -214,12 +245,20 @@ def create_tenancy(
         valid_from=body.valid_from,
         valid_to=body.valid_to,
         base_rent_cents=body.base_rent_cents,
-        advance_payment_cents=body.advance_payment_cents,
+    )
+    schedule = AdvancePaymentPeriod(
+        id=new_id(),
+        account_id=account_id,
+        tenancy_id=tenancy.id,
+        amount_cents=body.initial_advance_payment_cents,
+        valid_from=body.valid_from,
+        predecessor_id=None,
+        declaration_ref=body.advance_declaration_ref,
     )
     party = TenancyParty(
         id=new_id(), account_id=account_id, tenancy_id=tenancy.id, renter_id=renter.id
     )
-    session.add_all([renter, tenancy, party])
+    session.add_all([renter, tenancy, party, schedule])
     session.flush()
     session.refresh(tenancy)
     return _tenancy_out(tenancy)

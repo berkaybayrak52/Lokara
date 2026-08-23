@@ -81,6 +81,7 @@ BASE = f"/a/{DEMO_ACCOUNT_ID}"
 
 
 class TestCreateChain:
+    tenancy_id: str
     """One flowing scenario: Building → Unit → Tenancy → timeline read-back."""
 
     building_id: str
@@ -142,7 +143,8 @@ class TestCreateChain:
                 "validFrom": "2024-03-01",
                 "validTo": None,
                 "baseRentCents": 89000,
-                "advancePaymentCents": 21000,
+                "initialAdvancePaymentCents": 21000,
+                "advanceDeclarationRef": "Mietvertrag 2024-02-15",
             },
         )
         assert response.status_code == 201
@@ -150,6 +152,35 @@ class TestCreateChain:
         assert body["renterNames"] == ["Erika Musterfrau"]
         assert body["baseRentEur"].startswith("890,00")
         assert body["activeToday"] is True
+        assert "advancePaymentCents" not in body
+        assert len(body["advancePaymentSchedule"]) == 1
+        assert body["advancePaymentSchedule"][0]["amountCents"] == 21000
+        assert body["advancePaymentSchedule"][0]["validFrom"] == "2024-03-01"
+        assert body["advancePaymentSchedule"][0]["validTo"] is None
+        TestCreateChain.tenancy_id = body["id"]
+
+        successor = client.post(
+            f"{BASE}/buildings/{TestCreateChain.building_id}/tenancies/"
+            f"{TestCreateChain.tenancy_id}/advance-schedule",
+            headers=DEMO,
+            json={
+                "amountCents": 24000,
+                "validFrom": "2024-07-01",
+                "declarationRef": "§ 560-Anpassung 2024-06-15",
+            },
+        )
+        assert successor.status_code == 201, successor.text
+        successor_id = successor.json()["id"]
+        schedule_read = client.get(f"{BASE}/units/{TestCreateChain.unit_id}", headers=DEMO)
+        assert schedule_read.status_code == 200, schedule_read.text
+        periods = schedule_read.json()["tenancies"][0]["advancePaymentSchedule"]
+        assert [(row["amountCents"], row["validFrom"], row["validTo"]) for row in periods] == [
+            (21000, "2024-03-01", "2024-07-01"),
+            (24000, "2024-07-01", None),
+        ]
+        assert periods[0]["predecessorId"] is None
+        assert periods[1]["id"] == successor_id
+        assert periods[1]["predecessorId"] == periods[0]["id"]
 
         detail = client.get(f"{BASE}/units/{TestCreateChain.unit_id}", headers=DEMO).json()
         assert detail["buildingName"] == "Testgasse 5"
@@ -169,7 +200,8 @@ class TestCreateChain:
                 "validFrom": "2025-01-01",  # inside the open-ended tenancy
                 "validTo": "2025-12-31",
                 "baseRentCents": 50000,
-                "advancePaymentCents": 10000,
+                "initialAdvancePaymentCents": 10000,
+                "advanceDeclarationRef": "Mietvertrag",
             },
         )
         assert response.status_code == 422
@@ -184,7 +216,8 @@ class TestCreateChain:
                 "validFrom": "2030-01-01",
                 "validTo": "2029-01-01",
                 "baseRentCents": 1,
-                "advancePaymentCents": 0,
+                "initialAdvancePaymentCents": 0,
+                "advanceDeclarationRef": "Mietvertrag",
             },
         )
         assert response.status_code == 422
