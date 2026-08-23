@@ -1,23 +1,25 @@
-# Last output — M6-B merged; stale documents corrected
+# Last output — M6-C1 matching engine committed, deliberately unmerged
 
-HEAD `f578f2f` on `main` · `23.08.2026`
+HEAD `a203755` on `slice/m6-c1-matching-engine` · `23.08.2026`
 Status: Partial
 
 ## Wanted
-Plan the remaining M6 work and correct the documents that no longer describe the repository.
+Implement M6-C1, the pure bank-matching engine against `docs/15`, and hand it off.
 
 ## Done
-M6-B is merged as `f578f2f` with green gates and both reviews closed; demo fingerprint unchanged at
-`88eb8434eda65f8d7ff82826fc837a58` (149269 bytes). Five stale `/private/tmp` worktrees were removed
-after diffing their uncommitted edits as superseded; `main` now lives in the primary tree.
-`LAST_OUTPUT.md`, `LEAD-HANDOFF.md` and `PLAN.md` were corrected: `check_handoff.sh` passes again,
-the missing M6-A section and the open M6-C scope were added, and the false claim that temporal
-contractual advances are still open was removed — M6-A shipped them and migration `0015` drops the
-scalar.
+`packages/matching-engine` is committed as `a203755`: § 4 signals and decision order, § 5.1
+designation/FIFO/§ 367 settlement, § 5.2 principal split and § 5.3 reversal. All thirteen
+`BANKMATCH-F01`–`F13` cases run through real code as 30 tests. The package imports the standard
+library only and refuses `float` at its single import boundary. `scripts/gate.sh full` is green.
+`LEAD-HANDOFF.md` and `PLAN.md` now carry the merge gate, the eight judgment calls the implementer
+flagged, and the disclosure that the main session reordered two assertions in
+`test_berkay_15_engine.py`. `FRAGEN-an-Berkay-05.md` records the two Seite-08 source questions.
 
 ## Not done
-M6-C is unimplemented: bank matching, payment ledger, job entrypoints and the Zahlungen screen.
-Nothing was committed or pushed; local `main` stays 8 commits ahead of `origin/main`.
+The slice is **not merged**. `scoring.py::_end_to_end_signal` binds § 4's "stored reference" to
+`profile.payment_code`, which §§ 3.2–3.3 never define; it must return 0 before the merge, and the
+`docs/15` status lines change only then. The workflow correction and M6-C2 are untouched. Nothing
+was pushed; local `main` (`4c9b9ac`) stays 9 commits ahead of `origin/main`.
 
 ## Optional next step
-Start M6-C1, the pure matching engine, against the thirteen `docs/15` fixtures.
+Do the workflow correction in `PLAN.md` § M6-C, then make the E2E signal inert and merge M6-C1.
