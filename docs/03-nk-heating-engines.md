@@ -60,6 +60,30 @@ ceiling is 21%. From two simultaneous grounds, emit the non-blocking warning: �
 Kürzungsgründe gleichzeitig — bitte prüfen Sie, ob beide zutreffen. Die Kürzungen wirken
 nebeneinander.” The output never represents § 5(2) and § 5(3) as two separate 3% rights.
 
+#### § 12 reduction result boundary (implementation contract)
+
+`calculate_page01b_statement` returns a separate, audit-only `section12_reduction` result. It
+does not replace the existing warning-only API, PDF, or web projection in this slice. For each
+Mietverhältnis it retains, in cents, `gross_claim`, the separately half-up rounded
+`non_consumption_15_percent`, `remote_readability_3_percent`, and
+`section_6a_information_3_percent`, their `total_deduction`, and `net_claim`. The result also
+lists the active § 12 grounds and, from two active grounds, exactly this non-blocking warning:
+“Zwei Kürzungsgründe gleichzeitig — bitte prüfen Sie, ob beide zutreffen. Die Kürzungen wirken
+nebeneinander.” `co2_disclosure_missing` remains an independent warning risk and is never a § 12
+component.
+
+For self-billing, the 15% base is each allocation line's existing non-consumption positions
+(`heating_base + ww_base`); the engine must not infer a different share or recalculate a line. For
+MDL, the caller supplies one non-consumption position per renter alongside the confirmed gross
+positions. A missing split, a length mismatch, a negative supplied value, or a supplied split
+above its confirmed renter position yields an explicit **incomplete** § 12 result and no net
+claim; it neither guesses a split nor recalculates MDL raw inputs. A complete result preserves
+gross values even where every component is zero, satisfies `gross_claim − total_deduction =
+net_claim` per renter, and applies the 21% ceiling after the three independently rounded,
+non-cascading components have been calculated. This remains `Konvention`,
+`verify-before-production`, and an Anwaltspunkt (Rechtsstand 08/2026); the values belong in a
+versioned rule surface rather than an unversioned production-law assertion.
+
 Block (c) is a mandatory audit value, never a second pot: `printed owner residual − sum(separately
 rounded origins)`. It is a subline of the owner residual, with no Bemessung or quota. Print only a
 non-zero value, but always retain it in the audit log. The required text is

@@ -84,6 +84,36 @@ class ReductionRisk:
 
 
 @dataclass(frozen=True)
+class Section12RenterReduction:
+    """One renter's auditable § 12 HeizkostenV reduction calculation.
+
+    The three components deliberately remain separate.  They are calculated
+    from their own unreduced bases, so a consumer cannot accidentally cascade
+    one reduction into the next.
+    """
+
+    renter_id: str
+    gross_claim: Cents
+    non_consumption_15_percent: Cents
+    remote_readability_3_percent: Cents
+    section_6a_information_3_percent: Cents
+    total_deduction: Cents
+    net_claim: Cents | None
+
+
+@dataclass(frozen=True)
+class Section12ReductionResult:
+    """Separate § 12 result; it does not alter the warning-only projections."""
+
+    renters: tuple[Section12RenterReduction, ...]
+    component_definitions: tuple[str, ...]
+    active_grounds: tuple[str, ...]
+    warnings: tuple[str, ...]
+    is_complete: bool
+    incomplete_reason_de: str | None = None
+
+
+@dataclass(frozen=True)
 class AnnualClimateFactor:
     value: Decimal
     period_label: str
@@ -182,6 +212,10 @@ class MdlStatementInput:
     co2_evidence_present: bool = True
     risks: RiskTriggers = RiskTriggers()
     annual_comparison: AnnualComparisonInput | None = None
+    # Confirmed MDL positions do not contain the §§ 7/8 split by themselves.
+    # The adapter must carry this per-renter source position rather than letting
+    # the engine reconstruct it from raw supplier material.
+    renter_non_consumption_positions: tuple[int, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -216,6 +250,7 @@ class Page01bStatementResult:
     device_aggregation: DeviceReadingAggregation | None = None
     owner_burden_preview: OwnerBurdenPreview | None = None
     oil_consumption: OilConsumptionResult | None = None
+    section12_reduction: Section12ReductionResult | None = None
     # Deliberately absent as an amount: the unresolved cumulation question may
     # not acquire a plausible number through a convenience property.
     risk_total: None = None
@@ -367,6 +402,118 @@ def _risks(triggers: RiskTriggers, renter_totals: tuple[Cents, ...]) -> tuple[Re
         )
         for code, percent, message in _RISK_ORDER
         if active[code]
+    )
+
+
+_SECTION12_COMPONENT_DEFINITIONS = (
+    "non_consumption_15_percent",
+    "remote_readability_3_percent",
+    "section_6a_information_3_percent",
+)
+_SECTION12_WARNING = (
+    "Zwei Kürzungsgründe gleichzeitig — bitte prüfen Sie, ob beide zutreffen. "
+    "Die Kürzungen wirken nebeneinander."
+)
+
+
+def _section12_active_grounds(triggers: RiskTriggers) -> tuple[str, ...]:
+    return tuple(
+        code
+        for code, enabled in (
+            ("consumption_billing_missing", triggers.consumption_billing_missing),
+            ("remote_readability_missing", triggers.remote_readability_missing),
+            ("section_6a_information_missing", triggers.section_6a_information_missing),
+        )
+        if enabled
+    )
+
+
+def _section12_result(
+    *,
+    renter_ids: tuple[str, ...],
+    gross_claims: tuple[Cents, ...],
+    non_consumption_claims: tuple[Cents, ...] | None,
+    triggers: RiskTriggers,
+) -> Section12ReductionResult:
+    """Calculate the three independent § 12 components without changing claims.
+
+    MDL callers without an explicit split receive an incomplete audit result;
+    their confirmed gross positions remain visible but no plausible net figure is
+    produced.
+    """
+
+    active_grounds = _section12_active_grounds(triggers)
+    warning = (_SECTION12_WARNING,) if len(active_grounds) >= 2 else ()
+    if (
+        non_consumption_claims is None
+        or len(non_consumption_claims) != len(gross_claims)
+        or any(int(amount) < 0 for amount in non_consumption_claims)
+        or any(
+            int(base) > int(gross)
+            for base, gross in zip(non_consumption_claims, gross_claims, strict=True)
+        )
+    ):
+        incomplete_renters = tuple(
+            Section12RenterReduction(
+                renter_id=renter_id,
+                gross_claim=gross,
+                non_consumption_15_percent=cents(0),
+                remote_readability_3_percent=cents(0),
+                section_6a_information_3_percent=cents(0),
+                total_deduction=cents(0),
+                net_claim=None,
+            )
+            for renter_id, gross in zip(renter_ids, gross_claims, strict=True)
+        )
+        return Section12ReductionResult(
+            renters=incomplete_renters,
+            component_definitions=_SECTION12_COMPONENT_DEFINITIONS,
+            active_grounds=active_grounds,
+            warnings=warning,
+            is_complete=False,
+            incomplete_reason_de=(
+                "§-12-Kürzung unvollständig: bestätigte nichtverbrauchsabhängige "
+                "Positionen je Mieter fehlen, sind ungültig oder übersteigen den Bruttoanspruch."
+            ),
+        )
+
+    renters: list[Section12RenterReduction] = []
+    for renter_id, gross, non_consumption in zip(
+        renter_ids, gross_claims, non_consumption_claims, strict=True
+    ):
+        non_consumption_component = (
+            _risk_amount(non_consumption, Decimal(15))
+            if triggers.consumption_billing_missing
+            else cents(0)
+        )
+        remote_component = (
+            _risk_amount(gross, Decimal(3)) if triggers.remote_readability_missing else cents(0)
+        )
+        section_6a_component = (
+            _risk_amount(gross, Decimal(3)) if triggers.section_6a_information_missing else cents(0)
+        )
+        independently_rounded_total = (
+            int(non_consumption_component) + int(remote_component) + int(section_6a_component)
+        )
+        capped_total = min(independently_rounded_total, int(_risk_amount(gross, Decimal(21))))
+        deduction = cents(capped_total)
+        renters.append(
+            Section12RenterReduction(
+                renter_id=renter_id,
+                gross_claim=gross,
+                non_consumption_15_percent=non_consumption_component,
+                remote_readability_3_percent=remote_component,
+                section_6a_information_3_percent=section_6a_component,
+                total_deduction=deduction,
+                net_claim=cents(int(gross) - int(deduction)),
+            )
+        )
+    return Section12ReductionResult(
+        renters=tuple(renters),
+        component_definitions=_SECTION12_COMPONENT_DEFINITIONS,
+        active_grounds=active_grounds,
+        warnings=warning,
+        is_complete=True,
     )
 
 
@@ -763,6 +910,14 @@ def _self_billing(value: SelfBillingStatementInput) -> Page01bStatementResult:
         int(core.owner_residual.ww_consumption)
         - sum(int(origin.ww_consumption) for origin in core.owner_residual.origins)
     )
+    section12_reduction = _section12_result(
+        renter_ids=renter_ids,
+        gross_claims=renter_totals,
+        non_consumption_claims=tuple(
+            cents(int(line.heating_base) + int(line.ww_base)) for line in core.lines
+        ),
+        triggers=triggers,
+    )
     return Page01bStatementResult(
         readiness="READY",
         values=Page01bStatementValues(
@@ -791,6 +946,7 @@ def _self_billing(value: SelfBillingStatementInput) -> Page01bStatementResult:
         device_aggregation=device,
         owner_burden_preview=owner_preview,
         oil_consumption=oil,
+        section12_reduction=section12_reduction,
     )
 
 
@@ -865,10 +1021,36 @@ def _mdl(value: MdlStatementInput) -> Page01bStatementResult:
         intensity = None
         mass_grams = None
 
+    non_consumption_claims: tuple[Cents, ...] | None = None
+    if value.renter_non_consumption_positions is not None:
+        if path == "MDL_NET" or value.confirmed_total == 0:
+            non_consumption_claims = tuple(
+                cents(position) for position in value.renter_non_consumption_positions
+            )
+        else:
+            non_consumption_claims = tuple(
+                cents(
+                    int(
+                        (
+                            Decimal(position)
+                            * Decimal(int(billable))
+                            / Decimal(value.confirmed_total)
+                        ).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+                    )
+                )
+                for position in value.renter_non_consumption_positions
+            )
+
     triggers = value.risks
     if not value.co2_evidence_present:
         triggers = replace(triggers, co2_disclosure_missing=True)
     risks = _risks(triggers, renters)
+    section12_reduction = _section12_result(
+        renter_ids=value.renter_ids,
+        gross_claims=renters,
+        non_consumption_claims=non_consumption_claims,
+        triggers=triggers,
+    )
     return Page01bStatementResult(
         readiness="READY",
         values=Page01bStatementValues(
@@ -898,6 +1080,7 @@ def _mdl(value: MdlStatementInput) -> Page01bStatementResult:
         device_evidence=(),
         risks=risks,
         annual_comparison=annual,
+        section12_reduction=section12_reduction,
     )
 
 
