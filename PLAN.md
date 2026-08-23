@@ -569,33 +569,39 @@ portal are M10, not M6.
 **Status:** open. This is the remaining M6 work. **Approved-spec prerequisite:** `docs/15`, whose
 thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three bounded slices:
 
-- **M6-C1 — implemented and committed as `a203755`; deliberately NOT merged.** Pure
-  `packages/matching-engine`: § 4 signals and decision order, § 5.1 designation/FIFO/§ 367
-  settlement, § 5.2 principal-component split and § 5.3 reversal. All thirteen fixtures run
-  through real code as 30 tests. The package needs the standard library only — not even
-  `lokara-domain` — and refuses `float` at the single import boundary.
+- **M6-C1 — complete and merged.** Pure `packages/matching-engine`: § 4 signals and decision
+  order, § 5.1 designation/FIFO/§ 367 settlement, § 5.2 principal split and § 5.3 reversal. All
+  thirteen fixtures run through real code as 30 tests. The package needs the standard library
+  only — not even `lokara-domain` — and refuses `float` at the single import boundary.
 
-  **Merge gate:** `scoring.py::_end_to_end_signal` binds § 4's "stored reference" to
-  `profile.payment_code`, but §§ 3.2–3.3 define no such field. That is an invented matching
-  convention with no source, exercised by zero fixtures, and +15 can move a candidate from
-  Unmatched to Review. Make the signal return 0 with the gap documented, then merge and update
-  `docs/15` line 13 and § 11 in the same change. Until then those status lines stay true of `main`
-  and must not be edited.
-- **Workflow correction** — a short process slice before M6-C2, from what M6-C1 cost:
+  **The merge gate is closed.** `scoring.py::_end_to_end_signal` had bound § 4's "stored
+  reference" to `profile.payment_code`, but §§ 3.2–3.3 define no such field — an invented
+  matching convention with no source, exercised by zero fixtures, and +15 moves a candidate from
+  Unmatched to Review. The signal now returns 0 with the gap recorded in its docstring, in
+  `docs/15` § 4 and in `FRAGEN-an-Berkay-05.md`. `docs/15`'s status lines were updated in the
+  same change. The § 5.3 reversal lookup is a different mechanism, is source-backed and
+  fixture-covered by `F06`, and was not touched.
+- **Workflow correction — done and merged.** The short process slice `PLAN.md` put before M6-C2,
+  from what M6-C1 cost:
   1. The stop gate cannot express "RED on purpose". `CLAUDE.md` § 10 forbids one agent from writing
      both a test and its implementation, so every calculation slice has a mandatory red window —
      and the gate rejects turn-endings inside it with an identical error dump. Measured over the
      session transcripts: **9 main-session blocks plus 2 in subagents during the M6-C1 session
      alone**, and roughly 47 across all sessions. **12 of the 19 subagent blocks were
      `spec-scribe`**, the one role whose deliverable is a *failing* fixture — the gate is fighting
-     the rule that creates the red window. Proposed: a sentinel naming the slice and reason; the
-     gate reports red but does not block while it exists, and merging requires it absent.
+     the rule that creates the red window. **Shipped:** `.lokara-red` names the slice and the
+     reason; `scripts/check_red_sentinel.py` reports it, `gate.sh fast` prints every failure and
+     exits 0 while it exists, and `full`/`demo` treat it as a hard failure, so merging requires it
+     absent. It is gitignored, an anonymous sentinel is rejected, and
+     `scripts/tests/test_red_sentinel.py` proves the check can fail.
   2. Agent briefs must name their files. Subagents are ~39 % of all token spend, and 95 % of that
      is context re-read, so cost is turns × context, not brief length. Measured per run:
      `spec-scribe` 84 turns / 9,7 M tokens, `app-implementer` 93 / 8,7 M, `engine-implementer`
      66 / 5,4 M, `docs-reconciler` 143 / 11,9 M. The lever is naming the exact files, fixture IDs
-     and acceptance command up front instead of letting an agent discover them. This is an
-     `AGENTS.md` rule, not a gate; `gate.sh fast` itself runs in 1,5 s and is never the cost.
+     and acceptance command up front instead of letting an agent discover them. **Shipped** as
+     `AGENTS.md` § 4 "Brief and turn discipline", including a ~40-turn stop condition and the
+     measured baseline a later change is judged against. It is a rule, not a gate; `gate.sh fast`
+     itself runs in 1,5 s and is never the cost.
 
   Two further fixes were measured and **rejected**; do not rediscover them as good ideas.
   Skipping the gate for read-only agents fixes nothing: `boundary-auditor`, `statement-reviewer`
@@ -618,7 +624,8 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   Owner-scoped endpoints, and the Page-01 handoff copying a finalized `RECEIVABLE`
   `StatementSettlement` into an `nk_nachzahlung` receivable at exact cents. This slice also owns
   the § 4 stored-reference field: decide where it lives on the receivable or matching profile,
-  add it with the table, and only then make the E2E signal live again.
+  add it with the table, and only then make the E2E signal live again. It is inert today, and
+  turning it on without the field would restore the invented convention M6-C1 removed.
 - **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed,
   the three job entrypoints, and the `docs/15` implementation-status closure.
 

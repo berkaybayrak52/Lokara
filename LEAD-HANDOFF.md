@@ -18,7 +18,7 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 - `stash@{0}` ("m6c1-superseded-by-a203755") is a recovery point from the branch repair described
   below. It is fully superseded by `a203755` and can be dropped once that is confirmed.
 
-## M6-C1 — done, and deliberately NOT merged
+## M6-C1 — complete and merged
 
 `packages/matching-engine` implements approved `docs/15`: signal scoring, the six-step decision
 order, § 366/§ 367 settlement, Largest-Remainder principal split and reversal. All thirteen
@@ -26,20 +26,16 @@ order, § 366/§ 367 settlement, Largest-Remainder principal split and reversal.
 library only — not even `lokara_domain` was needed. Money is integer cents and `Decimal`; `float`
 is refused at the single import boundary.
 
-**The merge to `main` is blocked on one thing.**
-`packages/matching-engine/src/lokara_matching_engine/scoring.py:112` (`_end_to_end_signal`) binds
-`docs/15` § 4's "stored reference" to `profile.payment_code` and awards +15 on a substring match.
-§§ 3.2–3.3 never define a stored-reference field, so this is an **invented matching convention with
-no source**, exercised by zero fixtures — index 3 is `0` in all thirteen cases. It is not inert:
-+15 can lift a candidate from 25 to 40, i.e. Unmatched to Review, changing the decision.
+**The merge gate is closed.** `scoring.py::_end_to_end_signal` now returns 0. It had bound
+`docs/15` § 4's "stored reference" to `profile.payment_code`, and §§ 3.2–3.3 define no such field —
+an invented matching convention with no source, exercised by zero fixtures, where +15 lifts a
+candidate from 25 to 40, i.e. Unmatched to Review. The gap is recorded in the docstring, in
+`docs/15` § 4 and in `FRAGEN-an-Berkay-05.md`; M6-C2 adds the real field with the `receivable`
+table and makes the signal live. The § 5.3 reversal lookup resolves an original match by
+E2E/mandate reference — a different, source-backed mechanism covered by `F06` — and was not
+touched.
 
-Before merging, make that signal return 0 with the source gap documented in the docstring. Emir
-decided to defer the stored-reference question to M6-C2, and shipping a guess is deciding it rather
-than deferring it. The receivable table built in M6-C2 is where the real field belongs.
-
-Because the slice is unmerged, `docs/15` line 13 ("specification only") and § 11 ("implementation
-remain paused") are still true of `main` and must **not** be edited yet. Update them in the same
-change that merges.
+`docs/15`'s status lines were updated in the same change, so they now describe `main`.
 
 ## Judgment calls already made — do not rediscover these
 
@@ -76,13 +72,16 @@ That is the separation working, and it is recorded here rather than buried.
 
 ## Next work, in order
 
-1. **Workflow correction** — see `PLAN.md` § M6-C. Two real items: the stop gate cannot express
-   "RED on purpose" during the red window `CLAUDE.md` § 10 itself requires, and agent briefs are
-   too long (~300k tokens and ~40 minutes for one pure engine).
-2. **Make `_end_to_end_signal` inert**, then merge M6-C1 into local `main` and update the `docs/15`
-   status lines in the same change.
-3. **M6-C2** — models, migration `0017`, RLS, the § 3.1 adapter rewrite and owner-scoped endpoints.
-   Add the stored-reference field to the `receivable` table there.
+1. **M6-C2** — models, migration `0017`, RLS, the § 3.1 adapter rewrite and owner-scoped
+   endpoints. Add the stored-reference field to the `receivable` table there and only then make
+   the § 4 E2E signal live again.
+2. **M6-C3** — the German landlord *Zahlungen* screen, the three job entrypoints and the
+   `docs/15` implementation-status closure.
+
+The workflow correction that `PLAN.md` § M6-C put before M6-C2 is **done and merged**:
+`.lokara-red` lets a slice declare the red window `CLAUDE.md` § 10 requires, announced and
+non-blocking at `gate.sh fast`, a hard failure at `full`/`demo`. `AGENTS.md` § 4 carries the
+brief and turn discipline and the measured baseline it is judged against.
 
 ## A correction worth keeping
 

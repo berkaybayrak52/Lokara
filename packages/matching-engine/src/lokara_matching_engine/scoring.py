@@ -110,22 +110,27 @@ def _code_or_surname_signal(purpose: str, profile: RenterProfileInput) -> int:
 
 
 def _end_to_end_signal(transaction: BankTransactionInput, profile: RenterProfileInput) -> int:
-    """15 when the E2E or mandate reference matches the renter's stored reference.
+    """Always 0: the field `docs/15` § 4 scores against does not exist in the source.
 
-    `docs/15` § 4 names "stored reference" but § 3.3 gives the renter profile exactly one
-    stored, renter-identifying reference: `payment_code`.  That is what is compared here.
-    No Page 08 fixture exercises this signal, so nothing in the oracle pins the reading —
-    it is flagged in the slice report as a judgment call for review, and it is deliberately
-    the narrowest option (the profile's own field) rather than an invented reference table.
+    § 4's table awards 15 points when the E2E or mandate reference matches a "stored
+    reference".  §§ 3.2–3.3 define no such field — not on `Receivable`, not on
+    `RenterMatchingProfile`.  An earlier draft bound it to `profile.payment_code`, the
+    profile's only stored renter-identifying value.  That is an invented matching
+    convention with no source, and no Page 08 fixture pins it: signal index 3 is 0 in all
+    thirteen cases, so the oracle would never have caught a wrong reading.  It is not
+    inert either — +15 lifts a candidate from 25 to 40, which is Unmatched to Review.
+
+    Shipping the guess would decide the question rather than defer it, so the signal
+    returns 0 until the source answers.  The question is open in `FRAGEN-an-Berkay-05.md`
+    § "Seite 08 — Bank-Matching"; M6-C2 adds the real field with the `receivable` table and
+    makes this live again.  `WEIGHT_END_TO_END_REFERENCE` stays defined: it is the § 4
+    value, and the value is not what is missing.
+
+    Note this is *not* the § 5.3 reversal lookup, which resolves an original match by
+    E2E/mandate reference against recorded allocations.  That path is source-backed,
+    fixture-covered by `F06`, and unaffected.
     """
-    stored = normalize_comparison_text(profile.payment_code)
-    if not stored:
-        return 0
-    references = (transaction.end_to_end_reference, transaction.counterpart_mandate_reference)
-    for reference in references:
-        normalized = normalize_comparison_text(reference)
-        if normalized and stored in normalized:
-            return WEIGHT_END_TO_END_REFERENCE
+    del transaction, profile  # deliberately unused until the § 4 field exists
     return 0
 
 
