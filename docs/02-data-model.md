@@ -155,9 +155,9 @@ flow may fill it after redeeming a tenancy-bound, per-person, single-use activat
 
 `app_bootstrap_contexts(text)` and migration `0014_bootstrap_contexts_read.py` are **shipped** on
 `main`. The design uses one bounded `SECURITY DEFINER` function, a dedicated
-`NOLOGIN`/`NOBYPASSRLS` owner with read access only
-to `person`, `membership` and `account`, and one checked API call site. It does not create a renter
-portal or account switcher.
+`NOLOGIN`/`NOBYPASSRLS` owner with read access only to `person`, `membership` and `account`, and one
+checked API call site. M5 also ships the live `/me` contexts, role and nested-route authorization,
+and the URL-based account chooser/switcher. It does not create a renter portal.
 
 `renter.person_id` is nullable and has no default. Current create APIs leave it `NULL`; no current
 API route is authorized to write it. M5 owns a negative OpenAPI guard proving that absence. M10 owns
@@ -667,7 +667,7 @@ approved `docs/11` adds no schema or API.
 | Gap or boundary | Status | Owner |
 | --- | --- | --- |
 | Secure pre-context identity read (`app_bootstrap_contexts`, migration `0014`) | **Shipped** on `main` | M5 foundation |
-| Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Future** | M5 remainder |
+| Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Shipped** on `main` | M5 (`a748729`) |
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
 | Page 02 catalogue, classifications, NK half-up rounding and owner residual | Technically implemented by Slice C; flagged authority remains production-blocking | Slice C |
 | Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |

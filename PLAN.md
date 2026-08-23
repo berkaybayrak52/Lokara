@@ -47,9 +47,10 @@ before UI. Dates are communication events, not planning inputs.
   21.08.2026. Slice B is complete and locally merged after the Round-4 Block-(c) correction;
   the separate §12 pure-engine result remains audit-only and the round-four transcription is
   preserved. No slice was pushed.
-- M5 is complete: secure bootstrap, backend membership/assigned-building authorization and the
-  URL-based account chooser/switcher are shipped locally. Renter activation/portal remains M10;
-  adviser profile, mapping and tax functions remain M7.
+- M5 is complete and merged into `main` as `a748729`: secure bootstrap, backend
+  membership/assigned-building authorization and the URL-based account chooser/switcher are
+  shipped. Renter activation/portal remains M10; adviser profile, mapping and tax functions remain
+  M7. M6 is the next implementation milestone.
 
 ---
 
@@ -256,7 +257,7 @@ not replace the complete documentation or reconciliation gates.
 | A | **complete; approved and merged 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
 | B | **complete; locally merged 23.08.2026** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Ledger/finalization remains M6 work. |
 | C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
-| M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are locally shipped. Renter portal is M10; adviser profile/mapping and tax functions are M7. |
+| M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7. |
 | M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`: actual advances, BGH minimum #4, immutable snapshots, bank matching, landlord overview, isolated tenant documents, and remaining statement copy/citation findings. |
 | G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
 | U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
@@ -483,7 +484,7 @@ This work added no new dashboard, portal or account switcher.
 - The full gate and boundary audit are green. No migration, switcher, renter activation, tax route,
   web or PDF change is included.
 
-### Web closure
+### Locally merged account chooser and switcher (`a748729`)
 
 - `/` enters a sole `OWNER` or `EMPLOYEE` context. With multiple contexts it shows every live
   `/me` context as a URL link; a sole `TAX_ADVISOR` context is chosen deliberately.
@@ -495,10 +496,10 @@ This work added no new dashboard, portal or account switcher.
   zero-data states state that no object is assigned. Server-side role and building checks remain the
   authorization boundary.
 
-M5 is complete: roles behave correctly; every nested building route verifies its URL context;
-multiple account contexts switch by URL and are re-authorized per request; the pre-context checker
-stays green; and no current API route writes `renter.person_id`. Renter activation, renter URL
-context and renter portal authorization are M10 work.
+M5 is complete and merged on `main`: roles behave correctly; every nested building route
+verifies its URL context; multiple account contexts switch by URL and are re-authorized per request;
+the pre-context checker stays green; and no current API route writes `renter.person_id`. Renter
+activation, renter URL context and renter portal authorization are M10 work. M6 is next.
 
 ---
 
