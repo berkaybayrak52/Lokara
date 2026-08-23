@@ -617,15 +617,26 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   **wrong**: the main session had `cd`-ed into an agent worktree and never returned. Worktree
   copy-back is not known to have failed; do not act on that claim.
 
-- **M6-C2** — `bank_account`, `bank_transaction`, `receivable`, `renter_matching_profile`,
-  `iban_history`, `match_proposal`, `match_confirmation`, `payment_ledger_entry` and
-  `payment_allocation`, with migration `0017`, RLS and composite `(id, account_id)` FKs. Rewrite
-  `packages/adapters/src/lokara_adapters/bank.py` to the § 3.1 contract, keeping finAPI stubbed.
-  Owner-scoped endpoints, and the Page-01 handoff copying a finalized `RECEIVABLE`
-  `StatementSettlement` into an `nk_nachzahlung` receivable at exact cents. This slice also owns
-  the § 4 stored-reference field: decide where it lives on the receivable or matching profile,
-  add it with the table, and only then make the E2E signal live again. It is inert today, and
-  turning it on without the field would restore the invented convention M6-C1 removed.
+- **M6-C2 — complete.** The nine tables (`bank_account`, `bank_transaction`, `receivable`,
+  `renter_matching_profile`, `iban_history`, `match_proposal`, `match_confirmation`,
+  `payment_ledger_entry`, `payment_allocation`) ship with migration `0017`, FORCEd RLS and
+  composite `(id, account_id)` FKs; `check_rls_coverage` reports 38 tenant tables and
+  `check_fk_isolation` 62 edges. `packages/adapters/.../bank.py` is rewritten to the § 3.1
+  contract with `BANKMATCH-F10` executed at the import boundary, and `StubBankGateway` now honours
+  its `bank_account_id`. Owner-scoped endpoints and the Page-01 handoff (`F12`, 24,500 cents copied
+  exactly, not repeatable per statement) are in `apps/api/.../routers/payments.py`.
+
+  Two limits ship with it. The **Zahlungsfrist is asked for, never defaulted**: `docs/08` flags it
+  `verify-before-production`, the register records no statutory deadline, and the 30-day figure is
+  a `Konvention` — so the handoff refuses without an explicit due date. The **§ 4 stored-reference
+  signal stays inert**: `receivable.stored_reference` exists as a column, nothing writes it, and
+  turning the signal on without Berkay's answer restores the invented convention M6-C1 removed.
+
+  Migration `0018` narrows the receivable component-sum check to `category = 'rent'`. An
+  `nk_nachzahlung` has no rent, garage or advance component, and § 5.2 makes the cost of getting
+  this wrong concrete: the paid NK-advance component feeds the annual actual-advance total Page 01
+  consumes, so parking a Nachzahlung there to satisfy the arithmetic would double-count it as an
+  advance that was never paid.
 - **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed,
   the three job entrypoints, and the `docs/15` implementation-status closure.
 

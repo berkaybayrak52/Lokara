@@ -338,10 +338,31 @@ and account isolation are provable rather than asserted. finAPI itself stays stu
 is a composite `(id, account_id)` edge, and the payment-ledger tables are append-only by trigger.
 `docs/02` § 6 holds the persisted shape.
 
-What M6-C2 does **not** yet ship: the Page-01 handoff that turns a finalized `RECEIVABLE`
-`StatementSettlement` into an `nk_nachzahlung` receivable (`F12`), and the owner-scoped endpoints.
-The § 4 stored-reference signal remains inert — `receivable.stored_reference` exists as a column,
-nothing writes it, and it stays that way until the source question is answered.
+M6-C2 is complete. `apps/api/src/lokara_api/routers/payments.py` carries the owner-scoped
+endpoints — transaction import, the receivable and transaction lists, and the Page-01 handoff of
+`F12`, which copies a finalized `RECEIVABLE` `StatementSettlement` into an `nk_nachzahlung`
+receivable at exact cents and refuses to run twice for the same statement.
+
+Two limits ship with it, both deliberate:
+
+- **The Zahlungsfrist is asked for, never defaulted.** § 3.2 requires a `due_date`, but
+  `docs/08` marks *Zahlungsfrist bei Nachzahlung* `verify-before-production` and the register is
+  explicit — no statutory deadline exists, the claim falls due on receipt of a proper statement,
+  and the customary 30 days is a `Konvention`. The handoff therefore takes the date from the
+  caller and refuses without it rather than making that convention Lokara's answer.
+- **The § 4 stored-reference signal remains inert.** `receivable.stored_reference` exists as a
+  column so the field has a home; nothing writes it, and it stays that way until the source
+  question in `FRAGEN-an-Berkay-05.md` is answered.
+
+Migration `0018` limits the receivable component-sum check to `category = 'rent'`. An
+`nk_nachzahlung` has no rent, garage or advance component, and § 5.2 makes the reason concrete:
+the paid NK-advance component feeds the annual actual-advance total Page 01 consumes, so parking a
+Nachzahlung in `nk_advance_cents` to satisfy an arithmetic check would double-count it as an
+advance that was never paid as one. Page 08 gives no component split for `nk_nachzahlung`, so none
+is invented.
+
+M6-C3 remains open: the landlord *Zahlungen* screen, the three job entrypoints and this document's
+implementation-status closure.
 
 ## 11. Approval and implementation boundary
 
