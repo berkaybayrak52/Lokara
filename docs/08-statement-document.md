@@ -73,9 +73,8 @@ Scope limits that this does **not** move:
   audience and `to_pdf_data` deliberately has **no** audience parameter, because a
   Mieter-Einzelabrechnung is a separate, independently rendered document (§ 3) and adding a flag to
   the existing route is exactly the "render everything and hide rows" shape § 3 forbids.
-- **Page 01 cent figures that need renter-side half-up rounding remain deferred to Slice C.**
-  Production NK still uses its shipped largest-remainder path (`CLAUDE.md` § 8); only heating rounds
-  each renter share half-up against one owner residual.
+- **Slice C applies renter-side half-up rounding and one owner residual to NK.** Its applicable
+  Page-02 authority remains production-blocking; heating uses the same rounding shape.
 - Everything in the next section stays with M6.
 
 ### Specified Page 01 and M6 output
@@ -322,10 +321,8 @@ single-unit timelines preserve origin.
 
 #### 3a — The party-totals block gets one Eigentümer row, not two
 
-The final owner summary row adds all NK owner-side amounts and the heating residual. The current NK
-money table still itemises landlord-side occupancy per unit because production NK remains on its
-pre-Page-02 method. The summary must not call its NK part a residual until Slice C implements
-`docs/09`.
+The final owner summary row adds all NK and heating residuals. Slice C applies the Page-02 residual
+model to NK; any final tenant-document presentation remains M6 work.
 
 #### 4 — Required rendered text (Gesamtübersicht)
 

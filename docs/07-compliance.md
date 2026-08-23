@@ -50,10 +50,10 @@ Every status below describes repository delivery, not legal certainty:
   `Membership` in that account and set the transaction-local Postgres account context. RLS is the
   database backstop, not a substitute for the application check.
 
-### Prepared but unmerged
+### Shipped bootstrap boundary
 
-- The least-privilege pre-context bootstrap read on `slice/m5-bootstrap-contexts` remains absent
-  from `main`. It is not a deployed identity path or permission to bypass account context.
+- The least-privilege pre-context bootstrap read is shipped on `main` through migration `0014`. It is
+  the sole deployed identity path before account context, not permission to bypass account context.
 
 ### Specified and Future
 

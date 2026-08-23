@@ -29,14 +29,14 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   the current persistence and isolation path.
 - The demo path persists one fixed account, calculates operating and heating costs and renders the
   landlord `Vermieter-Gesamtübersicht`.
-- `docs/09-betrkv-catalogue.md` and its data-only oracle are merged specifications. The production
-  catalogue, Page 02 gate and NK integration are not shipped.
+- `docs/09-betrkv-catalogue.md` and its data-only oracle are technically implemented through Slice C.
+  Its flagged authority still blocks production use.
 
-### Prepared but unmerged
+### Shipped
 
-- `slice/m5-bootstrap-contexts` contains the bounded least-privilege pre-context identity read.
-- `slice/docs-15` contains the Page 08 bank-matching transcription. It remains blocked by the
-  missing authoritative `BANKMATCH-F03` case and is neither merged nor production behavior.
+- The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
+- The Page 08 bank-matching transcription is merged in `docs/15`; `BANKMATCH-F03` is resolved in
+  its complete thirteen-case oracle. Production bank matching remains M6 work.
 
 ### Specified
 
@@ -93,8 +93,8 @@ backend.
   it does not recalculate legal or money rules.
 
 `scripts/check_engine_purity.py` protects the engine boundary. The RLS and composite-FK checks
-protect the current persistence boundary. The pre-context checker is Prepared but unmerged on
-`slice/m5-bootstrap-contexts`; `AGENTS.md` owns the complete gate contract.
+protect the current persistence boundary. The shipped pre-context checker protects the one bounded
+identity read; `AGENTS.md` owns the complete gate contract.
 
 ## Identity and account isolation
 
@@ -110,9 +110,8 @@ protect the current persistence boundary. The pre-context checker is Prepared bu
   in the composite edge.
 - Current account routes verify live membership and set transaction-local account context; forced
   Postgres RLS is the backstop. Nested-resource authorization remains Specified M5 work.
-- Login is the only permitted pre-account lookup. The bounded
-  `app_bootstrap_contexts(text)` design is Prepared but unmerged; it does not authorize another
-  pre-context reader.
+- Login is the only permitted pre-account lookup. The shipped bounded
+  `app_bootstrap_contexts(text)` read does not authorize another pre-context reader.
 - Tenant-document isolation is the Specified M6 contract: select one account-valid tenancy before
   rendering and expose no other renter's visible or hidden data. It is not current output.
 

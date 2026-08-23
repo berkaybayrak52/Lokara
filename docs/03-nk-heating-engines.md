@@ -156,23 +156,21 @@ Garbage cost: **€1,200.00**, period 2025, key `AREA`.
 | Unit C — renter 3 | 20 m² | 365 | 7,300 | €240.00 |
 | **Total** |  |  | **36,500** | **€1,200.00** |
 
-The current engine uses largest-remainder rounding. This exact fixture produces the same cents under
-the later renter-half-up/owner-residual method, so it does not hide the pending change.
+The current engine uses renter-half-up rounding and one owner residual. This exact fixture also
+produces the same cents under the former largest-remainder method, so it remains a stable oracle.
 
-### Current Slice C boundary
+### Slice C technical closure and production boundary
 
 `docs/09-betrkv-catalogue.md` is merged with the Page 02 contract and exact `09-F01`–`09-F32` data
-oracle. Merge does not prove a production catalogue, legal approval or engine behavior. Until Slice
-C implements the merged Page 02 contract:
+oracle. Slice C technically implements that contract. It does not prove legal production approval:
 
-- NK remains largest-remainder and continues to represent owner-side occupancy as ordinary result
-  lines with `tenancy_id = None`;
-- production eligibility, classification, renter-side half-up rounding, and one NK owner residual
-  are not claimed;
+- NK uses renter-half-up rounding and one owner residual;
+- technical eligibility and classification behavior is implemented, while its flagged legal inputs
+  remain production-blocking;
 - every missing register assignment and unresolved classification remains
   `verify-before-production`;
-- `DIRECT`, `PERSONS`, `CONSUMPTION`, period validation, and end-to-end Page 02 fixtures remain Slice C
-  closure work, even where current primitives already exist.
+- `DIRECT`, `PERSONS`, `CONSUMPTION`, period validation, and end-to-end Page 02 fixtures are covered
+  by Slice C; their applicable flagged authority remains `verify-before-production`.
 
 The Page 08 bank-matching contract is **approved and merged** in `docs/15`. That approved doc and
 its oracle resolve `BANKMATCH-F03`, and all thirteen cases are executable. This
@@ -583,7 +581,7 @@ keep different shapes.
 | 10 | CO₂ cost → statutory landlord/renter sides | half-up landlord deduction plus exact complement | renter statutory side; no owner residual |
 
 Sites 1, 5, 9, and 10 are two-way complements. Sites 2, 3, 4, 6, 7, and 8 allocate to renters and
-therefore use the owner-residual model. NK remains on `distribute_cents` until Slice C.
+therefore use the owner-residual model. NK now uses the corresponding owner-residual path.
 
 ### 9.2 The owner bucket is one Liegenschafts-Residuum — and it always exists
 
@@ -783,7 +781,7 @@ filenames appear nowhere else in the live repository except the retirement check
 
 | Superseded method/value | Current disposition and reason |
 | --- | --- |
-| Heating largest-remainder party allocation | Renter half-up plus unconditional owner residual; avoids silent cent transfer between renters. NK keeps largest remainder until Slice C. |
+| Heating largest-remainder party allocation | Renter half-up plus unconditional owner residual; avoids silent cent transfer between renters. Slice C aligns NK with that residual model. |
 | Unsourced K3 table `170 150 130 80 40 15 10 10 30 80 120 165` | VDI 2067 12/1983 Table 22 in tenth-promille, sum 10,000. |
 | Short-period table-bound scaling and period-intensity display | H2 annualises intensity, R8 rounds it, and lookup uses unshortened statutory bounds. |
 | Raw/unrounded F05 classification | `11.999… → 12.0 → step 2`; landlord deduction 1,280 ct. |

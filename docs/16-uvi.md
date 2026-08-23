@@ -45,8 +45,8 @@ The later sources settle these corrections:
 6. A renter is a Person/Tenancy domain context. `RENTER` is never a `Membership` role. Membership
    roles remain `OWNER`, `EMPLOYEE` and `TAX_ADVISOR`.
 7. UVI introduces no money allocation. It does not add a heating largest-remainder path. Heating
-   money remains renter half-up plus the unconditional owner residual in `docs/03`; NK keeps its
-   own current rule until Slice C.
+   money remains renter half-up plus the unconditional owner residual in `docs/03`; Slice C aligns
+   NK with the same residual shape.
 8. Block D normalizes by area and requires at least three valid comparable-category units,
    **including the target**. Two other valid units plus the target meet the threshold.
 9. Mid-month readings interpolate linearly by elapsed days, and the output retains interpolation

@@ -102,12 +102,11 @@ inside Python; Pydantic validates the backend boundary.
 Local login still uses the explicitly enabled dev-token route; no real Supabase Auth project is
 wired. Demo load/reset also require their explicit flag and operate on the fixed demo account.
 
-## Prepared but unmerged identity foundation
+## Shipped bootstrap identity foundation
 
-**Prepared but unmerged:** `app_bootstrap_contexts(text)` and migration `0014` exist only on
-`slice/m5-bootstrap-contexts`, not on `main`. They define one bounded pre-context identity read; they
-do not ship an account switcher, new dashboard or renter portal. `docs/02-data-model.md` owns the
-detailed function, role, policy, privilege and call-site contract.
+**Shipped on `main`:** `app_bootstrap_contexts(text)` and migration `0014` define one bounded
+pre-context identity read. They do not ship an account switcher, new dashboard or renter portal.
+`docs/02-data-model.md` owns the detailed function, role, policy, privilege and call-site contract.
 
 ## Shipped statement boundary and Specified M6 work
 

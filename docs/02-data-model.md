@@ -153,9 +153,9 @@ have no earlier relationship to the landlord's account, and may simultaneously o
 exists. The actual invariant is consent: the nullable link starts empty and exactly one future M10
 flow may fill it after redeeming a tenancy-bound, per-person, single-use activation code.
 
-`app_bootstrap_contexts(text)` and migration `0014_bootstrap_contexts_read.py` are **prepared but
-unmerged** on `slice/m5-bootstrap-contexts`. They are not part of `main`. The prepared design uses one
-bounded `SECURITY DEFINER` function, a dedicated `NOLOGIN`/`NOBYPASSRLS` owner with read access only
+`app_bootstrap_contexts(text)` and migration `0014_bootstrap_contexts_read.py` are **shipped** on
+`main`. The design uses one bounded `SECURITY DEFINER` function, a dedicated
+`NOLOGIN`/`NOBYPASSRLS` owner with read access only
 to `person`, `membership` and `account`, and one checked API call site. It does not create a renter
 portal or account switcher.
 
@@ -339,10 +339,9 @@ split; presenting an ordinary allocation-key selector for them would model a cho
 not have.
 
 Page 02 is merged in [`docs/09-betrkv-catalogue.md`](09-betrkv-catalogue.md) with the exact
-`09-F01`–`09-F32` data oracle. Merge is **specified**, not production closure or legal approval: no
-production catalogue or Page 02 gate is wired, and the missing register rows and unresolved
-classifications remain `verify-before-production`. Slice C owns production NK eligibility,
-classification, renter half-up allocation and owner-residual integration.
+`09-F01`–`09-F32` data oracle. Slice C technically implements the catalogue and Page-02 NK
+integration, but this is not production closure or legal approval: missing register rows and
+unresolved classifications remain `verify-before-production`.
 
 The Page 08 bank-matching contract is **complete, approved and merged** in `docs/15`. That approved
 doc and its oracle resolve `BANKMATCH-F03` as E12 and distinguish potential-duplicate Review from
@@ -527,9 +526,8 @@ field; no owner percentage exists.
 
 #### This is cross-engine and binding
 
-Heating already calculates every renter block with half-up rounding and commits the remainder to one
-property residual. NK still uses its shipped largest-remainder path until Slice C implements the
-reviewed Page 02 contract. The residual rule and renter-side half-up rounding must move together:
+Heating and the Slice-C NK path calculate every renter block with half-up rounding and commit the
+remainder to one property residual. The residual rule and renter-side half-up rounding move together:
 largest remainder allocates the entire pot across its weight list, which would either treat the
 owner as a separately weighted party or force a zero residual. Both contradict the normalized model.
 For heating, the same one owner result reconciles all four displayed blocks and the combined
@@ -668,10 +666,10 @@ approved `docs/11` adds no schema or API.
 
 | Gap or boundary | Status | Owner |
 | --- | --- | --- |
-| Secure pre-context identity read (`app_bootstrap_contexts`, migration `0014`) | **Prepared but unmerged** on `slice/m5-bootstrap-contexts` | M5, after documentation and Slices A–C |
+| Secure pre-context identity read (`app_bootstrap_contexts`, migration `0014`) | **Shipped** on `main` | M5 foundation |
 | Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Future** | M5 remainder |
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
-| Page 02 production catalogue, classifications, NK half-up rounding and owner residual | Merged specification; production missing and flags remain | Slice C |
+| Page 02 catalogue, classifications, NK half-up rounding and owner residual | Technically implemented by Slice C; flagged authority remains production-blocking | Slice C |
 | Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |
 | Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |

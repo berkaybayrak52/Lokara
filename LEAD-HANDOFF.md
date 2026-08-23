@@ -146,9 +146,10 @@ unanswered, and belong to a round five.
   decisions above are explicitly labelled `Konvention` or `UNSICHER` and remain Anwaltspunkte.
 - M6 still owns actual paid advances, Saldo/Nachzahlung/Guthaben, immutable finalization, archived
   bytes and hashes, and the rendered tenant document. There is no tenant PDF.
-- Page 01 cent figures needing half-up stay deferred to Slice C; NK keeps largest remainder.
-- The paused `slice/m5-bootstrap-contexts` was rebased onto current local `main`; its bootstrap
-  migration is now `0014`, following Slice C's `0013`.
+- Slice C applies renter-side half-up rounding and one NK owner residual; its flagged Page-02
+  authority remains production-blocking.
+- M5's bootstrap foundation is locally merged as `1300db1`; its migration is `0014`, following
+  Slice C's `0013`.
 
 ## 5. Next decisions — all Emir's
 

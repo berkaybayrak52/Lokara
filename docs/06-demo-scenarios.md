@@ -20,7 +20,7 @@
 | Status | Demo capability |
 | --- | --- |
 | **Shipped** | One fixed `SOLO` owner account; the six-screen seeded path; Scenarios 1–5; the 2025 landlord calculation and PDF |
-| **Prepared but unmerged** | The secure M5 bootstrap read on `slice/m5-bootstrap-contexts`; it changes identity lookup, not onboarding or the visible demo |
+| **Shipped** | The secure M5 bootstrap read; it changes identity lookup, not onboarding or the visible demo |
 | **Specified** | The M6 Page 01 tenant output: actual advances, Saldo, immutable finalization and one isolated document per eligible tenancy |
 | **Future** | Scenario 6, the five-persona identity demo, role-aware account switching, renter/tax-adviser portals, investment entitlement and mobile |
 
@@ -147,9 +147,9 @@ RLS-scoped application role and cannot create the first `Person`; after the owne
 and reset operate only on the fixed `acc_demo_lokara` account. They are pitch utilities, not
 production signup, onboarding or account creation.
 
-The **Prepared but unmerged** M5 branch adds migration `0014` and the bounded
-`app_bootstrap_contexts(text)` identity read. That work does not add a `Person` write, production
-onboarding, a new dashboard, a portal or an account switcher.
+The shipped M5 foundation adds migration `0014` and the bounded `app_bootstrap_contexts(text)`
+identity read. It does not add a `Person` write, production onboarding, a new dashboard, a portal
+or an account switcher.
 
 ## Current statement boundary
 
