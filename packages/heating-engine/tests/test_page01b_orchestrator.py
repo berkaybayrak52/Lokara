@@ -526,6 +526,10 @@ def test_f25_reduction_risks_stay_separate_and_never_change_money() -> None:
         Decimal(15),
     ]
     assert result.risk_total is None
+    reduction = result.section12_reduction
+    assert reduction is not None
+    assert len(reduction.component_definitions) == 3
+    assert "co2_disclosure_missing" not in reduction.active_grounds
     _assert_allocation(result, "01b-F01")
 
 
