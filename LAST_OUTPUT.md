@@ -1,6 +1,6 @@
 # Last output — M6-C2 complete, unmerged and awaiting its boundary review
 
-HEAD `5af7897` on `slice/m6-c2a-bank-schema` · `23.08.2026`
+HEAD `b0ff5af` on `slice/m6-c2a-bank-schema` · `23.08.2026`
 Status: Complete
 
 ## Wanted
@@ -22,8 +22,8 @@ which also proved `0001`–`0018` apply on a clean database; demo fingerprint un
 
 ## Not done
 M6-C2 is **unmerged** and `boundary-auditor` has not been run, though `AGENTS.md` § 7 requires it
-for nine new tenant tables, four endpoints and an adapter. M6-C3 is untouched. Nothing pushed;
-`main` is 16 commits ahead of `origin/main`.
+for nine new tenant tables, four endpoints and an adapter. M6-C3 is untouched. The M6-C2 slice is
+not on the remote; `main` itself was pushed by Emir at 16:34 and matches `origin/main`.
 
 ## Optional next step
 Run `boundary-auditor` over the slice, then merge it and start M6-C3.

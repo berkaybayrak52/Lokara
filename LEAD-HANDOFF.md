@@ -8,8 +8,12 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 - `main` is at `e755b9c`. The working branch is `slice/m6-c2a-bank-schema`, which carries the
   three M6-C2 commits ahead of it: `f1731f6` (schema + migration `0017`), `a729bf9` (§ 3.1 adapter)
   and `5af7897` (endpoints + the `F12` handoff + migration `0018`). **Not merged.**
-- Local `main` is 16 commits ahead of `origin/main` (`a748729`, the M5 merge). Nothing has been
-  pushed since M5. Do not push without Emir's explicit go-ahead.
+- `origin/main` is **also** at `e755b9c`: Emir pushed `main` on 23.08.2026 at 16:34, so this
+  session's merged work (the workflow correction `cc2f758` and the M6-C1 merge `8306b68`) is on
+  GitHub. Local `main` is zero commits ahead. Earlier drafts of this file said "16 ahead, nothing
+  pushed since M5" — that was true when written and is now wrong.
+- The M6-C2 slice branch is **not** on the remote. Do not push it without Emir's explicit
+  go-ahead.
 - `Antwort-an-Emir_04.md` stays untracked at repository root by Emir's decision.
 - `scripts/gate.sh full` is green: 1105 Python tests, 43 web tests, `mypy --strict` clean, RLS
   coverage 38 tenant tables, FK isolation 62 edges, engine purity clean.
