@@ -317,6 +317,77 @@ recorded; migrate create/read API schemas; and remove the scalar only after back
 tenancy becomes one open-ended period beginning at `tenancy.valid_from` with its current scalar
 amount. This is a data migration, not just a model rename.
 
+### M6-A temporal advances and confirmed actual-advance preview
+
+**Status:** implementation contract for the first M6 slice.  **Source:** Page 01, § 4 minimum #4
+and its `08-F02`–`08-F04`, `08-F10`, `08-F14`, `08-F16`, `08-F18`–`08-F19` oracle branches;
+this document's financial-time-axis and scalar-defect rules; and the M6-A product charter dated
+23.08.2026.  **Rechtsstand:** 08/2026 for the already transcribed Page-01 statement rule.
+The manual-entry workflow below is a Lokara technical/product convention, not an assertion about
+banking, payment-service or tax law.
+
+M6-A replaces the tenancy scalar with the following append-only records. All records carry a
+non-null `account_id`; every tenancy edge is composite `(account_id, tenancy_id)`. A route that
+carries both a building and tenancy must prove that the tenancy's unit belongs to that building,
+even inside one account. RLS and composite foreign keys are both required; either one alone is
+insufficient.
+
+| Record | Required fields and constraints | History/read rule |
+| --- | --- | --- |
+| `AdvancePaymentPeriod` | `id`, `account_id`, `tenancy_id`, non-negative `amount_cents`, `valid_from`, nullable `predecessor_id`, required `declaration_ref` and server `created_at`. The initial backfill has `predecessor_id = NULL`. | The effective end is **derived**, never stored: a period ends at the next successor's `valid_from`; no successor means open-ended. A successor must have the same account and tenancy and start after its predecessor. It is an insert, never an update of the earlier row. |
+| `AdvancePayment` | `id`, `account_id`, `tenancy_id`, strictly positive `amount_cents`, `payment_date`, required non-blank `evidence_ref`, server `accepted_at`, and nullable `reversal_of_id`. | An owner-entered entry is accepted immediately in M6-A. It is immutable. A correction inserts a compensating entry that references the original entry; it does not edit or delete it. The compensating entry has the opposite allocation effect while retaining a positive recorded amount. |
+| `AdvanceAllocation` | `id`, `account_id`, `payment_id`, `tenancy_id`, inclusive `period_start` and `period_end`, and positive `amount_cents`. | Allocations are immutable evidence. Each allocation belongs to the payment's tenancy/account, and the sum allocated from one payment may not exceed its positive payment amount. M6-A creates one allocation per manual payment, but the separate record keeps the later matching boundary explicit. |
+| `AdvanceReconciliation` | `id`, `account_id`, `tenancy_id`, inclusive period, `version`, `total_cents`, nullable `supersedes_id`, `confirmed_at` and an immutable ordered list of allocation IDs. | `total_cents` is derived only from the accepted listed allocations (with correction signs applied). An explicitly empty allocation list is a valid confirmation of zero. The newest version for the same tenancy and billing period supersedes the earlier reconciliation without changing it. |
+
+The tenancy-create request accepts an initial advance amount only as the input used to create the
+first `AdvancePaymentPeriod`; tenancy read responses expose `advance_payment_periods`, not
+`advance_payment_cents` or an `advancePaymentCents` alias. The migration must first backfill every
+existing tenancy from its scalar (`valid_from`, scalar amount, no predecessor), then make the scalar
+unavailable to new model/API code. A zero contractual period is valid. No update/delete endpoint
+exists for any of these four record types.
+
+M6-A does **not** introduce imported bank transactions, matching proposals, learned IBANs,
+receivables, final statements, tenant portal delivery, PDF changes or a tax export. The payment entry
+is immediate owner-entered evidence only; it neither proves a bank transfer nor creates a tax event.
+
+#### Reconciliation and preview invariant
+
+For a selected tenancy and billing period, the internal owner preview computes:
+
+```text
+confirmed_actual_advances = signed sum(accepted allocations in the current reconciliation)
+saldo = subtotal - confirmed_actual_advances
+```
+
+All values are integer cents. A positive Saldo, zero Saldo and a negative Saldo are all valid
+arithmetic results. If there is no current reconciliation, the projection returns its subtotal and
+the reconciliation state `MISSING`, but **omits** both actual advances and Saldo. It must not infer
+them from the contractual schedule, sum unconfirmed entries or use result language such as
+`Nachzahlung`, `Guthaben`, `zu zahlen`, `offener Betrag` or `fällig`. This is an owner-only preview;
+it is neither finalization nor a renter document.
+
+The current projection must expose its reconciliation state and, when confirmed, the current
+reconciliation identity/version, confirmed actual advances and Saldo. A correction has no effect on
+an already confirmed preview until a newer reconciliation explicitly selects the corrected evidence.
+This makes the before/after evidence auditable rather than silently changing an old result.
+
+#### M6-A executable fixture map
+
+| Fixture | Scenario and required result |
+| --- | --- |
+| `M6A-F01` | Migration backfills every existing tenancy into exactly one open-ended initial schedule at `tenancy.valid_from`, with the former scalar amount. The scalar is then absent from the mapped tenancy and tenancy HTTP contracts. |
+| `M6A-F02` | A 12,000-cent initial period followed on 01.07 by a 15,000-cent successor keeps the initial row unchanged and reads as `[01.01, 01.07)` then `[01.07, open)`. |
+| `M6A-F03` | A confirmed 28,857-cent allocation yields confirmed actual advances `28,857`; an explicitly confirmed empty list yields `0`, not missing. |
+| `M6A-F04` | Without a reconciliation, preview exposes subtotal and `MISSING` only; actual advances and Saldo are absent. |
+| `M6A-F05` | With subtotal `28,857`, confirmed advances `28,000` yields Saldo `857`; `28,857` yields `0`; `30,000` yields `-1,143`. |
+| `M6A-F06` | Reversing a 28,000-cent entry and creating a new reconciliation changes the current confirmed total by `-28,000`; the prior reconciliation remains readable and unchanged. |
+| `M6A-F07` | Foreign-account rows and a tenancy from another building cannot be read, attached, allocated or reconciled through guessed IDs; database composite edges and RLS reject cross-account links. |
+| `M6A-F08` | An allocation cannot attach a payment to a different tenancy, even within one account; nor can any advance payment, allocation, reconciliation, predecessor or reversal cross an account. Every such edge rejects the link. |
+| `M6A-F09` | The cumulative positive allocation amount for one payment never exceeds that payment's positive recorded amount; a second allocation that would exceed it is rejected. |
+| `M6A-F10` | One original payment has at most one reversal. A second reversal is rejected and the original/reversal evidence remains unchanged. |
+| `M6A-F11` | The live app role sees all five M6-A tables in account A, sees none under account B, cannot insert a foreign-account row, and cannot update or delete an A row. |
+| `M6A-F12` | The owner-only preview exposes reconciliation `id` and `version` together with confirmed advances and Saldo. An assigned employee keeps the otherwise permitted statement projection, but receives none of those M6-A fields or state. |
+
 ### Allocation keys
 
 `AllocationKey` and `AllocationKeyAssignment` are **shipped**, not future M3 work. A cost keeps its

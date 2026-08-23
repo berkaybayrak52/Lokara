@@ -190,7 +190,8 @@ class TestDemoReset:
                 "validFrom": "2025-01-01",
                 "validTo": None,
                 "baseRentCents": 70000,
-                "advancePaymentCents": 12000,
+                "initialAdvancePaymentCents": 12000,
+                "advanceDeclarationRef": "Demo-Reset-Mietvertrag",
             },
         )
         assert tenancy.status_code == 201

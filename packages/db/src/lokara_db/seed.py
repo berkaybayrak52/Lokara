@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from .models import (
     Account,
+    AdvancePaymentPeriod,
     AllocationKeyAssignment,
     Building,
     ConfirmedCostClassification,
@@ -237,7 +238,19 @@ def seed_demo(session: Session) -> None:
                 valid_from=valid_from,
                 valid_to=valid_to,
                 base_rent_cents=rent,
-                advance_payment_cents=advance,
+            )
+        )
+        session.merge(
+            AdvancePaymentPeriod(
+                # Matches migration 0015's deterministic backfill identity so
+                # seed_demo remains idempotent on a database that existed before M6-A.
+                id=f"app_backfill_{tenancy_id}",
+                account_id=DEMO_ACCOUNT_ID,
+                tenancy_id=tenancy_id,
+                amount_cents=advance,
+                valid_from=valid_from,
+                predecessor_id=None,
+                declaration_ref="Demo-Mietvertrag",
             )
         )
         session.merge(
@@ -470,6 +483,17 @@ def reset_demo(session: Session) -> None:
     session.execute(
         text(
             "DELETE FROM tenancy_party WHERE tenancy_id IN "
+            "(SELECT t.id FROM tenancy t JOIN unit u ON u.id = t.unit_id "
+            "WHERE u.building_id <> 'bld_demo_muster12' AND NOT EXISTS "
+            "(SELECT 1 FROM allocation_key_assignment a "
+            "WHERE a.direct_tenancy_id = t.id))"
+        )
+    )
+    # M6-A schedule rows are children of tenancy and are not an archive or a
+    # finalized record. Reset removes them before the disposable tenancy graph.
+    session.execute(
+        text(
+            "DELETE FROM advance_payment_period WHERE tenancy_id IN "
             "(SELECT t.id FROM tenancy t JOIN unit u ON u.id = t.unit_id "
             "WHERE u.building_id <> 'bld_demo_muster12' AND NOT EXISTS "
             "(SELECT 1 FROM allocation_key_assignment a "

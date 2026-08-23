@@ -20,6 +20,11 @@ EXPECTED_TABLES = {
     "unit",
     "tenancy",
     "tenancy_party",
+    "advance_payment_period",
+    "advance_payment",
+    "advance_allocation",
+    "advance_reconciliation",
+    "advance_reconciliation_allocation",
     "person_count",
     "mdl_statement",
     "mdl_statement_position",
@@ -86,7 +91,6 @@ class TestSchemaShape:
     def test_money_and_area_columns_are_integers(self) -> None:
         for table_name, column in (
             ("tenancy", "base_rent_cents"),
-            ("tenancy", "advance_payment_cents"),
             ("statement", "total_cents"),
             ("unit", "area_sqm_x100"),
             ("self_use_period", "sqm_x100"),

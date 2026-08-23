@@ -27,7 +27,14 @@ import type { DemoStatementResponse } from '@/lib/contracts';
 
 import { useBuildings } from '../objekte/queries';
 
-import { useStatement } from './queries';
+import {
+  useBuildingTenancies,
+  useConfirmAdvanceReconciliation,
+  useCreateAdvancePayment,
+  useMe,
+  useStatement,
+  useTenantPreview,
+} from './queries';
 
 /**
  * Abrechnung erstellen (docs/04 M3 page 6, docs/06 Scenario 1+2): run the
@@ -40,6 +47,7 @@ const DEFAULT_PERIOD_TO = '2025-12-31';
 
 export function StatementPage({ accountId }: { accountId: string }) {
   const [requested, setRequested] = useState(false);
+  const { data: me } = useMe();
   const buildings = useBuildings(accountId);
   const [buildingId, setBuildingId] = useState('');
   const [periodFrom, setPeriodFrom] = useState(DEFAULT_PERIOD_FROM);
@@ -49,6 +57,7 @@ export function StatementPage({ accountId }: { accountId: string }) {
   // statement is always computed for the object the user can see selected.
   const options = buildings.data?.buildings ?? [];
   const selectedId = buildingId || options[0]?.id || '';
+  const ownerControls = me?.accounts.find((account) => account.id === accountId)?.role === 'OWNER';
 
   const statement = useStatement(
     accountId,
@@ -159,7 +168,13 @@ export function StatementPage({ accountId }: { accountId: string }) {
           </Button>
         </div>
       ) : (
-        <StatementResult data={statement.data} pdfUrl={pdfUrl} accountId={accountId} />
+        <StatementResult
+          data={statement.data}
+          pdfUrl={pdfUrl}
+          accountId={accountId}
+          selection={{ buildingId: selectedId, periodFrom, periodTo }}
+          ownerControls={ownerControls}
+        />
       )}
     </main>
   );
@@ -169,10 +184,14 @@ export function StatementResult({
   data,
   pdfUrl,
   accountId,
+  selection,
+  ownerControls = false,
 }: {
   data: DemoStatementResponse;
   pdfUrl: string;
   accountId: string;
+  selection: { buildingId: string; periodFrom: string; periodTo: string };
+  ownerControls?: boolean;
 }) {
   // A confirmed Messdienstleister statement is passed through, not recomputed
   // (docs/03 H7), so its table has party totals and no §§ 7/8/9 split. The
@@ -512,7 +531,101 @@ export function StatementResult({
           {data.rechtsstaende.join(' · ')} — {data.disclaimer}
         </p>
       </section>
+      {ownerControls ? <TenantSaldoPreview accountId={accountId} selection={selection} /> : null}
     </div>
+  );
+}
+
+function TenantSaldoPreview({
+  accountId,
+  selection,
+}: {
+  accountId: string;
+  selection: { buildingId: string; periodFrom: string; periodTo: string };
+}) {
+  const [tenancyId, setTenancyId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(selection.periodTo);
+  const [evidenceRef, setEvidenceRef] = useState('');
+  const [allocationIds, setAllocationIds] = useState<string[]>([]);
+  const tenancies = useBuildingTenancies(accountId, selection.buildingId, true);
+  const preview = useTenantPreview(accountId, { ...selection, tenancyId }, tenancyId !== '');
+  const payment = useCreateAdvancePayment(accountId, selection.buildingId, tenancyId);
+  const reconciliation = useConfirmAdvanceReconciliation(accountId, selection.buildingId, tenancyId);
+  const eur = (value: number) =>
+    new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value / 100);
+
+  return (
+    <section aria-labelledby="tenant-preview-heading">
+      <h2 id="tenant-preview-heading" className="mb-3 font-display text-xl font-bold">
+        Vorauszahlungen und Saldo prüfen
+      </h2>
+      <Card>
+        <CardHeader>
+          <CardTitle>Mietverhältnis auswählen</CardTitle>
+          <CardDescription>
+            Interne Vorschau. Ein Saldo erscheint erst nach einer bestätigten Vorauszahlungsabstimmung.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="tenant-preview">Mietverhältnis</Label>
+            <Select
+              id="tenant-preview"
+              value={tenancyId}
+              onChange={(event) => setTenancyId(event.target.value)}
+            >
+              <option value="">Bitte wählen</option>
+              {(tenancies.data ?? []).map((tenancy) => (
+                <option key={tenancy.id} value={tenancy.id}>
+                  {tenancy.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {tenancyId ? (
+            <div className="space-y-3 border-t pt-4">
+              <p className="font-medium">Manuelle Vorauszahlung erfassen</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Input aria-label="Betrag in Cent" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Betrag in Cent" />
+                <Input aria-label="Zahlungsdatum" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
+                <Input aria-label="Belegreferenz" value={evidenceRef} onChange={(event) => setEvidenceRef(event.target.value)} placeholder="Belegreferenz" />
+              </div>
+              <Button
+                variant="outline"
+                disabled={!amount || !paymentDate || !evidenceRef || payment.isPending}
+                onClick={() => payment.mutate({ amountCents: Number(amount), paymentDate, evidenceRef, periodStart: selection.periodFrom, periodEnd: selection.periodTo }, {
+                  onSuccess: (result) => { setAllocationIds((ids) => [...ids, result.allocationId]); setAmount(''); setEvidenceRef(''); },
+                })}
+              >Vorauszahlung übernehmen</Button>
+              <Button
+                disabled={reconciliation.isPending}
+                onClick={() => reconciliation.mutate({ periodStart: selection.periodFrom, periodEnd: selection.periodTo, allocationIds })}
+              >Vorauszahlungen bestätigen</Button>
+            </div>
+          ) : null}
+          {preview.data ? (
+            <div className="space-y-2 rounded-lg bg-mint/40 p-4 tabular-nums">
+              <p>Zwischensumme: {eur(preview.data.subtotalCents ?? 0)}</p>
+              {preview.data.advanceReconciliationState === 'CONFIRMED' ? (
+                <>
+                  <p>Bestätigte Vorauszahlungen: {eur(preview.data.actualAdvancesCents ?? 0)}</p>
+                  <p className="font-semibold">Saldo: {eur(preview.data.saldoCents ?? 0)}</p>
+                  <p className="text-sm text-slate">
+                    Bestätigte Abstimmung: ID {preview.data.reconciliationId ?? 'nicht verfügbar'} ·
+                    Version {preview.data.reconciliationVersion ?? 'nicht verfügbar'}
+                  </p>
+                </>
+              ) : (
+                <StatusNote kind="warning" label="Vorauszahlungen noch nicht bestätigt.">
+                  Für dieses Mietverhältnis fehlt die bestätigte Abstimmung. Deshalb zeigt die Vorschau keinen Saldo.
+                </StatusNote>
+              )}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 

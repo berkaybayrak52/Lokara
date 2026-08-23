@@ -135,8 +135,16 @@ invent their contracts.
   consumption denominator gives renters `0` and leaves the cost with the owner; it never silently
   changes to an area key.
 - **Saldo uses actual payments.** `saldo = party subtotal − geleistete Vorauszahlungen`. Missing
-  actual advances hard-block a tenant document; confirmed zero is valid. The current contractual
-  Soll scalar is not a substitute.
+actual advances hard-block a tenant document; confirmed zero is valid. The current contractual
+Soll scalar is not a substitute.
+
+**M6-A preview boundary (23.08.2026).** Before finalization, the existing owner-only statement flow
+may show a selected tenancy's `subtotal`, reconciliation state, and — only after an explicit current
+advance reconciliation — confirmed actual advances and arithmetic Saldo. The persistence and
+versioning contract is `docs/02` “M6-A temporal advances and confirmed actual-advance preview”.
+No reconciliation means that advances and Saldo are omitted rather than estimated from contractual
+Soll. This preview is not a renter document and must not use legal payment-result wording; it does
+not change the PDF, tenant portal, finalization, receivables, bank matching or tax-export boundary.
 - **Deadline behavior.** A late landlord `Nachforderung` is suppressed while the arithmetic remains
   visible as `Rechnerischer Saldo`; a renter `Guthaben` remains payable. A landlord exception needs
   an explicit reason. Cadence and escalation belong to `docs/12`.

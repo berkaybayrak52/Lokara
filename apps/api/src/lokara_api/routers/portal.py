@@ -6,9 +6,10 @@ context to it, on every request (enforced twice, CLAUDE.md rule 3).
 """
 
 from datetime import date, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
-from lokara_db import Account, Person
+from lokara_db import Account, AdvanceReconciliation, Person
 from lokara_domain import OccupancyOverlapError, Period, cents, format_eur
 from lokara_heating_engine import Page01bStatementValues
 from lokara_nk_engine import BillingWindowTooLongError, NkInputError
@@ -19,9 +20,10 @@ from lokara_pdf import (
     render_html_to_pdf,
     statement_html,
 )
+from sqlalchemy import select
 
 from ..auth import RequireAuth
-from ..authorization import default_building_id, require_building
+from ..authorization import default_building_id, require_building, visible_building_ids
 from ..deps import PathAccountSession
 from ..schemas import (
     DemoStatementResponse,
@@ -185,11 +187,11 @@ def statement_projection(
         ) from exc
     except StatementProductionBlockedError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return _projection_response(projection, bundle)
+    return _projection_response(projection, bundle, session)
 
 
 def _projection_response(
-    projection: StatementProjection, bundle: StatementBundle
+    projection: StatementProjection, bundle: StatementBundle, session: PathAccountSession
 ) -> StatementProjectionResponse:
     costs: list[StatementProjectionCost] = []
     for cost in projection.nk_costs:
@@ -255,6 +257,38 @@ def _projection_response(
             )
         )
 
+    subtotal_cents: int | None = None
+    actual_advances_cents: int | None = None
+    saldo_cents: int | None = None
+    reconciliation_state: Literal["MISSING", "CONFIRMED"] | None = None
+    reconciliation_id: str | None = None
+    reconciliation_version: int | None = None
+    # Employees can retain the calculation projection for an assigned building,
+    # but advance evidence and the resulting saldo are owner-only M6-A data.
+    if (
+        visible_building_ids(session) is None
+        and projection.audience.value == "TENANT"
+        and projection.tenancy_id is not None
+    ):
+        subtotal_cents = sum(line.amount_cents for cost in costs for line in cost.lines) + sum(
+            line.total_cents for line in heating_lines if not line.is_landlord
+        )
+        assert projection.window.valid_to is not None
+        reconciliation = session.scalar(
+            select(AdvanceReconciliation)
+            .where(
+                AdvanceReconciliation.tenancy_id == projection.tenancy_id,
+                AdvanceReconciliation.period_start == projection.window.valid_from,
+                AdvanceReconciliation.period_end == projection.window.valid_to - timedelta(days=1),
+            )
+            .order_by(AdvanceReconciliation.version.desc())
+        )
+        reconciliation_state = "CONFIRMED" if reconciliation is not None else "MISSING"
+        if reconciliation is not None:
+            actual_advances_cents = reconciliation.total_cents
+            saldo_cents = subtotal_cents - actual_advances_cents
+            reconciliation_id = reconciliation.id
+            reconciliation_version = reconciliation.version
     building = projection.building
     return StatementProjectionResponse(
         audience=projection.audience.value,
@@ -265,6 +299,12 @@ def _projection_response(
         costs=costs,
         heating_lines=heating_lines,
         owner_residual_cents=(int(residual.total) if residual is not None else None),
+        subtotal_cents=subtotal_cents,
+        actual_advances_cents=actual_advances_cents,
+        saldo_cents=saldo_cents,
+        advance_reconciliation_state=reconciliation_state,
+        reconciliation_id=reconciliation_id,
+        reconciliation_version=reconciliation_version,
         findings=list(projection.findings),
         rechtsstaende=list(bundle.rechtsstaende),
         disclaimer=DISCLAIMER,

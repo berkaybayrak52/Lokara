@@ -37,13 +37,21 @@ from lokara_api import create_app
 from lokara_api.routers import portal
 from lokara_api.settings import ApiSettings
 from lokara_db import (
+    AdvanceAllocation,
+    AdvancePayment,
+    AdvanceReconciliation,
+    AdvanceReconciliationAllocation,
     Building,
+    BuildingAssignment,
     DbSettings,
     FiktivbelegungMode,
+    Membership,
     Meter,
     MeterReading,
+    Person,
     PersonCount,
     Renter,
+    Role,
     Tenancy,
     TenancyParty,
     Unit,
@@ -156,7 +164,6 @@ def client() -> Iterator[TestClient]:
                 valid_from=date(2024, 1, 1),
                 valid_to=None,
                 base_rent_cents=70000,
-                advance_payment_cents=16000,
             )
         )
         session.add(
@@ -182,7 +189,6 @@ def client() -> Iterator[TestClient]:
                 valid_from=date(2026, 2, 1),
                 valid_to=date(2026, 6, 1),
                 base_rent_cents=70000,
-                advance_payment_cents=16000,
             )
         )
         session.add(
@@ -411,6 +417,117 @@ class TestTenantProjectionIsAPrivacyBoundary:
         """Findings name other units by label, so they are operational notes for
         the landlord, not renter copy."""
         assert _get(client, audience="TENANT", tenancy_id=TEN_B)["findings"] == []
+
+    def test_confirmed_preview_identifies_its_snapshot_but_not_to_an_employee(
+        self, client: TestClient
+    ) -> None:
+        """M6A-F12: the owner can audit the selected snapshot; an assigned
+        employee may retain the existing calculation view but not its advance
+        evidence, reconciliation state, or Saldo.
+        """
+        payment_id = "pay_p01_m6_preview"
+        allocation_id = "aal_p01_m6_preview"
+        reconciliation_id = "arc_p01_m6_preview"
+        employee_id = "per_p01_m6_employee"
+        membership_id = "mem_p01_m6_employee"
+        assignment_id = "bas_p01_m6_employee"
+        engine = _owner_engine()
+        try:
+            with Session(engine) as session, session.begin():
+                session.add(
+                    AdvancePayment(
+                        id=payment_id,
+                        account_id=DEMO_ACCOUNT_ID,
+                        tenancy_id=TEN_B,
+                        amount_cents=28_000,
+                        payment_date=date(2025, 12, 31),
+                        evidence_ref="M6A-F12",
+                        reversal_of_id=None,
+                    )
+                )
+                session.flush()
+                session.add_all(
+                    [
+                        AdvanceAllocation(
+                            id=allocation_id,
+                            account_id=DEMO_ACCOUNT_ID,
+                            payment_id=payment_id,
+                            tenancy_id=TEN_B,
+                            period_start=date(2025, 1, 1),
+                            period_end=date(2025, 12, 31),
+                            amount_cents=28_000,
+                        ),
+                        AdvanceReconciliation(
+                            id=reconciliation_id,
+                            account_id=DEMO_ACCOUNT_ID,
+                            tenancy_id=TEN_B,
+                            period_start=date(2025, 1, 1),
+                            period_end=date(2025, 12, 31),
+                            version=1,
+                            total_cents=28_000,
+                            supersedes_id=None,
+                        ),
+                        Person(id=employee_id, email="m6-preview-employee@lokara.example"),
+                        Membership(
+                            id=membership_id,
+                            person_id=employee_id,
+                            account_id=DEMO_ACCOUNT_ID,
+                            role=Role.EMPLOYEE,
+                        ),
+                        BuildingAssignment(
+                            id=assignment_id,
+                            account_id=DEMO_ACCOUNT_ID,
+                            membership_id=membership_id,
+                            building_id=DEMO_BUILDING_ID,
+                        ),
+                    ]
+                )
+                session.flush()
+                session.add(
+                    AdvanceReconciliationAllocation(
+                        id="ara_p01_m6_preview",
+                        account_id=DEMO_ACCOUNT_ID,
+                        reconciliation_id=reconciliation_id,
+                        allocation_id=allocation_id,
+                    )
+                )
+
+            owner = _get(client, audience="TENANT", tenancy_id=TEN_B)
+            assert owner["advanceReconciliationState"] == "CONFIRMED"
+            assert owner["reconciliationId"] == reconciliation_id
+            assert owner["reconciliationVersion"] == 1
+            assert owner["actualAdvancesCents"] == 28_000
+            assert owner["saldoCents"] == owner["subtotalCents"] - 28_000
+
+            employee = client.get(
+                STATEMENT,
+                headers=_token(employee_id),
+                params={"audience": "TENANT", "tenancy_id": TEN_B},
+            )
+            assert employee.status_code == 200, employee.text
+            employee_body = employee.json()
+            assert employee_body["tenancyId"] == TEN_B
+            for key in (
+                "advanceReconciliationState",
+                "reconciliationId",
+                "reconciliationVersion",
+                "actualAdvancesCents",
+                "saldoCents",
+            ):
+                assert employee_body.get(key) is None
+        finally:
+            with Session(engine) as session, session.begin():
+                for table, row_id in (
+                    ("advance_reconciliation_allocation", "ara_p01_m6_preview"),
+                    ("advance_reconciliation", reconciliation_id),
+                    ("advance_allocation", allocation_id),
+                    ("advance_payment", payment_id),
+                    ("building_assignment", assignment_id),
+                    ("membership", membership_id),
+                    ("person", employee_id),
+                ):
+                    session.execute(text(f"DELETE FROM {table} WHERE id = :id"), {"id": row_id})
+        engine.dispose()
 
 
 class TestTaxProjection:
