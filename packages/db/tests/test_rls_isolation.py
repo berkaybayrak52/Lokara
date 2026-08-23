@@ -1176,6 +1176,88 @@ class TestMdlStatementIsolation:
             assert session.scalars(select(MdlStatement.id)).all() == [statement_id]
             assert session.scalars(select(MdlStatementPosition.id)).all() == [position_id]
 
+    def test_own_context_cannot_update_a_confirmed_statement(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """A same-account app session may append a correction, never alter it.
+
+        RLS account scoping alone is insufficient here: it deliberately exposes
+        account A's own row to A, and the generic policy consequently permits an
+        UPDATE today.  A confirmed MDL document is legally relevant evidence;
+        its correction path is a new version, not an overwrite.
+        """
+        statement_id, _ = mdl_rows
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            result: CursorResult[Any] = session.connection().execute(
+                text("UPDATE mdl_statement SET source_ref = 'ueberschrieben' WHERE id = :id"),
+                {"id": statement_id},
+            )
+            assert result.rowcount == 0
+
+    def test_own_context_cannot_delete_a_confirmed_statement(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """The original document must remain readable after every correction.
+
+        This parent has no positions, so a baseline failure cannot be mistaken
+        for its child FK refusing the deletion for an unrelated reason.
+        """
+        del mdl_rows
+        owner, app = engines
+        statement_id = new_id()
+        with Session(owner) as session, session.begin():
+            session.add(
+                MdlStatement(
+                    id=statement_id,
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    branch=MdlBranch.NET,
+                    period_from=date(2024, 1, 1),
+                    period_to=date(2025, 1, 1),
+                    confirmed_total_cents=20_000,
+                    owner_position_cents=20_000,
+                    source_ref="leere bestätigte MDL-Abrechnung",
+                    version=1,
+                )
+            )
+        try:
+            with account_scoped_session(app, seed.account_a) as session:
+                result: CursorResult[Any] = session.connection().execute(
+                    text("DELETE FROM mdl_statement WHERE id = :id"), {"id": statement_id}
+                )
+                assert result.rowcount == 0
+        finally:
+            with Session(owner) as session, session.begin():
+                row = session.get(MdlStatement, statement_id)
+                if row is not None:
+                    session.delete(row)
+
+    def test_own_context_cannot_update_a_confirmed_position(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """The renter amount is part of the confirmed pass-through document."""
+        _, position_id = mdl_rows
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            result: CursorResult[Any] = session.connection().execute(
+                text("UPDATE mdl_statement_position SET amount_cents = 1 WHERE id = :id"),
+                {"id": position_id},
+            )
+            assert result.rowcount == 0
+
+    def test_own_context_cannot_delete_a_confirmed_position(
+        self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
+    ) -> None:
+        """Deleting a line would change the already-confirmed control sum."""
+        _, position_id = mdl_rows
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            result: CursorResult[Any] = session.connection().execute(
+                text("DELETE FROM mdl_statement_position WHERE id = :id"), {"id": position_id}
+            )
+            assert result.rowcount == 0
+
     def test_cross_account_statement_insert_is_rejected(
         self, engines: tuple[Engine, Engine], seed: _Seed, mdl_rows: tuple[str, str]
     ) -> None:

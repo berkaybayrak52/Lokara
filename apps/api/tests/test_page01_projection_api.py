@@ -36,6 +36,7 @@ from lokara_api.settings import ApiSettings
 from lokara_db import (
     Building,
     DbSettings,
+    FiktivbelegungMode,
     Meter,
     MeterReading,
     PersonCount,
@@ -48,7 +49,7 @@ from lokara_db import (
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
 from lokara_domain import MeasurementUnit, MeterKind, ReadingReason, ReadingSource
 from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 NBSP = " "  # format_eur puts a non-breaking space before the € sign
@@ -668,6 +669,62 @@ class TestPersonsKeyReachesTheEngineWithItsInputs:
                 )
             engine.dispose()
 
+    def test_later_mode_change_cannot_rewrite_a_closed_period_denominator(
+        self, client: TestClient
+    ) -> None:
+        """D0 is a billing input, not a retroactive building setting.
+
+        The July--December vacancy of unit B has last occupancy 3.  Changing
+        the building from ``LETZTE_BELEGUNG`` to ``IMMER_1`` later must either
+        be rejected as immutable or leave this already-ended 2025 period on its
+        original denominator.  Both designs preserve the billed period; reading
+        the current scalar mode during every rerun does not.
+        """
+        engine = _owner_engine()
+        changed = False
+        with Session(engine) as session, session.begin():
+            _add_demo_person_counts(session)
+        cost_id = _create_cost(client, "Aufzug zeitstabil", 100000, "PERSONS")
+        try:
+            first = client.get(f"{BASE}/statements/demo", headers=DEMO)
+            assert first.status_code == 200, first.text
+            first_lift = next(
+                c for c in first.json()["nkCosts"] if c["label"] == "Aufzug zeitstabil"
+            )
+            first_weights = [line["weightDisplay"] for line in first_lift["lines"]]
+
+            try:
+                with Session(engine) as session, session.begin():
+                    building = session.get(Building, DEMO_BUILDING_ID)
+                    assert building is not None
+                    building.fiktivbelegung_mode = FiktivbelegungMode.IMMER_1
+                    changed = True
+            except IntegrityError:
+                # An immutable mode is an equally valid resolution.  Its failed
+                # transaction leaves the already-closed period untouched.
+                changed = False
+
+            if changed:
+                second = client.get(f"{BASE}/statements/demo", headers=DEMO)
+                assert second.status_code == 200, second.text
+                second_lift = next(
+                    c for c in second.json()["nkCosts"] if c["label"] == "Aufzug zeitstabil"
+                )
+                assert [line["weightDisplay"] for line in second_lift["lines"]] == first_weights
+        finally:
+            if changed:
+                with Session(engine) as session, session.begin():
+                    building = session.get(Building, DEMO_BUILDING_ID)
+                    assert building is not None
+                    building.fiktivbelegung_mode = FiktivbelegungMode.LETZTE_BELEGUNG
+            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            with Session(engine) as session, session.begin():
+                session.execute(
+                    text("DELETE FROM person_count WHERE account_id = :a"),
+                    {"a": DEMO_ACCOUNT_ID},
+                )
+            engine.dispose()
+
     def test_without_any_person_count_the_fiktivbelegung_alone_carries_the_cost(
         self, client: TestClient
     ) -> None:
@@ -734,6 +791,50 @@ class TestPersonCountsOutlivingTheirTenancy:
             assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
             with Session(engine) as session, session.begin():
                 session.execute(text("DELETE FROM person_count WHERE id = 'pcd_demo_b1_open'"))
+            engine.dispose()
+
+    def test_overlapping_person_count_ranges_for_one_tenancy_are_rejected(
+        self, client: TestClient
+    ) -> None:
+        """A correction must replace a non-overlapping segment, never stack it.
+
+        Two counts for the same tenancy and overlapping days give that renter
+        two denominator weights.  The database must reject the duplicate range,
+        including direct writes that arrive before a future UI write path.
+        """
+        del client  # live database fixture; the HTTP app is not the write boundary yet
+        engine = _owner_engine()
+        try:
+            with pytest.raises(IntegrityError), Session(engine) as session, session.begin():
+                session.add_all(
+                    [
+                        PersonCount(
+                            id="pcd_demo_overlap_first",
+                            account_id=DEMO_ACCOUNT_ID,
+                            tenancy_id=TEN_A,
+                            count=2,
+                            valid_from=date(2025, 1, 1),
+                            valid_to=date(2025, 7, 1),
+                        ),
+                        PersonCount(
+                            id="pcd_demo_overlap_second",
+                            account_id=DEMO_ACCOUNT_ID,
+                            tenancy_id=TEN_A,
+                            count=3,
+                            valid_from=date(2025, 6, 1),
+                            valid_to=date(2026, 1, 1),
+                        ),
+                    ]
+                )
+                session.flush()
+        finally:
+            with Session(engine) as session, session.begin():
+                session.execute(
+                    text(
+                        "DELETE FROM person_count "
+                        "WHERE id IN ('pcd_demo_overlap_first', 'pcd_demo_overlap_second')"
+                    )
+                )
             engine.dispose()
 
 

@@ -484,7 +484,8 @@ a transcribed source rule, and no output may present it as either.
 Source trace: derived from `docs/02` § 4, which defines `VACANT` as "neither rented nor self-used",
 read together with original Page 01 § 4 D0, which runs "for each Leerstandsperiode". Shipped in
 `apps/api/src/lokara_api/person_counts.py`. Raised as an open source question in
-`FRAGEN-an-Berkay-04.md` → "Seite 01 — Fiktivbelegung und Eigennutzung".
+`FRAGEN-an-Berkay-05.md` → "Seite 01 — Fiktivbelegung und Eigennutzung". Round 4 settled its
+other listed items; this source question was not answered and remains open.
 
 | Constellation | Shipped behavior | Why this direction |
 | --- | --- | --- |

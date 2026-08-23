@@ -41,10 +41,12 @@ before UI. Dates are communication events, not planning inputs.
   approved and merged on **21.08.2026**. The `docs/13` and `docs/14` transcriptions were approved
   and merged on **21.08.2026**. D2 is complete.
 - Phase D3 is **complete and approved 21.08.2026**. `docs/03` Appendix D is the single historical
-  ledger, genuine source questions are in the current round-four question file, governance uses the
+  ledger, genuine source questions are in the current round-five question file, governance uses the
   post-D3 source model, and the seven retired files have no live dependency. D1-D3 now form the
   approved implementation baseline. Slice A is technically closed, approved and merged locally on
-  21.08.2026. Slice B is next, but starting it remains a separate decision.
+  21.08.2026. Slice B is review-complete and green on `slice/b-page01-closure`, but remains
+  unmerged pending the Round-4 Block-(c) correction; the separate round-four transcription slice
+  follows it.
 - M5 is paused. Its secure bootstrap foundation is complete on `slice/m5-bootstrap-contexts`,
   but the slice is not merged yet.
 - That M5 foundation has not added a new dashboard, portal or account switcher.
@@ -59,7 +61,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
-| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. This is specification closure, not application closure: Slice B revalidates M3/M4 and M6 still owns actual advances, Saldo, finalization and isolated tenant documents. |
+| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is review-complete and green for the persisted M3/M4 path, pending the Round-4 Block-(c) correction; M6 still owns actual advances, Saldo, finalization and isolated tenant documents. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Merged with a full D2 source trace and exact 32-ID data oracle. Merge is not production closure or legal approval: no production catalogue or gate was implemented. The current 180-row CSV has no Page 02-assigned rows, so `09-K01…K11` and the three unresolved classifications remain production-blocking. Slice C still owns M1 implementation closure and classifications used by M6, M7 and Page 07. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
@@ -154,7 +156,7 @@ Source ownership stays explicit during all three phases:
   `docs/09`–`docs/16`; they do not duplicate those detailed contracts.
 
 The exact seven-file retirement scope and every section-level disposition live only in `docs/03`
-Appendix D. Git preserves the deleted text. Approved docs, fixtures and the current round-four
+Appendix D. Git preserves the deleted text. Approved docs, fixtures and the current round-five
 question file preserve the durable rule, arithmetic, supersession and unresolved-source knowledge.
 
 **Phase D1 — complete; approved 17.08.2026; final reconciliation closed 18.08.2026.** The completed
@@ -205,7 +207,7 @@ information:
 
 1. Prove that every section of all seven files is mapped to an approved doc section, golden fixture,
    superseded-history note or unresolved item.
-2. Keep one current round-four question file because genuine source questions remain. It contains
+2. Keep one current round-five question file because genuine source questions remain. It contains
    no settled history, completed requests or implementation status.
 3. Verify the target docs preserve every rule, correction, source reference, supersession,
    verification flag and unresolved risk. Preserve exact arithmetic in fixtures rather than copying
@@ -250,9 +252,9 @@ not replace the complete documentation or reconciliation gates.
 | --- | --- | --- | --- |
 | D1 | **complete; approved 17.08.2026; final reconciliation closed 18.08.2026** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. |
 | D2 | **complete; approved 21.08.2026** | Create source-backed `docs/09`–`docs/16` | All assigned transcriptions are approved and merged, including `docs/14`; the final `docs/07` tax/archive reconciliation is approved. The phase added documentation and data-only fixtures, not investment implementation. |
-| D3 | **complete; approved 21.08.2026** | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-four question file, updated governance, permanent dependency guard and joint deletion. |
+| D3 | **complete; approved 21.08.2026** | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-five question file. Round 4 settled its answered decisions; Round 5 retains only its unanswered/source-delivery follow-ups and the external/legal-source gaps. Governance, permanent dependency guard and joint deletion remain intact. |
 | A | **complete; approved and merged 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
-| B | After A | Reconcile M3–M4 with Page 01 | Revalidate the approved Page 01 contract against persisted calculation and extraction, close M3/M4 gaps and leave ledger/finalization work to M6. |
+| B | **review-complete and green; unmerged pending Round-4 Block-(c) correction** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; two scoped reviews completed and the MDL uniqueness key was assessed as no cross-account disclosure channel. Ledger/finalization remains M6 work. |
 | C | After B | Reconcile M1 with Page 02 | Revalidate NK eligibility, allocation, classification and rounding against merged `docs/09` and close M1. |
 | M5 | After A–C | Roles, URL context and switcher | Finish the prepared secure bootstrap slice, role enforcement, owner contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
 | M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`: actual advances, BGH minimum #4, immutable snapshots, bank matching, landlord overview, isolated tenant documents, and remaining statement copy/citation findings. |
@@ -396,7 +398,7 @@ three earlier bounded fixes remain correct, and API/web/PDF print the verified s
 `Rechtsstand`. Emir approved Slice A on 21.08.2026; its provisional wording and separate-risk
 boundaries remain unchanged.
 
-### M3 — Web vertical slice and PDF 🟡 built and green; Page 01 reconciliation pending
+### M3 — Web vertical slice and PDF 🟢 Slice B review-complete; pending Round-4 Block-(c) correction
 
 Built:
 
@@ -409,10 +411,11 @@ Built:
 - autosave so leaving a flow does not lose entered data;
 - statement inputs from persisted rows, not fixture constants.
 
-**Spec-closed when:** Slice B proves the persisted path against approved `docs/08`, the original demo
-remains green and all `08-Fxx` statement fixtures pass.
+**Slice B status:** persisted path is green and review-complete. The original demo remains green and
+all `08-Fxx` statement fixtures pass. It remains pending the Round-4 Block-(c) correction; M6-owned
+final-document work remains open.
 
-### M4 — Document extraction demo 🟡 built and green; Page 01 reconciliation pending
+### M4 — Document extraction demo 🟢 Slice B review-complete; pending Round-4 Block-(c) correction
 
 - Shared upload → prefill → confirm flow.
 - Stub Vision adapter with canned invoices.
@@ -424,8 +427,8 @@ Not included:
 - automatic allocation-key choice, which needs the Slice C BetrKV catalogue;
 - Beleg persistence, file hash and object storage.
 
-**Spec-closed when:** its confirmed extraction path still feeds the Page 01 statement model after
-Slice B, without bypassing review or tenant-document isolation.
+**Slice B status:** its confirmed extraction path feeds the Page 01 statement model without
+bypassing review or tenant-document isolation. It remains pending the Round-4 Block-(c) correction.
 
 ### FK isolation slice ✅
 
@@ -632,8 +635,9 @@ heating calculation view with CO₂ allocation and tenant isolation. They are no
 spec-closed. D1 is complete; approved 17.08.2026; final reconciliation closed 18.08.2026. D2 and all
 `docs/09`–`docs/16` transcriptions are complete, approved and merged. D3 is complete and approved;
 the correspondence retirement closes the documentation program. Slice A is complete, approved and
-merged locally; Slice B is next, but requires a separate start decision. Slices A–C retain
-their order and reconcile implementation with Pages 01b, 01 and 02 before feature work continues.
+merged locally; Slice B is review-complete and green but unmerged pending the Round-4 Block-(c)
+correction. Slices A–C retain their order and reconcile implementation with Pages 01b, 01 and 02
+before feature work continues.
 The finalized tenant document still waits for M6.
 
 Protect that floor. Correctness comes before breadth. If work stops, stop at a green state.

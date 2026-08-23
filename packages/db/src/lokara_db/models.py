@@ -34,8 +34,10 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy import Enum as SaEnum
+from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .ids import new_id
@@ -155,6 +157,9 @@ class FiktivbelegungMode(enum.Enum):
     It sits on the object (`objekt.fiktivbelegungModus`, Page 01 § 3.5), defaults
     to `LETZTE_BELEGUNG`, and `KEINE` is only lawful with a logged confirmation —
     which is why `Building` carries a waiver note and a CHECK that demands one.
+    The pair is immutable after creation: changing a current scalar would rewrite
+    the denominator of a closed billing period. A future changed-mode workflow
+    must introduce an explicitly effective-dated resolution instead.
 
     `Konvention`, `verify-before-production`, Rechtsstand 07/2026. It is a Lokara
     convention over split instance case law (LG Krefeld 2 S 56/09; BGH VIII ZR
@@ -351,6 +356,8 @@ class Building(Base):
     city: Mapped[str]
     # Page 01 § 3.5 `objekt.fiktivbelegungModus` — Stammdaten of the object, not
     # of a unit or a run, because one building bills one way (docs/02 § 5 D0).
+    # Migration 0009 makes this and its waiver note immutable after creation, so
+    # a later edit cannot change a historical person-key denominator.
     fiktivbelegung_mode: Mapped[FiktivbelegungMode] = mapped_column(
         default=FiktivbelegungMode.LETZTE_BELEGUNG,
         server_default=FiktivbelegungMode.LETZTE_BELEGUNG.value,
@@ -631,14 +638,15 @@ class PersonCount(Base):
     Abrechnung. Half-open validity like every other temporal row here.
 
     **Vacancy is deliberately absent from this table.** The D0 Fiktivbelegung of a
-    vacant unit is *derived* per run from the last ended tenancy of that unit and
-    the building's `fiktivbelegung_mode` — it is never a stored row, because it is
-    a flagged convention (`verify-before-production`) applied at calculation time,
-    not a fact anyone observed. Storing it would make a convention look like
-    entered data and would freeze it against a later legal review. That is also
-    why a unit vacant for a whole billing period still resolves: the tenancy that
-    ended *before* the period keeps its rows here. See `docs/02` § 5 "D0
-    Fiktivbelegung", which records the layering decision.
+    vacant unit is derived per run from the last ended tenancy of that unit and
+    the building's immutable `fiktivbelegung_mode`. The mode cannot be changed
+    after creation, so a completed period cannot be recalculated under a later
+    convention. A future effective-dated mode model would be an explicit new
+    resolution, rather than an overwrite. This remains a flagged convention
+    (`verify-before-production`), not a fact anyone observed. That is also why a
+    unit vacant for a whole billing period still resolves: the tenancy that ended
+    before the period keeps its rows here. See `docs/02` § 5 "D0 Fiktivbelegung",
+    which records the layering decision.
     """
 
     __tablename__ = "person_count"
@@ -661,6 +669,22 @@ class PersonCount(Base):
         # Zero is a real entered count (an empty but still-running lease); a
         # negative one is not a Personenzahl at all.
         CheckConstraint("count >= 0", name="ck_person_count_non_negative"),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_person_count_period_ordered",
+        ),
+        # A tenant has one count on each day. The Postgres exclusion constraint
+        # uses half-open dateranges, so an adjacent correction is allowed while
+        # two competing counts for the same day are rejected at the DB boundary.
+        # `account_id` keeps an invalid foreign-account write on the composite
+        # FK path, whose explicit rejection is part of the isolation contract.
+        ExcludeConstraint(
+            ("account_id", "="),
+            ("tenancy_id", "="),
+            (text("daterange(valid_from, valid_to, '[)')"), "&&"),
+            name="ex_person_count_tenancy_period_no_overlap",
+            using="gist",
+        ),
         Index("ix_person_count_account", "account_id"),
         Index("ix_person_count_tenancy", "tenancy_id"),
     )
