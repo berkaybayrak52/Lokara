@@ -1,16 +1,23 @@
-# Last output — M6-A ready for final gates
+# Last output — M6-B merged; stale documents corrected
 
-HEAD `53a8858` on `slice/m6-a-advances` · `23.08.2026`
+HEAD `f578f2f` on `main` · `23.08.2026`
 Status: Partial
 
 ## Wanted
-Close and locally merge M6-A before starting M6-B.
+Plan the remaining M6 work and correct the documents that no longer describe the repository.
 
 ## Done
-Temporal advances, confirmed owner preview, RLS boundaries and the UI review fixes are implemented.
+M6-B is merged as `f578f2f` with green gates and both reviews closed; demo fingerprint unchanged at
+`88eb8434eda65f8d7ff82826fc837a58` (149269 bytes). Five stale `/private/tmp` worktrees were removed
+after diffing their uncommitted edits as superseded; `main` now lives in the primary tree.
+`LAST_OUTPUT.md`, `LEAD-HANDOFF.md` and `PLAN.md` were corrected: `check_handoff.sh` passes again,
+the missing M6-A section and the open M6-C scope were added, and the false claim that temporal
+contractual advances are still open was removed — M6-A shipped them and migration `0015` drops the
+scalar.
 
 ## Not done
-Final gates, repeated reviews, commit and local merge remain pending. No push was performed.
+M6-C is unimplemented: bank matching, payment ledger, job entrypoints and the Zahlungen screen.
+Nothing was committed or pushed; local `main` stays 8 commits ahead of `origin/main`.
 
 ## Optional next step
-Complete the final M6-A gates and reviews.
+Start M6-C1, the pure matching engine, against the thirteen `docs/15` fixtures.

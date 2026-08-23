@@ -50,7 +50,9 @@ before UI. Dates are communication events, not planning inputs.
 - M5 is complete and merged into `main` as `a748729`: secure bootstrap, backend
   membership/assigned-building authorization and the URL-based account chooser/switcher are
   shipped. Renter activation/portal remains M10; adviser profile, mapping and tax functions remain
-  M7. M6 is the next implementation milestone.
+  M7. M6-A (temporal advances) and M6-B (finalized archives) are merged into `main` as
+  `d82abcc` and `f578f2f`. M6-C — bank matching, payment ledger and the landlord Zahlungen
+  screen — is the open implementation work.
 
 ---
 
@@ -70,7 +72,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. The exact 24-ID data oracle covers date arithmetic, strict arrears thresholds, cent rounding, UVI cadence, rent limits, VPI and vacancy. All 18 Page-specific register rows remain `verify-before-production`; the 5-year/6-year meter conflict is unresolved. No guard implementation exists. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
-| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. Production bank matching remains open for M6. |
+| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. Production bank matching is the M6-C implementation slice; the thirteen fixtures are the acceptance surface. |
 | UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. No implementation exists. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
@@ -258,7 +260,7 @@ not replace the complete documentation or reconciliation gates.
 | B | **complete; locally merged 23.08.2026** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Ledger/finalization remains M6 work. |
 | C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
 | M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7. |
-| M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`: actual advances, BGH minimum #4, immutable snapshots, bank matching, landlord overview, isolated tenant documents, and remaining statement copy/citation findings. |
+| M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A and M6-B are merged**: temporal advances, BGH minimum #4, immutable snapshots, owner overview and isolated tenant archives. **M6-C is open**: bank matching, payment ledger, job entrypoints and the landlord Zahlungen screen. |
 | G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
 | U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
 | M7 | After U | Tax export and AfA | Implement approved `docs/09`–`docs/11`. Build computation paths and archives; flagged register values continue to block real output. |
@@ -510,6 +512,25 @@ activation, renter URL context and renter portal authorization are M10 work. M6 
 **Approved-spec prerequisite:** D1's `docs/08` and D2's `docs/15`. If bank matching is deferred,
 `docs/15` does not block the remaining ledger and statement work.
 
+#### M6-A — temporal advances and confirmed owner preview
+
+**Status:** implementation and review closed on 23.08.2026; merged as `d82abcc`.
+
+M6-A replaced the `tenancy.advance_payment_cents` scalar with the account-scoped,
+composite-FK-protected `AdvancePaymentPeriod` append-only Soll schedule, and added `AdvancePayment`
+money evidence, `AdvanceAllocation`, `AdvanceReconciliation` and its allocations. Migration `0015`
+backfills every existing tenancy as one open-ended period at `tenancy.valid_from` and drops the
+scalar; `packages/db/tests/test_m6_advance_models.py` asserts the column is gone. It also ships the
+confirmed owner advance preview, its API projection and the RLS boundaries for every new table.
+
+**Implementation acceptance:** contractual Soll is temporal, never a current-value scalar. Accepted
+money evidence is immutable and reversals are positive rows carrying a direction, never edits.
+Reconciliation requires an explicit confirmation; an unconfirmed period yields a preview only.
+
+**M6-A closed when:** the temporal schedule replaced the scalar with a verified backfill, actual
+advances are separable from contractual Soll, and the owner preview is confirmed before any Saldo
+branch is frozen. This work is complete — do not reopen it as M6-C scope.
+
 #### M6-B — finalized, isolated statement documents
 
 **Status:** implementation and review closed on 23.08.2026. M6-B is deliberately limited to
@@ -538,8 +559,43 @@ fixtures are `M6B-F02`–`F04`, `F10`, `F14`, `F16`–`F19`, `M6B-IMM`, `M6B-COR
 
 **M6-B closed when:** confirmed advances produce frozen Saldo branches; owner-only finalization is
 immutable and reproducible; owner and isolated tenant archives are separately rendered; zero-day
-tenancies are excluded and footnoted. **M6 remains open** until bank matching, temporal contractual
-advances, payment ledger/cash events, matching evidence and delivery/portal work are implemented.
+tenancies are excluded and footnoted. **M6 remains open** until bank matching, payment
+ledger/cash events, matching evidence and the job entrypoints are implemented in M6-C.
+Temporal contractual advances are **not** open work: M6-A shipped them. Delivery and the renter
+portal are M10, not M6.
+
+#### M6-C — bank matching, payment ledger and the Zahlungen screen
+
+**Status:** open. This is the remaining M6 work. **Approved-spec prerequisite:** `docs/15`, whose
+thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three bounded slices:
+
+- **M6-C1** — pure `packages/matching-engine` depending on `lokara-domain` only: § 4 signals and
+  decision order, § 5.1 designation/FIFO/§ 367 settlement, § 5.2 principal-component split and
+  § 5.3 reversal. Integer cents and `Decimal`; the adapter is the only float boundary.
+- **M6-C2** — `bank_account`, `bank_transaction`, `receivable`, `renter_matching_profile`,
+  `iban_history`, `match_proposal`, `match_confirmation`, `payment_ledger_entry` and
+  `payment_allocation`, with migration `0017`, RLS and composite `(id, account_id)` FKs. Rewrite
+  `packages/adapters/src/lokara_adapters/bank.py` to the § 3.1 contract, keeping finAPI stubbed.
+  Owner-scoped endpoints, and the Page-01 handoff copying a finalized `RECEIVABLE`
+  `StatementSettlement` into an `nk_nachzahlung` receivable at exact cents.
+- **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed,
+  the three job entrypoints, and the `docs/15` implementation-status closure.
+
+**Hard constraints:**
+
+- Provider transaction identity is unique on `(account_id, bank_account_id,
+  provider_transaction_id)`, never on the provider ID alone.
+- The payment ledger is append-only. Reversals append compensating rows; nothing is edited.
+- An IBAN is learned only from a confirmed match and never when null.
+- The § 5.2 Largest-Remainder tie-break convention is missing from the authoritative source. The
+  engine raises on an exact tie; it must not invent a rule. No fixture exercises that branch.
+- Matching confidence is a Lokara convention and is never presented as legal support for a match.
+- Background jobs ship as service functions behind a scheduler port. Redis, Arq and Celery stay
+  uninstalled until a real worker slice; `docs/01` D7 keeps that pick open.
+
+**M6-C closed when:** all thirteen fixtures pass through real code, every new table has RLS and
+isolation-test coverage, a landlord can confirm a Review proposal in the UI, and the demo PDF
+fingerprint is unchanged. **M6 is then complete**; delivery and the renter portal remain M10.
 
 ### Shared guard foundation and UVI implementation slice
 
