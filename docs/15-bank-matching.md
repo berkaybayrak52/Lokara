@@ -361,8 +361,19 @@ Nachzahlung in `nk_advance_cents` to satisfy an arithmetic check would double-co
 advance that was never paid as one. Page 08 gives no component split for `nk_nachzahlung`, so none
 is invented.
 
+Migration `0019` carries the invariants a boundary audit of 23.08.2026 found `0017` had left to
+the application: § 6's "a match never moves money between renters" is now four parent-scope
+triggers rather than a convention; an allocation cannot exceed the cents its ledger entry carried
+and its components cannot be negative; a `REVERSAL` must be negative, must name what it reverses
+and may be filed once, so `F06` can only net to zero; § 3.3's confirmation requirement for a
+learned IBAN is a constraint and the row is versioned rather than rewritable; and
+`bank_transaction`, `match_proposal` and `match_confirmation` are append-only, as § 4 and § 147 AO
+already said they were.
+
 M6-C3 remains open: the landlord *Zahlungen* screen, the three job entrypoints and this document's
-implementation-status closure.
+implementation-status closure. It also inherits the recorded shape gaps in `PLAN.md` § M6-C —
+`ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
+reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.
 
 ## 11. Approval and implementation boundary
 

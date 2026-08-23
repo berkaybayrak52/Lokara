@@ -5,29 +5,39 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 
 ## Current state — 23.08.2026
 
-- `main` is at `e755b9c`. The working branch is `slice/m6-c2a-bank-schema`, which carries the
-  three M6-C2 commits ahead of it: `f1731f6` (schema + migration `0017`), `a729bf9` (§ 3.1 adapter)
-  and `5af7897` (endpoints + the `F12` handoff + migration `0018`). **Not merged.**
-- `origin/main` is **also** at `e755b9c`: Emir pushed `main` on 23.08.2026 at 16:34, so this
-  session's merged work (the workflow correction `cc2f758` and the M6-C1 merge `8306b68`) is on
-  GitHub. Local `main` is zero commits ahead. Earlier drafts of this file said "16 ahead, nothing
-  pushed since M5" — that was true when written and is now wrong.
-- The M6-C2 slice branch is **not** on the remote. Do not push it without Emir's explicit
-  go-ahead.
+- `main` is at `e755b9c`, level with `origin/main` — Emir pushed it at 16:34. The working branch
+  is `slice/m6-c2a-bank-schema`, carrying M6-C2 in seven commits: `f1731f6` (schema + `0017`),
+  `a729bf9` (§ 3.1 adapter), `5af7897` (endpoints + `F12` + `0018`), `b0ff5af`/`6241f8d` (docs),
+  `043e70a` (URL-relationship fix) and `56b4c61` (the boundary-audit response + `0019`).
 - `Antwort-an-Emir_04.md` stays untracked at repository root by Emir's decision.
-- `scripts/gate.sh full` is green: 1105 Python tests, 43 web tests, `mypy --strict` clean, RLS
-  coverage 38 tenant tables, FK isolation 62 edges, engine purity clean.
-- The local database was rebuilt from empty with `verify_demo_path.sh --fresh` on Emir's
-  authorization, which also proved migrations `0001`–`0018` apply on a clean database rather than
-  only incrementally. Demo PDF fingerprint unchanged: `88eb8434eda65f8d7ff82826fc837a58`
-  (149269 bytes).
+- `scripts/gate.sh full` is green: 1119 Python tests, 43 web tests, `mypy --strict` clean, RLS 38
+  tenant tables `WITH CHECK` + cross-account-write tested, FK isolation 63 edges, engine purity
+  clean. `gate.sh demo` green; fingerprint `88eb8434eda65f8d7ff82826fc837a58` (149269 bytes).
+- The local database was rebuilt from empty twice on Emir's authorization. The second rebuild was
+  needed because the boundary auditor proved two findings with **committed** probe rows in
+  append-only tables, which then blocked the migration that forbids them. Worth fixing in the
+  agent's brief: prove a destructive finding inside a rolled-back transaction.
 
-## Before merging M6-C2 — one required review
+## The boundary audit — read this before trusting M6-C2's shape
 
-`AGENTS.md` § 7 makes `boundary-auditor` mandatory here: the slice adds nine tenant tables, four
-owner-scoped endpoints and an external adapter. It has **not** been run — this session's harness
-does not spawn subagents unless asked. Either run it, or merge knowing the review was skipped and
-record that choice.
+Run 23.08.2026 over `e755b9c..043e70a`. **Six HIGH findings, all in code and fixtures written by
+one session.** `CLAUDE.md` § 10 wants the fixture author and the implementer to be different
+agents; that did not happen for any of M6-C2, and this is what it cost.
+
+`0017` got account isolation right and constrained nothing inside one account: an allocation could
+settle renter 2's debt from renter 1's cash, could exceed the cents its entry carried, and could
+carry a negative component that cancelled inside the sum check and then fed Page 01 a negative
+advance; a `REVERSAL` could be positive, name no original, or be filed twice; `iban_history` was
+rewritable and needed no confirmation; `bank_transaction` and `match_proposal` were documented
+immutable and were not. Migration `0019` fixes all of it, with fifteen new tests.
+
+**The gate that let it through has been strengthened.** `check_rls_coverage` accepted "the table is
+named in the isolation test", which an `import` line satisfies. It now requires a `WITH CHECK`
+clause and a real cross-account **write** assertion — and immediately found three more tables
+predating this slice (`cost_entry`, `heating_cost_entry`, `allocation_key_assignment`). Their
+assertions were added, not grandfathered. Verified the check fails when that coverage is removed.
+
+Findings recorded but deliberately not fixed are in `PLAN.md` § M6-C, and M6-C3 inherits them.
 
 ## The red window is now declarable
 
@@ -129,15 +139,17 @@ That is the separation working, and it is recorded here rather than buried.
 
 ## Next work, in order
 
-1. **Review and merge M6-C2** — run `boundary-auditor` first (see above), then merge
-   `slice/m6-c2a-bank-schema` into local `main`.
-2. **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed, the
+1. **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed, the
    three job entrypoints (bank sync, 180-day reconsent cleanup, deadline watchers, as service
    functions behind a scheduler port), and the `docs/15` implementation-status closure. That
-   completes M6.
+   completes M6. It also inherits the recorded findings in `PLAN.md` § M6-C — the free-text
+   version columns, the polymorphic `source_id` with no composite FK, the adapter dataclass that
+   accepts a `float` outside its factory, and the unread PSD2 consent expiry.
+2. **Before M6-C3 writes any calculation**, note that the `docs/15` § 4 stored-reference signal is
+   still inert and still needs Berkay's answer. Turning it on without that answer restores the
+   invented convention M6-C1 removed.
 
-The workflow correction and the M6-C1 merge gate that `PLAN.md` § M6-C put before M6-C2 are both
-done and merged (`cc2f758`, `8306b68`).
+M6-C1, the workflow correction and M6-C2 are all merged.
 
 ## A correction worth keeping
 

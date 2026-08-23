@@ -637,6 +637,43 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   this wrong concrete: the paid NK-advance component feeds the annual actual-advance total Page 01
   consumes, so parking a Nachzahlung there to satisfy the arithmetic would double-count it as an
   advance that was never paid.
+
+  **Boundary audit, 23.08.2026 — six HIGH findings, all fixed in migration `0019`.** `0017` got
+  account isolation right and constrained nothing *inside* one account. A `payment_allocation`
+  could settle renter 2's debt from renter 1's cash (§ 6: "a match never moves money between
+  renters"); an allocation could exceed the cents its entry carried, and a negative component
+  cancelled inside the sum check and then fed Page 01 a negative advance; a `REVERSAL` could be
+  positive, name no original, or be filed twice, so `F06` nets to +216,000 instead of zero;
+  `iban_history` was freely rewritable and needed no confirmation, against § 3.3 and `F09`;
+  `bank_transaction` and `match_proposal` were documented immutable and were not; and the
+  receivable's § 367 projection columns could contradict `status`. `0019` adds the parent-scope
+  triggers, the allocation cap and non-negativity, the reversal shape, IBAN provenance and
+  versioning, append-only on the evidence tables, and the missing uniqueness.
+
+  Two router defects came with it: the `F12` handoff took the first `TenancyParty` and silently
+  discarded the rest, so a joint tenancy attributed the Nachzahlung to an arbitrary spouse; and the
+  supersede path let a correcting `v2` bill the same renter again. Both now refuse rather than
+  guess.
+
+  **Why all six shipped:** `check_rls_coverage` accepted "the table is named in the isolation
+  test", which an `import` line satisfies. All nine tables passed while not one had a
+  cross-account **write** assertion — two of the four tests ran on the owner engine, which
+  bypasses RLS. The check now requires a `WITH CHECK` clause and a real write assertion, and
+  immediately found three more tables predating this slice (`cost_entry`, `heating_cost_entry`,
+  `allocation_key_assignment`), whose assertions were added rather than grandfathered.
+
+  **Recorded, not fixed — M6-C3 inherits these.** `receivable.source_type`,
+  `payment_ledger_entry.ordering_version` and `match_proposal.convention_version` are
+  unconstrained free text, and `CLAUDE.md` § 6 puts versioned legal rules in the rules store, not
+  in a caller-supplied string. `Receivable.source_id` is polymorphic, so it carries no composite
+  FK and `check_fk_isolation` cannot see it — the traceability § 147 AO needs is asserted by a test
+  but not guaranteed by the schema. The adapter's `BankTransaction` dataclass has no
+  `__post_init__`, so a `float` reaching `amount_cents` from an `Any`-typed payload bypasses the
+  refusal in `cents_from_provider_amount` and silently truncates in Postgres. The list endpoints
+  have no pagination. `require_owner` reports "Only owners may create buildings" on payment routes.
+  `bank_account.consent_expires_at` is stored and never read, though a PSD2 consent expiry is a
+  legal precondition for an AIS pull. `0017`'s downgrade raises, so a CI job that resets by
+  downgrading wedges there.
 - **M6-C3** — the German landlord *Zahlungen* screen where a Review proposal is confirmed,
   the three job entrypoints, and the `docs/15` implementation-status closure.
 
