@@ -8,6 +8,10 @@ update overrides its pre-review and pre-transcription status claims.
 
 - M5's bootstrap foundation was locally merged into `main` as `1300db1`; no push occurred. It adds
   only subject-scoped bootstrap contexts and the `0014` bounded identity read, not the M5 UI remainder.
+- M5's backend role and assigned-building guard was locally merged into `main` as `99ac47e`; no push
+  occurred. It covers OWNER, EMPLOYEE and TAX_ADVISOR behaviour across current `/a/{accountId}/…`
+  routes, with `404` for inaccessible building resources. The switcher, renter portal and tax routes
+  remain separate work.
 - Its full and non-fresh demo gates are green (993 Python tests) and its boundary audit is clean. The
   statement review found two pre-existing Page-01 PDF/spec mismatches but no M5 regression; `PLAN.md`
   records the separate follow-up.

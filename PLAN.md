@@ -255,7 +255,7 @@ not replace the complete documentation or reconciliation gates.
 | A | **complete; approved and merged 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
 | B | **complete; locally merged 23.08.2026** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Ledger/finalization remains M6 work. |
 | C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
-| M5 | After A–C | Roles, URL context and switcher | Finish the prepared secure bootstrap slice, role enforcement, owner contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
+| M5 | After A–C | Roles, URL context and switcher | Secure bootstrap plus backend role/building authorization are locally merged. The account switcher, renter portal and future tax routes remain open. |
 | M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`: actual advances, BGH minimum #4, immutable snapshots, bank matching, landlord overview, isolated tenant documents, and remaining statement copy/citation findings. |
 | G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
 | U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
@@ -449,7 +449,7 @@ bypassing review or tenant-document isolation. The Round-4 Block-(c) correction 
 
 ---
 
-## 4. M5 remainder — bootstrap foundation locally merged
+## 4. M5 remainder — bootstrap and backend authorization locally merged
 
 ### Locally merged bootstrap foundation (`1300db1`)
 
@@ -468,18 +468,26 @@ bypassing review or tenant-document isolation. The Round-4 Block-(c) correction 
 
 This work added no new dashboard, portal or account switcher.
 
+### Locally merged backend role and building-scope guard (`99ac47e`)
+
+- `OWNER` retains the current owner-portal surface.
+- `EMPLOYEE` can reach only assigned buildings; zero assignments expose no buildings.
+- `TAX_ADVISOR` may use `/me` but is denied all current `/a/{accountId}/…` owner-portal routes.
+- Every current building-scoped route resolves the owning building before work; inaccessible buildings
+  and nested resources return `404`.
+- Employee building lists are filtered. Account-level routes use a single assignment, return no data
+  for zero assignments, and require an explicit building for multiple assignments.
+- The API fixtures cover role, revocation, cross-account and nested-resource cases, and prove the
+  current OpenAPI request surface cannot write `renter.person_id`.
+- The full gate and boundary audit are green. No migration, switcher, renter activation, tax route,
+  web or PDF change is included.
+
 ### Still open
 
-- Complete the existing owner portal with role-aware account context.
 - Keep owner context in `/a/{accountId}/…`.
 - Show a context switcher only when a Person has more than one context.
-- Enforce OWNER, EMPLOYEE and TAX_ADVISOR behaviour in app logic.
-- Restrict EMPLOYEE access to assigned buildings. No assignments means no visibility.
 - Make TAX_ADVISOR read-only outside the future adviser-profile and account-mapping write exception
   specified in `docs/11`; no other write is permitted.
-- Validate every nested `{buildingId}` through `PathAccountSession` before work begins.
-- Return a deliberate 403/404 for a foreign or unauthorized building.
-- Add an OpenAPI guard proving no route writes `renter.person_id`. Only M10 activation may write it.
 
 **Done when:** roles behave correctly; every nested building route verifies its URL context;
 multiple account contexts switch by URL and are re-authorized per request; the pre-context checker
