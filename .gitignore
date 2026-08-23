@@ -23,6 +23,9 @@ coverage/
 playwright-report/
 test-results/
 
+# the deliberate red window (scripts/check_red_sentinel.py) -- never commit it
+.lokara-red
+
 # os / editor
 .DS_Store
 .idea/

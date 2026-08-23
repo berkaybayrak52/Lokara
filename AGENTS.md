@@ -105,6 +105,40 @@ The normal flow is:
 The red fixture and its implementation stay on the same slice branch. `main` receives only green
 work.
 
+### The red window
+
+Steps 1 and 2 are deliberately different agents, so between them the suite is red and neither agent
+is allowed to close it. Declare that window in `.lokara-red`, one line naming the slice and the
+reason:
+
+```bash
+echo "slice/<name> · <why the suite is red>" > .lokara-red
+```
+
+`scripts/gate.sh fast` then reports every failure and does not block, so the fixture author can end
+a turn honestly. `full` and `demo` treat the sentinel as a hard failure. Delete it when the
+implementation lands — a slice never closes with its window open. The file is gitignored and can
+never be committed.
+
+An anonymous sentinel is rejected. It must name the slice and the reason, because a sentinel that
+does not is simply an off switch for the gate.
+
+### Brief and turn discipline
+
+Agent cost is **turns × context**, not brief length: subagents are roughly 39% of all token spend
+and about 95% of that is context re-read on each turn. Measured per run over the 23.07–23.08.2026
+sessions: `spec-scribe` 84 turns, `app-implementer` 93, `engine-implementer` 66,
+`docs-reconciler` 143. Discovery is what costs, so a brief removes it:
+
+- Name the **exact files** to read, the fixture IDs, the acceptance command and the stop condition.
+  Never "explore the codebase" or "find the relevant tests".
+- Say what the agent must not touch, and which agent owns it instead.
+- An agent past roughly **40 turns** without its deliverable stops and reports what it has, rather
+  than spending further. A brief that cannot be finished in that budget is too large a slice.
+
+These are judgement rules, not a gate. Nothing enforces them; the numbers above are the baseline a
+later change is measured against.
+
 For work without a legal or calculation rule, such as a screen or a framework refactor, the spec
 step may be skipped. Review is still required for anything a landlord will read.
 
@@ -163,6 +197,14 @@ permission.
 
 The stop hook prevents an agent from ending on a red configured gate. `LOKARA_GATE=off` is only for
 explicit exploratory work. It is never evidence that a slice is complete.
+
+`scripts/check_red_sentinel.py` is the one bounded exception. `CLAUDE.md` § 10 forbids one agent
+from writing both a test and its implementation, which makes a red window mandatory on every
+calculation slice — and the stop hook was rejecting turn-endings inside it. A `.lokara-red` file
+naming the slice and the reason is announced at `fast` and does not block; it is a hard failure at
+`full` and `demo`. See § 4 "The red window". This narrows the gate to the window the contract
+itself requires; it is not `LOKARA_GATE=off` by another name, and it is never evidence that a slice
+is complete.
 
 ## 7. Review requirements
 
