@@ -299,10 +299,14 @@ export const StatementNkCostSchema = z.object({
 export const StatementHeatingLineSchema = z.object({
   partyLabel: z.string(),
   isLandlord: z.boolean(),
-  heatingBaseEur: z.string(),
-  heatingConsumptionEur: z.string(),
-  wwBaseEur: z.string(),
-  wwConsumptionEur: z.string(),
+  /** Null on a confirmed Messdienstleister passthrough: that document states a
+   * total per party and no §§ 7/8/9 column split, and Lokara does not compute
+   * one for it (docs/03 H7). Null rather than "0,00 €", so a missing figure can
+   * never be mistaken for a real zero. */
+  heatingBaseEur: z.string().nullable(),
+  heatingConsumptionEur: z.string().nullable(),
+  wwBaseEur: z.string().nullable(),
+  wwConsumptionEur: z.string().nullable(),
   totalCents: z.number().int(),
   totalEur: z.string(),
 });
@@ -380,6 +384,10 @@ export const DemoStatementResponseSchema = z.object({
   heatingTotalEur: z.string(),
   heatingInputTotalCents: z.number().int(),
   heatingMissingReason: z.string().nullable(),
+  /** Which input produced the heating figures — a calculated self-billing run,
+   * or a confirmed Messdienstleister statement passed through unchanged. */
+  heatingPath: z.enum(['SELF_BILLING', 'MDL_NET', 'MDL_GROSS']).nullable(),
+  heatingSourceNote: z.string().nullable(),
   heatingReadiness: z.enum(['READY', 'BLOCKED']),
   heatingFindings: z.array(StatementFindingSchema),
   heatingProvenance: z.array(StatementProvenanceSchema),

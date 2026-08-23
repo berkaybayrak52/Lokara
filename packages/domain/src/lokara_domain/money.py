@@ -5,7 +5,7 @@ math uses decimal.Decimal exclusively.
 """
 
 from collections.abc import Sequence
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
 from typing import NewType
 
 Cents = NewType("Cents", int)
@@ -47,6 +47,19 @@ def distribute_cents(total: Cents, weights: Sequence[Decimal | int]) -> list[Cen
 
     Deterministic: quotas are computed with Decimal (no float drift); leftover
     cents go to the largest fractional remainders, ties broken by lowest index.
+
+    ``total`` **may be negative** — a Gutschrift is a credit cost line, and
+    `docs/08` ("Credits stay separate negative lines") allocates it exactly like
+    any other cost rather than netting it against the gross line. ``weights``
+    stay non-negative either way: a Bemessung is a quantity, and only the pot
+    being distributed carries the sign.
+
+    The floor is therefore taken toward -infinity (``ROUND_FLOOR``) and never by
+    ``Decimal``'s ``//``, which truncates toward zero. On a negative total every
+    truncated "floor" is one cent too high, the leftover count comes out
+    negative, and the ranking slice then removes cents instead of adding them —
+    the function used to trip its own reconciliation assert. For a non-negative
+    total the two agree exactly, so no existing allocation moves.
     """
     if len(weights) == 0:
         raise ValueError("distribute_cents requires at least one weight")
@@ -58,12 +71,14 @@ def distribute_cents(total: Cents, weights: Sequence[Decimal | int]) -> list[Cen
         raise ValueError("distribute_cents requires a positive weight sum")
 
     quotas = [Decimal(total) * w / weight_sum for w in decimal_weights]
-    floors = [int(q // 1) for q in quotas]
+    floors = [int(q.to_integral_value(rounding=ROUND_FLOOR)) for q in quotas]
     remainder = int(total) - sum(floors)
 
-    # Rank by fractional remainder descending; ties broken by lowest index.
+    # Rank by fractional remainder descending; ties broken by lowest index. The
+    # fraction is measured against the same floor that was taken, so it stays in
+    # [0, 1) for a negative quota too and `remainder` stays in [0, len(weights)].
     by_remainder = sorted(
-        range(len(quotas)), key=lambda i: (quotas[i] - (quotas[i] // 1), -i), reverse=True
+        range(len(quotas)), key=lambda i: (quotas[i] - floors[i], -i), reverse=True
     )
     for i in by_remainder[:remainder]:
         floors[i] += 1

@@ -6,6 +6,7 @@ cent-exact shares out (docs/03). Depends only on lokara-domain.
 
 from .engine import calculate_nk_statement
 from .inputs import (
+    BillingWindowTooLongError,
     ConsumptionValue,
     CostItem,
     NkInput,
@@ -19,6 +20,7 @@ from .inputs import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "BillingWindowTooLongError",
     "ConsumptionValue",
     "CostItem",
     "NkInput",

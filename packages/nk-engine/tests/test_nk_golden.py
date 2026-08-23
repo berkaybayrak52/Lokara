@@ -260,7 +260,24 @@ class TestMeaKey:
 
 
 class TestPeriodLengthIndependence:
-    """Interim (<12 months) and >12-month statements — day-count-driven, never 365 assumed."""
+    """Day-count-driven statements, never 365 assumed — inside the legal 12-month bound.
+
+    The former `test_18_month_statement` (546-day window 2025-01-01 – 2026-07-01)
+    was removed rather than repaired. `docs/02` § 5 step 1 ("A period longer than
+    12 months blocks before calculation or rendering; leap years retain their
+    actual days") and `docs/08` "Page 01 output contract" → Period boundary
+    ("More than 12 months hard-blocks before an engine run or render") make that
+    window an `NkInputError`, so asserting shares for it asserted the opposite of
+    the approved rule. `08-F15` is the fixture and
+    `test_page01_edge_cases.py::TestF15PeriodLongerThanTwelveMonths` pins the
+    block. Do not restore an over-long window here; the M1-era test predates the
+    Page 01 transcription and its window is now illegal input.
+
+    The property that test carried — no 365-day assumption anywhere — survives
+    unchanged inside the bound: the interim window below, the 11-month window
+    that is aligned to no calendar year, and the 275-day Rumpfperiode (`08-F14`)
+    plus the 366-day leap year (`08-F20`) in `test_page01_edge_cases.py`.
+    """
 
     def test_interim_statement_jan_to_jun(self) -> None:
         # Window Jan 1 – Jul 1 (181 days); B's renter leaves Mar 31 (ends Apr 1, 90 d).
@@ -291,11 +308,15 @@ class TestPeriodLengthIndependence:
             ("unit-c", "ten-c", 24000),
         ]
 
-    def test_18_month_statement(self) -> None:
-        # Window Jan 1 2025 – Jul 1 2026 (546 days); B renter out Jun 30 2025, vacant after.
+    def test_eleven_month_window_across_the_year_boundary(self) -> None:
+        # Window Feb 1 2025 – Jan 1 2026: 334 days. It ends before the 12-month
+        # bound (Feb 1 2026), so it is legal input, and it is aligned to no
+        # calendar year, so a hard-coded 365 could not hide in the denominator.
+        # B's renter still ends Jul 1 2025: 150 days let, 184 days vacant, and
+        # 150 + 184 == 334 == the window — not 365.
         result = calculate_nk_statement(
             NkInput(
-                billing_period=period("2025-01-01", "2026-07-01"),
+                billing_period=period("2025-02-01", "2026-01-01"),
                 units=UNITS,
                 occupancies=OCCUPANCIES,
                 costs=(
@@ -308,13 +329,27 @@ class TestPeriodLengthIndependence:
                 ),
             )
         )
-        # Weights: A 5000×546, B renter 3000×181, B vacant 3000×365, C 2000×546.
+        # area_sqm_x100 × days, so the denominator is 100 m² × 334 d = 3,340,000.
+        assert [line.weight for line in result.lines] == [
+            Decimal(5000 * 334),
+            Decimal(3000 * 150),
+            Decimal(3000 * 184),
+            Decimal(2000 * 334),
+        ]
+        # €1,200.00 × weight / 3,340,000, then largest remainder:
+        #   A       1,670,000/3,340,000 = 1/2 -> 600.000000 exact
+        #   B renter  450,000/3,340,000       -> 161.676647 floor 16167 rem .676…
+        #   B vacant  552,000/3,340,000       -> 198.323353 floor 19832 rem .323…
+        #   C         668,000/3,340,000 = 1/5 -> 240.000000 exact
+        # The floors sum to 119,999; the single remaining cent goes to the
+        # largest remainder, B's renter, giving 16,168.
         assert shares_of(result.lines, "cost-garbage") == [
             ("unit-a", "ten-a", 60000),
-            ("unit-b", "ten-b", 11934),
-            ("unit-b", None, 24066),
+            ("unit-b", "ten-b", 16168),
+            ("unit-b", None, 19832),
             ("unit-c", "ten-c", 24000),
         ]
+        assert sum(int(line.amount) for line in result.lines) == 120000
 
 
 class TestValidation:

@@ -34,8 +34,10 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy import Enum as SaEnum
+from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .ids import new_id
@@ -133,6 +135,43 @@ class SelfUseKind(enum.Enum):
     FREE_OF_CHARGE = "FREE_OF_CHARGE"
 
 
+class MdlBranch(enum.Enum):
+    """Whether a confirmed Messdienstleister statement is net or gross of CO₂.
+
+    The two are different arithmetic, not a display flag (`docs/03` H7): a NET
+    statement already had the landlord's CO₂ share deducted and must not be
+    deducted from twice, while a GROSS one is rescaled by the exact quotient
+    after the split. Which one a document is cannot be inferred from its
+    figures, so it is confirmed by the person reading the document.
+    """
+
+    NET = "NET"
+    GROSS = "GROSS"
+
+
+class FiktivbelegungMode(enum.Enum):
+    """How a vacant unit's fictional person occupancy is counted (Page 01 § 4 D0).
+
+    Source names, kept in the repository's UPPER convention:
+    `letzteBelegung` → `LETZTE_BELEGUNG`, `immer1` → `IMMER_1`, `keine` → `KEINE`.
+    It sits on the object (`objekt.fiktivbelegungModus`, Page 01 § 3.5), defaults
+    to `LETZTE_BELEGUNG`, and `KEINE` is only lawful with a logged confirmation —
+    which is why `Building` carries a waiver note and a CHECK that demands one.
+    The pair is immutable after creation: changing a current scalar would rewrite
+    the denominator of a closed billing period. A future changed-mode workflow
+    must introduce an explicitly effective-dated resolution instead.
+
+    `Konvention`, `verify-before-production`, Rechtsstand 07/2026. It is a Lokara
+    convention over split instance case law (LG Krefeld 2 S 56/09; BGH VIII ZR
+    180/12 leaves the Ansatz a Tatfrage), never settled law, and no output may
+    present it as one. See `docs/02` § 5 "D0 Fiktivbelegung".
+    """
+
+    LETZTE_BELEGUNG = "LETZTE_BELEGUNG"
+    IMMER_1 = "IMMER_1"
+    KEINE = "KEINE"
+
+
 class Base(DeclarativeBase):
     # SQLAlchemy's documented idiom is a plain class attribute (read once at
     # mapper configuration, never mutated).
@@ -144,6 +183,8 @@ class Base(DeclarativeBase):
         Role: SaEnum(Role, name="role"),
         StatementStatus: SaEnum(StatementStatus, name="statement_status"),
         SelfUseKind: SaEnum(SelfUseKind, name="self_use_kind"),
+        FiktivbelegungMode: SaEnum(FiktivbelegungMode, name="fiktivbelegung_mode"),
+        MdlBranch: SaEnum(MdlBranch, name="mdl_branch"),
         AllocationKey: SaEnum(AllocationKey, name="allocation_key"),
         MeterKind: SaEnum(MeterKind, name="meter_kind"),
         MeasurementUnit: SaEnum(MeasurementUnit, name="measurement_unit"),
@@ -313,6 +354,20 @@ class Building(Base):
     street: Mapped[str]
     postal_code: Mapped[str]
     city: Mapped[str]
+    # Page 01 § 3.5 `objekt.fiktivbelegungModus` — Stammdaten of the object, not
+    # of a unit or a run, because one building bills one way (docs/02 § 5 D0).
+    # Migration 0009 makes this and its waiver note immutable after creation, so
+    # a later edit cannot change a historical person-key denominator.
+    fiktivbelegung_mode: Mapped[FiktivbelegungMode] = mapped_column(
+        default=FiktivbelegungMode.LETZTE_BELEGUNG,
+        server_default=FiktivbelegungMode.LETZTE_BELEGUNG.value,
+    )
+    # Page 01 E18: `keine` is permitted "only with logged confirmation", after a
+    # hard warning naming the case law — without the fiction the renters carry
+    # 100 % of the person-keyed fixed costs, which is what BGH VIII ZR 159/05 and
+    # LG Krefeld 2 S 56/09 reject. The CHECK below makes the log a precondition
+    # of the mode rather than a step someone can skip.
+    fiktivbelegung_waiver_note: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     landlord: Mapped["Landlord | None"] = relationship(
@@ -345,10 +400,19 @@ class Building(Base):
         primaryjoin="Building.id == HeatingCostEntry.building_id",
         foreign_keys="HeatingCostEntry.building_id",
     )
+    mdl_statements: Mapped[list["MdlStatement"]] = relationship(
+        back_populates="building",
+        primaryjoin="Building.id == MdlStatement.building_id",
+        foreign_keys="MdlStatement.building_id",
+    )
 
     __table_args__ = (
         _scoped_fk("building", "landlord_id", "landlord"),
         _scoped_pair("building"),
+        CheckConstraint(
+            "fiktivbelegung_mode <> 'KEINE' OR fiktivbelegung_waiver_note IS NOT NULL",
+            name="ck_building_fiktivbelegung_waiver_logged",
+        ),
         Index("ix_building_account", "account_id"),
     )
 
@@ -418,6 +482,11 @@ class Tenancy(Base):
         primaryjoin="Tenancy.id == TenancyParty.tenancy_id",
         foreign_keys="TenancyParty.tenancy_id",
     )
+    person_counts: Mapped[list["PersonCount"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == PersonCount.tenancy_id",
+        foreign_keys="PersonCount.tenancy_id",
+    )
 
     __table_args__ = (
         _scoped_fk("tenancy", "unit_id", "unit"),
@@ -451,6 +520,173 @@ class TenancyParty(Base):
         _scoped_fk("tenancy_party", "renter_id", "renter"),
         UniqueConstraint("tenancy_id", "renter_id"),
         Index("ix_tenancy_party_account", "account_id"),
+    )
+
+
+# ── Messdienstleister: a confirmed third-party statement, passed through. ──
+
+
+class MdlStatement(Base):
+    """A Wärmedienstleister's finished Abrechnung, as confirmed by a human.
+
+    Not a `HeatingCostEntry`: that is an invoice Lokara bills *from*, this is a
+    statement Lokara bills *with*. `docs/03` H7 — "validate and pass through;
+    never recompute MDL amounts" — so the per-renter positions are stored as
+    delivered and only checked against the confirmed total.
+
+    Append-only and versioned (`CLAUDE.md` § 3.2): a correction inserts
+    `version + 1` for the same building period and the earlier row stays. The
+    reader takes the highest version. Nothing UPDATEs a confirmed row, because
+    what was confirmed is the evidence that the figures were a human's decision
+    and not Lokara's arithmetic.
+
+    `source_ref` names the document the confirmation came from. It is required:
+    a passed-through figure whose origin nobody can name is not evidence.
+    """
+
+    __tablename__ = "mdl_statement"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    branch: Mapped[MdlBranch]
+    period_from: Mapped[date]
+    period_to: Mapped[date]  # exclusive
+    confirmed_total_cents: Mapped[int]
+    owner_position_cents: Mapped[int]
+    # Off the MDL document; all three or none, and only the GROSS branch needs
+    # them (a NET statement was already reduced by the landlord's share).
+    co2_kg_x1000: Mapped[int | None] = mapped_column(BigInteger)
+    co2_cost_cents: Mapped[int | None]
+    heated_area_sqm_x100: Mapped[int | None]
+    # False when the document carries no CO₂ disclosure at all — a separate
+    # 3-percent risk, never silently netted against anything (`docs/03` F25).
+    co2_evidence_present: Mapped[bool] = mapped_column(default=True)
+    source_ref: Mapped[str]
+    version: Mapped[int] = mapped_column(default=1)
+    confirmed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    building: Mapped["Building"] = relationship(
+        back_populates="mdl_statements",
+        primaryjoin="Building.id == MdlStatement.building_id",
+        foreign_keys="MdlStatement.building_id",
+    )
+    positions: Mapped[list["MdlStatementPosition"]] = relationship(
+        back_populates="statement",
+        primaryjoin="MdlStatement.id == MdlStatementPosition.mdl_statement_id",
+        foreign_keys="MdlStatementPosition.mdl_statement_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("mdl_statement", "building_id", "building"),
+        _scoped_pair("mdl_statement"),
+        CheckConstraint("confirmed_total_cents >= 0", name="ck_mdl_statement_total_non_negative"),
+        CheckConstraint("owner_position_cents >= 0", name="ck_mdl_statement_owner_non_negative"),
+        CheckConstraint("version >= 1", name="ck_mdl_statement_version_positive"),
+        CheckConstraint("period_to > period_from", name="ck_mdl_statement_period_ordered"),
+        UniqueConstraint(
+            "building_id",
+            "period_from",
+            "period_to",
+            "version",
+            name="uq_mdl_statement_building_period_version",
+        ),
+        Index("ix_mdl_statement_account", "account_id"),
+        Index("ix_mdl_statement_building", "building_id"),
+    )
+
+
+class MdlStatementPosition(Base):
+    """One renter's amount on a confirmed MDL statement, exactly as delivered."""
+
+    __tablename__ = "mdl_statement_position"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    mdl_statement_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    amount_cents: Mapped[int]
+
+    statement: Mapped["MdlStatement"] = relationship(
+        back_populates="positions",
+        primaryjoin="MdlStatement.id == MdlStatementPosition.mdl_statement_id",
+        foreign_keys="MdlStatementPosition.mdl_statement_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("mdl_statement_position", "mdl_statement_id", "mdl_statement"),
+        _scoped_fk("mdl_statement_position", "tenancy_id", "tenancy"),
+        CheckConstraint("amount_cents >= 0", name="ck_mdl_position_non_negative"),
+        UniqueConstraint(
+            "mdl_statement_id", "tenancy_id", name="uq_mdl_position_statement_tenancy"
+        ),
+        Index("ix_mdl_position_account", "account_id"),
+        Index("ix_mdl_position_statement", "mdl_statement_id"),
+        Index("ix_mdl_position_tenancy", "tenancy_id"),
+    )
+
+
+# ── Personenzahl: a temporal count per tenancy, never a scalar on the unit. ──
+
+
+class PersonCount(Base):
+    """How many people a tenancy housed over a period — the Personenschlüssel input.
+
+    A row rather than a scalar because the count changes inside a billing period
+    (`CLAUDE.md` § 6): a birth, a move-out and a Rumpfperiode all have to survive
+    as history, and a current-value column would silently rewrite last year's
+    Abrechnung. Half-open validity like every other temporal row here.
+
+    **Vacancy is deliberately absent from this table.** The D0 Fiktivbelegung of a
+    vacant unit is derived per run from the last ended tenancy of that unit and
+    the building's immutable `fiktivbelegung_mode`. The mode cannot be changed
+    after creation, so a completed period cannot be recalculated under a later
+    convention. A future effective-dated mode model would be an explicit new
+    resolution, rather than an overwrite. This remains a flagged convention
+    (`verify-before-production`), not a fact anyone observed. That is also why a
+    unit vacant for a whole billing period still resolves: the tenancy that ended
+    before the period keeps its rows here. See `docs/02` § 5 "D0 Fiktivbelegung",
+    which records the layering decision.
+    """
+
+    __tablename__ = "person_count"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    count: Mapped[int]
+    valid_from: Mapped[date]
+    valid_to: Mapped[date | None]
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="person_counts",
+        primaryjoin="Tenancy.id == PersonCount.tenancy_id",
+        foreign_keys="PersonCount.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("person_count", "tenancy_id", "tenancy"),
+        # Zero is a real entered count (an empty but still-running lease); a
+        # negative one is not a Personenzahl at all.
+        CheckConstraint("count >= 0", name="ck_person_count_non_negative"),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_person_count_period_ordered",
+        ),
+        # A tenant has one count on each day. The Postgres exclusion constraint
+        # uses half-open dateranges, so an adjacent correction is allowed while
+        # two competing counts for the same day are rejected at the DB boundary.
+        # `account_id` keeps an invalid foreign-account write on the composite
+        # FK path, whose explicit rejection is part of the isolation contract.
+        ExcludeConstraint(
+            ("account_id", "="),
+            ("tenancy_id", "="),
+            (text("daterange(valid_from, valid_to, '[)')"), "&&"),
+            name="ex_person_count_tenancy_period_no_overlap",
+            using="gist",
+        ),
+        Index("ix_person_count_account", "account_id"),
+        Index("ix_person_count_tenancy", "tenancy_id"),
     )
 
 
@@ -762,6 +998,9 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "unit",
     "tenancy",
     "tenancy_party",
+    "person_count",
+    "mdl_statement",
+    "mdl_statement_position",
     "self_use_period",
     "statement",
     "cost_entry",

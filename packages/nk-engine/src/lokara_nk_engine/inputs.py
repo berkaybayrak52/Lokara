@@ -5,6 +5,7 @@ vendor types ever reach the engine (docs/03 shared engine contract).
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 
 from lokara_domain import AllocationKey, Cents, MeasurementUnit, Occupancy, Period
@@ -21,11 +22,30 @@ class UnitBasis:
 
 @dataclass(frozen=True)
 class PersonCountPeriod:
-    """Temporal person count of a tenancy — a row, never a scalar (docs/02)."""
+    """Temporal person count of one party — a row, never a scalar (docs/02).
 
-    tenancy_id: str
+    ``tenancy_id=None`` is the **D0 Fiktivbelegung** row: the fictional occupancy
+    a vacant unit contributes to the person-day denominator (`docs/02` § 5
+    "D0 Fiktivbelegung", original Page 01 § 4 D0). It is the same landlord-side
+    convention `ConsumptionValue.tenancy_id=None` already uses, and it exists so
+    the person key can express what the area and unit keys get for free — a
+    vacant unit stays in the Gesamtverteiler (BGH VIII ZR 159/05).
+
+    The count is **derived by the caller, never invented by it**: last known
+    occupancy of the unit, minimum 1, day-exact, switchable to always-1 or off
+    (`Konvention`, `verify-before-production`, Rechtsstand 07/2026). The engine
+    stays pure and history-free and takes the derived figure as given; deriving
+    it needs a person-count history the engine deliberately does not carry.
+    `docs/02` § 5 records why this layering was chosen over an engine-side one.
+
+    ``unit_id`` is which unit the fictional occupancy belongs to, and is only
+    meaningful on a landlord row: a renter row's unit comes from its tenancy.
+    """
+
+    tenancy_id: str | None
     count: int
     period: Period
+    unit_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -101,3 +121,23 @@ class NkResult:
 
 class NkInputError(ValueError):
     pass
+
+
+class BillingWindowTooLongError(NkInputError):
+    """The Abrechnungszeitraum exceeds 12 months (`docs/02` § 5 step 1, `08-F15`).
+
+    A named subclass rather than a message a caller has to recognise by its
+    text: the application layer owes a landlord a German sentence
+    (`CLAUDE.md` § 9.3), and matching English engine prose to produce it would
+    make the copy break silently the next time the message is reworded. The
+    dates travel as fields so that sentence can name them.
+    """
+
+    def __init__(self, window_from: date, window_to: date, maximum_to: date) -> None:
+        self.window_from = window_from
+        self.window_to = window_to
+        self.maximum_to = maximum_to
+        super().__init__(
+            f"Billing period {window_from.isoformat()}–{window_to.isoformat()} is longer "
+            "than 12 months; an Abrechnungszeitraum may not exceed 12 months"
+        )

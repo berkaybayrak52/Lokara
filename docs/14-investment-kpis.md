@@ -334,15 +334,16 @@ calculation; purchase/ranking recommendations; and Bank-PDF valuation/credit/app
 ## 11. Unresolved production blockers
 
 - every default, threshold and KPI convention in the register;
-- the Page-03 R13 deductible-interest versus Page-07 R3 planning-interest choice;
 - how often a linked Page-03 AfA record is available during acquisition;
 - the editable marginal-tax default and all flat-tax scenario limits;
 - the capital-markets permission claim;
-- the target-return/default policy and every missing concept from the two absent source files; and
+- every missing concept from the two absent source files; and
 - real AfA availability and financing provenance at the time a Prüfobjekt is evaluated.
 
-The Berkay-answerable missing sources and choices are routed to `FRAGEN-an-Berkay-04.md`. Legal
-verification and all remaining production blockers stay in this owning document.
+Round 4 settled the Page-03 R13/Page-07 R3 interest choice and the target-return/default policy.
+The still Berkay-answerable re-delivery of the two absent source files is routed to
+`FRAGEN-an-Berkay-05.md`. Legal verification and all remaining production blockers stay in this
+owning document.
 
 ## 12. Source coverage ledger
 
