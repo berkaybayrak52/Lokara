@@ -8,6 +8,7 @@ from berkay_09_golden import (
     ALLOCABLE_CATALOGUE,
     NON_ALLOCABLE_CATALOGUE_IDS,
     PAGE_02_GOLDENS,
+    ROUND4_CATALOGUE_AUTHORITY,
 )
 
 EXPECTED_IDS = {f"09-F{number:02}" for number in range(1, 33)}
@@ -53,9 +54,18 @@ def test_catalogue_identity_surface_is_complete_and_unique() -> None:
 
 def test_every_nr_17_catalogue_row_requires_specific_naming() -> None:
     nr_17_rows = [row for row in ALLOCABLE_CATALOGUE if row[2] == "2 Nr. 17"]
-    assert len(nr_17_rows) == 5
+    assert len(nr_17_rows) == 6
     assert all(row[6] for row in nr_17_rows)
     assert all(not row[6] for row in ALLOCABLE_CATALOGUE if row[2] != "2 Nr. 17")
+
+
+def test_round4_catalogue_authority_keeps_electro_checked_and_trinkwasser_flagged() -> None:
+    electro = ROUND4_CATALOGUE_AUTHORITY["elektropruefung"]
+    assert electro["legal_basis"] == "BGH VIII ZR 123/06, 14.02.2007"
+    assert electro["verification_flag"] == "geprüft"
+    trinkwasser = ROUND4_CATALOGUE_AUTHORITY["trinkwasseruntersuchung"]
+    assert trinkwasser["rechtsnatur"] == "Konvention"
+    assert trinkwasser["verification_flag"] == "verify-before-production"
 
 
 def test_plain_and_split_invoices_reconcile() -> None:
@@ -73,6 +83,21 @@ def test_plain_and_split_invoices_reconcile() -> None:
         "09-F31",
     ):
         _assert_allocable_reconciliation(case_id)
+
+
+def test_f28_trinkwasser_variants_keep_the_existing_amount_without_recomputation() -> None:
+    case = PAGE_02_GOLDENS["09-F28"]
+    variant_a = case["variant_a"]
+    variant_b = case["variant_b"]
+    assert isinstance(variant_a, dict)
+    assert isinstance(variant_b, dict)
+    for variant in (variant_a, variant_b):
+        assert isinstance(variant, dict)
+        assert sum(_ints(variant, "shares")) == _int(variant, "renter_total")
+        assert _int(variant, "renter_total") + _int(variant, "owner") == _int(case, "allocable")
+    assert variant_a["betrkv_number"] == "2 Nr. 17"
+    assert variant_b["betrkv_number"] == "2 Nr. 2"
+    assert variant_b["fallback_used"] is True
 
 
 def test_wholly_non_allocable_cases_never_enter_a_denominator() -> None:

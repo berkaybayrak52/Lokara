@@ -41,6 +41,32 @@ All 47 Page 01b register rows are in Appendix C. Current conflicts and dependenc
 
 ## 1. Shared pure-engine boundary and data flow
 
+### 1.1 Round 4 — reductions and Block (c) (source: `Antwort-an-Emir_04.md` §§ 1.1–1.2, Rechtsstand 08/2026)
+
+This supersedes the unresolved prose in § 7 items 12 and 14, but does **not** implement an automatic
+deduction. It is an implementation contract for a later owner lane. The cumulation result is
+`Konvention`, `verify-before-production`, Anwaltspunkt: no BGH decision or settled literature line
+was supplied. The three components stay independently switchable.
+
+```text
+reduction = half_up(non_consumption_cost_share × 15%)
+          + half_up(total_cost_share × 3%) [§ 12(1) S. 2: one hardware ground]
+          + half_up(total_cost_share × 3%) [§ 12(1) S. 3: missing/incomplete § 6a information]
+```
+
+All three summands use their own **unreduced** base and never cascade. The two 3% grounds may
+cumulate (maximum 6%); 3% and 15% may cumulate only across their distinct cost masses. The overall
+ceiling is 21%. From two simultaneous grounds, emit the non-blocking warning: “Zwei
+Kürzungsgründe gleichzeitig — bitte prüfen Sie, ob beide zutreffen. Die Kürzungen wirken
+nebeneinander.” The output never represents § 5(2) and § 5(3) as two separate 3% rights.
+
+Block (c) is a mandatory audit value, never a second pot: `printed owner residual − sum(separately
+rounded origins)`. It is a subline of the owner residual, with no Bemessung or quota. Print only a
+non-zero value, but always retain it in the audit log. The required text is
+“Rundungsdifferenz aus der zeilenweisen Verteilung — keiner Einheit zurechenbar” for the vacancy
+schedule and “davon Rundungsdifferenz” below the owner row in the statement. This is `Konvention`,
+with no external source and no `verify-before-production` requirement.
+
 Both engines are pure Python packages. They import no web framework, database model, vendor SDK, or
 rules-store implementation. Adapters normalize persisted and supplier data first; callers resolve
 versioned legal values and pass plain domain shapes into the engines.

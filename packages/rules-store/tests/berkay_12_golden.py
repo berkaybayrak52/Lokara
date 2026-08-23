@@ -47,13 +47,17 @@ PAGE_05_GOLDENS: dict[str, dict[str, object]] = {
         "medium": "warm_water",
         "calibration_month": "2020-06",
         "today_month": "2025-08",
-        "page_05_years": 5,
-        "conflicting_meter_spec_years": 6,
-        "valid_until": "2025-12-31",
-        "months_until_expiry": 4,
+        "device_types": ("cold_water", "warm_water", "heat_meter", "heat_exchanger_hot_water"),
+        "years": 6,
+        "valid_until": "2026-12-31",
+        "months_until_expiry": 16,
         "stage": "notice",
-        "conflict": "warm_water_and_heat_meter_5_years_vs_meter_spec_6_years",
-        "production_blocked": True,
+        "effective_from": "2021-11-04",
+        "expiry_rule": "end_of_calendar_year",
+        "transition": (
+            "UNSICHER: applies to already-installed devices only by provider communication"
+        ),
+        "heating_cost_allocator_in_guard": False,
     },
     "12-F06": {
         "guard": "W2",

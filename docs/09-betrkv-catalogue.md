@@ -64,10 +64,11 @@ cleared.
 
 ### 2.1 Explicitly unresolved legal classifications
 
-- `trinkwasseruntersuchung` is provisionally Nr. 2 with an additional-contract-naming warning; a
-  specialist must decide whether it belongs to Nr. 17.
-- `elektropruefung` is provisionally Nr. 17 and naming-required; recurring fixed-installation tests
-  remain disputed against maintenance.
+- `trinkwasseruntersuchung` uses the dominant risk route Nr. 17 and specific naming, with the
+  documented Nr.-2 fallback for existing unnamed contracts; its classification remains a
+  `Konvention`, `verify-before-production`, Anwaltspunkt.
+- `elektropruefung` is Nr. 17, naming-required and `geprüft` as recurring safety inspection under
+  BGH VIII ZR 123/06; repair/remedy portions remain excluded.
 - an individually negotiated residential administration-cost agreement is treated conservatively
   like the invalid form-clause case until specialist review.
 - only `versicherung` has a Page-provided efficiency band. The remaining catalogue bands are
@@ -91,7 +92,8 @@ lohnanteilTypischProzent: integer 0..100 | null
 bandbreiteEurProM2Jahr: {min, max} | null
 sonderregel: keine | aufzugEg | hauswartSplit | gartenNutzbarkeit |
              schornsteinNr4a | rauchmelderMiete | kabelStichtag |
-             neuanlage2021 | glasfaserCap | ungezieferVorbeugend
+             neuanlage2021 | glasfaserCap | ungezieferVorbeugend |
+             trinkwasserFallback | pruefungOhneMaengelbeseitigung
 afaKlasseVorschlag: string | null
 anlageVKategorie: string | null
 gueltigVon / gueltigBis: date | null
@@ -116,7 +118,7 @@ Nr. 17 naming flag. Every default is a proposal, not an automatic legal conclusi
 | `wasserversorgung` | Wasserversorgung | 2 Nr. 2 | Wasserverbrauch | — | leistung | no | — |
 | `entwaesserung` | Entwässerung | 2 Nr. 3 | Wasserverbrauch | — | leistung | no | — |
 | `niederschlagswasser` | Niederschlagswasser | 2 Nr. 3 | Wohnfläche | — | abfluss | no | — |
-| `trinkwasseruntersuchung` | Trinkwasseruntersuchung | 2 Nr. 2 | Wohnfläche | — | abfluss | no | unresolved classification |
+| `trinkwasseruntersuchung` | Trinkwasseruntersuchung | 2 Nr. 17 | Wohnfläche | — | abfluss | yes | `trinkwasserFallback` |
 | `heizkosten` | Heizkosten | 2 Nr. 4a | Heizkosten (Messdienst) | — | leistung | no | — |
 | `wartung_heizung` | Wartung Heizungsanlage | 2 Nr. 4a | Heizkosten (Messdienst) | 60 | leistung | no | — |
 | `brennstoffversorgung` | Brennstoffversorgungsanlage | 2 Nr. 4b | Heizkosten (Messdienst) | — | leistung | no | — |
@@ -142,7 +144,7 @@ Nr. 17 naming flag. Every default is a proposal, not an automatic legal conclusi
 | `dachrinnenreinigung` | Dachrinnenreinigung | 2 Nr. 17 | Wohnfläche | 80 | abfluss | yes | — |
 | `rauchwarnmelder_wartung` | Wartung Rauchwarnmelder | 2 Nr. 17 | Wohneinheiten | 63 | abfluss | yes | `rauchmelderMiete` |
 | `lueftungsanlage_wartung` | Wartung Lüftungsanlage | 2 Nr. 17 | Wohnfläche | 70 | abfluss | yes | — |
-| `elektropruefung` | Prüfung der Elektroanlage (DGUV V3) | 2 Nr. 17 | Wohnfläche | 80 | abfluss | yes | unresolved classification |
+| `elektropruefung` | Prüfung der Elektroanlage (DGUV V3) | 2 Nr. 17 | Wohnfläche | 80 | abfluss | yes | `pruefungOhneMaengelbeseitigung` |
 | `sonstige` | Sonstige Betriebskosten (frei benannt) | 2 Nr. 17 | Wohnfläche | — | abfluss | yes | — |
 
 ### 3.2 Non-allocable catalogue rows
@@ -213,6 +215,10 @@ The first matching rule wins:
 3. Commercial use hard-blocks V1.
 4. A naming-required Nr. 17 item not named in one contract yields zero for that renter; the object
    denominator is unchanged.
+   `trinkwasserFallback` is the sole exception: retain the amount, route it as Nr. 2 and emit its
+   risk warning when the contract does not name the cost. `pruefungOhneMaengelbeseitigung` keeps
+   recurring inspection allocable, but proposes evidenced repair/instandsetzung/Mangelbeseitigung
+   portions as non-allocable; it never splits automatically.
 5. An affected antenna/broadband installation from 01.12.2021 yields zero.
 6. Cable costs are capped to the overlap ending 30.06.2024.
 7. Fibre charges are capped in order by installation date, collection year, 6,000 cents per unit

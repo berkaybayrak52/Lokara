@@ -309,6 +309,20 @@ The reference case prints `(a) 17.531`, `(b) 100.800`, `(c) 0`, total `118.331` 
 counterfactual vacancy calculation gives `17.536`; it does not replace the residual. Required
 convention copy:
 
+#### 5a — Round 4 final Block-(c) rendering
+
+Block (c) is only a subline of the owner residual. It never has a separate pot, amount addition,
+Bemessung or quota. Render it only when its cents are non-zero; retain the mandatory value in the
+audit log at zero too. The landlord/statement text below the owner row is “davon
+Rundungsdifferenz”; the tax-adviser vacancy-schedule text is “Rundungsdifferenz aus der
+zeilenweisen Verteilung — keiner Einheit zurechenbar”. This is a `Konvention` (Darstellungswahl,
+no external source); it does not upgrade any legal flag.
+
+For the Round-4 § 12 HeizkostenV reduction convention, show separately identified non-cascading
+15%/3%/3% components only after the later calculation lane has made them available. At two or more
+grounds, show the specified non-blocking review warning; this document neither calculates nor
+silently aggregates a reduction.
+
 ```text
 Hinweis: Der Abzug als Werbungskosten setzt eine fortbestehende Einkünfteerzielungsabsicht voraus
 (§§ 9, 21 EStG; BFH IX R 68/10). Die Feststellungslast liegt bei Ihnen (§ 90 AO). Diese Aufstellung
