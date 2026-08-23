@@ -2,7 +2,7 @@
 
 **Status:** D2 transcription approved and merged 21.08.2026; not implemented
 
-**Rechtsstand:** 07/2026
+**Rechtsstand:** 08/2026
 
 **Authoritative Page:**
 `berkay-work/Spec-Seiten/06 · Vertragsklauseln — Risiko-Memo 3ab5fd420731813799c0c1b419eac4f3.md`
@@ -228,8 +228,16 @@ six_year_cap_cents = cap_per_sqm_cents * area_sqm
 increase = min(monthly, remaining_six_year_cap_cents)
 ```
 
-B4a covers the €3/m² cap and B4b the €2/m² cap. The cap is cumulative across six years. The exact
-day on which the six-year window starts for each measure remains unresolved.
+B4a covers the €3/m² cap and B4b the €2/m² cap. The cap is cumulative across a sliding, backward
+six-year window ending at the new increase's **Wirksamwerden**; start is six years earlier under
+§ 188 Abs. 2 BGB. This anchor remains `[UNSICHER: Wortlautauslegung, no BGH/verified commentary]`
+and `verify-before-production`, not settled law.
+
+§ 559 Abs. 3a has three sentences: €3/m² (or €2/m² below €7/m² prior rent) overall, plus a parallel
+€0.50/m² heating subcap for § 555b Nr. 1/1a heating installation. Heating increases count in both
+counters. Every position therefore requires `massnahmeArt ∈ {allgemein, heizung_555b_1,
+heizung_555b_1a}`; without it the historic split is not reconstructible. The statutory text is
+`geprüft`, Rechtsstand 08/2026.
 
 ### B5 — small repairs
 

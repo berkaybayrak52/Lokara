@@ -34,6 +34,13 @@ def _ints(case: dict[str, object], key: str) -> tuple[int, ...]:
     return value
 
 
+def _texts(case: dict[str, object], key: str) -> tuple[str, ...]:
+    value = case[key]
+    assert isinstance(value, tuple)
+    assert all(isinstance(item, str) for item in value)
+    return value
+
+
 def _bool(case: dict[str, object], key: str) -> bool:
     value = case[key]
     assert isinstance(value, bool)
@@ -111,13 +118,18 @@ def test_w1_date_arithmetic_and_deadline_states() -> None:
     assert _bool(resolved, "resolved")
 
 
-def test_w2_keeps_the_meter_conflict_visible_and_missing_date_uncomputed() -> None:
+def test_w2_uses_six_years_to_calendar_year_end_and_excludes_heat_allocators() -> None:
     case = _case("12-F05")
-    assert _int(case, "page_05_years") == 5
-    assert _int(case, "conflicting_meter_spec_years") == 6
-    assert _date(case["valid_until"]) == date(2025, 12, 31)
-    assert _int(case, "months_until_expiry") == 4
-    assert _bool(case, "production_blocked")
+    assert _int(case, "years") == 6
+    assert set(_texts(case, "device_types")) == {
+        "cold_water",
+        "warm_water",
+        "heat_meter",
+        "heat_exchanger_hot_water",
+    }
+    assert _date(case["valid_until"]) == date(2026, 12, 31)
+    assert case["expiry_rule"] == "end_of_calendar_year"
+    assert case["heating_cost_allocator_in_guard"] is False
 
     missing = _case("12-F06")
     assert missing["calibration_date"] is None

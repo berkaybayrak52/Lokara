@@ -178,7 +178,13 @@ def test_section_558_and_559_paths_cap_the_correct_amounts() -> None:
     assert _int(cumulative, "first_increase_cents") + _int(
         cumulative, "second_allowed_increase_cents"
     ) == _int(cumulative, "resulting_cumulative_cents")
-    assert cumulative["window_start"] == "unresolved"
+    assert cumulative["window_start"] == "2020-09-01"
+    assert cumulative["window_anchor"] == "wirksamwerden"
+    assert cumulative["massnahme_art_required"] is True
+    assert (
+        _int(cumulative, "heating_cap_cents")
+        == _int(cumulative, "heating_subcap_cents_per_sqm") * 60
+    )
 
 
 def test_small_repairs_and_deposit_reconcile_in_integer_cents() -> None:

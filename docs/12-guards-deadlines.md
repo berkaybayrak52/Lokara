@@ -182,7 +182,12 @@ else:
   < 0  -> exceeded, non-blocking
 ```
 
-The years table is versioned rules data and remains production-blocked by the 5/6-year conflict.
+The years table is versioned rules data. From 04.11.2021, cold-water, warm-water, heat and
+heat-exchanger hot-water meters use **six years** (MessEV Anlage 7 Nr. 5.5.1/5.5.2 and 7.1/7.2);
+§ 34 Abs. 2 MessEV ends the period on 31 December of the calculated expiry year. This is
+`geprüft`, Rechtsstand 08/2026. The source's transition statement for already-installed devices is
+`UNSICHER` (provider communication, no found transition clause). Heizkostenverteiler are excluded:
+they have no Eichfrist guard.
 The exact warning is: “Der {medium}-Zähler in {WE} ist ab {valid_until} nicht mehr geeicht. Werte
 aus ungeeichten Zählern können bei der Abrechnung angreifbar sein — bitte Austausch/Nacheichung
 veranlassen.”

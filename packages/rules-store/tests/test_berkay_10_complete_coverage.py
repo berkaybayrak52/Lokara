@@ -147,14 +147,15 @@ def test_variante_s_is_isolated_and_self_use_never_changes_the_afa_basis() -> No
         assert _int(case, "area_month_denominator") == 19_400 * 12
 
     choice = _case("10-F11")
-    assert _int(choice, "month_result") - _int(choice, "day_result") == _int(choice, "delta")
+    assert _int(choice, "selected_result") == _int(choice, "month_result")
+    assert _int(choice, "discarded_day_exact_result") == 447_887
     assert _int(choice, "month_result") + _int(choice, "month_non_deductible") == _int(
         choice, "annual_afa"
     )
-    assert _int(choice, "day_result") + _int(choice, "day_non_deductible") == _int(
-        choice, "annual_afa"
-    )
-    assert choice["production_blocked"] is True
+    assert choice["started_rental_month_counts_fully"] is True
+    reverse = choice["reverse_change"]
+    assert isinstance(reverse, dict)
+    assert reverse["august_counts_as_letting"] is False
 
 
 def test_fifteen_percent_guard_keeps_service_end_and_reclassification_distinct() -> None:

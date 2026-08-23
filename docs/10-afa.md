@@ -1,7 +1,7 @@
 # AfA — purchase allocation, deduction and 15% guard
 
 **Status:** D2 transcription complete; approved and merged 21.08.2026
-**Rechtsstand:** 07/2026
+**Rechtsstand:** 08/2026
 **Authoritative Page:**
 `berkay-work/Spec-Seiten/03 · AfA (Abschreibung) 3a95fd4207318179b865c8a1c9e4b487.md`
 **Fixtures:** exactly `10-F01`–`10-F34` in
@@ -152,7 +152,10 @@ absent and an advisor handoff is produced.
 6. `10-K06`: building share below 50% or above 95% gives a notice; contract/BMF difference above 10 percentage points gives a warning; neither blocks.
 7. `10-K07`: rental ratio uses usable area, never income; it affects deductibility, not basis or rate.
 8. `10-K08`: denominator is hundredth-m² × month.
-9. `10-K09`: the source result treats a started rental month as fully rented. `10-F11` also preserves the day-level alternative. The 59.11 EUR choice is unresolved and production-blocking.
+9. `10-K09`: a started rental month counts fully. `10-F11` selects **453,798 ct**; the prior
+   day-exact **447,887 ct** result is discarded. On letting → self-use, the letting ends with the
+   month before self-use begins (unless self-use begins on a month-end). This is § 7 Abs. 1 S. 4
+   EStG, Rechtsstand 08/2026, `geprüft`.
 10. `10-K10`: every generated money amount rounds `ROUND_HALF_UP` once to cents; ratios stay exact; rates use basis points.
 11. `10-K11`: the final year takes the remaining book value; the same residual rule closes Disagio.
 12. `10-K12`: the 15% clock uses mandatory `leistungBis`, not invoice/payment date. It is separate from Page 02 `abfluss`; no schema is approved here.
@@ -272,7 +275,7 @@ oracle; this table is the complete 34-ID trace.
 | F08 | December gives 45,009; 12×45,009 deliberately differs from annual AfA. |
 | F09 | Variante S, whole-year self-use: deductible 367,493 + private 172,610 = 540,103. |
 | F10 | Variante S, rental from 1 July: 453,798 + 86,305 = 540,103. |
-| F11 | Variante S, K09 month 453,798 vs day 447,887; delta 5,911; unresolved blocker. |
+| F11 | Variante S, K09: started letting month fully counts, 453,798 ct; discard day-exact 447,887 ct. Reverse letting→self-use ends at the month before use. |
 | F12 | Variante S, two periods: 439,414 + 100,689 = 540,103. |
 | F13 | First year + 49 full years + 89,996 residual = basis. |
 | F14 | August 2028 sale AfA 360,069; closing book value 24,574,665. |

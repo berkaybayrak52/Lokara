@@ -31,12 +31,12 @@ ALLOCABLE_CATALOGUE: Final[tuple[CatalogueRow, ...]] = (
     (
         "trinkwasseruntersuchung",
         "Trinkwasseruntersuchung",
-        "2 Nr. 2",
+        "2 Nr. 17",
         "area",
         None,
         "payment",
-        False,
-        "unresolved_classification",
+        True,
+        "trinkwasser_fallback",
     ),
     ("heizkosten", "Heizkosten", "2 Nr. 4a", "heating", None, "service", False, "none"),
     (
@@ -206,7 +206,7 @@ ALLOCABLE_CATALOGUE: Final[tuple[CatalogueRow, ...]] = (
         80,
         "payment",
         True,
-        "unresolved_classification",
+        "inspection_without_defect_remediation",
     ),
     (
         "sonstige",
@@ -233,6 +233,23 @@ NON_ALLOCABLE_CATALOGUE_IDS: Final[tuple[str, ...]] = (
     "kabel_altentgelt",
     "antenne_neuanlage",
 )
+
+# Round-4 authority is kept apart from the catalogue row shape so this remains a
+# data-only oracle rather than a production rules-store implementation.
+ROUND4_CATALOGUE_AUTHORITY: Final[dict[str, dict[str, str]]] = {
+    "elektropruefung": {
+        "legal_basis": "BGH VIII ZR 123/06, 14.02.2007",
+        "rechtsnatur": "Rechtsprechung",
+        "rechtsstand": "08/2026",
+        "verification_flag": "geprüft",
+    },
+    "trinkwasseruntersuchung": {
+        "legal_basis": "Konvention: dominant Nr. 17 risk route; Nr. 2 fallback",
+        "rechtsnatur": "Konvention",
+        "rechtsstand": "08/2026",
+        "verification_flag": "verify-before-production",
+    },
+}
 
 PAGE_02_GOLDENS: Final[dict[str, Golden]] = {
     "09-F01": {
@@ -451,6 +468,26 @@ PAGE_02_GOLDENS: Final[dict[str, Golden]] = {
         "shares": (5_753, 3_988, 2_295, 5_381),
         "renter_total": 17_417,
         "owner": 583,
+        "variant_a": {
+            "contract_names_cost": True,
+            "betrkv_number": "2 Nr. 17",
+            "naming_required": True,
+            "fallback_used": False,
+            "warning": None,
+            "shares": (5_753, 3_988, 2_295, 5_381),
+            "renter_total": 17_417,
+            "owner": 583,
+        },
+        "variant_b": {
+            "contract_names_cost": False,
+            "betrkv_number": "2 Nr. 2",
+            "naming_required": False,
+            "fallback_used": True,
+            "warning": "trinkwasser_fallback_contract_naming",
+            "shares": (5_753, 3_988, 2_295, 5_381),
+            "renter_total": 17_417,
+            "owner": 583,
+        },
     },
     "09-F29": {
         "gross": 110_000,

@@ -20,6 +20,11 @@ before UI. Dates are communication events, not planning inputs.
   are green. Emir approved Slice A and it was merged locally on 21.08.2026; open wording, cumulation and
   `verify-before-production` flags remain explicit.
 - Berkay's Pages 01–08 and 01b exist. They are primary implementation specs, not background notes.
+- Round 4 transcription is a separate, unmerged documentation/fixture slice. It supersedes the
+  stated Page-01b wording/cumulation, Page-02 classification, AfA K09, Eichfrist and § 559 details
+  only where its source says so; all `Konvention`/`UNSICHER` labels remain. The 180-row register
+  count remains unresolved and is not edited here. Page 07 planning remains blocked by its two
+  missing companion files, notwithstanding earlier summary wording.
 - Page 01 is completely transcribed in `docs/08`/`docs/02` with a 24-ID data oracle and green
   consistency checks. Page 01b's settled implementation contract is technically closed by Slice A.
   Page 02 is merged in `docs/09` with an exact 32-ID data oracle; its production catalogue
