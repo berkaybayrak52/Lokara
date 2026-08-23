@@ -16,6 +16,12 @@ from lokara_db import Building, Renter, Tenancy, TenancyParty, Unit, new_id
 from lokara_domain import Period, cents, format_eur, periods_overlap
 from sqlalchemy import select
 
+from ..authorization import (
+    require_building,
+    require_owner,
+    require_resource_building,
+    visible_building_ids,
+)
 from ..deps import PathAccountSession
 from ..schemas import (
     BuildingCreate,
@@ -57,6 +63,9 @@ def list_buildings(account_id: str, session: PathAccountSession) -> BuildingList
         .where(Building.archived_at.is_(None))
         .order_by(Building.created_at, Building.id)
     ).all()
+    visible_ids = visible_building_ids(session)
+    if visible_ids is not None:
+        buildings = [building for building in buildings if building.id in visible_ids]
     return BuildingListResponse(buildings=[_building_summary(b) for b in buildings])
 
 
@@ -64,6 +73,7 @@ def list_buildings(account_id: str, session: PathAccountSession) -> BuildingList
 def create_building(
     account_id: str, body: BuildingCreate, session: PathAccountSession
 ) -> BuildingSummary:
+    require_owner(session)
     building = Building(
         id=new_id(),
         account_id=account_id,  # WITH CHECK refuses any other value
@@ -78,12 +88,7 @@ def create_building(
 
 
 def _get_building(session: PathAccountSession, building_id: str) -> Building:
-    building = session.scalar(
-        select(Building).where(Building.id == building_id, Building.archived_at.is_(None))
-    )
-    if building is None:  # unknown OR invisible under RLS — same answer
-        raise HTTPException(status_code=404, detail="Building not found")
-    return building
+    return require_building(session, building_id)
 
 
 @router.get("/buildings/{building_id}")
@@ -153,6 +158,7 @@ def _get_unit(session: PathAccountSession, unit_id: str) -> Unit:
     unit = session.get(Unit, unit_id)
     if unit is None:
         raise HTTPException(status_code=404, detail="Unit not found")
+    require_resource_building(session, unit.building_id)
     return unit
 
 

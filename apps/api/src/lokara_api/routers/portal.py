@@ -21,6 +21,7 @@ from lokara_pdf import (
 )
 
 from ..auth import RequireAuth
+from ..authorization import default_building_id, require_building
 from ..deps import PathAccountSession
 from ..schemas import (
     DemoStatementResponse,
@@ -63,7 +64,9 @@ _NO_DATA = 'Keine Daten im Konto — erst "Demo-Szenario laden" ausführen.'
 
 @router.get("/summary")
 def summary(account_id: str, session: PathAccountSession) -> DemoSummaryResponse:
-    return summary_response(session, session.get(Account, account_id))
+    return summary_response(
+        session, session.get(Account, account_id), building_id=default_building_id(session)
+    )
 
 
 def _bundle(
@@ -72,6 +75,10 @@ def _bundle(
     building_id: str | None = None,
     window: Period | None = None,
 ) -> StatementBundle:
+    if building_id is None:
+        building_id = default_building_id(session)
+    else:
+        require_building(session, building_id)
     try:
         return compute_statement(session, building_id=building_id, window=window)
     except NoDemoDataError as exc:

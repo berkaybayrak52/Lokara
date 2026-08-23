@@ -22,6 +22,7 @@ from lokara_domain import AllocationKey, cents, format_eur
 from lokara_rules_store import CataloguePosition, ContractFacts, classify_position
 from sqlalchemy import select
 
+from ..authorization import require_building, require_resource_building
 from ..deps import PathAccountSession
 from ..schemas import (
     CostCreate,
@@ -48,12 +49,7 @@ ALLOCATION_KEY_LABELS: dict[AllocationKey, str] = {
 
 def _get_building(session: PathAccountSession, building_id: str) -> Building:
     """Resolve a URL building under RLS before reading or writing its costs."""
-    building = session.scalar(
-        select(Building).where(Building.id == building_id, Building.archived_at.is_(None))
-    )
-    if building is None:  # unknown, archived, or invisible under RLS
-        raise HTTPException(status_code=404, detail="Building not found")
-    return building
+    return require_building(session, building_id)
 
 
 def current_assignment(cost: CostEntry) -> AllocationKeyAssignment:
@@ -221,6 +217,7 @@ def void_cost(
     cost = session.get(CostEntry, cost_id)
     if cost is None:
         raise HTTPException(status_code=404, detail="Cost entry not found")
+    require_resource_building(session, cost.building_id)
     if cost.voided_at is not None:
         raise HTTPException(status_code=422, detail="Cost entry is already voided")
     cost.voided_at = datetime.now(UTC)
@@ -248,6 +245,7 @@ def reassign_key(
     cost = session.get(CostEntry, cost_id)
     if cost is None:  # unknown OR invisible under RLS — same answer
         raise HTTPException(status_code=404, detail="Cost entry not found")
+    require_resource_building(session, cost.building_id)
     _validate_direct_target(session, cost.building_id, body)
     assignment = AllocationKeyAssignment(
         id=new_id(),
@@ -319,8 +317,13 @@ def list_operating_cost_agreements(
     account_id: str, tenancy_id: str, session: PathAccountSession
 ) -> list[OperatingCostAgreementOut]:
     del account_id
-    if session.get(Tenancy, tenancy_id) is None:
+    tenancy = session.get(Tenancy, tenancy_id)
+    if tenancy is None:
         raise HTTPException(status_code=404, detail="Tenancy not found")
+    unit = session.get(Unit, tenancy.unit_id)
+    if unit is None:
+        raise HTTPException(status_code=404, detail="Tenancy not found")
+    require_resource_building(session, unit.building_id)
     rows = session.scalars(
         select(OperatingCostAgreement)
         .where(OperatingCostAgreement.tenancy_id == tenancy_id)
@@ -336,8 +339,13 @@ def create_operating_cost_agreement(
     body: OperatingCostAgreementIn,
     session: PathAccountSession,
 ) -> OperatingCostAgreementOut:
-    if session.get(Tenancy, tenancy_id) is None:
+    tenancy = session.get(Tenancy, tenancy_id)
+    if tenancy is None:
         raise HTTPException(status_code=404, detail="Tenancy not found")
+    unit = session.get(Unit, tenancy.unit_id)
+    if unit is None:
+        raise HTTPException(status_code=404, detail="Tenancy not found")
+    require_resource_building(session, unit.building_id)
     rows = session.scalars(
         select(OperatingCostAgreement).where(OperatingCostAgreement.tenancy_id == tenancy_id)
     ).all()

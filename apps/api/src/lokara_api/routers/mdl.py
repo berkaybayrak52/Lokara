@@ -14,12 +14,13 @@ a rejected upload leaves no trace to clean up.
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, status
-from lokara_db import Building, MdlBranch, MdlStatement, MdlStatementPosition
+from lokara_db import MdlBranch, MdlStatement, MdlStatementPosition
 from lokara_domain import Period
 from lokara_heating_engine import calculate_page01b_statement
 from lokara_rules_store import CO2_SPLIT_TABLE, get_rule
 from sqlalchemy import select
 
+from ..authorization import require_building
 from ..deps import PathAccountSession
 from ..schemas import MdlStatementCreate, MdlStatementOut
 from ..statement_service import RULES_AS_OF, mdl_statement_input, period_label
@@ -42,9 +43,7 @@ def confirm_mdl_statement(
     confirmation in place (`CLAUDE.md` § 3.2). Nothing here updates a row.
     """
     del account_id  # scoping happened in the dependency
-    building = session.scalars(select(Building).where(Building.id == building_id)).first()
-    if building is None:
-        raise HTTPException(status_code=404, detail="Objekt nicht gefunden.")
+    building = require_building(session, building_id)
 
     # Each position's tenancy must belong to *this* building. RLS already keeps
     # another account out; this closes the same-account, wrong-building case,
@@ -129,6 +128,7 @@ def list_mdl_statements(
     versions are invisible is not auditable.
     """
     del account_id
+    require_building(session, building_id)
     rows = session.scalars(
         select(MdlStatement)
         .where(MdlStatement.building_id == building_id)
