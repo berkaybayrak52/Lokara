@@ -1,22 +1,42 @@
-# LEAD-HANDOFF.md — M6-C1 committed, unmerged; workflow correction is next
+# LEAD-HANDOFF.md — M6-C merged through C1; M6-C2 is the open work
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting.
 
 ## Current state — 23.08.2026
 
-- `main` is at `4c9b9ac` (document correction), whose parent `f578f2f` is the M6-B merge. The
-  working branch is `slice/m6-c1-matching-engine` at `a203755`, which carries exactly one commit
-  ahead of `main`: `a203755`, the pure bank-matching engine. `git branch --contains a203755` lists
-  the slice branch only.
-- Local `main` is 9 commits ahead of `origin/main` (`a748729`, the M5 merge). Nothing has been
+- `main` is at `8306b68` "merge: complete M6-C1 bank-matching engine". Two slices merged this
+  session: `slice/m6-workflow-correction` (`cc2f758`) and `slice/m6-c1-matching-engine`
+  (`8306b68`). Both slice branches are fully contained in `main` and have no unmerged work.
+- Local `main` is **15 commits ahead of `origin/main`** (`a748729`, the M5 merge). Nothing has been
   pushed since M5. Do not push without Emir's explicit go-ahead.
 - `Antwort-an-Emir_04.md` stays untracked at repository root by Emir's decision. Keep it out of
   every commit.
 - `scripts/gate.sh full` is green: 1077 Python tests, 43 web tests, `mypy --strict` clean, engine
   purity clean, handoff clean.
-- `stash@{0}` ("m6c1-superseded-by-a203755") is a recovery point from the branch repair described
-  below. It is fully superseded by `a203755` and can be dropped once that is confirmed.
+- `stash@{0}` ("m6c1-superseded-by-a203755") is fully superseded by the merged engine and can be
+  dropped. `stash@{1}` is an older M6-A rebase checkpoint; it was left alone.
+
+## The red window is now declarable
+
+`CLAUDE.md` § 10 forbids one agent from writing both a test and its implementation, so every
+calculation slice has a mandatory red window — and the Stop hook, which runs `gate.sh fast`, used
+to reject turn-endings inside it. Measured over the session transcripts: 9 main-session blocks plus
+2 in subagents during M6-C1 alone, ~47 across all sessions, and 12 of the 19 subagent blocks were
+`spec-scribe`, whose deliverable *is* a failing fixture.
+
+Write one line naming the slice and the reason to `.lokara-red`. `gate.sh fast` then prints every
+failure and exits 0; `full` and `demo` treat it as a hard failure, so nothing closes or merges with
+its window open. The file is gitignored and an anonymous sentinel is rejected. See `AGENTS.md` § 4.
+
+`AGENTS.md` § 4 also carries the brief and turn discipline: agent cost is turns × context, not
+brief length, so a brief names its exact files, fixture IDs and acceptance command, and an agent
+past ~40 turns stops and reports. The measured per-run baseline is recorded there.
+
+Two further fixes were measured and rejected — skipping the gate for read-only agents (they were
+blocked zero times in 16 runs) and downgrading the reviewers to a cheaper model (~3 % of spend,
+against `statement-reviewer`'s ability to see the de-scaling defect class the suite cannot).
+`PLAN.md` § M6-C records both so they are not rediscovered.
 
 ## M6-C1 — complete and merged
 

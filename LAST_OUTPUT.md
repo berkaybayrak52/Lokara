@@ -1,25 +1,29 @@
-# Last output — M6-C1 matching engine committed, deliberately unmerged
+# Last output — M6-C1 merged, red window declarable
 
-HEAD `a203755` on `slice/m6-c1-matching-engine` · `23.08.2026`
-Status: Partial
+HEAD `8306b68` on `main` · `23.08.2026`
+Status: Complete
 
 ## Wanted
-Implement M6-C1, the pure bank-matching engine against `docs/15`, and hand it off.
+Clear the two items `PLAN.md` § M6-C puts before M6-C2, in that order.
 
 ## Done
-`packages/matching-engine` is committed as `a203755`: § 4 signals and decision order, § 5.1
-designation/FIFO/§ 367 settlement, § 5.2 principal split and § 5.3 reversal. All thirteen
-`BANKMATCH-F01`–`F13` cases run through real code as 30 tests. The package imports the standard
-library only and refuses `float` at its single import boundary. `scripts/gate.sh full` is green.
-`LEAD-HANDOFF.md` and `PLAN.md` now carry the merge gate, the eight judgment calls the implementer
-flagged, and the disclosure that the main session reordered two assertions in
-`test_berkay_15_engine.py`. `FRAGEN-an-Berkay-05.md` records the two Seite-08 source questions.
+Both are merged into local `main`. The **workflow correction** (`cc2f758`) adds `.lokara-red`: a
+slice declares the red window `CLAUDE.md` § 10 requires, `gate.sh fast` reports every failure and
+exits 0 while it exists, `full`/`demo` treat it as a hard failure, and
+`scripts/tests/test_red_sentinel.py` proves the check can fail. `AGENTS.md` § 4 adds brief and turn
+discipline with the measured baseline. The **M6-C1 merge gate** (`8306b68`) is closed: the § 4
+stored-reference signal returns 0, since §§ 3.2–3.3 define no such field, with the gap recorded in
+the docstring, `docs/15` § 4 and `FRAGEN-an-Berkay-05.md`; the § 5.3 reversal lookup was not
+touched and `F06` stays green. `docs/15`'s status lines now describe `main`. `gate.sh full` is
+green: 1077 Python tests, 43 web tests, `mypy --strict` clean.
+
+The agent system was measured against the session transcripts rather than estimated: subagents are
+~39 % of spend, 95 % of that is context re-read, and 12 of 19 subagent gate blocks were
+`spec-scribe`. Two candidate fixes were rejected on that evidence and recorded in `PLAN.md`.
 
 ## Not done
-The slice is **not merged**. `scoring.py::_end_to_end_signal` binds § 4's "stored reference" to
-`profile.payment_code`, which §§ 3.2–3.3 never define; it must return 0 before the merge, and the
-`docs/15` status lines change only then. The workflow correction and M6-C2 are untouched. Nothing
-was pushed; local `main` (`4c9b9ac`) stays 9 commits ahead of `origin/main`.
+Nothing requested. M6-C2 (models, migration `0017`, RLS, the § 3.1 adapter rewrite, owner-scoped
+endpoints) is untouched. Nothing was pushed; `main` is 15 commits ahead of `origin/main`.
 
 ## Optional next step
-Do the workflow correction in `PLAN.md` § M6-C, then make the E2E signal inert and merge M6-C1.
+Start M6-C2, adding the § 4 stored-reference field with the `receivable` table.
