@@ -6,12 +6,11 @@ exists. No membership is not an error here (the dashboard offers "Demo-Szenario
 laden" in that case), so this returns an empty list instead of 403.
 """
 
-from fastapi import APIRouter
-from lokara_db import Account, Membership
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException
+from lokara_db import bootstrap_contexts
 
 from ..auth import RequireAuth
-from ..deps import raw_account_scoped_session
+from ..deps import _engine
 from ..schemas import MeAccount, MeResponse
 
 router = APIRouter()
@@ -19,25 +18,26 @@ router = APIRouter()
 
 @router.get("/me")
 def me(auth: RequireAuth) -> MeResponse:
-    # TODO(M5): a person-scoped RLS policy will let this list *all* of the
-    # person's accounts; until then RLS limits the view to the claimed account.
+    rows = bootstrap_contexts(_engine(), auth.person_id)
+    if not rows:
+        raise HTTPException(status_code=401, detail="Authenticated subject has no Person")
+
     accounts: list[MeAccount] = []
-    with raw_account_scoped_session(auth.account_id) as session:
-        rows = session.execute(
-            select(Membership, Account)
-            .join(Account, Membership.account_id == Account.id)
-            .where(
-                Membership.person_id == auth.person_id,
-                Membership.revoked_at.is_(None),
+    for row in rows:
+        account_id = row.account_id
+        account_name = row.account_name
+        account_shape = row.account_shape
+        membership_role = row.membership_role
+        if account_id is None:
+            continue
+        if account_name is None or account_shape is None or membership_role is None:
+            raise HTTPException(status_code=500, detail="Invalid bootstrap account context")
+        accounts.append(
+            MeAccount(
+                id=account_id,
+                name=account_name,
+                role=membership_role.value,
+                shape=account_shape.value,
             )
-        ).all()
-        for membership, account in rows:
-            accounts.append(
-                MeAccount(
-                    id=account.id,
-                    name=account.name,
-                    role=membership.role.value,
-                    shape=account.shape.value,
-                )
-            )
-    return MeResponse(person_id=auth.person_id, accounts=accounts)
+        )
+    return MeResponse(person_id=rows[0].person_id, email=rows[0].email, accounts=accounts)

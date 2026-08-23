@@ -69,6 +69,7 @@ case "$LEVEL" in
     # isolation suite, i.e. CLAUDE.md rule 3. Eight sessions of "local green" rested on
     # that. A gate that cannot tell a skipped suite from a passing one is not a gate.
     run "pytest (all)"      env LOKARA_REQUIRE_DB=1 LOKARA_REQUIRE_PDF=1 uv run pytest -q
+    run "pre-context reads" uv run python scripts/check_pre_context_reads.py
     run "eslint"            bun run lint
     run "tsc"               bun run typecheck
     run "vitest"            bun run test

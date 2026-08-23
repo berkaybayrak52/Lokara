@@ -21,6 +21,7 @@ LOKARA_REQUIRE_DB (set in CI) forbids the skip.
 """
 
 import os
+import time
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import date, datetime
@@ -218,16 +219,24 @@ def client() -> Iterator[TestClient]:
     teardown.dispose()
 
 
-def _token(person_id: str, account_id: str) -> dict[str, str]:
+def _token(person_id: str) -> dict[str, str]:
+    now = int(time.time())
     encoded = jwt.encode(
-        {"sub": person_id, "account_id": account_id},
+        {
+            "sub": person_id,
+            "iss": str(ApiSettings().supabase_jwt_issuer),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + 3600,
+        },
         ApiSettings().supabase_jwt_secret,
         algorithm="HS256",
     )
     return {"Authorization": f"Bearer {encoded}"}
 
 
-DEMO = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+DEMO = _token(DEMO_PERSON_ID)
 
 
 def _get(client: TestClient, **params: str) -> Any:

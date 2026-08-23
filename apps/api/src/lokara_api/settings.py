@@ -34,6 +34,12 @@ class ApiSettings(BaseSettings):
     # min_length alone is not enough: the published dev secret satisfies it happily,
     # which is why _refuse_dev_switches_in_deployed_environments checks it by value.
     supabase_jwt_secret: str = Field(default="", min_length=16, validate_default=True)
+    # Exact Supabase Auth issuer. The loopback default keeps local/CI auth usable
+    # without requiring developers to retrofit an existing .env; deployments set
+    # their project's https://<project-ref>.supabase.co/auth/v1 value explicitly.
+    supabase_jwt_issuer: str = Field(
+        default="http://127.0.0.1:54321/auth/v1", min_length=1, validate_default=True
+    )
     # Dev-only: enables POST /auth/dev-token. MUST be false (or unset) in prod.
     auth_dev_token: bool = False
     # Dev/pitch-only: enables POST /demo/load (one-click demo seed). Off by

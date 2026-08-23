@@ -153,7 +153,7 @@ have no earlier relationship to the landlord's account, and may simultaneously o
 exists. The actual invariant is consent: the nullable link starts empty and exactly one future M10
 flow may fill it after redeeming a tenancy-bound, per-person, single-use activation code.
 
-`app_bootstrap_contexts(text)` and migration `0006_bootstrap_contexts_read.py` are **prepared but
+`app_bootstrap_contexts(text)` and migration `0014_bootstrap_contexts_read.py` are **prepared but
 unmerged** on `slice/m5-bootstrap-contexts`. They are not part of `main`. The prepared design uses one
 bounded `SECURITY DEFINER` function, a dedicated `NOLOGIN`/`NOBYPASSRLS` owner with read access only
 to `person`, `membership` and `account`, and one checked API call site. It does not create a renter
@@ -668,7 +668,7 @@ approved `docs/11` adds no schema or API.
 
 | Gap or boundary | Status | Owner |
 | --- | --- | --- |
-| Secure pre-context identity read (`app_bootstrap_contexts`, migration `0006`) | **Prepared but unmerged** on `slice/m5-bootstrap-contexts` | M5, after documentation and Slices A–C |
+| Secure pre-context identity read (`app_bootstrap_contexts`, migration `0014`) | **Prepared but unmerged** on `slice/m5-bootstrap-contexts` | M5, after documentation and Slices A–C |
 | Role behavior, switcher, assigned-building enforcement, nested-route authorization and the no-`renter.person_id`-writer guard | **Future** | M5 remainder |
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
 | Page 02 production catalogue, classifications, NK half-up rounding and owner residual | Merged specification; production missing and flags remain | Slice C |

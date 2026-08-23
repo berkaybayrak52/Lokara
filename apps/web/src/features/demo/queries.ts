@@ -19,9 +19,9 @@ export function useHealth() {
   });
 }
 
-export function useDemoSummary() {
+export function useDemoSummary(accountId: string) {
   return useQuery<DemoSummaryResponse>({
-    queryKey: ['demo', 'summary'],
-    queryFn: () => api('/demo/summary', DemoSummaryResponseSchema),
+    queryKey: ['account', accountId, 'summary'],
+    queryFn: () => api(`/a/${accountId}/summary`, DemoSummaryResponseSchema),
   });
 }

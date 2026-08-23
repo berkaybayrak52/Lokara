@@ -1,8 +1,11 @@
-"""Request-scoped DB session with the RLS context set — the isolation spine.
+"""Database session boundaries with transaction-local RLS context.
 
-Enforced twice per CLAUDE.md rule 3: (1) this dependency verifies the caller
-holds a live Membership in the claimed account, (2) Postgres RLS scopes every
-row via the transaction-local `app.account_id` GUC underneath.
+Ordinary ``/a/{account_id}/...`` requests use ``PathAccountSession``: the URL
+names the account, a live Membership independently authorizes it, and Postgres
+RLS scopes every row underneath. The fixed ``DEMO_ACCOUNT_ID`` load/reset path
+is the narrow exception: it uses ``unmembered_account_session`` because loading
+creates the Membership it would otherwise require, while still setting the
+same RLS context.
 
 Endpoints using this dependency are sync `def` on purpose: FastAPI runs them
 in the threadpool, so the blocking psycopg driver never stalls the event loop
@@ -28,39 +31,14 @@ def _engine() -> Engine:
     return create_db_engine(DbSettings().database_url)
 
 
-def raw_account_scoped_session(account_id: str) -> AbstractContextManager[Session]:
-    """An RLS-scoped session WITHOUT the membership gate — only for endpoints
-    whose semantics forbid it (/me lists relationships, /demo/load creates the
-    membership it would be gated on). RLS still confines every row underneath."""
-    return account_scoped_session(_engine(), account_id)
+def unmembered_account_session(account_id: str) -> AbstractContextManager[Session]:
+    """An RLS-scoped session for fixed-account demo bootstrap writes only.
 
-
-def account_session(
-    auth: Annotated[AuthContext, Depends(require_auth)],
-) -> Iterator[Session]:
-    """Yields a session whose transaction carries the caller's account context.
-
-    The membership check runs under RLS already scoped to the claimed account:
-    a caller without a row there gets 403 before any domain data is touched.
-    TODO(supabase): at M5 the account id moves from the token claim to the URL
-    (/a/{accountId}/…) — this dependency then takes it from the path instead.
+    Demo load creates the Membership that would otherwise gate it, while demo
+    reset must operate on that same fixed account. The helper remains scoped by
+    ``app.account_id`` underneath and must not be used for ordinary requests.
     """
-    with account_scoped_session(_engine(), auth.account_id) as session:
-        membership = session.scalar(
-            select(Membership).where(
-                Membership.person_id == auth.person_id,
-                Membership.account_id == auth.account_id,
-                Membership.revoked_at.is_(None),
-            )
-        )
-        if membership is None:
-            raise HTTPException(
-                status_code=403, detail="Caller holds no membership in this account"
-            )
-        yield session
-
-
-AccountSession = Annotated[Session, Depends(account_session)]
+    return account_scoped_session(_engine(), account_id)
 
 
 def account_session_for_path(

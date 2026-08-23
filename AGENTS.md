@@ -147,12 +147,15 @@ uv run python scripts/check_engine_purity.py
 uv run python scripts/check_agent_parity.py
 uv run python scripts/check_rls_coverage.py
 uv run python scripts/check_fk_isolation.py
+uv run python scripts/check_pre_context_reads.py
 ```
 
 - `check_engine_purity.py` protects pure, deterministic engine packages.
 - `check_agent_parity.py` protects the `.claude` and `.codex` mirror.
 - `check_rls_coverage.py` requires every tenant table to have RLS and isolation-test coverage.
 - `check_fk_isolation.py` rejects unsafe cross-account foreign keys.
+- `check_pre_context_reads.py` enforces the sole bounded pre-account identity read, including its
+  function, role, policies, privileges and API call sites.
 - `verify_demo_path.sh` validates migration, seed, statement, PDF and rendered figures.
 
 `scripts/verify_demo_path.sh --fresh` destroys local Postgres data. Run it only with Emir's explicit

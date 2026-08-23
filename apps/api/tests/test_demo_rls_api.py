@@ -7,6 +7,7 @@ init-app-role.sql + alembic upgrade head + the demo seed itself.
 """
 
 import os
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -16,7 +17,6 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from lokara_api import create_app
-from lokara_api.auth import create_dev_token
 from lokara_api.settings import ApiSettings
 from lokara_db import Account, DbSettings, Membership, Person, Role, create_db_engine
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 NBSP = " "
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "packages" / "db"
+TEST_JWT_ISSUER = "https://lokara.test/auth/v1"
 
 ISO_ACCOUNT_ID = "acc_iso_check"
 ISO_PERSON_ID = "per_iso_owner"
@@ -71,9 +72,17 @@ def client() -> Iterator[TestClient]:
     yield TestClient(create_app())
 
 
-def _token(person_id: str, account_id: str) -> dict[str, str]:
+def _token(person_id: str) -> dict[str, str]:
+    now = int(time.time())
     encoded = jwt.encode(
-        {"sub": person_id, "account_id": account_id},
+        {
+            "sub": person_id,
+            "iss": str(getattr(ApiSettings(), "supabase_jwt_issuer", TEST_JWT_ISSUER)),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + 3600,
+        },
         ApiSettings().supabase_jwt_secret,
         algorithm="HS256",
     )
@@ -82,8 +91,7 @@ def _token(person_id: str, account_id: str) -> dict[str, str]:
 
 class TestDemoSummary:
     def test_owner_sees_the_seeded_demo(self, client: TestClient) -> None:
-        headers = {"Authorization": f"Bearer {create_dev_token(ApiSettings().supabase_jwt_secret)}"}
-        response = client.get("/demo/summary", headers=headers)
+        response = client.get(f"/a/{DEMO_ACCOUNT_ID}/summary", headers=_token(DEMO_PERSON_ID))
         assert response.status_code == 200
         body = response.json()
         assert body["accountName"] == "Demo Konto"
@@ -96,21 +104,20 @@ class TestDemoSummary:
 
 
 class TestApiIsolation:
-    def test_no_membership_in_claimed_account_is_403(self, client: TestClient) -> None:
-        """A valid JWT claiming the demo account, but the person holds no
-        membership there — the app-logic check fires before any domain data."""
-        response = client.get("/demo/summary", headers=_token("per_stranger", DEMO_ACCOUNT_ID))
+    def test_no_membership_in_path_account_is_403(self, client: TestClient) -> None:
+        """The URL account is independently authorized before domain data is touched."""
+        response = client.get(f"/a/{DEMO_ACCOUNT_ID}/summary", headers=_token("per_stranger"))
         assert response.status_code == 403
 
-    def test_unknown_account_context_is_403(self, client: TestClient) -> None:
-        response = client.get("/demo/summary", headers=_token("per_stranger", "acc_ghost"))
+    def test_unknown_path_account_is_403(self, client: TestClient) -> None:
+        response = client.get("/a/acc_ghost/summary", headers=_token("per_stranger"))
         assert response.status_code == 403
 
     def test_other_accounts_context_cannot_see_demo_rows(self, client: TestClient) -> None:
         """The RLS backstop through the whole stack: a legitimate member of a
         different account gets an empty view (404 'no data'), never the demo
         account's building."""
-        response = client.get("/demo/summary", headers=_token(ISO_PERSON_ID, ISO_ACCOUNT_ID))
+        response = client.get(f"/a/{ISO_ACCOUNT_ID}/summary", headers=_token(ISO_PERSON_ID))
         assert response.status_code == 404
 
 
@@ -120,7 +127,7 @@ class TestDemoReset:
     it cannot touch another account's data."""
 
     def test_reset_removes_stray_rows_and_restores_the_scenario(self, client: TestClient) -> None:
-        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        headers = _token(DEMO_PERSON_ID)
         base = f"/a/{DEMO_ACCOUNT_ID}"
 
         # A rehearsal leftover: exactly what pollutes the Objekte list.
@@ -144,14 +151,14 @@ class TestDemoReset:
         assert [b["name"] for b in buildings] == ["Musterstraße 12"]
         # Re-seeded, not merely emptied: the scenario is back in full.
         assert buildings[0]["unitCount"] == 3
-        summary = client.get("/demo/summary", headers=headers).json()
+        summary = client.get(f"/a/{DEMO_ACCOUNT_ID}/summary", headers=headers).json()
         assert len(summary["tenancies"]) == 3
 
     def test_reset_removes_a_stray_tenancy_graph_but_retains_page02_evidence(
         self, client: TestClient
     ) -> None:
         """Immutable demo costs stay; a separate rehearsal tenancy does not."""
-        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        headers = _token(DEMO_PERSON_ID)
         base = f"/a/{DEMO_ACCOUNT_ID}"
         before = client.get(f"{base}/buildings/bld_demo_muster12/costs", headers=headers)
         assert before.status_code == 200
@@ -234,10 +241,10 @@ class TestDemoReset:
     def test_reset_leaves_the_callers_own_access_intact(self, client: TestClient) -> None:
         """It must not wipe the Account/Membership it runs under — doing so
         would 403 the very session that pressed the button."""
-        headers = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+        headers = _token(DEMO_PERSON_ID)
         assert client.post("/demo/reset", headers=headers).status_code == 200
         me = client.get("/me", headers=headers).json()
-        assert [a["id"] for a in me["accounts"]] == [DEMO_ACCOUNT_ID]
+        assert DEMO_ACCOUNT_ID in [a["id"] for a in me["accounts"]]
 
     def test_reset_cannot_delete_another_accounts_rows(self, client: TestClient) -> None:
         """The guarantee that matters for a DELETE endpoint.
@@ -249,7 +256,7 @@ class TestDemoReset:
         context, so a caller from elsewhere cannot use it to wipe their own —
         or anyone else's — data.
         """
-        iso = _token(ISO_PERSON_ID, ISO_ACCOUNT_ID)
+        iso = _token(ISO_PERSON_ID)
         created = client.post(
             f"/a/{ISO_ACCOUNT_ID}/buildings",
             headers=iso,
@@ -267,7 +274,5 @@ class TestDemoReset:
         survivors = client.get(f"/a/{ISO_ACCOUNT_ID}/buildings", headers=iso).json()
         assert [b["name"] for b in survivors["buildings"]] == ["Fremdes Haus"]
         # …and the demo account is the one that got re-seeded.
-        demo = client.get(
-            f"/a/{DEMO_ACCOUNT_ID}/buildings", headers=_token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
-        ).json()
+        demo = client.get(f"/a/{DEMO_ACCOUNT_ID}/buildings", headers=_token(DEMO_PERSON_ID)).json()
         assert [b["name"] for b in demo["buildings"]] == ["Musterstraße 12"]

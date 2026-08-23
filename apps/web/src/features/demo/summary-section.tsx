@@ -14,6 +14,8 @@ import {
 
 import { useDemoSummary, useHealth } from './queries';
 
+const DEMO_ACCOUNT_ID = 'acc_demo_lokara';
+
 /**
  * Live data over the FastAPI backend: first request 401s (no session cookie),
  * the api.ts interceptor mints the session and replays — no explicit login
@@ -21,7 +23,7 @@ import { useDemoSummary, useHealth } from './queries';
  */
 export function SummarySection() {
   const health = useHealth();
-  const summary = useDemoSummary();
+  const summary = useDemoSummary(DEMO_ACCOUNT_ID);
 
   return (
     <section aria-labelledby="api-heading">

@@ -73,6 +73,9 @@ uv run python scripts/check_rls_coverage.py || ISOLATION_FAILED+=("RLS coverage"
 step "FK isolation (docs/02 — RLS does not cover referential integrity)"
 uv run python scripts/check_fk_isolation.py || ISOLATION_FAILED+=("FK isolation")
 
+step "Pre-context read boundary (docs/02 — exactly one bounded exception)"
+uv run python scripts/check_pre_context_reads.py || ISOLATION_FAILED+=("pre-context reads")
+
 if (( ${#ISOLATION_FAILED[@]} )); then
   fail "isolation gate(s) red: $(IFS=', '; echo "${ISOLATION_FAILED[*]}") — see above"
 fi

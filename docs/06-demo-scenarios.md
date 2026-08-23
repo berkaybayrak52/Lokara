@@ -147,7 +147,7 @@ RLS-scoped application role and cannot create the first `Person`; after the owne
 and reset operate only on the fixed `acc_demo_lokara` account. They are pitch utilities, not
 production signup, onboarding or account creation.
 
-The **Prepared but unmerged** M5 branch adds migration `0006` and the bounded
+The **Prepared but unmerged** M5 branch adds migration `0014` and the bounded
 `app_bootstrap_contexts(text)` identity read. That work does not add a `Person` write, production
 onboarding, a new dashboard, a portal or an account switcher.
 

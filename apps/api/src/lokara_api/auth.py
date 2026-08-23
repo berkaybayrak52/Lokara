@@ -1,10 +1,7 @@
-"""Supabase-JWT auth (HS256) — port of the NestJS SupabaseJwtGuard.
+"""Supabase-JWT auth shared by the web and mobile transports.
 
-TODO(supabase): with a real project the `account_id` claim does not exist —
-at M5 the account context moves to the URL (/a/{accountId}/…) and the API
-resolves Person → Membership → Account, verifying the caller holds that
-relationship. Until then tokens carry an explicit account_id claim (see the
-dev-token endpoint), and the membership check runs in deps.account_session.
+Authentication establishes only the verified subject. Account context always
+comes from an ``/a/{account_id}/...`` URL and is authorized independently.
 """
 
 import time
@@ -23,27 +20,45 @@ ACCESS_TOKEN_COOKIE = "lokara_access_token"
 DEV_TOKEN_EXPIRES_IN_SECONDS = 60 * 60
 # Fixed demo identities — must match the lokara_db.seed demo scenario.
 DEV_PERSON_ID = "per_demo_owner"
-DEV_ACCOUNT_ID = "acc_demo_lokara"
+AUTHENTICATED_AUDIENCE = "authenticated"
+AUTHENTICATED_ROLE = "authenticated"
+REQUIRED_JWT_CLAIMS = ["sub", "exp", "iss", "aud", "role"]
 
 
 @dataclass(frozen=True)
 class AuthContext:
     """Claims the API relies on after JWT verification."""
 
-    person_id: str  # Supabase user id (JWT `sub`) — maps onto Person at M5
-    account_id: str  # the account whose data this request may touch (RLS context)
+    person_id: str  # Supabase user id (JWT `sub`) — maps onto Person
 
 
-def verify_supabase_token(token: str, secret: str) -> AuthContext:
+def verify_supabase_token(token: str, secret: str, issuer: str | None = None) -> AuthContext:
+    """Verify the complete Supabase access-token provenance contract.
+
+    TODO(supabase): confirm whether the real project uses legacy HS256 or
+    asymmetric signing keys via JWKS (ES256/RS256). The issuer, audience, role,
+    expiry and subject checks remain required with either signing mechanism.
+    """
+    expected_issuer = issuer or ApiSettings().supabase_jwt_issuer
     try:
-        payload: dict[str, Any] = jwt.decode(token, secret, algorithms=["HS256"])
+        payload: dict[str, Any] = jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            issuer=expected_issuer,
+            audience=AUTHENTICATED_AUDIENCE,
+            options={"require": REQUIRED_JWT_CLAIMS},
+        )
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
     person_id = payload.get("sub")
-    account_id = payload.get("account_id") or (payload.get("app_metadata") or {}).get("account_id")
-    if not isinstance(person_id, str) or not isinstance(account_id, str) or not account_id:
-        raise HTTPException(status_code=401, detail="Token carries no account context")
-    return AuthContext(person_id=person_id, account_id=account_id)
+    if not isinstance(person_id, str) or not person_id:
+        raise HTTPException(status_code=401, detail="Token carries no valid subject")
+    if payload.get("aud") != AUTHENTICATED_AUDIENCE:
+        raise HTTPException(status_code=401, detail="Token carries no exact authenticated audience")
+    if payload.get("role") != AUTHENTICATED_ROLE:
+        raise HTTPException(status_code=401, detail="Token carries no authenticated role")
+    return AuthContext(person_id=person_id)
 
 
 def require_auth(
@@ -59,18 +74,20 @@ def require_auth(
         token = lokara_access_token
     else:
         raise HTTPException(status_code=401, detail="Missing bearer token or session cookie")
-    return verify_supabase_token(token, ApiSettings().supabase_jwt_secret)
+    settings = ApiSettings()
+    return verify_supabase_token(token, settings.supabase_jwt_secret, settings.supabase_jwt_issuer)
 
 
-def create_dev_token(secret: str) -> str:
-    """DEV ONLY — a token shaped like a Supabase access token, so the auth path
-    is exercisable without a Supabase project. TODO(supabase): delete at M5."""
+def create_dev_token(secret: str, issuer: str | None = None) -> str:
+    """DEV ONLY — issue a subject-only token through the production auth path."""
     now = int(time.time())
+    expected_issuer = issuer or ApiSettings().supabase_jwt_issuer
     return jwt.encode(
         {
             "sub": DEV_PERSON_ID,
-            "account_id": DEV_ACCOUNT_ID,
-            "role": "authenticated",
+            "iss": expected_issuer,
+            "aud": AUTHENTICATED_AUDIENCE,
+            "role": AUTHENTICATED_ROLE,
             "iat": now,
             "exp": now + DEV_TOKEN_EXPIRES_IN_SECONDS,
         },

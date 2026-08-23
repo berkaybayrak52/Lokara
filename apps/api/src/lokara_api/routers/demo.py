@@ -1,5 +1,10 @@
-"""Guarded demo endpoint proving the Phase E spine: JWT auth → membership
-check → RLS-scoped session → typed contract response (consumed by apps/web)."""
+"""Flag-gated bootstrap writes for the one fixed demo account.
+
+Load/reset require authentication but deliberately do not require an existing
+Membership: load creates it, and both operations are confined to
+``DEMO_ACCOUNT_ID`` by their RLS-scoped unmembered session. Ordinary account
+reads use URL-carried context and the live-Membership gate in the portal router.
+"""
 
 from fastapi import APIRouter, HTTPException
 from lokara_db import Account, Building
@@ -9,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import RequireAuth
-from ..deps import AccountSession, raw_account_scoped_session
+from ..deps import unmembered_account_session
 from ..schemas import DemoLoadResponse, DemoSummaryResponse, DemoTenancySummary
 from ..settings import ApiSettings
 
@@ -23,13 +28,13 @@ def load(auth: RequireAuth) -> DemoLoadResponse:
     DEV/PITCH ONLY — disabled unless DEMO_SEED_ENABLED=true (same pattern as
     AUTH_DEV_TOKEN). Idempotent merge of the fixed demo fixture — including the
     OWNER Membership this endpoint would otherwise be gated on, so it runs on
-    the raw scoped session; RLS confines every write to the demo account
+    the unmembered scoped session; RLS confines every write to the demo account
     context underneath.
     """
     if not ApiSettings().demo_seed_enabled:
         raise HTTPException(status_code=403, detail="Demo seeding is disabled")
     del auth  # any authenticated caller may (re)load the fixed demo fixture
-    with raw_account_scoped_session(DEMO_ACCOUNT_ID) as session:
+    with unmembered_account_session(DEMO_ACCOUNT_ID) as session:
         seed_demo(session)
     return DemoLoadResponse(ok=True, account_id=DEMO_ACCOUNT_ID)
 
@@ -47,7 +52,7 @@ def reset(auth: RequireAuth) -> DemoLoadResponse:
     if not ApiSettings().demo_seed_enabled:
         raise HTTPException(status_code=403, detail="Demo seeding is disabled")
     del auth  # same audience as /demo/load: any authenticated caller
-    with raw_account_scoped_session(DEMO_ACCOUNT_ID) as session:
+    with unmembered_account_session(DEMO_ACCOUNT_ID) as session:
         reset_demo(session)
     return DemoLoadResponse(ok=True, account_id=DEMO_ACCOUNT_ID)
 
@@ -82,8 +87,3 @@ def summary_response(session: Session, account: Account | None) -> DemoSummaryRe
         unit_count=len(building.units),
         tenancies=tenancies,
     )
-
-
-@router.get("/summary")
-def summary(auth: RequireAuth, session: AccountSession) -> DemoSummaryResponse:
-    return summary_response(session, session.get(Account, auth.account_id))

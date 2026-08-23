@@ -53,6 +53,7 @@ jobs:
       # The API tests construct ApiSettings (no .env in CI) and exercise the
       # gated demo-seed endpoint in its enabled state.
       SUPABASE_JWT_SECRET: ci-only-secret-not-used-in-prod-123456
+      SUPABASE_JWT_ISSUER: https://lokara.test/auth/v1
       DEMO_SEED_ENABLED: 'true'
       # docs/01 D9: required, no default. It must be `ci` and not staging/production
       # -- this job runs with DEMO_SEED_ENABLED above, which the guard refuses in a
@@ -75,3 +76,6 @@ jobs:
       # apply scripts/init-app-role.sql and `alembic upgrade head` themselves
       # (packages/db/tests/test_rls_isolation.py), so a bare Postgres service is enough.
       - run: uv run pytest
+      # The live catalogs and API call sites must agree on the single sanctioned
+      # pre-account-context read. Pytest leaves the self-migrated database at head.
+      - run: uv run python scripts/check_pre_context_reads.py

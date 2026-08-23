@@ -12,6 +12,7 @@ The two properties this file exists to pin down:
 """
 
 import os
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ from sqlalchemy.orm import Session
 
 NBSP = " "  # format_eur puts a non-breaking space before the €
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "packages" / "db"
+TEST_JWT_ISSUER = "https://lokara.test/auth/v1"
 
 BASE = f"/a/{DEMO_ACCOUNT_ID}"
 DEMO_BUILDING_ID = "bld_demo_muster12"
@@ -75,16 +77,24 @@ def client() -> Iterator[TestClient]:
     yield test_client
 
 
-def _token(person_id: str, account_id: str) -> dict[str, str]:
+def _token(person_id: str) -> dict[str, str]:
+    now = int(time.time())
     encoded = jwt.encode(
-        {"sub": person_id, "account_id": account_id},
+        {
+            "sub": person_id,
+            "iss": str(getattr(ApiSettings(), "supabase_jwt_issuer", TEST_JWT_ISSUER)),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + 3600,
+        },
         ApiSettings().supabase_jwt_secret,
         algorithm="HS256",
     )
     return {"Authorization": f"Bearer {encoded}"}
 
 
-DEMO = _token(DEMO_PERSON_ID, DEMO_ACCOUNT_ID)
+DEMO = _token(DEMO_PERSON_ID)
 
 PDF_BYTES = b"%PDF-1.7\nfake demo invoice\n"
 
@@ -275,7 +285,7 @@ class TestExtractionIsolation:
     def test_another_accounts_member_cannot_extract_here(self, client: TestClient) -> None:
         """Same rule as every other route: holding no Membership in the account
         in the URL is a 403, before any document is read."""
-        response = _upload(client, headers=_token(ISO_PERSON_ID, DEMO_ACCOUNT_ID))
+        response = _upload(client, headers=_token(ISO_PERSON_ID))
         assert response.status_code == 403
 
     def test_an_unauthenticated_upload_is_rejected(self, client: TestClient) -> None:
