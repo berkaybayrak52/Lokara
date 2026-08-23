@@ -27,6 +27,8 @@ EXPECTED_TABLES = {
     "statement",
     "cost_entry",
     "allocation_key_assignment",
+    "operating_cost_agreement",
+    "confirmed_cost_classification",
     "meter",
     "meter_reading",
     "heating_cost_entry",

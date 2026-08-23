@@ -34,7 +34,7 @@ BASE = f"/a/{DEMO_ACCOUNT_ID}"
 DEMO_BUILDING_ID = "bld_demo_muster12"
 
 # The canonical fixture (docs/03), by unit label so the assertions read.
-GOLDEN_AREA_SHARES = [60000, 17852, 18148, 24000]
+GOLDEN_AREA_SHARES = [60000, 17852, 24000, 18148]
 
 
 @pytest.fixture(scope="module")
@@ -52,25 +52,24 @@ def client() -> Iterator[TestClient]:
     command.upgrade(Config(str(_DB_PACKAGE_DIR / "alembic.ini")), "head")
     with Session(owner) as session, session.begin():
         seed_demo(session)
-        # Deterministic start: exactly the seeded cost with exactly its seeded
-        # AREA assignment. Without this, leftovers from an interrupted run
-        # (an extra cost, or a key left on UNITS) would break the exact
-        # golden-number assertions below.
-        session.execute(
-            text(
-                "DELETE FROM allocation_key_assignment "
-                "WHERE account_id = :account AND id <> 'aka_demo_garbage_1'"
-            ),
-            {"account": DEMO_ACCOUNT_ID},
-        )
-        session.execute(
-            text(
-                "DELETE FROM cost_entry WHERE account_id = :account AND id <> 'cost_demo_garbage'"
-            ),
-            {"account": DEMO_ACCOUNT_ID},
-        )
+        # Classifications are append-only. Test-created costs are voided below,
+        # so no destructive cleanup is permitted here.
     owner.dispose()
-    yield TestClient(create_app())
+    test_client = TestClient(create_app())
+    # A prior interrupted local run may have append-only test rows.  Retire
+    # them through the public void workflow; they remain evidence but cannot
+    # contaminate this module's later previews.
+    for cost in test_client.get(f"{BASE}/buildings/{DEMO_BUILDING_ID}/costs", headers=DEMO).json()[
+        "costs"
+    ]:
+        if cost["id"] != "cost_demo_garbage":
+            response = test_client.post(
+                f"{BASE}/costs/{cost['id']}/void",
+                headers=DEMO,
+                json={"reason": "Testbereinigung"},
+            )
+            assert response.status_code == 200, response.text
+    yield test_client
 
 
 def _token(person_id: str, account_id: str) -> dict[str, str]:
@@ -168,10 +167,11 @@ class TestCostCreation:
             headers=DEMO,
             json={
                 "label": "Hausreinigung",
+                "catalogueId": "gebaeudereinigung",
                 "amountCents": 60000,
                 "periodFrom": "2025-01-01",
                 "periodTo": "2026-01-01",
-                "key": "UNITS",
+                "keyOverride": "UNITS",
             },
         )
         assert response.status_code == 201
@@ -188,8 +188,10 @@ class TestCostCreation:
         assert sum(line["amountCents"] for line in cleaning["lines"]) == 60000
         assert statement["nkTotalCents"] == statement["nkInputTotalCents"]
 
-        # Clean up so the other tests keep their single-cost expectations.
-        assert client.delete(f"{BASE}/costs/{body['id']}", headers=DEMO).status_code == 204
+        voided = client.post(
+            f"{BASE}/costs/{body['id']}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+        )
+        assert voided.status_code == 200
 
     def test_direct_key_requires_a_target(self, client: TestClient) -> None:
         response = client.post(
@@ -226,10 +228,10 @@ class TestCostCreation:
             headers=DEMO,
             json={
                 "label": "Reparatur Wohnung A",
+                "catalogueId": "etagenheizung_wartung",
                 "amountCents": 30000,
                 "periodFrom": "2025-01-01",
                 "periodTo": "2026-01-01",
-                "key": "DIRECT",
                 "directUnitId": "unit_demo_a",
             },
         )
@@ -241,9 +243,16 @@ class TestCostCreation:
         assert repair["keyLabel"] == "Direktzuordnung"
         # The whole amount lands on unit A's party lines, nothing spreads.
         assert sum(line["amountCents"] for line in repair["lines"]) == 30000
-        assert all("Wohnung A" in line["partyLabel"] for line in repair["lines"])
+        assert all(
+            "Wohnung A" in line["partyLabel"] for line in repair["lines"] if not line["isLandlord"]
+        )
 
-        assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+        assert (
+            client.post(
+                f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+            ).status_code
+            == 200
+        )
 
     def test_period_must_be_ordered(self, client: TestClient) -> None:
         response = client.post(
@@ -261,6 +270,24 @@ class TestCostCreation:
 
 
 class TestIsolation:
+    def test_unknown_or_invisible_buildings_are_not_cost_routes(self, client: TestClient) -> None:
+        unknown = "bld_missing"
+        assert client.get(f"{BASE}/buildings/{unknown}/costs", headers=DEMO).status_code == 404
+        assert (
+            client.post(
+                f"{BASE}/buildings/{unknown}/costs",
+                headers=DEMO,
+                json={
+                    "label": "Unbekannt",
+                    "catalogueId": "gebaeudereinigung",
+                    "amountCents": 100,
+                    "periodFrom": "2025-01-01",
+                    "periodTo": "2026-01-01",
+                },
+            ).status_code
+            == 404
+        )
+
     def test_stranger_cannot_read_or_write_costs(self, client: TestClient) -> None:
         stranger = _token("per_stranger", DEMO_ACCOUNT_ID)
         assert (

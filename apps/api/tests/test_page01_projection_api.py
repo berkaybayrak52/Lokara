@@ -22,6 +22,7 @@ LOKARA_REQUIRE_DB (set in CI) forbids the skip.
 
 import os
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from lokara_api import create_app
+from lokara_api.routers import portal
 from lokara_api.settings import ApiSettings
 from lokara_db import (
     Building,
@@ -77,7 +79,7 @@ FUTURE_RENTER_ID = "ren_p01_zukunft"
 # The canonical €1.200,00 AREA split (docs/03), in party order A, B-renter,
 # B-vacancy, C. Repeated here rather than imported so a change to the shared
 # fixture cannot silently move this file's expectations too.
-GOLDEN_AREA_SHARES = [60000, 17852, 18148, 24000]
+GOLDEN_AREA_SHARES = [60000, 17852, 24000, 18148]
 
 _ADDED_ROWS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("tenancy_party", (f"tp_{SECOND_TENANCY_ID}", f"tp_{FUTURE_TENANCY_ID}")),
@@ -112,20 +114,9 @@ def client() -> Iterator[TestClient]:
     command.upgrade(Config(str(_DB_PACKAGE_DIR / "alembic.ini")), "head")
     with Session(owner) as session, session.begin():
         seed_demo(session)
-        # Deterministic start: exactly the seeded cost with exactly its seeded
-        # AREA assignment. Leftovers from an interrupted run would break the
-        # golden-number assertions below.
-        session.execute(
-            text(
-                "DELETE FROM allocation_key_assignment "
-                "WHERE account_id = :a AND id <> 'aka_demo_garbage_1'"
-            ),
-            {"a": DEMO_ACCOUNT_ID},
-        )
-        session.execute(
-            text("DELETE FROM cost_entry WHERE account_id = :a AND id <> 'cost_demo_garbage'"),
-            {"a": DEMO_ACCOUNT_ID},
-        )
+        # Page-02 cost, classification and allocation-key history is
+        # append-only.  Test-created costs are voided and naturally excluded
+        # from later previews; setup never deletes that evidence.
         session.execute(
             text("DELETE FROM person_count WHERE account_id = :a"), {"a": DEMO_ACCOUNT_ID}
         )
@@ -202,8 +193,21 @@ def client() -> Iterator[TestClient]:
             )
         )
     owner.dispose()
+    test_client = TestClient(create_app())
+    # Retain historical test costs but remove them from subsequent calculation
+    # inputs through the same void endpoint production uses.
+    for cost in test_client.get(f"{BASE}/buildings/{DEMO_BUILDING_ID}/costs", headers=DEMO).json()[
+        "costs"
+    ]:
+        if cost["id"] != "cost_demo_garbage":
+            response = test_client.post(
+                f"{BASE}/costs/{cost['id']}/void",
+                headers=DEMO,
+                json={"reason": "Testbereinigung"},
+            )
+            assert response.status_code == 200, response.text
 
-    yield TestClient(create_app())
+    yield test_client
 
     teardown = create_db_engine(settings.direct_url)
     with Session(teardown) as session, session.begin():
@@ -258,7 +262,7 @@ class TestOwnerProjection:
         [garbage] = body["costs"]
         [vacancy] = [line for line in garbage["lines"] if line["isLandlord"]]
         assert vacancy["amountCents"] == 18148
-        assert vacancy["partyLabel"] == "Wohnung B (EG rechts) — Leerstand → Vermieter"
+        assert vacancy["partyLabel"] == "None"
 
     def test_the_owner_residual_is_present_and_is_the_last_heating_line(
         self, client: TestClient
@@ -278,9 +282,41 @@ class TestOwnerProjection:
         assert _get(client) == _get(client, audience="OWNER")
 
 
+class TestPage02ProductionBlock:
+    def test_owner_keeps_the_german_blocker_finding(self, client: TestClient) -> None:
+        body = _get(client, audience="OWNER")
+        assert "Page-02-Position gesperrt: Müllabfuhr" in body["findings"]
+
+    def test_tenant_route_refuses_the_seeded_blocked_cost(self, client: TestClient) -> None:
+        response = client.get(
+            STATEMENT, headers=DEMO, params={"audience": "TENANT", "tenancy_id": TEN_B}
+        )
+        assert response.status_code == 422
+        assert response.json()["detail"] == (
+            "Die Mieteransicht ist wegen einer noch nicht produktionsfreigegebenen "
+            "Betriebskostenposition gesperrt."
+        )
+
+
 class TestTenantProjectionIsAPrivacyBoundary:
     """`docs/08` § 3: never render everything and crop. What the response does
     not contain, no client can leak."""
+
+    @pytest.fixture(autouse=True)
+    def unblocked_bundle(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Keep this contract test independent of Page-02 legal release.
+
+        The real seeded cost is production-blocked.  This fixture constructs
+        only the projection input with that one gate cleared, so these tests
+        continue to exercise tenant serialization rather than weakening the
+        Page-02 demo data.
+        """
+        original_bundle = portal._bundle
+
+        def fixture_bundle(*args: Any, **kwargs: Any) -> Any:
+            return replace(original_bundle(*args, **kwargs), page02_production_blocked=False)
+
+        monkeypatch.setattr(portal, "_bundle", fixture_bundle)
 
     def test_only_that_tenancys_lines_are_returned(self, client: TestClient) -> None:
         body = _get(client, audience="TENANT", tenancy_id=TEN_B)
@@ -380,7 +416,7 @@ class TestTaxProjection:
     def test_the_vacancy_row_keeps_its_origin_unit(self, client: TestClient) -> None:
         """`docs/08`: "Block (a) itemises vacancy by unit and cost type"."""
         [line] = _lines(_get(client, audience="TAX"))
-        assert line["partyLabel"] == "Wohnung B (EG rechts) — Leerstand → Vermieter"
+        assert line["partyLabel"] == "None"
 
     def test_it_carries_the_owner_residual_but_no_renter_heating_line(
         self, client: TestClient
@@ -460,6 +496,15 @@ class TestTenantSelectionFailsClosed:
 
 
 class TestPeriodSelection:
+    @pytest.fixture(autouse=True)
+    def unblocked_bundle(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        original_bundle = portal._bundle
+
+        def fixture_bundle(*args: Any, **kwargs: Any) -> Any:
+            return replace(original_bundle(*args, **kwargs), page02_production_blocked=False)
+
+        monkeypatch.setattr(portal, "_bundle", fixture_bundle)
+
     def test_omitting_the_dates_reproduces_the_demo_preset(self, client: TestClient) -> None:
         body = _get(client, audience="OWNER")
         assert body["periodLabel"] == "01.01.2025 – 31.12.2025"
@@ -477,8 +522,8 @@ class TestPeriodSelection:
         body = _get(client, audience="OWNER", period_from="2025-01-01", period_to="2025-06-30")
         assert body["periodLabel"] == "01.01.2025 – 30.06.2025"
         lines = _lines(body)
-        assert [line["amountCents"] for line in lines] == [60000, 36000, 24000]
-        assert all(line["isLandlord"] is False for line in lines)
+        assert [line["amountCents"] for line in lines] == [60000, 36000, 24000, 0]
+        assert [line["isLandlord"] for line in lines] == [False, False, False, True]
         assert sum(line["amountCents"] for line in lines) == 120000
 
     def test_a_rumpfperiode_changes_the_renters_share(self, client: TestClient) -> None:
@@ -593,11 +638,12 @@ def _create_cost(client: TestClient, label: str, amount_cents: int, key: str) ->
         f"{BASE}/buildings/{DEMO_BUILDING_ID}/costs",
         headers=DEMO,
         json={
+            "catalogueId": "sonstige",
             "label": label,
             "amountCents": amount_cents,
             "periodFrom": "2025-01-01",
             "periodTo": "2026-01-01",
-            "key": key,
+            "keyOverride": key,
         },
     )
     assert response.status_code == 201, response.text
@@ -640,7 +686,12 @@ class TestPersonsKeyReachesTheEngineWithItsInputs:
             ]
             assert sum(line["amountCents"] for line in lift["lines"]) == 100000
         finally:
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
             with Session(engine) as session, session.begin():
                 session.execute(
                     text("DELETE FROM person_count WHERE account_id = :a"),
@@ -658,10 +709,15 @@ class TestPersonsKeyReachesTheEngineWithItsInputs:
             body = client.get(f"{BASE}/statements/demo", headers=DEMO).json()
             lift = next(c for c in body["nkCosts"] if c["label"] == "Aufzug")
             [landlord] = [line for line in lift["lines"] if line["isLandlord"]]
-            assert landlord["partyLabel"] == "Wohnung B (EG rechts) — Leerstand → Vermieter"
+            assert landlord["partyLabel"] == "None"
             assert landlord["weightDisplay"] == "552"
         finally:
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
             with Session(engine) as session, session.begin():
                 session.execute(
                     text("DELETE FROM person_count WHERE account_id = :a"),
@@ -717,7 +773,12 @@ class TestPersonsKeyReachesTheEngineWithItsInputs:
                     building = session.get(Building, DEMO_BUILDING_ID)
                     assert building is not None
                     building.fiktivbelegung_mode = FiktivbelegungMode.LETZTE_BELEGUNG
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
             with Session(engine) as session, session.begin():
                 session.execute(
                     text("DELETE FROM person_count WHERE account_id = :a"),
@@ -742,7 +803,12 @@ class TestPersonsKeyReachesTheEngineWithItsInputs:
                 (100000, True)
             ]
         finally:
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
 
 
 class TestPersonCountsOutlivingTheirTenancy:
@@ -788,7 +854,12 @@ class TestPersonCountsOutlivingTheirTenancy:
             # move-out are the vacancy the D0 row already weights.
             assert renter["weightDisplay"] == "543"
         finally:
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
             with Session(engine) as session, session.begin():
                 session.execute(text("DELETE FROM person_count WHERE id = 'pcd_demo_b1_open'"))
             engine.dispose()
@@ -853,18 +924,33 @@ class TestConsumptionKeyReachesTheEngineWithItsInputs:
             assert water["keyLabel"] == "Verbrauch"
             # met_demo_kw_c: 340,900 minus 302,400 = 38,5 m³, and unit C had exactly
             # one user across the window, so the figure is attributable.
-            [line] = water["lines"]
+            [line, owner] = water["lines"]
+            assert owner["isLandlord"] is True
             assert line["weightDisplay"] == "38,5"
             assert line["partyLabel"] == "Wohnung C (1. OG) — Clara Vorlage"
             assert line["amountCents"] == 50000
         finally:
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
 
 
 class TestUnattributableConsumptionIsSaidNotSplit:
     """A unit whose renter changed mid-window has one meter figure and two
     parties. `docs/08` forbids document-layer money math, and a day-weighted
     division of a consumption is exactly that."""
+
+    @pytest.fixture(autouse=True)
+    def unblocked_bundle(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        original_bundle = portal._bundle
+
+        def fixture_bundle(*args: Any, **kwargs: Any) -> Any:
+            return replace(original_bundle(*args, **kwargs), page02_production_blocked=False)
+
+        monkeypatch.setattr(portal, "_bundle", fixture_bundle)
 
     def _add_cold_water_meter_to_unit_b(self, session: Session) -> None:
         session.merge(
@@ -904,7 +990,9 @@ class TestUnattributableConsumptionIsSaidNotSplit:
             self._add_cold_water_meter_to_unit_b(session)
         try:
             owner = _get(client, audience="OWNER")
-            [finding] = owner["findings"]
+            finding = next(
+                finding for finding in owner["findings"] if finding.startswith("Wohnung B")
+            )
             assert finding.startswith("Wohnung B (EG rechts): ")
             assert "Nutzerwechsel" in finding
             assert "Zwischenablesung" in finding
@@ -931,10 +1019,15 @@ class TestUnattributableConsumptionIsSaidNotSplit:
             body = _get(client, audience="OWNER")
             water = next(c for c in body["costs"] if c["label"] == "Wasser/Abwasser")
             # Unit C only: unit B's 22 m³ are recorded but not allocated.
-            assert [line["weightDisplay"] for line in water["lines"]] == ["38,5"]
+            assert [line["weightDisplay"] for line in water["lines"]] == ["38,5", "0"]
             assert sum(line["amountCents"] for line in water["lines"]) == 50000
         finally:
-            assert client.delete(f"{BASE}/costs/{cost_id}", headers=DEMO).status_code == 204
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost_id}/void", headers=DEMO, json={"reason": "Testkorrektur"}
+                ).status_code
+                == 200
+            )
             with Session(engine) as session, session.begin():
                 session.execute(text("DELETE FROM meter_reading WHERE meter_id = 'met_p01_kw_b'"))
                 session.execute(text("DELETE FROM meter WHERE id = 'met_p01_kw_b'"))

@@ -104,6 +104,12 @@ class NkConsumptionIn(ApiModel):
     measurement_unit: MeasurementUnit | None = None
 
 
+class NkIneligibleTenancyPeriodIn(ApiModel):
+    tenancy_id: str
+    period: PeriodIn
+    cost_id: str | None = None
+
+
 class NkCostIn(ApiModel):
     cost_id: str
     label: str
@@ -120,6 +126,7 @@ class NkCalcRequest(ApiModel):
     costs: list[NkCostIn]
     person_counts: list[NkPersonCountIn] = Field(default_factory=list)
     consumptions: list[NkConsumptionIn] = Field(default_factory=list)
+    ineligible_tenancy_periods: list[NkIneligibleTenancyPeriodIn] = Field(default_factory=list)
 
 
 class NkShareLineOut(ApiModel):
@@ -180,16 +187,38 @@ class KeyChoice(ApiModel):
         return self
 
 
-class CostCreate(KeyChoice):
+class CostCreate(ApiModel):
+    # A catalogue identity is a human confirmation, never an OCR inference.
+    catalogue_id: str = Field(min_length=1, max_length=80)
     label: str = Field(min_length=1, max_length=200)
     amount_cents: int = Field(gt=0)
     period_from: date
     period_to: date  # exclusive
+    invoice_date: date | None = None
+    payment_date: date | None = None
+    service_from: date | None = None
+    service_to: date | None = None
+    non_allocable_cents: int = Field(default=0, ge=0)
+    labour_cents: int | None = Field(default=None, ge=0)
+    key_override: AllocationKey | None = None
+    direct_unit_id: str | None = None
+    direct_tenancy_id: str | None = None
+    special_rule_evidence: dict[str, object] = Field(default_factory=dict)
+    replaces_cost_id: str | None = None
+    new_cost: bool = False
 
     @model_validator(mode="after")
     def _period_order(self) -> "CostCreate":
         if self.period_to <= self.period_from:
             raise ValueError("period_to must be after period_from")
+        if (self.service_from is None) != (self.service_to is None):
+            raise ValueError("service_from and service_to must be supplied together")
+        if (
+            self.service_from is not None
+            and self.service_to is not None
+            and self.service_to <= self.service_from
+        ):
+            raise ValueError("service_to must be after service_from")
         return self
 
 
@@ -207,10 +236,48 @@ class CostEntryOut(ApiModel):
     # Length of the append-only assignment history — re-keying grows this and
     # deletes nothing.
     assignment_count: int
+    catalogue_id: str | None = None
+    classification_findings: list[str] = Field(default_factory=list)
+    production_blocked: bool = False
+    voided_at: datetime | None = None
+    void_reason: str | None = None
+    replaces_cost_id: str | None = None
+
+
+class CostVoid(ApiModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class CostVoidOut(ApiModel):
+    id: str
+    voided_at: datetime
+    successor_workflow_target: str
 
 
 class CostListResponse(ApiModel):
     costs: list[CostEntryOut]
+
+
+class OperatingCostAgreementIn(ApiModel):
+    allocation_agreed: bool
+    mehrbelastung_clause: bool = False
+    named_other_costs: list[str] = Field(default_factory=list)
+    contractual_keys: dict[str, AllocationKey] = Field(default_factory=dict)
+    valid_from: date
+    valid_to: date | None = None
+    revises_id: str | None = None
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "OperatingCostAgreementIn":
+        if self.valid_to is not None and self.valid_to <= self.valid_from:
+            raise ValueError("valid_to must be after valid_from")
+        return self
+
+
+class OperatingCostAgreementOut(OperatingCostAgreementIn):
+    id: str
+    tenancy_id: str
+    created_at: datetime
 
 
 # ── The demo statement (Abrechnung erstellen, M3 slice) ──────────────────────
@@ -501,6 +568,7 @@ class ExtractionPrefill(ApiModel):
     submits through the ordinary Kosten erfassen endpoint. Nothing here is
     written until the user confirms."""
 
+    catalogue_id: str
     label: str
     amount_cents: int
     period_from: date

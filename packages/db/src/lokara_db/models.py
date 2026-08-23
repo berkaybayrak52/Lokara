@@ -25,6 +25,7 @@ from lokara_domain import (
     ReadingSource,
 )
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     Date,
@@ -368,6 +369,10 @@ class Building(Base):
     # LG Krefeld 2 S 56/09 reject. The CHECK below makes the log a precondition
     # of the mode rather than a step someone can skip.
     fiktivbelegung_waiver_note: Mapped[str | None]
+    # Reset may retire a rehearsal building whose immutable cost evidence must
+    # remain referentially intact. Archived buildings never enter normal
+    # object routes or statement work.
+    archived_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     landlord: Mapped["Landlord | None"] = relationship(
@@ -486,6 +491,11 @@ class Tenancy(Base):
         back_populates="tenancy",
         primaryjoin="Tenancy.id == PersonCount.tenancy_id",
         foreign_keys="PersonCount.tenancy_id",
+    )
+    operating_cost_agreements: Mapped[list["OperatingCostAgreement"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == OperatingCostAgreement.tenancy_id",
+        foreign_keys="OperatingCostAgreement.tenancy_id",
     )
 
     __table_args__ = (
@@ -773,6 +783,10 @@ class CostEntry(Base):
     amount_cents: Mapped[int]
     period_from: Mapped[date]
     period_to: Mapped[date]  # exclusive
+    voided_at: Mapped[datetime | None]
+    void_reason: Mapped[str | None]
+    replaces_cost_entry_id: Mapped[str | None]
+    new_cost: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     building: Mapped["Building"] = relationship(
@@ -785,9 +799,15 @@ class CostEntry(Base):
         primaryjoin="CostEntry.id == AllocationKeyAssignment.cost_entry_id",
         foreign_keys="AllocationKeyAssignment.cost_entry_id",
     )
+    classifications: Mapped[list["ConfirmedCostClassification"]] = relationship(
+        back_populates="cost_entry",
+        primaryjoin="CostEntry.id == ConfirmedCostClassification.cost_entry_id",
+        foreign_keys="ConfirmedCostClassification.cost_entry_id",
+    )
 
     __table_args__ = (
         _scoped_fk("cost_entry", "building_id", "building"),
+        _scoped_fk("cost_entry", "replaces_cost_entry_id", "cost_entry"),
         _scoped_pair("cost_entry"),
         Index("ix_cost_entry_account", "account_id"),
         Index("ix_cost_entry_building", "building_id"),
@@ -822,6 +842,103 @@ class AllocationKeyAssignment(Base):
         _scoped_fk("allocation_key_assignment", "direct_tenancy_id", "tenancy"),
         Index("ix_aka_account", "account_id"),
         Index("ix_aka_cost_entry", "cost_entry_id"),
+    )
+
+
+# ── Page 02 — temporal agreement + human-confirmed classification. ─────────
+
+
+class OperatingCostAgreement(Base):
+    """Contract facts for one tenancy and effective period.
+
+    Absence is meaningful: callers must treat it conservatively and must not
+    infer an agreement from an old/current scalar on the tenancy.
+    """
+
+    __tablename__ = "operating_cost_agreement"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    allocation_agreed: Mapped[bool]
+    mehrbelastung_clause: Mapped[bool]
+    named_other_costs: Mapped[list[str]] = mapped_column(JSON, default=list)
+    contractual_keys: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
+    valid_from: Mapped[date]
+    valid_to: Mapped[date | None]
+    revises_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="operating_cost_agreements",
+        primaryjoin="Tenancy.id == OperatingCostAgreement.tenancy_id",
+        foreign_keys="OperatingCostAgreement.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("operating_cost_agreement", "tenancy_id", "tenancy"),
+        _scoped_fk("operating_cost_agreement", "revises_id", "operating_cost_agreement"),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_operating_cost_agreement_period_ordered",
+        ),
+        _scoped_pair("operating_cost_agreement"),
+        Index("ix_operating_cost_agreement_account", "account_id"),
+        Index("ix_operating_cost_agreement_tenancy", "tenancy_id"),
+    )
+
+
+class ConfirmedCostClassification(Base):
+    """Append-only human confirmation of a Page-02 catalogue decision.
+
+    The raw entry remains unchanged. A later correction creates another row so
+    both the original confirmation and the revised evidence survive.
+    """
+
+    __tablename__ = "confirmed_cost_classification"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    cost_entry_id: Mapped[str]
+    allocation_key_assignment_id: Mapped[str]
+    catalogue_id: Mapped[str]
+    rule_source: Mapped[str]
+    rule_rechtsstand: Mapped[str]
+    source_amount_cents: Mapped[int]
+    allocable_cents: Mapped[int]
+    non_allocable_cents: Mapped[int]
+    labour_cents: Mapped[int | None]
+    key: Mapped[AllocationKey | None]
+    key_source: Mapped[str | None]
+    findings: Mapped[list[str]] = mapped_column(JSON, default=list)
+    special_rule_evidence: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    production_blocked: Mapped[bool]
+    confirmed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    cost_entry: Mapped["CostEntry"] = relationship(
+        back_populates="classifications",
+        primaryjoin="CostEntry.id == ConfirmedCostClassification.cost_entry_id",
+        foreign_keys="ConfirmedCostClassification.cost_entry_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("confirmed_cost_classification", "cost_entry_id", "cost_entry"),
+        _scoped_fk(
+            "confirmed_cost_classification",
+            "allocation_key_assignment_id",
+            "allocation_key_assignment",
+        ),
+        CheckConstraint(
+            "source_amount_cents = allocable_cents + non_allocable_cents",
+            name="ck_cost_classification_reconciles",
+        ),
+        CheckConstraint(
+            "labour_cents IS NULL OR (labour_cents >= 0 AND labour_cents <= allocable_cents)",
+            name="ck_cost_classification_labour_valid",
+        ),
+        _scoped_pair("confirmed_cost_classification"),
+        Index("ix_cost_classification_account", "account_id"),
+        Index("ix_cost_classification_cost", "cost_entry_id"),
     )
 
 
@@ -1005,6 +1122,8 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "statement",
     "cost_entry",
     "allocation_key_assignment",
+    "operating_cost_agreement",
+    "confirmed_cost_classification",
     "meter",
     "meter_reading",
     "heating_cost_entry",

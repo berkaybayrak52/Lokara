@@ -63,7 +63,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction; M6 still owns actual advances, Saldo, finalization and isolated tenant documents. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
-| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Merged with a full D2 source trace and exact 32-ID data oracle. Merge is not production closure or legal approval: no production catalogue or gate was implemented. The current 180-row CSV has no Page 02-assigned rows, so `09-K01…K11` and the three unresolved classifications remain production-blocking. Slice C still owns M1 implementation closure and classifications used by M6, M7 and Page 07. |
+| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. The exact 24-ID data oracle covers date arithmetic, strict arrears thresholds, cent rounding, UVI cadence, rent limits, VPI and vacancy. All 18 Page-specific register rows remain `verify-before-production`; the 5-year/6-year meter conflict is unresolved. No guard implementation exists. |
@@ -255,7 +255,7 @@ not replace the complete documentation or reconciliation gates.
 | D3 | **complete; approved 21.08.2026** | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-five question file. Round 4 settled its answered decisions; Round 5 retains only its unanswered/source-delivery follow-ups and the external/legal-source gaps. Governance, permanent dependency guard and joint deletion remain intact. |
 | A | **complete; approved and merged 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
 | B | **complete; locally merged 23.08.2026** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Ledger/finalization remains M6 work. |
-| C | After B | Reconcile M1 with Page 02 | Revalidate NK eligibility, allocation, classification and rounding against merged `docs/09` and close M1. |
+| C | **technically complete 23.08.2026; not merged** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
 | M5 | After A–C | Roles, URL context and switcher | Finish the prepared secure bootstrap slice, role enforcement, owner contexts, switcher, nested-building authorization and the `renter.person_id` negative guard. |
 | M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`: actual advances, BGH minimum #4, immutable snapshots, bank matching, landlord overview, isolated tenant documents, and remaining statement copy/citation findings. |
 | G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
@@ -374,7 +374,7 @@ Built:
 
 The Expo mobile skeleton is not part of the completed foundation. It moved to M10.
 
-### M1 — Operating-cost engine 🟡 built and green; Page 02 spec merged, production open
+### M1 — Operating-cost engine 🟡 Slice C technically complete; Page 02 production-blocked
 
 - Pure `packages/nk-engine`.
 - Day-weighted allocation, vacancy handling and largest-remainder reconciliation.
@@ -382,8 +382,10 @@ The Expo mobile skeleton is not part of the completed foundation. It moved to M1
 - Per-period `AllocationKeyAssignment`; changing a key does not delete entered data.
 - Canonical €1,200 golden fixture passes exactly.
 
-**Spec-closed when:** Slice C proves the existing engine against approved `docs/09`, every `09-Fxx`
-fixture passes and all confirmed differences are resolved.
+**Technical closure evidence (23.08.2026):** Slice C proves the engine against approved `docs/09`;
+every `09-Fxx` fixture passes, confirmed differences are resolved, full/non-fresh demo gates and
+required reviews are green, and the PDF fingerprint is unchanged. This does not clear
+`09-K01`–`09-K11`, the Trinkwasser route or the administration-cost legal check.
 
 ### M2 — Heating and CO₂ engine 🟢 Slice A complete and approved
 

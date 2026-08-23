@@ -1,15 +1,16 @@
-# Last output — Slice B Block-(c) correction
+# Last output — Slice C technical closure
 
-HEAD `d62000a` on `slice/page01b-block-c-pdf` · `23.08.2026`
+HEAD `206f029` on `slice/c-page02-m1-reconciliation` · `23.08.2026`
 Status: Complete
 
+## Wanted
+Make Slice C green without turning Page 02 into legal-production approval.
+
 ## Done
-- Page 01b §12 reductions are locally merged as a pure, audit-only engine result with unchanged
-  warning-only application projections.
-- Block (c) now renders as the conditional `davon Rundungsdifferenz` audit subline. Full and demo
-  gates are green (898 Python tests); the statement review found no new issue. Its demo fingerprint
-  is unchanged at `a45fa3d1e3d69957948e58885b4ab797` (149280 bytes).
+Full and non-fresh demo gates are green (922 tests); PDF fingerprint is unchanged; boundary and statement reviews are clean for Slice C.
 
 ## Not done
-- Slice B is complete and locally merged; nothing was pushed.
-- `Antwort-an-Emir_04.md` remains untracked at the repository root pending a separate filing decision.
+No commit, merge or push. `09-K01`–`09-K11`, Trinkwasser and administration-cost authority remain production blocks; M6 formal-statement blocks remain.
+
+## Optional next step
+None.

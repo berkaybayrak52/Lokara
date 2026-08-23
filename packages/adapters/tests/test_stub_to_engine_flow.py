@@ -42,7 +42,7 @@ def test_extracted_invoice_reproduces_the_canonical_1200_allocation() -> None:
     assert [(line.unit_id, line.tenancy_id, int(line.amount)) for line in result.lines] == [
         ("unit-a", "ten-a", 60000),
         ("unit-b", "ten-b", 17852),
-        ("unit-b", None, 18148),
         ("unit-c", "ten-c", 24000),
+        (None, None, 18148),
     ]
     assert result.total == fields.total_amount

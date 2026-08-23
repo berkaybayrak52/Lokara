@@ -1,11 +1,13 @@
 # BetrKV catalogue — versioned classification before allocation
 
-**Status:** D2 transcription complete; approved and merged
+**Status:** Slice C technically complete 23.08.2026; production-blocked pending authority
 **Authoritative Page:**
 `berkay-work/Spec-Seiten/02 · BetrKV — Betriebskosten-Katalog 3a95fd4207318199a2c8fd9b390aacf4.md`  
 **Fixtures:** exactly `09-F01`–`09-F32` in
 `packages/rules-store/tests/berkay_09_golden.py`  
-**Implementation status:** specification only. No catalogue or Page 02 gate is wired into production.
+**Implementation status:** the versioned catalogue, temporal agreement records,
+human-confirmed classification history and Page-02 NK rounding are technically verified. They do
+not enable final tenant output, finalization or exports.
 
 This document owns the deterministic step between an incoming cost position and the existing
 operating-cost allocation engine. It decides whether the position is allocable, its BetrKV number,
@@ -349,11 +351,13 @@ extraction may propose `kostenartId`, but the user must confirm it.
 
 ## 9. Implementation gap and approval gate
 
-The shipped cost-entry and OCR review screens still use free text and deliberately derive no legal
-allocation key from it. The NK engine still uses largest-remainder allocation. Neither behavior is
-changed by this slice.
+The cost-entry and OCR review path require a human-confirmed catalogue identity; free text remains
+evidence/label only. The Page-02 rule set determines eligibility and the proposed allocation key,
+and its current classifications retain the applicable production block. Slice C proved the
+owner-residual/eligibility behavior through the `09-F01`–`09-F32` oracle, full/non-fresh demo gates,
+an unchanged PDF fingerprint and both required reviews on 23.08.2026.
 
-After Emir approves this specification, Slice C must implement the versioned rules-store catalogue,
-reconcile the input model, switch NK renter lines to line-wise half-up plus the single owner
-residual, prove all `09-Fxx` behavior against production code and keep every unresolved flag visible.
-Until then this document and its green data oracle are specification evidence only.
+Production remains blocked by all `09-K01`–`09-K11` conventions (`verify-before-production`), the
+`trinkwasseruntersuchung` classification/fallback and the required legal review of individually
+negotiated administration costs. These limits must be resolved in a new execution order and every
+affected calculation/output path re-verified before final tenant output, finalization or export.

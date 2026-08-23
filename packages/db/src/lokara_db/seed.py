@@ -27,11 +27,13 @@ from .models import (
     Account,
     AllocationKeyAssignment,
     Building,
+    ConfirmedCostClassification,
     CostEntry,
     HeatingCostEntry,
     Membership,
     Meter,
     MeterReading,
+    OperatingCostAgreement,
     Person,
     Renter,
     Role,
@@ -246,6 +248,20 @@ def seed_demo(session: Session) -> None:
                 renter_id=renter_id,
             )
         )
+        session.merge(
+            OperatingCostAgreement(
+                id=f"oca_{tenancy_id}_2025",
+                account_id=DEMO_ACCOUNT_ID,
+                tenancy_id=tenancy_id,
+                allocation_agreed=True,
+                mehrbelastung_clause=True,
+                named_other_costs=["muellbeseitigung", "sonstige"],
+                contractual_keys={},
+                valid_from=date(2025, 1, 1),
+                valid_to=date(2026, 1, 1),
+                revises_id=None,
+            )
+        )
 
     # The canonical €1,200.00 garbage cost as a REAL cost entry + its AREA key
     # (append-only assignment) — the statement computes from these rows, and
@@ -269,6 +285,59 @@ def seed_demo(session: Session) -> None:
             key=AllocationKey.AREA,
         )
     )
+    demo_classification = session.get(ConfirmedCostClassification, "classification_demo_garbage_1")
+    if demo_classification is None:
+        session.add(
+            ConfirmedCostClassification(
+                id="classification_demo_garbage_1",
+                account_id=DEMO_ACCOUNT_ID,
+                cost_entry_id="cost_demo_garbage",
+                allocation_key_assignment_id="aka_demo_garbage_1",
+                catalogue_id="muellbeseitigung",
+                rule_source="BetrKV / Page 02",
+                rule_rechtsstand="Rechtsstand 07/2026",
+                source_amount_cents=120000,
+                allocable_cents=120000,
+                non_allocable_cents=0,
+                labour_cents=None,
+                key=AllocationKey.AREA,
+                key_source="confirmed-seed",
+                findings=["verify-before-production"],
+                special_rule_evidence={},
+                # The Page-02 demo cost is deliberately not tenant-deliverable:
+                # the catalogue conventions remain verify-before-production.
+                # Projection-isolation tests use an in-memory unblocked bundle,
+                # never a misleadingly released demo record.
+                production_blocked=True,
+            )
+        )
+    elif (
+        not demo_classification.production_blocked
+        and session.get(ConfirmedCostClassification, "classification_demo_garbage_2") is None
+    ):
+        # Databases seeded by the short-lived pre-block fixture already carry
+        # immutable evidence.  Correct them by appending the current confirmed
+        # classification instead of rewriting or deleting history.
+        session.add(
+            ConfirmedCostClassification(
+                id="classification_demo_garbage_2",
+                account_id=DEMO_ACCOUNT_ID,
+                cost_entry_id="cost_demo_garbage",
+                allocation_key_assignment_id="aka_demo_garbage_1",
+                catalogue_id="muellbeseitigung",
+                rule_source="BetrKV / Page 02",
+                rule_rechtsstand="Rechtsstand 07/2026",
+                source_amount_cents=120000,
+                allocable_cents=120000,
+                non_allocable_cents=0,
+                labour_cents=None,
+                key=AllocationKey.AREA,
+                key_source="confirmed-seed-correction",
+                findings=["verify-before-production"],
+                special_rule_evidence={},
+                production_blocked=True,
+            )
+        )
 
     # The heating-system invoice: € 10.300,00 total, of which € 261,80 is the
     # CO₂ price on 4.000 kg — the numbers the CO2KostAufG split runs on. Those
@@ -344,16 +413,9 @@ _RESET_ORDER: tuple[str, ...] = (
     "meter_reading",
     "meter",
     "heating_cost_entry",
-    "allocation_key_assignment",
-    "cost_entry",
     "statement",
     "self_use_period",
-    "tenancy_party",
-    "tenancy",
-    "unit",
     "building_assignment",
-    "building",
-    "renter",
     "landlord",
 )
 
@@ -366,13 +428,87 @@ def reset_demo(session: Session) -> None:
     full of *Testgasse 5*. This puts the account back to precisely the state
     `seed_demo` produces — same ids, same numbers.
 
-    Scope is the session's RLS context: these DELETEs cannot reach another
-    account's rows even though they name no account_id (the policy adds it).
-    Destructive by definition, which is why the endpoint that calls it is
-    behind the same flag as the seed itself.
+    Confirmed classifications, allocation-key history and cost entries are
+    immutable evidence, so reset retains them (voided costs are excluded from
+    previews).  It also preserves the seeded tenancy graph they reference and
+    removes only additional buildings.  Scope is the session's RLS context.
     """
     for table in _RESET_ORDER:
         session.execute(text(f"DELETE FROM {table}"))
+    # A non-canonical cost is evidence too.  It stays in the ledger, but must
+    # not keep participating in previews while its surrounding rehearsal graph
+    # is removed.  Page-02 classifications and allocation-key history remain
+    # attached to their cost and are never deleted here.
+    session.execute(
+        text(
+            "UPDATE cost_entry SET voided_at = now(), "
+            "void_reason = 'Demo-Reset: Nicht-kanonisches Objekt' "
+            "WHERE building_id <> 'bld_demo_muster12' AND voided_at IS NULL"
+        )
+    )
+    # Remove only non-canonical object graphs. A direct allocation reference
+    # is immutable evidence too, so its tenancy/unit survives under an archived
+    # building; ordinary rehearsal tenancies are removed in child-first order.
+    session.execute(
+        text(
+            "DELETE FROM operating_cost_agreement WHERE tenancy_id IN "
+            "(SELECT t.id FROM tenancy t JOIN unit u ON u.id = t.unit_id "
+            "WHERE u.building_id <> 'bld_demo_muster12' AND NOT EXISTS "
+            "(SELECT 1 FROM allocation_key_assignment a "
+            "WHERE a.direct_tenancy_id = t.id))"
+        )
+    )
+    session.execute(
+        text(
+            "DELETE FROM person_count WHERE tenancy_id IN "
+            "(SELECT t.id FROM tenancy t JOIN unit u ON u.id = t.unit_id "
+            "WHERE u.building_id <> 'bld_demo_muster12' AND NOT EXISTS "
+            "(SELECT 1 FROM allocation_key_assignment a "
+            "WHERE a.direct_tenancy_id = t.id))"
+        )
+    )
+    session.execute(
+        text(
+            "DELETE FROM tenancy_party WHERE tenancy_id IN "
+            "(SELECT t.id FROM tenancy t JOIN unit u ON u.id = t.unit_id "
+            "WHERE u.building_id <> 'bld_demo_muster12' AND NOT EXISTS "
+            "(SELECT 1 FROM allocation_key_assignment a "
+            "WHERE a.direct_tenancy_id = t.id))"
+        )
+    )
+    session.execute(
+        text(
+            "DELETE FROM tenancy WHERE unit_id IN "
+            "(SELECT u.id FROM unit u WHERE u.building_id <> 'bld_demo_muster12' "
+            "AND NOT EXISTS (SELECT 1 FROM allocation_key_assignment a "
+            "WHERE a.direct_tenancy_id = tenancy.id))"
+        )
+    )
+    session.execute(
+        text(
+            "DELETE FROM unit WHERE building_id <> 'bld_demo_muster12' "
+            "AND NOT EXISTS (SELECT 1 FROM tenancy t WHERE t.unit_id = unit.id) "
+            "AND NOT EXISTS (SELECT 1 FROM allocation_key_assignment a "
+            "WHERE a.direct_unit_id = unit.id)"
+        )
+    )
+    # A cost keeps a non-cascading FK to its entered building. Archive that
+    # otherwise-empty parent rather than violating the append-only evidence
+    # contract; normal object routes filter it out, so reset still lists only
+    # Musterstraße 12.
+    session.execute(
+        text(
+            "UPDATE building SET archived_at = now() "
+            "WHERE id <> 'bld_demo_muster12' AND EXISTS "
+            "(SELECT 1 FROM cost_entry c WHERE c.building_id = building.id)"
+        )
+    )
+    session.execute(
+        text(
+            "DELETE FROM building WHERE id <> 'bld_demo_muster12' "
+            "AND NOT EXISTS (SELECT 1 FROM cost_entry c WHERE c.building_id = building.id)"
+        )
+    )
     session.flush()
     seed_demo(session)
 

@@ -56,21 +56,23 @@ def client() -> Iterator[TestClient]:
     command.upgrade(Config(str(_DB_PACKAGE_DIR / "alembic.ini")), "head")
     with Session(owner) as session, session.begin():
         seed_demo(session)
-        # The duplicate check counts rows, so a leftover cost from an
-        # interrupted run would change what this module asserts.
-        session.execute(
-            text(
-                "DELETE FROM allocation_key_assignment WHERE account_id = :a "
-                "AND cost_entry_id <> 'cost_demo_garbage'"
-            ),
-            {"a": DEMO_ACCOUNT_ID},
-        )
-        session.execute(
-            text("DELETE FROM cost_entry WHERE account_id = :a AND id <> 'cost_demo_garbage'"),
-            {"a": DEMO_ACCOUNT_ID},
-        )
     owner.dispose()
-    yield TestClient(create_app())
+    test_client = TestClient(create_app())
+    # Immutable classifications and allocation-key history are retained; void
+    # stray costs through the production workflow before duplicate assertions.
+    for cost in test_client.get(f"{BASE}/buildings/{DEMO_BUILDING_ID}/costs", headers=DEMO).json()[
+        "costs"
+    ]:
+        if cost["id"] != "cost_demo_garbage":
+            assert (
+                test_client.post(
+                    f"{BASE}/costs/{cost['id']}/void",
+                    headers=DEMO,
+                    json={"reason": "Testbereinigung"},
+                ).status_code
+                == 200
+            )
+    yield test_client
 
 
 def _token(person_id: str, account_id: str) -> dict[str, str]:
@@ -197,9 +199,16 @@ class TestConfirmGoesThroughTheNormalPath:
             assert cost["key"] == "AREA"
             assert cost["assignmentCount"] == 1
         finally:
-            # Leave the seeded scenario exactly as found — a second Müllabfuhr
-            # would double the € 1.200 golden for every other suite.
-            assert client.delete(f"{BASE}/costs/{cost['id']}", headers=DEMO).status_code == 204
+            # Leave immutable evidence intact but remove this test row from
+            # later previews through the supported void workflow.
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost['id']}/void",
+                    headers=DEMO,
+                    json={"reason": "Testkorrektur"},
+                ).status_code
+                == 200
+            )
 
     def test_a_corrected_amount_is_what_gets_stored(self, client: TestClient) -> None:
         """The reviewer overrules the extraction — the whole point of the step."""
@@ -216,7 +225,14 @@ class TestConfirmGoesThroughTheNormalPath:
             assert cost["label"] == "Straßenreinigung"
             assert cost["amountEur"] == f"450,50{NBSP}€"
         finally:
-            client.delete(f"{BASE}/costs/{cost['id']}", headers=DEMO)
+            assert (
+                client.post(
+                    f"{BASE}/costs/{cost['id']}/void",
+                    headers=DEMO,
+                    json={"reason": "Testkorrektur"},
+                ).status_code
+                == 200
+            )
 
     def test_there_is_no_confirm_route_that_writes_a_cost(self) -> None:
         """The contract, asserted against the OpenAPI schema: extraction is
@@ -229,6 +245,16 @@ class TestConfirmGoesThroughTheNormalPath:
 
 
 class TestUploadValidation:
+    def test_unknown_building_is_rejected_before_upload_processing(
+        self, client: TestClient
+    ) -> None:
+        response = client.post(
+            f"{BASE}/buildings/bld_missing/extractions",
+            headers=DEMO,
+            files={"file": ("rechnung.pdf", PDF_BYTES, "application/pdf")},
+        )
+        assert response.status_code == 404
+
     def test_an_unsupported_file_type_is_rejected(self, client: TestClient) -> None:
         response = _upload(client, name="tabelle.xlsx")
         assert response.status_code == 422

@@ -26,7 +26,15 @@ from lokara_adapters import (
     consumption_by_meter,
     device_reading_segments,
 )
-from lokara_db import Building, CostEntry, HeatingCostEntry, MdlStatement, Tenancy, Unit
+from lokara_db import (
+    Building,
+    CostEntry,
+    HeatingCostEntry,
+    MdlStatement,
+    OperatingCostAgreement,
+    Tenancy,
+    Unit,
+)
 from lokara_domain import (
     AllocationKey,
     Cents,
@@ -62,6 +70,7 @@ from lokara_nk_engine import (
     NkInput,
     NkResult,
     ShareLine,
+    TenancyIneligibilityPeriod,
     UnitBasis,
     calculate_nk_statement,
 )
@@ -74,6 +83,7 @@ from lokara_rules_store import (
     WARM_WATER_FORMULA,
     ResolvedRule,
     get_rule,
+    resolve_rule,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -126,6 +136,10 @@ class NoDemoDataError(LookupError):
     """The account holds no seeded building yet."""
 
 
+class StatementProductionBlockedError(ValueError):
+    """A tenant projection cannot include a production-blocked Page-02 cost."""
+
+
 @dataclass(frozen=True)
 class StatementBundle:
     building: Building
@@ -147,6 +161,7 @@ class StatementBundle:
     # self-use inside a vacancy, an unattributable meter. They are said on the
     # document rather than resolved silently (docs/08 rule 1).
     nk_findings: tuple[str, ...]
+    page02_production_blocked: bool
     # Two spellings of the same four rules, on purpose. `rechtsstaende` is the
     # bare stamp and is the JSON contract the portal page reads (mirrored by
     # Zod); `rechtsstand_entries` names each rule beside its date, which is what
@@ -326,7 +341,9 @@ def _co2_input(rows: tuple[HeatingCostEntry, ...]) -> Co2Input | None:
     return Co2Input(total_co2_kg=Decimal(total_kg) / Decimal(1000), co2_cost=cents(total_cost))
 
 
-def _nk_costs(session: Session, building_id: str, window: Period) -> tuple[CostItem, ...]:
+def _nk_costs(
+    session: Session, building_id: str, window: Period, tenancies: tuple[Tenancy, ...]
+) -> tuple[tuple[CostItem, ...], tuple[TenancyIneligibilityPeriod, ...], tuple[str, ...], bool]:
     """Entered costs overlapping the billing period, each with the key from its
     LATEST assignment — the cost row itself never carries a key, so re-keying
     changes only what the engine is told, never what the user typed."""
@@ -338,23 +355,123 @@ def _nk_costs(session: Session, building_id: str, window: Period) -> tuple[CostI
             CostEntry.building_id == building_id,
             CostEntry.period_from < window.valid_to,
             CostEntry.period_to > window.valid_from,
+            CostEntry.voided_at.is_(None),
         )
         .order_by(CostEntry.created_at, CostEntry.id)
     ).all()
     items: list[CostItem] = []
+    ineligible: list[TenancyIneligibilityPeriod] = []
+    findings: list[str] = []
+    production_blocked = False
+    agreements = session.scalars(select(OperatingCostAgreement)).all()
+    agreements_by_tenancy: dict[str, list[OperatingCostAgreement]] = {}
+    revised_ids = {row.revises_id for row in agreements if row.revises_id is not None}
+    for agreement in agreements:
+        if agreement.id not in revised_ids:
+            agreements_by_tenancy.setdefault(agreement.tenancy_id, []).append(agreement)
     for row in rows:
         assignment = current_assignment(row)
+        classification = max(
+            (
+                candidate
+                for candidate in row.classifications
+                if candidate.allocation_key_assignment_id == assignment.id
+            ),
+            key=lambda candidate: (candidate.confirmed_at, candidate.id),
+            default=None,
+        )
+        if classification is None:
+            findings.append(f"Page-02-Klassifizierung fehlt: {row.label}")
+            production_blocked = True
+            continue
+        production_blocked = production_blocked or classification.production_blocked
+        if classification.production_blocked:
+            findings.append(f"Page-02-Position gesperrt: {row.label}")
         items.append(
             CostItem(
                 cost_id=row.id,
                 label=row.label,
-                amount=cents(row.amount_cents),
+                amount=cents(classification.allocable_cents),
                 key=assignment.key,
                 direct_unit_id=assignment.direct_unit_id,
                 direct_tenancy_id=assignment.direct_tenancy_id,
             )
         )
-    return tuple(items)
+        rule = resolve_rule(classification.catalogue_id, row.period_to - timedelta(days=1)).value
+        for tenancy in tenancies:
+            for period in _agreement_failure_periods(
+                tenancy,
+                agreements_by_tenancy.get(tenancy.id, []),
+                window,
+                cost_id=row.id,
+                naming_required=rule.naming_required,
+                catalogue_id=classification.catalogue_id,
+                new_cost=row.new_cost,
+            ):
+                ineligible.append(period)
+    return tuple(items), tuple(ineligible), tuple(dict.fromkeys(findings)), production_blocked
+
+
+def _agreement_failure_periods(
+    tenancy: Tenancy,
+    agreements: list[OperatingCostAgreement],
+    window: Period,
+    *,
+    cost_id: str,
+    naming_required: bool,
+    catalogue_id: str,
+    new_cost: bool,
+) -> tuple[TenancyIneligibilityPeriod, ...]:
+    """Resolve one active immutable agreement for every occupied day.
+
+    Missing agreement and missing contractual facts are renter/cost eligibility
+    facts, not changes to the object-level cost amount or denominator.
+    """
+    assert window.valid_to is not None
+    start = max(window.valid_from, tenancy.valid_from)
+    end = min(window.valid_to, tenancy.valid_to or window.valid_to)
+    bad_days: list[date] = []
+    day = start
+    while day < end:
+        active = next(
+            (
+                row
+                for row in agreements
+                if row.valid_from <= day and (row.valid_to is None or day < row.valid_to)
+            ),
+            None,
+        )
+        if (
+            active is None
+            or not active.allocation_agreed
+            or (naming_required and catalogue_id not in active.named_other_costs)
+            or (active is not None and new_cost and not active.mehrbelastung_clause)
+        ):
+            bad_days.append(day)
+        day += timedelta(days=1)
+    periods: list[TenancyIneligibilityPeriod] = []
+    for day in bad_days:
+        if not periods or periods[-1].period.valid_to != day:
+            periods.append(
+                TenancyIneligibilityPeriod(
+                    tenancy_id=tenancy.id,
+                    period=Period(valid_from=day, valid_to=day + timedelta(days=1)),
+                    cost_id=cost_id,
+                )
+            )
+        else:
+            previous = periods.pop()
+            periods.append(
+                TenancyIneligibilityPeriod(
+                    tenancy_id=tenancy.id,
+                    period=Period(
+                        valid_from=previous.period.valid_from,
+                        valid_to=day + timedelta(days=1),
+                    ),
+                    cost_id=cost_id,
+                )
+            )
+    return tuple(periods)
 
 
 def compute_statement(
@@ -386,8 +503,6 @@ def compute_statement(
     units = sorted(building.units, key=lambda u: u.label)
     if not units:
         raise NoDemoDataError
-    nk_costs = _nk_costs(session, building.id, window)
-
     occupancies = tuple(
         Occupancy(
             unit_id=unit.id,
@@ -396,6 +511,10 @@ def compute_statement(
         )
         for unit in units
         for tenancy in unit.tenancies
+    )
+    tenancies = tuple(tenancy for unit in units for tenancy in unit.tenancies)
+    nk_costs, ineligible_tenancy_periods, page02_findings, page02_production_blocked = _nk_costs(
+        session, building.id, window, tenancies
     )
 
     facts = _meter_facts(DbMeterGateway(session), building.id, window)
@@ -416,9 +535,10 @@ def compute_statement(
             costs=nk_costs,
             person_counts=persons.rows,
             consumptions=consumptions,
+            ineligible_tenancy_periods=ineligible_tenancy_periods,
         )
     )
-    nk_findings = (*persons.findings, *consumption_findings)
+    nk_findings = (*persons.findings, *consumption_findings, *page02_findings)
 
     split_bounds = get_rule(HEATING_SPLIT_BOUNDS, RULES_AS_OF)
     warm_water_rule = get_rule(WARM_WATER_FORMULA, RULES_AS_OF)
@@ -542,6 +662,7 @@ def compute_statement(
         heating_missing_reason=missing,
         party_labels=_party_labels(units, window),
         nk_findings=nk_findings,
+        page02_production_blocked=page02_production_blocked,
         rechtsstaende=stamps,
         rechtsstand_entries=entries,
     )
@@ -666,6 +787,14 @@ def project_statement(
     )
     if used_days == 0:
         raise EmptyTenancyError(tenancy_id)
+    # Resolve the URL relationship before revealing that a building contains a
+    # production-blocked Page-02 cost.  Unknown, foreign and zero-day tenancy
+    # ids must retain their indistinguishable 404 precedence.
+    if bundle.page02_production_blocked:
+        raise StatementProductionBlockedError(
+            "Die Mieteransicht ist wegen einer noch nicht produktionsfreigegebenen "
+            "Betriebskostenposition gesperrt."
+        )
     return StatementProjection(
         audience=audience,
         tenancy_id=tenancy_id,

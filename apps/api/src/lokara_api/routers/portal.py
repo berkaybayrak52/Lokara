@@ -45,6 +45,7 @@ from ..statement_service import (
     NoDemoDataError,
     StatementAudience,
     StatementBundle,
+    StatementProductionBlockedError,
     StatementProjection,
     UnknownTenancyError,
     compute_statement,
@@ -175,6 +176,8 @@ def statement_projection(
             status_code=404,
             detail="Mietverhältnis nicht gefunden.",
         ) from exc
+    except StatementProductionBlockedError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _projection_response(projection, bundle)
 
 

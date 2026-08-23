@@ -226,6 +226,18 @@ UI work is done only when:
   isolation.
 - Merge only green work. Commit, merge and push only at the stage Emir authorizes.
 
+### Technical closure and unresolved authority
+
+- Classify every unresolved authority as `verify-before-production`, a required
+  primary-source/legal check, or a required Berkay answer. Do not turn a green
+  technical result into legal-production approval.
+- A technically green slice may be committed and merged only when its owning
+  specification and `PLAN.md` record every such limit. It must not enable or
+  claim legal-production output while any applicable limit remains.
+- Once the current milestone programme is complete, create a new execution
+  order for the unresolved authorities and re-verify every affected path before
+  production use.
+
 ### Session summary
 
 At the end of each main session, overwrite `LAST_OUTPUT.md`. It is a short summary, not project memory
