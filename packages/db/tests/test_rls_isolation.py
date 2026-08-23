@@ -17,6 +17,7 @@ FORCE binds it too — admin/seed flows there must set a context.
 import os
 from collections.abc import Iterator
 from datetime import date
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -36,6 +37,7 @@ from lokara_db import (
     ConfirmedCostClassification,
     CostEntry,
     DbSettings,
+    DeliveryAddress,
     HeatingCostEntry,
     Landlord,
     MdlBranch,
@@ -45,6 +47,7 @@ from lokara_db import (
     Meter,
     MeterReading,
     OperatingCostAgreement,
+    PaymentInstruction,
     Person,
     PersonCount,
     Renter,
@@ -52,6 +55,8 @@ from lokara_db import (
     SelfUseKind,
     SelfUsePeriod,
     Statement,
+    StatementArchive,
+    StatementSettlement,
     StatementStatus,
     Tenancy,
     TenancyParty,
@@ -355,6 +360,10 @@ class TestCrossAccountIsolation:
             assert session.scalars(select(TenancyParty)).all() == []
             assert session.scalars(select(Renter)).all() == []
             assert session.scalars(select(Statement)).all() == []
+            assert session.scalars(select(StatementArchive)).all() == []
+            assert session.scalars(select(StatementSettlement)).all() == []
+            assert session.scalars(select(DeliveryAddress)).all() == []
+            assert session.scalars(select(PaymentInstruction)).all() == []
             assert session.scalars(select(Membership)).all() == []
             assert session.scalars(select(BuildingAssignment)).all() == []
             assert session.scalars(select(CostEntry)).all() == []
@@ -421,6 +430,285 @@ class TestCrossAccountIsolation:
                     street="Leak-Allee 1",
                     postal_code="00000",
                     city="Nirgendwo",
+                )
+            )
+            session.flush()
+
+
+class TestM6BArchiveGuards:
+    """M6-B rows are RLS-scoped evidence, not ordinary mutable cache rows."""
+
+    def test_archive_rows_are_hidden_and_append_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, app = engines
+        address_id = new_id()
+        instruction_id = new_id()
+        archive_id = new_id()
+        settlement_id = new_id()
+        payload = b"immutable archived statement"
+        with Session(owner) as session, session.begin():
+            session.add_all(
+                [
+                    DeliveryAddress(
+                        id=address_id,
+                        account_id=seed.account_a,
+                        tenancy_id=seed.tenancy_a,
+                        version=1,
+                        addressee="Mieter A",
+                        street="Testweg 1",
+                        postal_code="10115",
+                        city="Berlin",
+                        country="DE",
+                        valid_from=date(2025, 1, 1),
+                    ),
+                    PaymentInstruction(
+                        id=instruction_id,
+                        account_id=seed.account_a,
+                        version=1,
+                        instruction_text="Bitte überweisen.",
+                        valid_from=date(2025, 1, 1),
+                    ),
+                    StatementArchive(
+                        id=archive_id,
+                        account_id=seed.account_a,
+                        statement_id=seed.statement_a,
+                        audience="OWNER",
+                        tenancy_id=None,
+                        content_bytes=payload,
+                        sha256=sha256(payload).hexdigest(),
+                        mime_type="application/pdf",
+                        filename="archiv.pdf",
+                    ),
+                    StatementSettlement(
+                        id=settlement_id,
+                        account_id=seed.account_a,
+                        statement_id=seed.statement_a,
+                        tenancy_id=seed.tenancy_a,
+                        kind="RECEIVABLE",
+                        amount_cents=1,
+                        origin_saldo_cents=1,
+                        late_positive_exception_reason=None,
+                    ),
+                ]
+            )
+        with account_scoped_session(app, seed.account_b) as session:
+            assert session.get(StatementArchive, archive_id) is None
+            assert session.get(DeliveryAddress, address_id) is None
+            assert session.get(PaymentInstruction, instruction_id) is None
+            assert session.get(StatementSettlement, settlement_id) is None
+        with (
+            pytest.raises(IntegrityError, match="append-only"),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            row = session.get(StatementArchive, archive_id)
+            assert row is not None
+            row.filename = "umgeschrieben.pdf"
+            session.flush()
+        immutable_rows = (
+            ("tenancy_delivery_address", address_id),
+            ("owner_payment_credit_instruction", instruction_id),
+            ("statement_document_archive", archive_id),
+            ("statement_settlement", settlement_id),
+        )
+        for table, row_id in immutable_rows:
+            for operation in ("UPDATE", "DELETE"):
+                sql = (
+                    f"UPDATE {table} SET created_at = created_at WHERE id = :id"
+                    if operation == "UPDATE"
+                    else f"DELETE FROM {table} WHERE id = :id"
+                )
+                with (
+                    pytest.raises(IntegrityError, match="append-only"),
+                    account_scoped_session(app, seed.account_a) as session,
+                ):
+                    session.execute(text(sql), {"id": row_id})
+
+        foreign_rows = (
+            (
+                "INSERT INTO tenancy_delivery_address (id, account_id, tenancy_id, addressee, "
+                "street, postal_code, city, country, version, valid_from) VALUES (:id, "
+                ":account_id, :tenancy_id, 'A', 'Weg 1', '10115', 'Berlin', 'DE', 99, "
+                "DATE '2025-01-01')"
+            ),
+            (
+                "INSERT INTO owner_payment_credit_instruction (id, account_id, version, "
+                "instruction_text, valid_from) VALUES (:id, :account_id, 99, 'fremd', "
+                "DATE '2025-01-01')"
+            ),
+            (
+                "INSERT INTO statement_document_archive (id, account_id, statement_id, audience, "
+                "tenancy_id, content_bytes, sha256, mime_type, filename) VALUES (:id, :account_id, "
+                ":statement_id, 'TENANT', :tenancy_id, :payload, :hash, 'application/pdf', "
+                "'fremd.pdf')"
+            ),
+            (
+                "INSERT INTO statement_settlement (id, account_id, statement_id, tenancy_id, kind, "
+                "amount_cents, origin_saldo_cents) VALUES (:id, :account_id, :statement_id, "
+                ":tenancy_id, 'RECEIVABLE', 1, 1)"
+            ),
+        )
+        for sql in foreign_rows:
+            with (
+                pytest.raises(ProgrammingError),
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.execute(
+                    text(sql),
+                    {
+                        "id": new_id(),
+                        "account_id": seed.account_a,
+                        "tenancy_id": seed.tenancy_a,
+                        "statement_id": seed.statement_a,
+                        "payload": payload,
+                        "hash": sha256(payload).hexdigest(),
+                    },
+                )
+
+    def test_archive_rejects_a_same_account_tenancy_from_another_building(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        building_id, unit_id, tenancy_id = new_id(), new_id(), new_id()
+        payload = b"wrong building"
+        with (
+            pytest.raises(IntegrityError, match="same building"),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            session.add(
+                Building(
+                    id=building_id,
+                    account_id=seed.account_a,
+                    name="Haus Nebenan",
+                    street="Nebenweg 2",
+                    postal_code="10115",
+                    city="Berlin",
+                )
+            )
+            session.add(
+                Unit(
+                    id=unit_id,
+                    account_id=seed.account_a,
+                    building_id=building_id,
+                    label="WE N",
+                    area_sqm_x100=5_000,
+                )
+            )
+            session.add(
+                Tenancy(
+                    id=tenancy_id,
+                    account_id=seed.account_a,
+                    unit_id=unit_id,
+                    valid_from=date(2025, 1, 1),
+                    valid_to=None,
+                    base_rent_cents=70_000,
+                )
+            )
+            session.add(
+                StatementArchive(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    statement_id=seed.statement_a,
+                    audience="TENANT",
+                    tenancy_id=tenancy_id,
+                    content_bytes=payload,
+                    sha256=sha256(payload).hexdigest(),
+                    mime_type="application/pdf",
+                    filename="falsch.pdf",
+                )
+            )
+            session.flush()
+
+    def test_archive_hash_must_match_the_stored_bytes(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="SHA-256 does not match"),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            session.add(
+                StatementArchive(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    statement_id=seed.statement_a,
+                    audience="TENANT",
+                    tenancy_id=seed.tenancy_a,
+                    content_bytes=b"actual bytes",
+                    sha256="0" * 64,
+                    mime_type="application/pdf",
+                    filename="falsch.pdf",
+                )
+            )
+            session.flush()
+
+    def test_finalized_statement_cannot_change_evidence_while_superseding(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, app = engines
+        statement_id = new_id()
+        with Session(owner) as session, session.begin():
+            session.add(
+                Statement(
+                    id=statement_id,
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    period_start=date(2024, 1, 1),
+                    period_end=date(2024, 12, 31),
+                    version=1,
+                    status=StatementStatus.FINALIZED,
+                    total_cents=100,
+                    content_hash="a" * 64,
+                    finalized_snapshot={"frozen": True},
+                )
+            )
+        with (
+            pytest.raises(IntegrityError, match="only FINALIZED to SUPERSEDED"),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            row = session.get(Statement, statement_id)
+            assert row is not None
+            row.status = StatementStatus.SUPERSEDED
+            row.total_cents = 101
+            session.flush()
+
+    def test_predecessor_must_share_the_finalized_building_and_period(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, app = engines
+        predecessor_id = new_id()
+        with Session(owner) as session, session.begin():
+            session.add(
+                Statement(
+                    id=predecessor_id,
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    period_start=date(2023, 1, 1),
+                    period_end=date(2023, 12, 31),
+                    version=1,
+                    status=StatementStatus.FINALIZED,
+                    total_cents=100,
+                    content_hash="b" * 64,
+                    finalized_snapshot={"frozen": True},
+                )
+            )
+        with (
+            pytest.raises(IntegrityError, match="share building and period"),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            session.add(
+                Statement(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    period_start=date(2022, 1, 1),
+                    period_end=date(2022, 12, 31),
+                    version=1,
+                    status=StatementStatus.FINALIZED,
+                    total_cents=100,
+                    content_hash="c" * 64,
+                    finalized_snapshot={"frozen": True},
+                    supersedes_statement_id=predecessor_id,
                 )
             )
             session.flush()

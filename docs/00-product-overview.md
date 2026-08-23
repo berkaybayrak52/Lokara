@@ -20,10 +20,11 @@ M1–M4 are a green, demoable floor:
 - a landlord-only calculation/QA overview and PDF that reconcile the seeded NK and heating paths;
 - canned document extraction behind a provider adapter, with human review before a cost is stored.
 
-This floor is not yet spec-closed. The current PDF is **not** the finalized Page 01 tenant document:
-it contains the landlord's building-wide view, lacks actual paid advances and Saldo, and is not the
-independently rendered per-tenancy archive required for dispatch. The approved D1–D3 documentation
-baseline is complete; Slice A is the next implementation reconciliation.
+This floor is not yet legal-production approved. The current demo PDF is **not** the finalized Page
+01 tenant document: it remains a live landlord building-wide preview. M6-B separately ships
+owner-only technical archives with frozen actual advances, Saldo and independently rendered tenancy
+documents. Those archives are neither renter delivery nor portal publication; the approved D1–D3
+documentation baseline and M6-B technical closure do not clear `verify-before-production` flags.
 
 ## Billing-period boundary
 
@@ -39,9 +40,9 @@ demo or sales copy may advertise that case as supported.
 ## Intended audience and future scope
 
 The account model supports `SOLO` and `HAUSVERWALTUNG`, with roles on Membership rather than Account.
-The shipped demo uses one owner membership and one account. Employee role enforcement, account
-switching, renter activation/portal, tax-adviser guest access, bank matching, tax export, contracts,
-billing and native apps remain future milestones in `PLAN.md`.
+The shipped demo uses one owner membership and one account. Employee role enforcement and account
+switching are shipped. Renter activation/portal, tax-adviser guest access, bank matching, tax export,
+contracts, billing and native apps remain future milestones in `PLAN.md`.
 
 Future product breadth includes the BetrKV catalogue, final tenant statements, UVI, a payment ledger,
 Anlage V/DATEV, guards/reminders and mobile clients. Those are roadmap dependencies, not shipped

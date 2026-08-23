@@ -42,8 +42,8 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 
 - Page 01 and Page 01b contracts and their data-only or capability evidence live in `docs/02`,
   `docs/03` and `docs/08`; their named implementation gaps remain open.
-- M6 owns actual paid advances, Saldo, receivables, immutable finalization and separately rendered
-  tenant documents.
+- M6-A/M6-B ship temporal/actual advances, Saldo settlements, immutable owner-only finalization and
+  separately rendered tenant archives. Bank matching, payment ledger and renter delivery/portal remain open.
 - Real external providers stay behind adapter contracts and require their own integration,
   security and compliance evidence.
 
@@ -112,8 +112,8 @@ identity read; `AGENTS.md` owns the complete gate contract.
   Postgres RLS is the backstop. Nested-resource authorization remains Specified M5 work.
 - Login is the only permitted pre-account lookup. The shipped bounded
   `app_bootstrap_contexts(text)` read does not authorize another pre-context reader.
-- Tenant-document isolation is the Specified M6 contract: select one account-valid tenancy before
-  rendering and expose no other renter's visible or hidden data. It is not current output.
+- Tenant-document isolation is shipped for M6-B owner-only archives: select one account-valid tenancy
+  before rendering and expose no other renter's visible or hidden data. It is not renter portal output.
 
 ## Financial and lifecycle time axes
 

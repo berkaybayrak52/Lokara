@@ -115,14 +115,16 @@ switcher; no account is stored in the token or client session. M5 account switch
 owner navigation or content. `docs/02-data-model.md` owns the detailed function, role, policy,
 privilege and call-site contract.
 
-## Shipped statement boundary and Specified M6 work
+## Shipped statement and M6-B archive boundary
 
 The current statement route is the fixed 2025 **Vermieter-Gesamtübersicht**: a landlord-only,
 building-wide calculation/QA preview. It is not a Mieter-Einzelabrechnung and must not be sent to a
 renter. A period longer than 12 months hard-blocks before calculation or rendering.
 
-Actual paid advances, Saldo, immutable/versioned finalization and separately constructed, isolated
-tenant documents remain **Specified** for M6 in `docs/02` and `docs/08`; they are not shipped.
+M6-A/M6-B ship owner-only controls for confirmed actual advances, Saldo, immutable/versioned
+finalization, history and stored-document download. The separate tenant archive is independently
+rendered and isolated, but is not a renter route, portal item, email/delivery feature or
+legal-production approval. The live demo PDF remains unchanged.
 
 ## Shipped Beleg-Upload boundary
 

@@ -15,8 +15,14 @@ vi.mock('./queries', () => ({
   useBuildingTenancies: () => ({ data: [] }),
   useConfirmAdvanceReconciliation: () => ({ isPending: false, mutate: vi.fn() }),
   useCreateAdvancePayment: () => ({ isPending: false, mutate: vi.fn() }),
+  useCreateDeliveryAddress: () => ({ isPending: false, mutate: vi.fn() }),
+  useCreatePaymentInstruction: () => ({ isPending: false, mutate: vi.fn() }),
+  useDeliveryAddresses: () => ({ data: [] }),
+  useFinalizeStatement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useMe: () => ({ data: undefined }),
+  usePaymentInstructions: () => ({ data: [] }),
   useStatement: () => ({ data: undefined }),
+  useStatementHistory: () => ({ data: [] }),
   useTenantPreview: () => queryFixtures.tenantPreview,
 }));
 

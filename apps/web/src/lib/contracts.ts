@@ -115,6 +115,52 @@ export const StatementProjectionResponseSchema = z.object({
 });
 export type StatementProjectionResponse = z.infer<typeof StatementProjectionResponseSchema>;
 
+// ── M6-B finalization archives (owner-only) ─────────────────────────────────
+
+export const DeliveryAddressSchema = z.object({
+  id: z.string(),
+  version: z.number().int(),
+  addressee: z.string(),
+  street: z.string(),
+  postalCode: z.string(),
+  city: z.string(),
+  country: z.string(),
+  validFrom: z.string(),
+});
+
+export const PaymentInstructionSchema = z.object({
+  id: z.string(),
+  version: z.number().int(),
+  instructionText: z.string(),
+  validFrom: z.string(),
+});
+
+export const FinalizedDocumentSchema = z.object({
+  id: z.string(),
+  audience: z.enum(['OWNER', 'TENANT']),
+  tenancyId: z.string().nullable(),
+  filename: z.string(),
+  sha256: z.string(),
+});
+
+export const StatementHistorySchema = z.object({
+  id: z.string(),
+  version: z.number().int(),
+  status: z.enum(['FINALIZED', 'SUPERSEDED']),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  contentHash: z.string().nullable(),
+  finalizedAt: z.string().nullable(),
+  supersedesStatementId: z.string().nullable(),
+  documents: z.array(FinalizedDocumentSchema),
+});
+
+export const FinalizeStatementSchema = StatementHistorySchema.extend({
+  settlements: z.array(z.object({
+    tenancy_id: z.string(), saldo_cents: z.number().int(), kind: z.string(),
+  })),
+});
+
 export const SelfUsePeriodOutSchema = z.object({
   kind: z.string(),
   validFrom: z.string(),

@@ -65,9 +65,9 @@ account-scoped tables carries the same `account_id`; section 3 lists all 22 enfo
 | Operating-cost inputs | `CostEntry`, `AllocationKeyAssignment` | **Shipped** |
 | Metering and heating inputs | `Meter`, `MeterReading`, `HeatingCostEntry` | **Shipped** |
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
-| Statement row | `Statement` with period, version, status, total and optional content hash | **Shipped**, but not the complete Page 01 snapshot/finalization contract |
-| Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Capability shipped** — server-side selection exists (`OWNER`/`TENANT`/`TAX`); the immutable finalized snapshot does not |
-| Temporal advance schedule, receivables, payment ledger and immutable finalization | M6 handoff described below | **Future** |
+| Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
+| Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
+| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger and matching remain future M6 |
 | Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
@@ -267,7 +267,7 @@ Building 1 ── N Unit 1 ── N Tenancy N ── N Renter
 | `PersonCount` | Dated Personenzahl per tenancy; half-open validity, never a scalar on the unit. Vacancy is deliberately absent — D0 is derived per run. | **Shipped** |
 | `MdlStatement` | A confirmed third-party Messdienstleister statement, append-only and versioned per building period. | **Shipped** |
 | `MdlStatementPosition` | One renter's amount on that statement, stored as delivered and never recomputed. | **Shipped** |
-| `AdvancePaymentPeriod` | Dated contractual advance amount replacing the tenancy scalar. | **Future**, M6 |
+| `AdvancePaymentPeriod` | Dated contractual advance amount replacing the tenancy scalar. | **Shipped**, M6-A |
 
 Shipped validity and cost ranges use half-open dates: `valid_from` or `period_from` is included and
 `valid_to` or `period_to` is excluded. Page 01's user-facing billing period is inclusive; adapters
@@ -311,15 +311,13 @@ continuing renter would appear as two parties even though the consecutive period
 and ordinary allocation checks stay green.
 
 The scalar is not an engine input, an actual payment, or a lawful substitute for Page 01's paid
-advances. M6 must introduce an account-scoped, composite-FK-protected `AdvancePaymentPeriod` with at
-least tenancy, amount, `valid_from` and `valid_to`; define how a dated adjustment and its versions are
-recorded; migrate create/read API schemas; and remove the scalar only after backfill. Every existing
-tenancy becomes one open-ended period beginning at `tenancy.valid_from` with its current scalar
-amount. This is a data migration, not just a model rename.
+advances. M6-A replaced it with the account-scoped, composite-FK-protected
+`AdvancePaymentPeriod`; the initial migration creates one open-ended period at
+`tenancy.valid_from`. This is a data migration, not just a model rename.
 
 ### M6-A temporal advances and confirmed actual-advance preview
 
-**Status:** implementation contract for the first M6 slice.  **Source:** Page 01, § 4 minimum #4
+**Status:** shipped M6-A technical scope. **Source:** Page 01, § 4 minimum #4
 and its `08-F02`–`08-F04`, `08-F10`, `08-F14`, `08-F16`, `08-F18`–`08-F19` oracle branches;
 this document's financial-time-axis and scalar-defect rules; and the M6-A product charter dated
 23.08.2026.  **Rechtsstand:** 08/2026 for the already transcribed Page-01 statement rule.
@@ -629,12 +627,12 @@ One normalized calculation must produce one immutable result and explicit audien
 | --- | --- |
 | Calculation identity | Account, building, inclusive period and calculation/version identity. Basic persisted fields exist; the exact Page 01 input is not complete. |
 | Property header | Legal landlord, object address, total area, unit count, creation date, engine/rule versions and every applicable register `Rechtsstand`. |
-| Covered tenancy | `tenancy_id`, renters/addressee, delivery address, unit, clipped usage dates and days, person/area/consumption inputs. Temporal tenancy exists; delivery and isolated projection remain incomplete. |
-| Actual advances | Paid cents for the period, distinct from contractual Soll. **Future M6 ledger work**; never nullable when a tenant document is finalized, while confirmed zero is valid. |
+| Covered tenancy | `tenancy_id`, renters/addressee, delivery address, unit, clipped usage dates and days, person/area/consumption inputs. M6-B freezes the selected address and isolated archive; renter delivery remains incomplete. |
+| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; matching-ledger cash work remains open. Confirmed zero is valid. |
 | Operating-cost result | Cost identity/classification, total, key, numerator, denominator, measurement unit, rounded renter share, § 35a inputs/result, warnings and provenance. |
 | Heating and CO₂ result | Every required block, ratio, numerator/denominator, device evidence, CO₂ figures, warnings and provenance defined in `docs/03`. |
 | Vacancy result | Origin unit/dates, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c) and evidence. The residual contract is settled; the full annex is not implemented. |
-| Projection and archive | Audience plus exactly one tenancy for tenant output, document bytes/storage keys and hashes. **Future M6 work**. |
+| Projection and archive | Audience plus exactly one tenancy for tenant output, document bytes/storage keys and hashes. **Shipped M6-B owner-only archive scope**; portal/delivery remains open. |
 
 Finalization must enforce all of these together:
 
@@ -656,15 +654,16 @@ future tax specification owns its Anlage-V mapping.
 
 ## 6. Immutable finalization, financial time axes, and M6 ledger handoff
 
-The shipped `Statement` row is an incomplete lifecycle anchor:
+Before M6-B, the `Statement` row was an incomplete lifecycle anchor. M6-B adds the finalization
+evidence described below:
 
 | Shipped field or constraint | Meaning and limit |
 | --- | --- |
 | `account_id`, `building_id` | Account-scoped statement and composite building edge. |
-| `period_start`, `period_end` | Stored statement period. The complete normalized snapshot is absent. |
+| `period_start`, `period_end` | Stored statement period; M6-B also stores the immutable normalized snapshot. |
 | `version`, `status` | Version defaults to 1; status is `DRAFT`, `FINALIZED` or `SUPERSEDED`. |
-| `total_cents`, optional `content_hash`, `created_at` | Basic output total and document hash slot, not all calculation/document evidence. |
-| Unique `(building_id, period_start, period_end, version)` | Prevents duplicate versions for one building period. It does not by itself enforce append-only finalization. |
+| `total_cents`, `finalized_snapshot`, `finalized_at`, `supersedes_statement_id`, `created_at` | M6-B finalization evidence; archive bytes/hashes are held in scoped archive rows. |
+| Unique `(building_id, period_start, period_end, version)` | Prevents duplicate versions for one building period; M6-B transition and immutability constraints complete the append-only finalization boundary. |
 
 ```text
 live inputs ── preview (no archive)
@@ -675,8 +674,8 @@ live inputs ── preview (no archive)
                            └── insert v2: DRAFT → FINALIZED
 ```
 
-The current enum and uniqueness constraint are **shipped**; the complete immutable transition,
-snapshot and document archive are **future M6**. Preview and finalization have different contracts:
+The lifecycle enum and uniqueness constraint are **shipped**. M6-B ships the complete technical
+immutable transition, snapshot and document archive; preview and finalization have different contracts:
 
 - A preview reads current normalized rows, calculates and renders live. It creates no archive.
 - Finalization creates one immutable, reproducible snapshot for account, building, period and
@@ -686,6 +685,72 @@ snapshot and document archive are **future M6**. Preview and finalization have d
   eligible tenancy. Lokara never creates one all-renters PDF and later crops or masks it.
 - A correction appends `vN+1`, retains `vN` and records supersession. Referenced input rows and
   archived bytes cannot be destructively changed or deleted.
+
+### M6-B — finalized, isolated statement documents
+
+**Status:** shipped M6-B technical scope. **Sources:** approved Page 01 in
+`berkay-work/Spec-Seiten/01 · Die Abrechnung 3a95fd420731816c9048ed7a517c3e9e.md`, its register
+rows transcribed in `docs/08`, the M6-A advance/reconciliation contract above, and this technical
+slice charter. **Rechtsstand:** 08/2026 for the Page-01 statement requirements. The timing of a
+Nachforderung and any payment deadline remain `verify-before-production` in the register; this
+contract neither settles them nor enables legal-production delivery.
+
+M6-B is a technical archive, not a bank-matching, finAPI, email-delivery, renter-portal or legal
+approval feature. It uses database bytes in this local slice; an object-storage adapter is deferred.
+Every row below carries non-null `account_id`, uses a composite account-preserving foreign key for
+each scoped parent, and is protected by RLS. A selected record is copied verbatim into the final
+snapshot; later address/instruction versions cannot alter an older document.
+
+| Record | Required fields | Append-only and isolation contract |
+| --- | --- | --- |
+| `Statement` finalization data | immutable normalized `finalized_snapshot` containing the selected account/building/period inputs, party outputs, selected reconciliation identity/version and total, selected delivery-address/instruction versions and values, engine/rule versions, warnings/provenance and all applicable `Rechtsstand`; `finalized_at`; nullable `supersedes_statement_id` | A finalization changes only a new/draft statement into `FINALIZED` once, with its snapshot. A correction names the latest finalized statement, marks only that predecessor `SUPERSEDED`, and inserts/finalizes `vN+1`. Neither snapshot is updated or deleted. `supersedes_statement_id` is a scoped edge to a statement in the same account, building and period. |
+| `StatementDocumentArchive` | `id`, `account_id`, `statement_id`, audience (`OWNER` or `TENANT`), nullable `tenancy_id`, `content_bytes`, lowercase-hex `sha256`, `mime_type`, `filename`, `created_at` | One owner row has `tenancy_id = NULL`; one tenant row has exactly one account/building-valid tenancy. Enforce exactly one archive per `(statement, OWNER)` and per `(statement, TENANT, tenancy)` (a partial unique index is required for the NULL owner edge). Bytes, hash, MIME type, filename and timestamp are immutable; download returns these stored bytes only. |
+| `StatementSettlement` | `id`, `account_id`, `statement_id`, `tenancy_id`, `kind` (`RECEIVABLE` or `CREDIT_REFUND`), positive `amount_cents`, immutable `origin_saldo_cents`, nullable `late_positive_exception_reason`, `created_at` | At most one settlement for a statement/tenancy. A positive timely Saldo creates `RECEIVABLE`; a negative Saldo creates `CREDIT_REFUND` with its absolute cents; zero creates no row. A late positive Saldo creates no settlement unless a non-blank exception reason is explicitly recorded. It is an obligation, never a payment, bank transaction or tax cash event. |
+| `TenancyDeliveryAddress` | `id`, `account_id`, `tenancy_id`, `version`, `addressee`, `street`, `postal_code`, `city`, `country`, `created_at` | A new version is an insert; `(tenancy_id, version)` is unique. No update/delete/current-value flag exists. The selected version must be account-valid and is frozen verbatim in the tenant snapshot. |
+| `OwnerPaymentCreditInstruction` | `id`, `account_id`, `version`, non-blank `instruction_text`, `created_at` | A new instruction is an insert; `(account_id, version)` is unique. It is technical payment/credit copy, not a bank account, matching decision or payment event. Its chosen value/version is frozen verbatim in every final snapshot that uses it. |
+
+#### Atomic finalization and correction
+
+The owner-only finalization command takes `building_id`, inclusive `period_start` and `period_end`,
+an optional `supersedes_statement_id`, and an optional `late_positive_exception_reason`. It:
+
+1. authorizes an `OWNER` against the URL account and building; an employee, tax adviser, renter
+   route or foreign account/building is forbidden;
+2. rejects a reversed/over-12-month period, overlap, missing required source data, production-blocked
+   cost, hard-stop result, foreign tenancy/reference, or a rendering failure before any archive write;
+3. identifies every clipped tenancy. A tenancy with zero clipped usage days is excluded from tenant
+   documents and settlements, and recorded only in the owner overview footnote;
+4. requires a current confirmed `AdvanceReconciliation` for **every eligible tenancy** for the same
+   inclusive period. An explicitly confirmed empty allocation set is zero; missing confirmation is
+   not zero;
+5. computes once, selects the current address and owner instruction, independently renders one owner
+   overview and one tenant document per eligible tenancy, hashes the exact bytes with SHA-256, then
+   persists statement snapshot, archive rows and the applicable settlement rows in one transaction.
+
+If any condition fails, the transaction leaves no new statement version, snapshot, archive or
+settlement. Rendering every document precedes persistence so a later tenant-render failure cannot
+leave a partial archive. A first finalization must not name a predecessor. A correction must name the
+latest finalized version for the same account/building/inclusive period; naming an older, foreign,
+different-building or already-superseded version is refused. It does not edit the predecessor or
+reuse its documents.
+
+#### Owner-only HTTP boundary
+
+The following are the M6-B public interfaces. Their dates are inclusive at the HTTP boundary. They
+are owner-only even where an employee may use the existing live preview; no renter endpoint, portal
+publication, delivery/email, bank-transaction, matching or finAPI endpoint is introduced.
+
+| Method and path | Contract |
+| --- | --- |
+| `POST /a/{account_id}/buildings/{building_id}/statements/finalize` | Executes the atomic command above. Body has `periodStart`, `periodEnd`, optional `supersedesStatementId`, optional `latePositiveExceptionReason`. It returns only archive metadata/history identity, never a recomputed document. |
+| `GET /a/{account_id}/buildings/{building_id}/statements/history` | Lists archived statement versions for the selected period/building, including `version`, status, predecessor relation, finalization time and document metadata. |
+| `GET /a/{account_id}/statement-documents/{document_id}/download` | Returns the archived `content_bytes` with stored MIME type and filename after account/owner authorization. It never recalculates or re-renders. |
+| `GET`/`POST /a/{account_id}/buildings/{building_id}/tenancies/{tenancy_id}/delivery-addresses` | Reads/creates append-only tenancy delivery-address versions after verifying the tenancy belongs to that building/account. |
+| `GET`/`POST /a/{account_id}/payment-credit-instructions` | Reads/creates append-only account owner-payment/credit-instruction versions. |
+
+The UI may expose only these owner controls: append a delivery address or instruction, finalize a
+selected building/period, explicitly correct the latest version, inspect history, and download an
+archive. It must not present finalization as renter delivery or legal/production approval.
 
 ### Financial time axes
 
@@ -714,8 +779,8 @@ M6 owns the handoff in this order:
 
 | Future record | Minimum contract and owner |
 | --- | --- |
-| `AdvancePaymentPeriod` | M6: account, tenancy, amount, effective dates and version/declaration evidence. |
-| `Receivable` | M6: account, finalized statement/version, tenancy, amount, due state and immutable origin. |
+| `AdvancePaymentPeriod` | Shipped M6-A: account, tenancy, amount, effective dates and version/declaration evidence. |
+| `Receivable` | Shipped M6-B as `StatementSettlement`: account, finalized statement/version, tenancy, amount and immutable origin; it is not a cash event. |
 | Payment event/ledger entry | M6: payment date state, integer cents, direction, account, landlord/building/unit/renter dimensions as applicable, category state, source (`finAPI`, manual or invoice), receipt reference and version history. Missing date is red; missing category is yellow before tax export. |
 | Matching evidence | M6: normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
 | `TaxCategoryMapping` | M7: tax-year category to Anlage-V line plus SKR03/SKR04, validity/source version and tax-adviser override provenance. All current lines/accounts remain blocked placeholders. |
@@ -742,7 +807,8 @@ approved `docs/11` adds no schema or API.
 | Page 01 persisted calculation/extraction reconciliation | **Specified and approved**; production gaps remain | Slice B |
 | Page 02 catalogue, classifications, NK half-up rounding and owner residual | Technically implemented by Slice C; flagged authority remains production-blocking | Slice C |
 | Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |
-| Temporal advances, actual advances, receivables, ledger, Saldo and immutable separated finalization | **Future** | M6 |
+| M6-A temporal advances/confirmed actual advances and M6-B Saldo, settlements, finalization and owner-only archives | **Shipped** technical scope; no renter delivery or legal-production approval | M6-A/M6-B |
+| Payment ledger, bank matching, matching evidence and delivery/portal work | **Future** | M6/M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Complete transcription approved and merged 21.08.2026; no production implementation | D2 / `docs/11-tax-export.md` |

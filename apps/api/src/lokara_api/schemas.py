@@ -780,6 +780,61 @@ class StatementProjectionResponse(ApiModel):
     disclaimer: str
 
 
+# ── M6-B finalized documents ────────────────────────────────────────────────
+
+
+class DeliveryAddressCreate(ApiModel):
+    addressee: str = Field(min_length=1, max_length=200)
+    street: str = Field(min_length=1, max_length=200)
+    postal_code: str = Field(min_length=1, max_length=30)
+    city: str = Field(min_length=1, max_length=100)
+    country: str = Field(min_length=1, max_length=100)
+    valid_from: date
+
+
+class PaymentInstructionCreate(ApiModel):
+    payment_text: str = Field(min_length=1, max_length=2000)
+    credit_text: str = Field(min_length=1, max_length=2000)
+    valid_from: date
+
+
+class FinalizeStatementCreate(ApiModel):
+    period_start: date
+    period_end: date
+    supersedes_statement_id: str | None = None
+    late_positive_exception_reason: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def period_is_ordered(self) -> "FinalizeStatementCreate":
+        if self.period_end < self.period_start:
+            raise ValueError("Das Ende liegt vor dem Beginn des Abrechnungszeitraums.")
+        return self
+
+
+class FinalizedDocumentOut(ApiModel):
+    id: str
+    audience: Literal["OWNER", "TENANT"]
+    tenancy_id: str | None
+    filename: str
+    sha256: str
+
+
+class StatementHistoryOut(ApiModel):
+    id: str
+    version: int
+    status: Literal["FINALIZED", "SUPERSEDED"]
+    period_start: date
+    period_end: date
+    content_hash: str | None
+    finalized_at: datetime | None
+    supersedes_statement_id: str | None
+    documents: list[FinalizedDocumentOut]
+
+
+class FinalizeStatementOut(StatementHistoryOut):
+    settlements: list[dict[str, object]]
+
+
 class MdlPositionIn(ApiModel):
     """One renter's amount as the Messdienstleister document states it."""
 

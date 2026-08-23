@@ -30,9 +30,15 @@ import { useBuildings } from '../objekte/queries';
 import {
   useBuildingTenancies,
   useConfirmAdvanceReconciliation,
+  useCreateDeliveryAddress,
+  useCreatePaymentInstruction,
   useCreateAdvancePayment,
+  useDeliveryAddresses,
+  useFinalizeStatement,
   useMe,
   useStatement,
+  useStatementHistory,
+  usePaymentInstructions,
   useTenantPreview,
 } from './queries';
 
@@ -532,7 +538,82 @@ export function StatementResult({
         </p>
       </section>
       {ownerControls ? <TenantSaldoPreview accountId={accountId} selection={selection} /> : null}
+      {ownerControls ? <FinalizationArchivePanel accountId={accountId} selection={selection} /> : null}
     </div>
+  );
+}
+
+function FinalizationArchivePanel({
+  accountId,
+  selection,
+}: {
+  accountId: string;
+  selection: { buildingId: string; periodFrom: string; periodTo: string };
+}) {
+  const [tenancyId, setTenancyId] = useState('');
+  const [address, setAddress] = useState({ addressee: '', street: '', postalCode: '', city: '', country: 'Deutschland' });
+  const [paymentText, setPaymentText] = useState('');
+  const [creditText, setCreditText] = useState('');
+  const [supersedesStatementId, setSupersedesStatementId] = useState('');
+  const [lateReason, setLateReason] = useState('');
+  const tenancies = useBuildingTenancies(accountId, selection.buildingId, true);
+  const addresses = useDeliveryAddresses(accountId, selection.buildingId, tenancyId);
+  const instructions = usePaymentInstructions(accountId);
+  const history = useStatementHistory(accountId, selection.buildingId);
+  const createAddress = useCreateDeliveryAddress(accountId, selection.buildingId, tenancyId);
+  const createInstruction = useCreatePaymentInstruction(accountId);
+  const finalize = useFinalizeStatement(accountId, selection.buildingId);
+  const latestForPeriod = (history.data ?? []).find(
+    (entry) => entry.periodStart === selection.periodFrom && entry.periodEnd === selection.periodTo && entry.status === 'FINALIZED',
+  );
+
+  return (
+    <section aria-labelledby="finalization-heading" className="space-y-4">
+      <h2 id="finalization-heading" className="font-display text-xl font-bold">Finalisieren und Archiv</h2>
+      <StatusNote kind="warning" label="Technisches Archiv, keine Zustellung.">
+        PDFs werden erst vollständig erzeugt und dann unveränderlich archiviert. Diese Aktion versendet nichts und ersetzt keine Rechtsprüfung.
+      </StatusNote>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Zustelladresse versionieren</CardTitle><CardDescription>Eine neue Fassung ergänzt die Historie; vorhandene Fassungen bleiben unverändert.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            <Label htmlFor="final-address-tenancy">Mietverhältnis</Label>
+            <Select id="final-address-tenancy" aria-label="Mietverhältnis für Zustelladresse" value={tenancyId} onChange={(event) => setTenancyId(event.target.value)}><option value="">Mietverhältnis wählen</option>{(tenancies.data ?? []).map((tenancy) => <option key={tenancy.id} value={tenancy.id}>{tenancy.label}</option>)}</Select>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Label htmlFor="final-address-name">Name</Label>
+              <Input id="final-address-name" aria-label="Name" placeholder="Name" value={address.addressee} onChange={(event) => setAddress({ ...address, addressee: event.target.value })} />
+              <Label htmlFor="final-address-street">Straße und Hausnummer</Label>
+              <Input id="final-address-street" aria-label="Straße" placeholder="Straße und Hausnummer" value={address.street} onChange={(event) => setAddress({ ...address, street: event.target.value })} />
+              <Label htmlFor="final-address-postal">Postleitzahl</Label>
+              <Input id="final-address-postal" aria-label="Postleitzahl" placeholder="Postleitzahl" value={address.postalCode} onChange={(event) => setAddress({ ...address, postalCode: event.target.value })} />
+              <Label htmlFor="final-address-city">Ort</Label>
+              <Input id="final-address-city" aria-label="Ort" placeholder="Ort" value={address.city} onChange={(event) => setAddress({ ...address, city: event.target.value })} />
+            </div>
+            <Button variant="outline" disabled={!tenancyId || !address.addressee || !address.street || !address.postalCode || !address.city || createAddress.isPending} onClick={() => createAddress.mutate({ ...address, validFrom: selection.periodFrom })}>Adresse als neue Version speichern</Button>
+            {(addresses.data ?? []).map((entry) => <p key={entry.id} className="text-sm text-slate">v{entry.version}: {entry.addressee}, {entry.street}, {entry.postalCode} {entry.city}</p>)}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Zahlungs- und Guthabenhinweis versionieren</CardTitle><CardDescription>Die bei der Finalisierung aktuelle Fassung wird wortgetreu eingefroren.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            <Label htmlFor="final-payment">Zahlungshinweis</Label><Input id="final-payment" aria-label="Zahlungshinweis" placeholder="Zahlungshinweis" value={paymentText} onChange={(event) => setPaymentText(event.target.value)} />
+            <Label htmlFor="final-credit">Guthabenhinweis</Label><Input id="final-credit" aria-label="Guthabenhinweis" placeholder="Guthabenhinweis" value={creditText} onChange={(event) => setCreditText(event.target.value)} />
+            <Button variant="outline" disabled={!paymentText || !creditText || createInstruction.isPending} onClick={() => createInstruction.mutate({ paymentText, creditText, validFrom: selection.periodFrom })}>Hinweis als neue Version speichern</Button>
+            {(instructions.data ?? []).map((entry) => <p key={entry.id} className="text-sm text-slate">v{entry.version}: {entry.instructionText}</p>)}
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Abrechnung finalisieren</CardTitle><CardDescription>Der Zeitraum ist einschließlich Anfangs- und Endtag. Alle betroffenen Mietverhältnisse benötigen eine bestätigte Vorauszahlungsabstimmung; ein bestätigtes 0,00 € ist gültig.</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          {latestForPeriod ? <><Label htmlFor="statement-correction">Korrektur der jüngsten finalen Version</Label><Select id="statement-correction" value={supersedesStatementId} onChange={(event) => setSupersedesStatementId(event.target.value)}><option value="">Jüngste Version ausdrücklich wählen</option><option value={latestForPeriod.id}>v{latestForPeriod.version} ({latestForPeriod.status})</option></Select></> : null}
+          <Label htmlFor="late-positive-reason">Ausnahmegrund bei verspäteter positiver Nachzahlung</Label><Input id="late-positive-reason" aria-label="Ausnahmegrund für verspätete Nachzahlung" placeholder="Ausnahmegrund bei verspäteter positiver Nachzahlung" value={lateReason} onChange={(event) => setLateReason(event.target.value)} />
+          {finalize.isError ? <StatusNote kind="danger" label="Finalisierung nicht möglich.">{finalize.error instanceof ApiError && finalize.error.detail ? finalize.error.detail : 'Bitte Eingaben und bestätigte Vorauszahlungen prüfen.'}</StatusNote> : null}
+          <Button disabled={(latestForPeriod !== undefined && supersedesStatementId !== latestForPeriod.id) || finalize.isPending} onClick={() => finalize.mutate({ periodStart: selection.periodFrom, periodEnd: selection.periodTo, supersedesStatementId: supersedesStatementId || undefined, latePositiveExceptionReason: lateReason || undefined })}>{latestForPeriod ? 'Korrektur finalisieren' : 'Finalisieren und archivieren'}</Button>
+        </CardContent>
+      </Card>
+      <Card><CardHeader><CardTitle className="text-base">Archivhistorie</CardTitle><CardDescription>Downloads sind gespeicherte Archivbytes; sie berechnen nichts neu.</CardDescription></CardHeader><CardContent className="space-y-3">{(history.data ?? []).map((entry) => <div key={entry.id} className="rounded-lg border border-mint p-3"><p className="font-medium">v{entry.version} · {entry.status} · {entry.periodStart} bis {entry.periodEnd}</p>{entry.documents.map((document) => <a key={document.id} className="block text-sm text-green underline underline-offset-4" href={`${API_URL}/a/${accountId}/statement-documents/${document.id}/download`} download>{document.audience === 'OWNER' ? 'Eigentümerübersicht' : 'Mieter-Einzelabrechnung'}: {document.filename}</a>)}</div>)}{history.data?.length === 0 ? <p className="text-sm text-slate">Noch keine archivierte Abrechnung.</p> : null}</CardContent></Card>
+    </section>
   );
 }
 

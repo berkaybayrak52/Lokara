@@ -62,7 +62,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
-| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction; M6 still owns actual advances, Saldo, finalization and isolated tenant documents. |
+| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction. M6-A/B ship actual-advance reconciliation and owner-only technical final archives; bank matching, cash ledger and renter delivery/portal remain open. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
@@ -510,28 +510,36 @@ activation, renter URL context and renter portal authorization are M10 work. M6 
 **Approved-spec prerequisite:** D1's `docs/08` and D2's `docs/15`. If bank matching is deferred,
 `docs/15` does not block the remaining ledger and statement work.
 
-- Add Redis workers and webhooks.
+#### M6-B — finalized, isolated statement documents
+
+**Status:** implementation and review closed on 23.08.2026. M6-B is deliberately limited to
+technical finalization archives: immutable statement snapshots,
+database PDF bytes/hashes, one owner overview plus independently rendered eligible-tenancy documents,
+Saldo settlement records, versioned delivery addresses/instructions and correction-only versioning.
+It preserves every `verify-before-production`/`Konvention` label and does not enable renter delivery,
+portal publication, email, bank matching, finAPI or legal-production approval. The existing live
+landlord preview/demo PDF remains outside this renderer.
+
+**Implementation acceptance:** owner-only atomic finalization requires confirmed reconciliation for
+every eligible tenancy (explicit zero accepted); a failure leaves no partial archive. Positive timely
+Saldo creates a receivable, negative creates a credit/refund obligation, zero creates neither, and a
+late positive is only `Rechnerischer Saldo` without an explicit recorded exception. Corrections name
+the latest final version and append `vN+1`; archived snapshots and bytes never change. Zero-day
+tenancies are excluded from tenant documents/settlements and footnoted in the owner archive. Required
+fixtures are `M6B-F02`–`F04`, `F10`, `F14`, `F16`–`F19`, `M6B-IMM`, `M6B-CORR` and `M6B-ISO` in
+`docs/08`.
+
 - Keep finAPI stubbed behind the bank adapter.
 - Match transactions using IBAN, amount and payment purpose.
 - Store transactions and versioned IBAN-to-renter mappings.
-- Add an append-only Payment Ledger with mandatory payment date.
-- Replace `Tenancy.advance_payment_cents` with temporal `AdvancePaymentPeriod` rows and backfill
-  existing tenancies.
-- Add BGH formal minimum #4: deduct actual paid advances and print Saldo/Nachzahlung/Guthaben.
-- Keep previews live and unarchived.
-- Finalization creates one immutable, reproducible snapshot with inputs, results, engine/rule
-  versions, `Rechtsstand`, timestamps, hashes and archived documents.
-- Corrections create `vN+1`; old versions and referenced inputs remain intact.
-- Render one internal landlord overview, one separate document per eligible tenancy and the
-  landlord-only vacancy schedule required by Page 01.
-- A tenancy with zero period-clipped usage days gets no tenant document or portal entry. The landlord
-  overview receives the required footnote.
-- Never generate one all-renters PDF and crop or hide sections.
-- Add background jobs for bank sync, 180-day reconsent cleanup and deadline watchers.
+- Add an append-only Payment Ledger with mandatory payment date and matching evidence.
+- Add background jobs/webhooks for bank sync, 180-day reconsent cleanup and deadline watchers.
+- Deliver/publish renter documents only after the separate M10 portal and legal-production work.
 
-**Done when:** seeded bank transactions match; actual paid advances produce the Saldo; temporal
-advances work; preview creates no archive; finalization is immutable and reproducible; landlord and
-tenant documents are separated; zero-day tenancies are excluded and footnoted.
+**M6-B closed when:** confirmed advances produce frozen Saldo branches; owner-only finalization is
+immutable and reproducible; owner and isolated tenant archives are separately rendered; zero-day
+tenancies are excluded and footnoted. **M6 remains open** until bank matching, temporal contractual
+advances, payment ledger/cash events, matching evidence and delivery/portal work are implemented.
 
 ### Shared guard foundation and UVI implementation slice
 
