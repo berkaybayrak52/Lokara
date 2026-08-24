@@ -1,6 +1,8 @@
 # UVI — monthly consumption information and comparisons
 
-**Status:** complete D2 transcription; approved and merged 21.08.2026; specification only
+**Status:** complete D2 transcription; approved and merged 21.08.2026; UVI
+calculation/readings/document remain specification only; G1's pure W4 evaluator is prepared but
+unmerged
 
 **Rechtsstand:** 07/2026 unless a row below carries its own date. `geprüft` means that the
 primary text was read, not that a lawyer approved the rule. Every `verify-before-production` flag
@@ -27,7 +29,8 @@ not implementation or legal approval. The oracle uses source names instead of in
 
 This document owns the monthly consumption information under § 6a HeizkostenV: monthly reading
 derivation, Blocks A–D2, weather inputs, the tenant document, archive/delivery evidence and the
-labelled fallbacks. `docs/12` W4 owns cadence and guard state. `docs/03` owns the annual heating
+labelled fallbacks. `docs/12` W4 owns cadence and guard state; the prepared G1 evaluator supplies
+that cadence result. `docs/03` owns the annual heating
 money allocation and Page 01b annual comparison. `docs/08` owns the annual statement projection.
 
 The later sources settle these corrections:
@@ -88,7 +91,8 @@ the annual two-year comparison or monthly UVI.
 
 ## 3. Cadence, readings and normalized inputs
 
-W4 from `docs/12` supplies one due occurrence per renter context in a remotely readable building:
+The prepared G1 W4 evaluator from `docs/12` supplies one due occurrence per renter context in a
+remotely readable building:
 month-end due date, in-app/email escalation, `uvi_sent` resolution and the unresolved
 year-round/heating-season legal flag. This document consumes that occurrence; it does not create a
 second scheduler rule.
@@ -446,7 +450,8 @@ are also outside this document.
 
 ## 17. Approval and implementation boundary
 
-This slice is documentation plus data-only fixtures. It changes no production, schema, migration,
-API, engine, adapter, UI or PDF code. Passing oracle tests proves that the sources, arithmetic,
-flags, non-goals and historical dispositions were transcribed. It does not demonstrate a working
-UVI, clear the unresolved monthly DWD authority, or authorize implementation.
+The approved D2 slice was documentation plus data-only fixtures and changed no production, schema,
+migration, API, engine, adapter, UI or PDF code. G1 now prepares only the pure W4 cadence evaluator;
+it adds no UVI reading, calculation, document, scheduling, delivery or portal consumer. Passing
+oracle or G1 tests does not demonstrate a working UVI, clear the unresolved monthly DWD authority,
+or authorize production use.

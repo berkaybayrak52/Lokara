@@ -56,7 +56,11 @@ before UI. Dates are communication events, not planning inputs.
   `92e1318`), followed by M6-C3-0's migration-`0020` invariant repair. **M6-C3a is technically
   complete, development-synchronized and locally merged. C3b's three job entrypoints and C3c's
   landlord Zahlungen screen (`6995bc4`) are technically complete and locally merged, which closes
-  M6-C and with it M6. Nothing was pushed.**
+  M6-C and with it M6. Current `main` and `origin/main` both point to `f372f67`.**
+- **G1 is technically complete and reviewed on the uncommitted, unmerged
+  `slice/g-shared-guard-foundation`.** The pure `packages/guard-engine` executes W1, W2 and W4 for
+  `12-F01`–`12-F06` and `12-F11`–`12-F13`. It adds no database, API, UI, scheduler or PDF consumer.
+  U is next; M9 reminder and delivery integration remains open.
 
 ---
 
@@ -73,11 +77,11 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
-| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. The exact 24-ID data oracle covers date arithmetic, strict arrears thresholds, cent rounding, UVI cadence, rent limits, VPI and vacancy. All 18 Page-specific register rows remain `verify-before-production`; the 5-year/6-year meter conflict is unresolved. No guard implementation exists. |
+| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. G1 executes the nine selected W1/W2/W4 cases (`12-F01`–`F06`, `F11`–`F13`) through the pure guard engine on an uncommitted, unmerged slice. Sixteen of the 18 Page-specific register rows remain `verify-before-production`; rows 128 and 129 were closed by round 4 against § 34 Abs. 2 MessEV and MessEV Anlage 7 and still need matching register entries. W3 and W5–W8 plus all consumers remain open. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's *Zahlungen* screen are technically complete and locally merged. |
-| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. No implementation exists. |
+| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. UVI calculation, readings and document implementation do not exist; G1 prepares only the W4 cadence evaluator. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
 engine contract; it does not create a second competing heating specification.
@@ -140,10 +144,12 @@ Current trace status after merged `docs/09`, `docs/15` and approved `docs/12` tr
 - Page 05 has a complete section/register/non-goal/correspondence trace and an exact data-only
   oracle for `12-F01…F24`. All eighteen Page-specific register rows remain
   `verify-before-production`; the 5-year/6-year meter conflict and every other authority gap remain
-  explicit. Emir approved the transcription on 21.08.2026. This is not guard implementation.
+  explicit. Emir approved the transcription on 21.08.2026. G1 now executes exactly the nine
+  selected W1/W2/W4 cases; the remaining Page-05 guards and every application consumer stay open.
 - UVI/DWD has a complete annex/Page/W4/register/non-goal/correspondence trace and source-named
   data-only oracles for Blocks A–D2, all nine annual DWD PLZ values/import guards and all 18
-  Heizspiegel rows. Emir approved it and the slice was merged on 21.08.2026; it is not implemented. Monthly DWD data and
+  Heizspiegel rows. Emir approved it and the slice was merged on 21.08.2026; UVI calculation,
+  readings and document work are not implemented, while G1 prepares only W4 cadence. Monthly DWD data and
   station-to-PLZ authority remain production-blocking.
 - Pages 03, 04, 06 and 07 have complete approved and merged transcriptions. Page 04 includes the
   exact 16-ID data oracle and final `docs/07` tax/archive reconciliation. Page 06 includes exactly
@@ -265,11 +271,11 @@ not replace the complete documentation or reconciliation gates.
 | C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
 | M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7. |
 | M6 | **Technically complete; locally merged 24.08.2026** | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **C3b's scheduler port and three job entrypoints are locally merged**: no schema change, no endpoint, one consent precondition on every AIS pull. **C3c's Zahlungen screen is technically complete and locally merged**: a client-only owner screen that records one final confirm/reject/duplicate outcome, with no manual assignment and no backend change. That merge closes M6-C and completes M6; delivery and the renter portal remain M10. |
-| G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
+| G | **Technically complete and reviewed 24.08.2026; uncommitted and unmerged** | Shared guard foundation | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration. |
 | U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
 | M7 | After U | Tax export and AfA | Implement approved `docs/09`–`docs/11`. Build computation paths and archives; flagged register values continue to block real output. |
 | M8 | After M7 | Document and letter engine | Implement approved `docs/13` with versioned clauses and risk gates. |
-| M9 | After M8 | Reminders, email and checklists | Complete the guard-driven reminder and delivery system from approved `docs/12`, including UVI scheduling. |
+| M9 | After M8 | Reminders, email and checklists | Extend the existing W1/W2/W4 foundation with the remaining guard projections, reminders, delivery and UVI scheduling from approved `docs/12`. |
 | M10 | After M9 | Portals, investment, billing and native apps | Implement renter activation and portal work, the approved `docs/14` investment cockpit, billing and mobile apps. |
 
 ### Slice A — progress and closure
@@ -323,8 +329,8 @@ The D1–D3 documentation and correspondence-retirement gates precede the A–C 
 reconciliation gate. Do not resume M5 or start later feature work until D1–D3 are approved, A–C are
 spec-closed and the full and demo gates pass. The three earlier Page 01b fixes remain complete only
 for their named scope; they do not count as full Page 01b coverage. UVI implementation is no longer
-blocked by the co2online licence, but it remains blocked until the shared guard foundation and
-Slice A is approved and green. A real § 6a output must still be checked later.
+blocked by the co2online licence. G1 and Slice A are technically green, but G1 remains uncommitted
+and unmerged and the U-specific source gaps remain. A real § 6a output must still be checked later.
 
 Slice A started without Berkay answers and keeps both choices visible: current structural block-(c)
 copy remains provisional, and every 3-percent risk is shown separately without an automatic sum or
@@ -846,24 +852,40 @@ Page-08 weights and thresholds stay `verify-before-production` at `Rechtsstand 0
 180-day AIS consent window still has no register row, and the § 4 stored-reference signal stays
 inert until its source gap is answered.
 
-The demo PDF is byte-stable in length but **not** byte-identical between runs: it embeds
-`/CreationDate` and `/ModDate`, so its MD5 changes on every render while the byte count stays at
-149269. The recorded `88eb8434eda65f8d7ff82826fc837a58` was only ever valid for one render instant
-and no gate ever enforced it. The enforced invariant is `assert_statement_pdf` — 22 goldens present
-and 8 scale-leak canaries absent — plus the byte count.
+The raw demo PDF is not byte-identical between runs: it embeds `/CreationDate` and `/ModDate`, so
+its raw MD5 changes while the byte count stays at 149269. `scripts/pdf_fingerprint.sh` normalizes
+those timestamps and produces the stable fingerprint `88eb8434eda65f8d7ff82826fc837a58`.
+`assert_statement_pdf` separately enforces 22 goldens present and 8 scale-leak canaries absent.
 
-### Shared guard foundation and UVI implementation slice
+### G1 — shared guard foundation
 
-**Approved-spec prerequisite:** `docs/12`, `docs/16` and spec-closed Slice A.
+**Status:** technically complete and statement-reviewed 24.08.2026 on
+`slice/g-shared-guard-foundation`; uncommitted, unmerged and unpushed.
 
-- Implement the shared § 556, Eichfrist and UVI cadence guards needed before M9.
+The pure `packages/guard-engine` implements `evaluate_statement_deadline`,
+`evaluate_meter_calibration` and `evaluate_uvi_cadence` against exactly `12-F01`–`12-F06` and
+`12-F11`–`12-F13`. Inputs carry explicit source identity and `today`; caller-supplied bundles carry
+source, Rechtsstand, verification status and scoped conflicts. W2 executes the unified six-year
+MessEV period from round 4 (`geprüft`, 08/2026); the superseded five-year Warmwasser/WMZ value is
+recorded as not restorable, and only the non-blocking retrofit-transition label remains.
+Missing W1 copy and post-retrofit W4 behavior remain explicit source gaps. No persistence,
+API, UI, scheduler, provider, e-mail, push or PDF consumer was added.
+
+Focused tests, fast and UTF-8 full gates are green. The normalized PDF fingerprint and byte count
+remain `88eb8434eda65f8d7ff82826fc837a58` and 149269 bytes. Statement review has no remaining
+finding. Technical closure does not clear any `verify-before-production` marker.
+
+### U — UVI comparison, calculation and document
+
+**Approved-spec prerequisite:** `docs/16`, spec-closed Slice A and the G1 cadence foundation.
+
 - Implement the specified heating-only comparison with labelled fallbacks and no extrapolation.
 - Add monthly readings, the UVI calculation and the separate tenant document.
 - Keep scheduled delivery in M9 and portal publication in M10.
 
-**Done when:** every `docs/16` calculation fixture passes, the DWD conflicts are resolved, the UVI
-document is tenant-isolated, and the shared due-date guard is executable. If the DWD inputs remain
-unresolved, this slice stays blocked.
+**Done when:** every `docs/16` calculation fixture passes, the DWD conflicts are resolved and the
+UVI document is tenant-isolated. If the DWD inputs remain unresolved, U stays blocked; G1 remains
+technically closed.
 
 ### M7 — Tax export and AfA
 
@@ -896,10 +918,12 @@ affected contract.
 
 ### M9 — Reminders, email and checklists
 
-**Approved-spec prerequisite:** `docs/12`. The bounded shared guard foundation lands before the UVI
-slice; M9 completes reminders, email and checklists without redefining those rules.
+**Approved-spec prerequisite:** `docs/12` and the G1 foundation. M9 extends the existing W1/W2/W4
+engine with remaining guard projections, reminders, email and checklists without redefining those
+rules.
 
-- Shared trigger/state-machine engine for § 556, arrears, move-in/out and UVI.
+- Add the remaining arrears and move-in/out guard projections and compose them with the existing
+  § 556, Eichfrist and UVI cadence evaluators.
 - Stubbed email provider using Lokara's domain and the landlord as the From-name, with an immutable
   delivery-status ledger.
 - Suppress bounced and complained-about addresses.

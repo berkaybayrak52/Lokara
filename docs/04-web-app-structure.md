@@ -39,6 +39,12 @@ lokara/
 The uv workspace contains `apps/api` and every Python package shown above except `ui`. The Bun
 workspace contains exactly `apps/web` and `packages/ui`.
 
+## Prepared but unmerged repository structure
+
+`packages/guard-engine` is an explicit uv member on `slice/g-shared-guard-foundation`. It contains
+pure W1, W2 and W4 evaluators and is absent from `main`. It has no API route, web/runtime consumer,
+database record, scheduler, provider, delivery path or PDF projection.
+
 `apps/mobile`, AfA/export/KPI engines, Redis and workers are absent. Real Supabase, Vision, bank,
 email and MDL providers are also absent; current external edges use local infrastructure or stubs.
 These are **Future**, not empty shipped modules.
@@ -208,7 +214,8 @@ catalogue-backed default-key suggestions remain unimplemented.
 - `apps/mobile` is **Future** at M10: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.
-- Pure AfA/export/KPI packages wait for their approved specs and owning milestones.
+- Pure AfA/export/KPI packages and W3/W5–W8 guard extensions wait for their approved specs and
+  owning milestones.
 - Redis plus Celery or Arq wait for a real rate-limit, retry, sync or scheduled-delivery slice.
 - Real Supabase Auth/Storage/Postgres credentials and real Vision, bank, email and MDL providers wait
   for their integration and hosting/DPA decisions and stay behind adapters.

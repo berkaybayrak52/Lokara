@@ -32,6 +32,14 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - `docs/09-betrkv-catalogue.md` and its data-only oracle are technically implemented through Slice C.
   Its flagged authority still blocks production use.
 
+### Prepared but unmerged
+
+- G1 on `slice/g-shared-guard-foundation` adds the pure `packages/guard-engine` with caller-supplied
+  W1 statement-deadline, W2 meter-calibration and W4 UVI-cadence rules. Exactly
+  `12-F01`–`12-F06` and `12-F11`–`12-F13` execute through production code. The slice is technically
+  complete and reviewed but uncommitted and unmerged; no API, persistence, UI, scheduler or PDF
+  consumer exists yet.
+
 ### Shipped
 
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
@@ -64,8 +72,8 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 
 - Real Supabase Auth/Storage/hosted Postgres, Redis-backed rate limiting or workers, payments,
   production bank/Vision/email/DATEV/Destatis providers and native mobile apps are not wired.
-- Source-backed `docs/10`–`docs/14` and `docs/16`, plus completion of `docs/15`, precede the
-  related implementation. `PLAN.md` owns their sequence.
+- Source-backed `docs/10`–`docs/14` and `docs/16` precede their remaining implementation.
+  `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
 
 ## Runtime topology
 
@@ -93,6 +101,9 @@ backend.
 - `packages/nk-engine` and `packages/heating-engine` depend only on the domain layer. They accept
   normalized inputs and return deterministic results. They do not import FastAPI, SQLAlchemy,
   Postgres, vendor SDKs or the PDF package.
+- `packages/guard-engine` is the prepared G1 decision layer. It depends only on `packages/domain`,
+  accepts explicit source identity, `today` and caller-resolved rule bundles, and never imports the
+  rules store or ambient clock. It stores and delivers nothing; later consumers belong to U and M9.
 - `packages/matching-engine` is the `docs/15` decision layer: signal scoring, the six-step decision
   order, § 366/§ 367 settlement, the Largest-Remainder principal split and reversal. It imports the
   standard library only — not even the domain package — and refuses `float` at its one import

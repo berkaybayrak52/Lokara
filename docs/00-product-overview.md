@@ -37,7 +37,7 @@ Page 01 is binding for residential operating-cost statements:
 The former product claim that periods over 12 months were a differentiator is withdrawn. No product,
 demo or sales copy may advertise that case as supported.
 
-## Intended audience and future scope
+## Intended audience and delivery scope
 
 The account model supports `SOLO` and `HAUSVERWALTUNG`, with roles on Membership rather than Account.
 The shipped demo uses one owner membership and one account. Employee role enforcement and account
@@ -48,8 +48,11 @@ C3b's scheduler port and three job entrypoints are technically complete and loca
 `main`, and so is the C3c landlord *Zahlungen* screen, which completes M6. Renter activation/portal, tax-adviser guest access, tax export, contracts, billing and
 native apps remain future milestones in `PLAN.md`.
 
-Future product breadth includes renter delivery, UVI, Anlage V/DATEV, guards/reminders and
-mobile clients. Those are roadmap dependencies, not shipped capabilities.
+The uncommitted, unmerged G1 slice prepares pure W1 statement-deadline, W2 meter-calibration and
+W4 UVI-cadence evaluators. It has no database, API, UI, scheduler, provider, delivery or PDF
+consumer. Future product breadth still includes renter delivery, UVI readings/calculation/document,
+W3 and W5–W8, M9 reminders and delivery, Anlage V/DATEV and mobile clients. Those are roadmap
+dependencies, not shipped capabilities.
 
 ## Competitive thesis
 

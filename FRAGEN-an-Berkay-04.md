@@ -1,5 +1,9 @@
 # Offene Quellenfragen an Berkay — Runde 4
 
+> **ÜBERHOLT — nicht aktuelle Autorität.** Die aktuelle offene Fragenliste ist
+> [`FRAGEN-an-Berkay-05.md`](FRAGEN-an-Berkay-05.md). Runde 4 bleibt nur als historischer Stand
+> erhalten.
+
 Emir · Stand 21.08.2026 · nach Abschluss des Dokumentationsprogramms D1–D3
 
 Diese Liste enthält nur Entscheidungen oder fehlende Quelldateien, die du liefern kannst. Die

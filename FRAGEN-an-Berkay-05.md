@@ -112,9 +112,9 @@ und muss mit Berkay geklärt werden, bevor sie produktiv gilt. Alle drei bleiben
 
    Lokaras Engine- und Persistenzvertrag folgt derzeit c): das Guthaben wird in
    `payment_ledger_entry.credit_cents` festgeschrieben und mindert keine spätere Forderung von
-   selbst. Der *Zahlungen*-Bildschirm ist noch nicht implementiert; die spätere Anzeige darf diese
-   Zwischenlösung nur sichtbar machen, nicht erweitern. Eine automatische Verrechnung würde
-   Mietergeld ohne Quellregel bewegen.
+   selbst. Der implementierte *Zahlungen*-Bildschirm zeigt dieses festgeschriebene Guthaben nur an;
+   er verrechnet es nicht automatisch mit einer späteren Forderung. Eine automatische Verrechnung
+   würde Mietergeld ohne Quellregel bewegen.
 
 3. **Ablehnung eines Vorschlags und manuelle Zuordnung.** § 4 beschreibt nur die *Bestätigung*
    („Confirmation records the actor and time"). Nicht beschrieben ist, (i) was eine **Ablehnung**
@@ -122,13 +122,13 @@ und muss mit Berkay geklärt werden, bevor sie produktiv gilt. Alle drei bleiben
    `Unmatched`-Buchung **von Hand** einer beliebigen offenen Forderung zuordnen darf. `F05` ist
    genau dieser Fall: zwei Kandidaten mit je 30 Punkten, `Unmatched`, nichts zugewiesen.
 
-   Lokaras Engine- und Persistenzvertrag sieht derzeit vor: eine spätere Ablehnung schreibt
+   Lokaras Engine- und Persistenzvertrag sieht derzeit vor: eine Ablehnung schreibt
    `match_confirmation.outcome` fort und verrechnet **nichts**; die Forderung bleibt unberührt.
-   Matching-Service und *Zahlungen*-Bildschirm sind noch nicht implementiert, daher kann heute
-   niemand dort ablehnen oder manuell zuordnen. Eine frei wählbare Zuordnung wäre ein Tilgungsweg
-   ohne Quelle, also genau die erfundene Konvention, die in M6-C1 aus § 4 entfernt wurde. Für den
-   Vermieter würde das in V1 bedeuten, dass er einen erkannten Zahlungseingang nicht selbst
-   zuordnen kann — bitte sag, ob das so bleiben soll.
+   Matching-Service und *Zahlungen*-Bildschirm implementieren die Ablehnung. Eine frei wählbare
+   manuelle Zuordnung gibt es weiterhin nicht; sie wäre ein Tilgungsweg ohne Quelle, also genau die
+   erfundene Konvention, die in M6-C1 aus § 4 entfernt wurde. Für den Vermieter bedeutet das in V1,
+   dass er einen erkannten Zahlungseingang nicht selbst zuordnen kann — bitte sag, ob das so bleiben
+   soll.
 
 ## Nicht erneut erfragt
 

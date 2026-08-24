@@ -15,12 +15,15 @@ planned or mentioned in the architecture.
 | Workspace | Exact current members |
 | --- | --- |
 | Bun/Turborepo | `apps/web`, `packages/ui` |
-| uv | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/matching-engine`, `packages/adapters`, `packages/db`, `packages/pdf` |
+| uv | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/matching-engine`, `packages/guard-engine`, `packages/adapters`, `packages/db`, `packages/pdf` |
+
+`packages/guard-engine` is **Prepared but unmerged** on
+`slice/g-shared-guard-foundation`; every other member above is present on `main`.
 
 Future members are separate:
 
 - `apps/mobile` is selected for M10 but does not exist and is not a Bun member.
-- No AfA, tax-export, ledger, guard or worker package is a current workspace member. Add a package
+- No AfA, tax-export, ledger or worker package is a current workspace member. Add a package
   only in the slice that defines and verifies its boundary.
 - Redis/Celery/Arq, payment SDKs and real provider SDKs are not installed workspace capabilities.
 
@@ -40,7 +43,8 @@ Future members are separate:
 | Validation | Pydantic at the API boundary; Zod on clients | **Shipped** |
 | PDF | HTML to PDF through Playwright Chromium | **Shipped** |
 | Money | integer cents and `decimal.Decimal`, never float | **Shipped invariant** |
-| Jobs/rate limits | Redis with Celery or Arq when a real worker slice needs it; M6-C3b's jobs run behind a vendor-free scheduler port | **Future** |
+| Callable jobs | M6-C3b's three entrypoints run behind a vendor-free scheduler port | **Shipped on local `main`** |
+| Workers/rate limits | Redis with Celery or Arq when a real worker or rate-limit slice needs it | **Future** |
 | Mobile | Expo / React Native against the same API | **Future M10** |
 | Payments | Stripe for web; RevenueCat for mobile IAP | **Future** |
 | Production hosting | EU/DE target, currently Hetzner | **Selected, not deployed** |
@@ -99,8 +103,8 @@ scheduled job entrypoints — bank sync, reconsent reporting and the deadline wa
 installed; the port answers only which jobs are due, and the caller executes them. The AIS pull now
 has a consent precondition: a missing or expired `bank_account.consent_expires_at` refuses the
 pull. The 180-day PSD2 ceiling behind it is a flagged convention, not a verified legal value —
-`docs/15` §§ 1 and 5.6 carry it. The real provider and the landlord *Zahlungen* screen remain
-unshipped.
+`docs/15` §§ 1 and 5.6 carry it. The C3c landlord *Zahlungen* screen is locally merged; the real
+provider remains unshipped.
 
 ## D6 — Transactional email
 

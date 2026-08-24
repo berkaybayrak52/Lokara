@@ -12,6 +12,7 @@ members = [
     "lokara-api",
     "lokara-db",
     "lokara-domain",
+    "lokara-guard-engine",
     "lokara-heating-engine",
     "lokara-matching-engine",
     "lokara-nk-engine",
@@ -26,6 +27,7 @@ dev = [
     { name = "lokara-api", editable = "apps/api" },
     { name = "lokara-db", editable = "packages/db" },
     { name = "lokara-domain", editable = "packages/domain" },
+    { name = "lokara-guard-engine", editable = "packages/guard-engine" },
     { name = "lokara-heating-engine", editable = "packages/heating-engine" },
     { name = "lokara-matching-engine", editable = "packages/matching-engine" },
     { name = "lokara-nk-engine", editable = "packages/nk-engine" },
@@ -419,6 +421,17 @@ requires-dist = [
 name = "lokara-domain"
 version = "0.1.0"
 source = { editable = "packages/domain" }
+
+[[package]]
+name = "lokara-guard-engine"
+version = "0.1.0"
+source = { editable = "packages/guard-engine" }
+dependencies = [
+    { name = "lokara-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lokara-domain", editable = "packages/domain" }]
 
 [[package]]
 name = "lokara-heating-engine"

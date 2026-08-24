@@ -137,7 +137,9 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
    M0–M5 and M6-A/M6-B/M6-C1/M6-C2/M6-C3-0/M6-C3a are built and green on local `main`. C3a is
    technically complete, development-synchronized and locally merged. C3b's scheduler port and
    three job entrypoints and the C3c *Zahlungen* screen are technically complete and
-   locally merged, which completes M6. Nothing is pushed.
+   locally merged, which completes M6. G1's pure W1/W2/W4 guard foundation is technically complete
+   and reviewed on the uncommitted, unmerged `slice/g-shared-guard-foundation`; U is next. Current
+   `main` and `origin/main` both point to `f372f67`; G1 itself is not pushed.
    Work follows PLAN's **execution order** — ranked by *what closes the legally-required surface
    first* — rather than the milestone numbering. **It carries no deadline on purpose:** dates in
    `lokara-arch.md` are communication events (when something gets shown), never planning inputs,
@@ -164,7 +166,8 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
      readiness and immutable export-archive contract, with all 16 source-backed fixtures transcribed;
      all line, account and format placeholders remain blocked.
    - `12-guards-deadlines.md` — Page 05's shared guard contract for deadlines, arrears, UVI,
-     rent adjustments and vacancy, with all 24 source-backed fixtures transcribed.
+     rent adjustments and vacancy, with all 24 source-backed fixtures transcribed; G1 executes the
+     nine selected W1/W2/W4 cases on its reviewed, unmerged slice.
    - `13-contract-clauses.md` — Page 06's clause-selection, compatibility, warning and workflow-
      routing contract, with all 19 source-backed fixtures transcribed; complete clause and action-
      letter bodies remain missing and block implementation.

@@ -7,6 +7,7 @@ members = [
   "packages/domain",
   "packages/nk-engine",
   "packages/heating-engine",
+  "packages/guard-engine",
   "packages/matching-engine",
   "packages/rules-store",
   "packages/adapters",
@@ -25,6 +26,7 @@ dev = [
   "lokara-domain",
   "lokara-nk-engine",
   "lokara-heating-engine",
+  "lokara-guard-engine",
   "lokara-matching-engine",
   "lokara-rules-store",
   "lokara-adapters",
@@ -38,6 +40,7 @@ lokara-api = { workspace = true }
 lokara-domain = { workspace = true }
 lokara-nk-engine = { workspace = true }
 lokara-heating-engine = { workspace = true }
+lokara-guard-engine = { workspace = true }
 lokara-matching-engine = { workspace = true }
 lokara-rules-store = { workspace = true }
 lokara-adapters = { workspace = true }
@@ -71,6 +74,8 @@ files = [
   "packages/nk-engine/tests",
   "packages/heating-engine/src",
   "packages/heating-engine/tests",
+  "packages/guard-engine/src",
+  "packages/guard-engine/tests",
   "packages/matching-engine/src",
   "packages/matching-engine/tests",
   "packages/rules-store/src",
@@ -90,6 +95,7 @@ testpaths = [
   "packages/domain/tests",
   "packages/nk-engine/tests",
   "packages/heating-engine/tests",
+  "packages/guard-engine/tests",
   "packages/matching-engine/tests",
   "packages/rules-store/tests",
   "packages/adapters/tests",
