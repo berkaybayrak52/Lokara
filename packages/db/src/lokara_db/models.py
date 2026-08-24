@@ -1327,6 +1327,7 @@ class Meter(Base):
         _scoped_fk("meter", "building_id", "building"),
         _scoped_fk("meter", "unit_id", "unit"),
         _scoped_pair("meter"),
+        UniqueConstraint("id", "account_id", "building_id", name="uq_meter_id_account_building"),
         UniqueConstraint("building_id", "serial"),
         CheckConstraint(
             "(kind = 'HEAT' AND valuation_factor_x1000 IS NOT NULL "
@@ -1382,6 +1383,7 @@ class MeterReading(Base):
         _scoped_fk("meter_reading", "meter_id", "meter"),
         _scoped_fk("meter_reading", "tenancy_id", "tenancy"),
         _scoped_pair("meter_reading"),
+        UniqueConstraint("id", "account_id", "meter_id", name="uq_meter_reading_id_account_meter"),
         CheckConstraint(
             "(estimated_consumption_x1000 IS NULL AND estimation_basis IS NULL) OR "
             "(estimated_consumption_x1000 IS NOT NULL AND estimated_consumption_x1000 >= 0 "
@@ -1499,6 +1501,13 @@ class UviStationAssignment(Base):
             "month",
             name="uq_uvi_station_assignment_postal_month",
         ),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "station_id",
+            "month",
+            name="uq_uvi_station_assignment_exact_month",
+        ),
         CheckConstraint("postal_code ~ '^[0-9]{5}$'", name="ck_uvi_station_assignment_postal_code"),
         CheckConstraint(
             "EXTRACT(DAY FROM month) = 1", name="ck_uvi_station_assignment_month_start"
@@ -1506,6 +1515,364 @@ class UviStationAssignment(Base):
         CheckConstraint("distance_km >= 0", name="ck_uvi_station_assignment_distance_km"),
         Index("ix_uvi_station_assignment_account", "account_id"),
         Index("ix_uvi_station_assignment_lookup", "account_id", "postal_code", "month"),
+    )
+
+
+class UviMonthlyDegreeDay(Base):
+    """Immutable normalized monthly DWD value bound to its station assignment."""
+
+    __tablename__ = "uvi_monthly_degree_day"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    station_assignment_id: Mapped[str]
+    station_id: Mapped[str]
+    month: Mapped[date]
+    monthly_degree_days: Mapped[Decimal] = mapped_column(Numeric(10, 3))
+    valid_day_count: Mapped[int]
+    source_file: Mapped[str]
+    source_id: Mapped[str]
+    provenance: Mapped[dict[str, object]] = mapped_column(JSONB)
+    rechtsstand: Mapped[str]
+    verification_status: Mapped[str]
+    monthly_annual_share: Mapped[Decimal | None] = mapped_column(Numeric(8, 7))
+    supersedes_degree_day_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["station_assignment_id", "account_id", "station_id", "month"],
+            [
+                "uvi_station_assignment.id",
+                "uvi_station_assignment.account_id",
+                "uvi_station_assignment.station_id",
+                "uvi_station_assignment.month",
+            ],
+            name="uvi_monthly_degree_day_station_assignment_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            [
+                "supersedes_degree_day_id",
+                "account_id",
+                "station_assignment_id",
+                "station_id",
+                "month",
+            ],
+            [
+                "uvi_monthly_degree_day.id",
+                "uvi_monthly_degree_day.account_id",
+                "uvi_monthly_degree_day.station_assignment_id",
+                "uvi_monthly_degree_day.station_id",
+                "uvi_monthly_degree_day.month",
+            ],
+            name="uvi_monthly_degree_day_supersedes_degree_day_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("uvi_monthly_degree_day"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "station_assignment_id",
+            "station_id",
+            "month",
+            name="uq_uvi_monthly_degree_day_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "station_assignment_id",
+            "source_id",
+            name="uq_uvi_monthly_degree_day_source",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_degree_day_id",
+            name="uq_uvi_monthly_degree_day_direct_successor",
+        ),
+        CheckConstraint(
+            "EXTRACT(DAY FROM month) = 1", name="ck_uvi_monthly_degree_day_month_start"
+        ),
+        CheckConstraint(
+            "monthly_degree_days NOT IN ('NaN'::numeric, 'Infinity'::numeric, "
+            "'-Infinity'::numeric) AND monthly_degree_days >= 0",
+            name="ck_uvi_monthly_degree_day_finite_non_negative",
+        ),
+        CheckConstraint(
+            "valid_day_count >= 25 AND valid_day_count <= 31",
+            name="ck_uvi_monthly_degree_day_valid_days",
+        ),
+        CheckConstraint(
+            "monthly_annual_share IS NULL OR (monthly_annual_share NOT IN "
+            "('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) AND "
+            "monthly_annual_share > 0 AND monthly_annual_share <= 1)",
+            name="ck_uvi_monthly_degree_day_annual_share",
+        ),
+        CheckConstraint(
+            "btrim(source_file, E' \\t\\n\\r') <> '' AND "
+            "btrim(source_id, E' \\t\\n\\r') <> '' AND "
+            "btrim(rechtsstand, E' \\t\\n\\r') <> '' AND "
+            "btrim(verification_status, E' \\t\\n\\r') <> ''",
+            name="ck_uvi_monthly_degree_day_source_metadata",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(provenance) = 'object' AND provenance <> '{}'::jsonb",
+            name="ck_uvi_monthly_degree_day_provenance",
+        ),
+        CheckConstraint(
+            "id <> supersedes_degree_day_id",
+            name="ck_uvi_monthly_degree_day_not_self_superseding",
+        ),
+        Index("ix_uvi_monthly_degree_day_account", "account_id"),
+        Index("ix_uvi_monthly_degree_day_lookup", "account_id", "station_id", "month"),
+        Index(
+            "uq_uvi_monthly_degree_day_root",
+            "account_id",
+            "station_assignment_id",
+            "station_id",
+            "month",
+            unique=True,
+            postgresql_where=text("supersedes_degree_day_id IS NULL"),
+        ),
+    )
+
+
+class BuildingUviConfiguration(Base):
+    """Immutable effective-dated building inputs for monthly UVI generation."""
+
+    __tablename__ = "building_uvi_configuration"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    energy_source: Mapped[str]
+    energy_reference: Mapped[str]
+    explicit_hkv_allocator: Mapped[bool]
+    calorific_factor: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    valid_from: Mapped[date]
+    valid_to: Mapped[date | None]
+    source_type: Mapped[str]
+    source_id: Mapped[str]
+    rechtsstand: Mapped[str]
+    verification_status: Mapped[str]
+    supersedes_configuration_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("building_uvi_configuration", "building_id", "building"),
+        _scoped_pair("building_uvi_configuration"),
+        ForeignKeyConstraint(
+            ["supersedes_configuration_id", "account_id", "building_id"],
+            [
+                "building_uvi_configuration.id",
+                "building_uvi_configuration.account_id",
+                "building_uvi_configuration.building_id",
+            ],
+            name="building_uvi_configuration_supersedes_configuration_id_fkey",
+            match="SIMPLE",
+        ),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            name="uq_building_uvi_configuration_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_configuration_id",
+            name="uq_building_uvi_configuration_direct_successor",
+        ),
+        CheckConstraint(
+            "energy_source IN ('Erdgas', 'Heizoel', 'Fernwaerme', 'Waermepumpe', 'Holzpellets')",
+            name="ck_building_uvi_configuration_energy_source",
+        ),
+        CheckConstraint(
+            "energy_reference IN ('HO', 'HU')",
+            name="ck_building_uvi_configuration_energy_reference",
+        ),
+        CheckConstraint(
+            "calorific_factor IS NULL OR (calorific_factor NOT IN "
+            "('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) AND "
+            "calorific_factor > 0)",
+            name="ck_building_uvi_configuration_calorific_factor",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_building_uvi_configuration_period_ordered",
+        ),
+        CheckConstraint(
+            "btrim(source_type, E' \\t\\n\\r') <> '' AND "
+            "btrim(source_id, E' \\t\\n\\r') <> '' AND "
+            "btrim(rechtsstand, E' \\t\\n\\r') <> '' AND "
+            "btrim(verification_status, E' \\t\\n\\r') <> ''",
+            name="ck_building_uvi_configuration_source_metadata",
+        ),
+        CheckConstraint(
+            "id <> supersedes_configuration_id",
+            name="ck_building_uvi_configuration_not_self_superseding",
+        ),
+        Index("ix_building_uvi_configuration_account", "account_id"),
+        Index("ix_building_uvi_configuration_lookup", "account_id", "building_id", "valid_from"),
+        Index(
+            "uq_building_uvi_configuration_root",
+            "account_id",
+            "building_id",
+            unique=True,
+            postgresql_where=text("supersedes_configuration_id IS NULL"),
+        ),
+    )
+
+
+class UviBuildingMonthlyEvidence(Base):
+    """Immutable building-side heat/HKV evidence for one calendar month."""
+
+    __tablename__ = "uvi_building_monthly_evidence"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    main_meter_id: Mapped[str]
+    month: Mapped[date]
+    measured_building_heat_kwh_x1000: Mapped[int | None] = mapped_column(BigInteger)
+    building_hkv_movement_x1000: Mapped[int | None] = mapped_column(BigInteger)
+    source_type: Mapped[str]
+    source_id: Mapped[str]
+    raw_evidence: Mapped[dict[str, object]] = mapped_column(JSONB)
+    supersedes_evidence_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("uvi_building_monthly_evidence", "building_id", "building"),
+        ForeignKeyConstraint(
+            ["main_meter_id", "account_id", "building_id"],
+            ["meter.id", "meter.account_id", "meter.building_id"],
+            name="uvi_building_monthly_evidence_main_meter_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            [
+                "supersedes_evidence_id",
+                "account_id",
+                "building_id",
+                "month",
+            ],
+            [
+                "uvi_building_monthly_evidence.id",
+                "uvi_building_monthly_evidence.account_id",
+                "uvi_building_monthly_evidence.building_id",
+                "uvi_building_monthly_evidence.month",
+            ],
+            name="uvi_building_monthly_evidence_supersedes_evidence_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("uvi_building_monthly_evidence"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            "month",
+            name="uq_uvi_building_monthly_evidence_correction_context",
+        ),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "main_meter_id",
+            name="uq_uvi_building_monthly_evidence_source_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_evidence_id",
+            name="uq_uvi_building_monthly_evidence_direct_successor",
+        ),
+        CheckConstraint(
+            "EXTRACT(DAY FROM month) = 1",
+            name="ck_uvi_building_monthly_evidence_month_start",
+        ),
+        CheckConstraint(
+            "measured_building_heat_kwh_x1000 IS NOT NULL OR "
+            "building_hkv_movement_x1000 IS NOT NULL",
+            name="ck_uvi_building_monthly_evidence_has_measurement",
+        ),
+        CheckConstraint(
+            "measured_building_heat_kwh_x1000 IS NULL OR measured_building_heat_kwh_x1000 >= 0",
+            name="ck_uvi_building_monthly_evidence_heat_non_negative",
+        ),
+        CheckConstraint(
+            "building_hkv_movement_x1000 IS NULL OR building_hkv_movement_x1000 >= 0",
+            name="ck_uvi_building_monthly_evidence_hkv_non_negative",
+        ),
+        CheckConstraint(
+            "btrim(source_type, E' \\t\\n\\r') <> '' AND btrim(source_id, E' \\t\\n\\r') <> ''",
+            name="ck_uvi_building_monthly_evidence_source_identity",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(raw_evidence) = 'object' AND raw_evidence <> '{}'::jsonb",
+            name="ck_uvi_building_monthly_evidence_raw_evidence",
+        ),
+        CheckConstraint(
+            "id <> supersedes_evidence_id",
+            name="ck_uvi_building_monthly_evidence_not_self_superseding",
+        ),
+        Index("ix_uvi_building_monthly_evidence_account", "account_id"),
+        Index(
+            "ix_uvi_building_monthly_evidence_lookup",
+            "account_id",
+            "building_id",
+            "month",
+        ),
+        Index(
+            "uq_uvi_building_monthly_evidence_root",
+            "account_id",
+            "building_id",
+            "month",
+            unique=True,
+            postgresql_where=text("supersedes_evidence_id IS NULL"),
+        ),
+    )
+
+
+class UviBuildingMonthlyEvidenceSource(Base):
+    """Immutable link from building-month evidence to a raw main-meter reading."""
+
+    __tablename__ = "uvi_building_monthly_evidence_source"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_monthly_evidence_id: Mapped[str]
+    main_meter_id: Mapped[str]
+    meter_reading_id: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["building_monthly_evidence_id", "account_id", "main_meter_id"],
+            [
+                "uvi_building_monthly_evidence.id",
+                "uvi_building_monthly_evidence.account_id",
+                "uvi_building_monthly_evidence.main_meter_id",
+            ],
+            name="uvi_bme_source_evidence_fkey",
+            match="SIMPLE",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["meter_reading_id", "account_id", "main_meter_id"],
+            ["meter_reading.id", "meter_reading.account_id", "meter_reading.meter_id"],
+            name="uvi_bme_source_meter_reading_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("uvi_building_monthly_evidence_source"),
+        UniqueConstraint(
+            "account_id",
+            "building_monthly_evidence_id",
+            "meter_reading_id",
+            name="uq_uvi_building_monthly_evidence_source_identity",
+        ),
+        Index("ix_uvi_building_monthly_evidence_source_account", "account_id"),
+        Index(
+            "ix_uvi_building_monthly_evidence_source_evidence",
+            "building_monthly_evidence_id",
+        ),
     )
 
 
@@ -1560,12 +1927,12 @@ class UviRun(Base):
     month: Mapped[date]
     inputs: Mapped[dict[str, object]] = mapped_column(JSONB)
     results: Mapped[dict[str, object]] = mapped_column(JSONB)
-    heizspiegel_vintage: Mapped[str]
+    heizspiegel_vintage: Mapped[str | None]
     source_type: Mapped[str]
     source_id: Mapped[str]
-    station_assignment_id: Mapped[str]
-    station_id: Mapped[str]
-    station_distance_km: Mapped[Decimal] = mapped_column(Numeric(9, 3))
+    station_assignment_id: Mapped[str | None]
+    station_id: Mapped[str | None]
+    station_distance_km: Mapped[Decimal | None] = mapped_column(Numeric(9, 3))
     sha256: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -1586,8 +1953,15 @@ class UviRun(Base):
             name="ck_uvi_run_results_nonempty_object",
         ),
         CheckConstraint(
-            "btrim(heizspiegel_vintage, E' \\t\\n\\r') <> ''",
+            "heizspiegel_vintage IS NULL OR btrim(heizspiegel_vintage, E' \\t\\n\\r') <> ''",
             name="ck_uvi_run_heizspiegel_vintage_nonblank",
+        ),
+        CheckConstraint(
+            "((station_assignment_id IS NULL AND station_id IS NULL "
+            "AND station_distance_km IS NULL) OR "
+            "(station_assignment_id IS NOT NULL AND station_id IS NOT NULL "
+            "AND station_distance_km IS NOT NULL))",
+            name="uvi_run_station_snapshot_all_or_none",
         ),
         CheckConstraint(
             "btrim(source_type, E' \\t\\n\\r') <> ''",
@@ -2172,6 +2546,10 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "monthly_meter_reading",
     "monthly_meter_reading_source",
     "uvi_station_assignment",
+    "uvi_monthly_degree_day",
+    "building_uvi_configuration",
+    "uvi_building_monthly_evidence",
+    "uvi_building_monthly_evidence_source",
     "dwd_climate_factor",
     "uvi_run",
     "uvi_delivery_event",

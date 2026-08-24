@@ -26,6 +26,7 @@ from .models import (
     InterpolatedBoundary,
     LinearInterpolationInput,
     LinearInterpolationResult,
+    NormalizedBlockAInput,
     UviRuleBundle,
 )
 
@@ -118,6 +119,122 @@ def evaluate_block_a(input_: BlockAInput, rules: UviRuleBundle) -> BlockAResult:
         measurement_unit=input_.measurement_unit,
         energy_reference=input_.energy_reference,
         label_de=None,
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
+    )
+
+
+def evaluate_normalized_block_a(
+    input_: NormalizedBlockAInput, rules: UviRuleBundle
+) -> BlockAResult:
+    """Derive monthly heat from an already-normalized persisted movement."""
+
+    movement_x1000 = input_.monthly_movement_x1000
+    if isinstance(movement_x1000, bool) or movement_x1000 < 0:
+        raise ValueError("monthly_movement_x1000 must be an integer >= 0")
+    movement = Decimal(movement_x1000) / _THOUSAND
+
+    if input_.measurement_unit is MeasurementUnit.KWH:
+        heat = movement
+    elif input_.measurement_unit is MeasurementUnit.CUBIC_METRE:
+        factor = input_.calorific_factor_kwh_per_unit
+        if factor is None:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="missing_calorific_factor",
+            )
+        _require_finite_nonnegative(factor, "calorific_factor_kwh_per_unit")
+        if factor == 0:
+            raise ValueError("calorific_factor_kwh_per_unit must be > 0")
+        heat = movement * factor
+    else:
+        if not input_.explicit_hkv_allocator:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="missing_explicit_hkv_allocator_marker",
+            )
+        building_heat_x1000 = input_.measured_building_heat_kwh_x1000
+        if building_heat_x1000 is None:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="missing_measured_building_heat_total",
+            )
+        if isinstance(building_heat_x1000, bool):
+            raise ValueError("measured_building_heat_kwh_x1000 must be an integer")
+        if building_heat_x1000 <= 0:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="nonpositive_measured_building_heat_total",
+            )
+        building_movement_x1000 = input_.building_hkv_movement_x1000
+        if building_movement_x1000 is None:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="missing_building_hkv_movement",
+            )
+        if isinstance(building_movement_x1000, bool):
+            raise ValueError("building_hkv_movement_x1000 must be an integer")
+        if building_movement_x1000 <= 0:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="nonpositive_building_hkv_movement",
+            )
+        heat = (
+            Decimal(building_heat_x1000)
+            * Decimal(movement_x1000)
+            / Decimal(building_movement_x1000)
+            / _THOUSAND
+        )
+
+    return BlockAResult(
+        status="ready",
+        movement_kwh=heat,
+        heat_kwh=_whole_kwh(heat),
+        measurement_unit=input_.measurement_unit,
+        energy_reference=input_.energy_reference,
+        label_de=_HKV_LABEL if input_.measurement_unit is MeasurementUnit.HKV_UNITS else None,
         rule_evidence=rules.evidence,
         unresolved_conflicts=rules.unresolved_conflicts,
     )

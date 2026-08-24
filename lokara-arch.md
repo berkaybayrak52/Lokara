@@ -38,10 +38,14 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   meter-calibration and W4 UVI-cadence rules. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13`
   execute through production code. No API, persistence, UI, scheduler or PDF consumer exists yet.
 
-- U1 (`d02c838`) adds the pure `packages/uvi-engine`. `docs/16` Blocks A, B, C with its raw
-  fallback, D, D2, the HKV provisional path and linear mid-month interpolation execute against the
-  nine `UVI_EXAMPLES` cases. Its statement review found no wording defect and one structural gap:
-  the engine has no provenance channel, which U1b closes before U2.
+- U1 adds the pure `packages/uvi-engine`; U1b adds its explicit provenance channel and U5 carries
+  the resolved evidence into the immutable run/archive, closing the former provenance gap.
+  U2 supplies versioned Heizspiegel inputs. U3 supplies annual and monthly DWD normalization
+  adapters. U4/U4b persist monthly readings and their raw links, station/month weather evidence,
+  effective-dated building configuration, building-month evidence and immutable run/delivery rows.
+  U5 composes those boundaries into owner-authorized generation, an immutable archive and a
+  separate German renter document downloadable by the owner. It does not schedule or email
+  delivery (M9) or publish to the renter portal (M10).
 
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
 - Page 08 bank matching is implemented. `packages/matching-engine` runs all thirteen
@@ -73,12 +77,11 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 
 - Real Supabase Auth/Storage/hosted Postgres, Redis-backed rate limiting or workers, payments,
   production bank/Vision/email/DATEV/Destatis providers and native mobile apps are not wired.
-- Source-backed `docs/10`–`docs/14` and `docs/16` precede their remaining implementation.
-  `docs/16` is transcription-complete after U0 (`738e048`): the monthly `hdd_3807` dataset, the
-  persisted station-to-PLZ convention, the display-rounding rule and the K13 vintage maintenance are
-  specified. U1 (`d02c838`) adds the pure engine; no importer, schema or document exists, and
-  production Blocks C/D2 stay blocked by the unchosen PLZ geodataset and three missing register
-  rows.
+- Source-backed `docs/10`–`docs/14` precede their remaining implementation. `docs/16` is
+  technically implemented through U5 as described above. Production clearance remains blocked by
+  the unchosen PLZ geodataset, three missing UVI register rows, the exact monthly § 6a content list,
+  unresolved legal/convention checks and the other `verify-before-production` items recorded
+  there. M9 delivery and M10 renter publication remain future work.
   `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
 
 ## Runtime topology
@@ -120,16 +123,18 @@ backend.
   boundary. It stores nothing; `packages/db` holds what it read and what it decided.
 - `packages/rules-store` resolves dated legal and convention values. Engines receive resolved
   values; they do not reach into the store.
-- `packages/adapters` normalizes bank, meter/MDL, Vision, email, Destatis and DATEV edges. Only an
-  adapter may know a provider format.
+- `packages/adapters` normalizes bank, meter/MDL, annual and monthly DWD, Vision, email, Destatis
+  and DATEV edges. Only an adapter may know a provider format.
 - `packages/db` owns SQLAlchemy models, Alembic migrations, sessions, RLS-supporting persistence
-  and seed data. Domain and engine packages do not depend on it.
-- `apps/api` composes authorization, persistence, engines, rules, adapters and rendering. Pydantic
-  validates the backend boundary.
+  and seed data, including U4/U4b monthly UVI evidence and archive rows. Domain and engine packages
+  do not depend on it.
+- `apps/api` composes authorization, persistence, engines, rules, adapters and rendering. U5 owns
+  the authorized UVI generation/archive and owner download boundary. Pydantic validates the
+  backend boundary.
 - `apps/web` and `packages/ui` own client interaction and presentation. Zod mirrors wire
   validation for user experience; it never replaces backend validation.
-- `packages/pdf` projects frozen calculation results into documents. It may format and paginate;
-  it does not recalculate legal or money rules.
+- `packages/pdf` projects frozen calculation results into documents, including the separate U5
+  renter artifact. It may format and paginate; it does not recalculate legal or money rules.
 
 `scripts/check_engine_purity.py` protects the engine boundary. The RLS and composite-FK checks
 protect the current persistence boundary. The shipped pre-context checker protects the one bounded
@@ -151,8 +156,9 @@ identity read; `AGENTS.md` owns the complete gate contract.
   Postgres RLS is the backstop. Nested-resource authorization remains Specified M5 work.
 - Login is the only permitted pre-account lookup. The shipped bounded
   `app_bootstrap_contexts(text)` read does not authorize another pre-context reader.
-- Tenant-document isolation is shipped for M6-B owner-only archives: select one account-valid tenancy
-  before rendering and expose no other renter's visible or hidden data. It is not renter portal output.
+- Tenant-document isolation is shipped for M6-B owner-only archives and the U5 owner-generated UVI
+  artifact: select one account-valid tenancy before rendering and expose no other renter's visible
+  or hidden data. Neither boundary is renter portal output or delivery.
 
 ## Financial and lifecycle time axes
 

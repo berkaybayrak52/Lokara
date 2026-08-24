@@ -53,6 +53,19 @@ class BlockAResult:
 
 
 @dataclass(frozen=True, slots=True)
+class NormalizedBlockAInput:
+    """A persisted calendar-month movement, without fabricated meter endpoints."""
+
+    monthly_movement_x1000: int
+    measurement_unit: MeasurementUnit
+    energy_reference: EnergyReference
+    calorific_factor_kwh_per_unit: Decimal | None = None
+    explicit_hkv_allocator: bool = False
+    measured_building_heat_kwh_x1000: int | None = None
+    building_hkv_movement_x1000: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BlockBInput:
     current_heat_kwh: int
     previous_month_heat_kwh: int | None

@@ -453,6 +453,279 @@ class TestCrossAccountIsolation:
             session.flush()
 
 
+class TestU4AndU4bCrossAccountReads:
+    """Non-vacuous app-role reads cover every UVI persistence table."""
+
+    def test_every_u4_and_u4b_table_hides_account_a_rows_from_b(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """U4/U4b-RLS-READ: A sees each seeded row and B sees none, all rolled back."""
+        owner, _ = engines
+        ids = {
+            name: new_id()
+            for name in (
+                "unit_meter",
+                "unit_raw",
+                "monthly",
+                "monthly_source",
+                "assignment",
+                "climate",
+                "degree",
+                "configuration",
+                "evidence",
+                "evidence_source",
+                "run",
+                "event",
+            )
+        }
+
+        class _RollbackProbe(Exception):
+            pass
+
+        with (
+            pytest.raises(_RollbackProbe),
+            owner.connect() as connection,
+            connection.begin(),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO meter"
+                    " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
+                    " calibration_valid_until, valuation_factor_x1000) VALUES"
+                    " (:id, :account, :building, :unit, 'HEAT', 'KWH', :serial,"
+                    " '2029-12-31', 1000)"
+                ),
+                {
+                    "id": ids["unit_meter"],
+                    "account": seed.account_a,
+                    "building": seed.building_a,
+                    "unit": seed.unit_a,
+                    "serial": f"U4-RLS-{ids['unit_meter']}",
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO meter_reading"
+                    " (id, account_id, meter_id, read_at, value_x1000, reason, source)"
+                    " VALUES (:id, :account, :meter, '2026-07-01', 100000,"
+                    " 'PERIODIC', 'MANUAL')"
+                ),
+                {"id": ids["unit_raw"], "account": seed.account_a, "meter": ids["unit_meter"]},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO monthly_meter_reading"
+                    " (id, account_id, meter_id, tenancy_id, unit_id, month,"
+                    " consumption_x1000, reason, source, interpolation_method,"
+                    " supersedes_reading_id) VALUES"
+                    " (:id, :account, :meter, :tenancy, :unit, '2026-07-01', 100000,"
+                    " 'PERIODIC', 'MANUAL', 'rls-read-control', NULL)"
+                ),
+                {
+                    "id": ids["monthly"],
+                    "account": seed.account_a,
+                    "meter": ids["unit_meter"],
+                    "tenancy": seed.tenancy_a,
+                    "unit": seed.unit_a,
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO monthly_meter_reading_source"
+                    " (id, account_id, monthly_meter_reading_id, meter_reading_id)"
+                    " VALUES (:id, :account, :monthly, :raw)"
+                ),
+                {
+                    "id": ids["monthly_source"],
+                    "account": seed.account_a,
+                    "monthly": ids["monthly"],
+                    "raw": ids["unit_raw"],
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO uvi_station_assignment"
+                    " (id, account_id, postal_code, month, station_id, distance_km,"
+                    " source_type, source_id) VALUES"
+                    " (:id, :account, '10115', '2026-07-01', '00433', 12.345,"
+                    " 'DWD_MONTHLY', :source_id)"
+                ),
+                {
+                    "id": ids["assignment"],
+                    "account": seed.account_a,
+                    "source_id": f"RLS-assignment-{ids['assignment']}",
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO dwd_climate_factor"
+                    " (id, account_id, postal_code, period_from, period_to, factor,"
+                    " source_type, source_id, published_at) VALUES"
+                    " (:id, :account, '10115', '2026-01-01', '2026-12-31', 1.14,"
+                    " 'DWD_CLIMATE_FACTOR', :source_id, '2026-08-01T00:00:00+00:00')"
+                ),
+                {
+                    "id": ids["climate"],
+                    "account": seed.account_a,
+                    "source_id": f"RLS-climate-{ids['climate']}",
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO uvi_monthly_degree_day"
+                    " (id, account_id, station_assignment_id, station_id, month,"
+                    " monthly_degree_days, valid_day_count, source_file, source_id, provenance,"
+                    " rechtsstand, verification_status, monthly_annual_share,"
+                    " supersedes_degree_day_id) VALUES"
+                    " (:id, :account, :assignment, '00433', '2026-07-01', 590, 31,"
+                    " 'rls-degree.csv', :source_id, '{\"source\":\"DWD\"}'::jsonb,"
+                    " '08/2026', 'verify-before-production', 0.19, NULL)"
+                ),
+                {
+                    "id": ids["degree"],
+                    "account": seed.account_a,
+                    "assignment": ids["assignment"],
+                    "source_id": f"RLS-degree-{ids['degree']}",
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO building_uvi_configuration"
+                    " (id, account_id, building_id, energy_source, energy_reference,"
+                    " explicit_hkv_allocator, calorific_factor, valid_from, valid_to, source_type,"
+                    " source_id,"
+                    " rechtsstand, verification_status, supersedes_configuration_id) VALUES"
+                    " (:id, :account, :building, 'Erdgas', 'HO', false, NULL, '2026-01-01',"
+                    " NULL, 'UVI_CONFIGURATION', :source_id, '08/2026',"
+                    " 'verify-before-production', NULL)"
+                ),
+                {
+                    "id": ids["configuration"],
+                    "account": seed.account_a,
+                    "building": seed.building_a,
+                    "source_id": f"RLS-config-{ids['configuration']}",
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO uvi_building_monthly_evidence"
+                    " (id, account_id, building_id, main_meter_id, month,"
+                    " measured_building_heat_kwh_x1000, building_hkv_movement_x1000, source_type,"
+                    " source_id,"
+                    " raw_evidence, supersedes_evidence_id) VALUES"
+                    " (:id, :account, :building, :meter, '2026-07-01', 100000, NULL,"
+                    " 'UVI_BUILDING_EVIDENCE', :source_id, CAST(:raw_evidence AS jsonb), NULL)"
+                ),
+                {
+                    "id": ids["evidence"],
+                    "account": seed.account_a,
+                    "building": seed.building_a,
+                    "meter": seed.meter_a,
+                    "source_id": f"RLS-building-{ids['evidence']}",
+                    "raw_evidence": f'{{"reading_ids":["{seed.reading_a}"]}}',
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO uvi_building_monthly_evidence_source"
+                    " (id, account_id, building_monthly_evidence_id, main_meter_id,"
+                    " meter_reading_id) VALUES (:id, :account, :evidence, :meter, :reading)"
+                ),
+                {
+                    "id": ids["evidence_source"],
+                    "account": seed.account_a,
+                    "evidence": ids["evidence"],
+                    "meter": seed.meter_a,
+                    "reading": seed.reading_a,
+                },
+            )
+            hash_params = {
+                "tenancy": seed.tenancy_a,
+                "unit": seed.unit_a,
+                "month": date(2026, 7, 1),
+                "inputs": '{"reading":"rls-control"}',
+                "results": '{"block_d":"ready"}',
+                "vintage": "2025",
+                "source_type": "DWD_MONTHLY",
+                "source_id": f"RLS-assignment-{ids['assignment']}",
+                "assignment": ids["assignment"],
+                "station_id": "00433",
+                "distance": "12.345",
+            }
+            run_hash = connection.scalar(
+                text(
+                    "SELECT encode(digest(convert_to(jsonb_build_object("
+                    " 'tenancy_id', CAST(:tenancy AS text), 'unit_id', CAST(:unit AS text),"
+                    " 'month', CAST(:month AS date), 'inputs', CAST(:inputs AS jsonb),"
+                    " 'results', CAST(:results AS jsonb),"
+                    " 'heizspiegel_vintage', CAST(:vintage AS text),"
+                    " 'source_type', CAST(:source_type AS text),"
+                    " 'source_id', CAST(:source_id AS text),"
+                    " 'station_assignment_id', CAST(:assignment AS text),"
+                    " 'station_id', CAST(:station_id AS text),"
+                    " 'station_distance_km', CAST(:distance AS numeric(9,3))"
+                    ")::text, 'UTF8'), 'sha256'), 'hex')"
+                ),
+                hash_params,
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO uvi_run"
+                    " (id, account_id, tenancy_id, unit_id, month, inputs, results,"
+                    " heizspiegel_vintage, source_type, source_id, station_assignment_id,"
+                    " station_id, station_distance_km, sha256) VALUES"
+                    " (:id, :account, :tenancy, :unit, '2026-07-01', CAST(:inputs AS jsonb),"
+                    " CAST(:results AS jsonb), '2025', 'DWD_MONTHLY', :source_id, :assignment,"
+                    " '00433', 12.345, :sha256)"
+                ),
+                {
+                    "id": ids["run"],
+                    "account": seed.account_a,
+                    "tenancy": seed.tenancy_a,
+                    "unit": seed.unit_a,
+                    "inputs": hash_params["inputs"],
+                    "results": hash_params["results"],
+                    "source_id": hash_params["source_id"],
+                    "assignment": ids["assignment"],
+                    "sha256": run_hash,
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO uvi_delivery_event"
+                    " (id, account_id, uvi_run_id, status, occurred_at) VALUES"
+                    " (:id, :account, :run, 'GENERATED', '2026-08-01T00:00:00+00:00')"
+                ),
+                {"id": ids["event"], "account": seed.account_a, "run": ids["run"]},
+            )
+            connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+            rows = (
+                ("monthly_meter_reading", ids["monthly"]),
+                ("monthly_meter_reading_source", ids["monthly_source"]),
+                ("uvi_station_assignment", ids["assignment"]),
+                ("dwd_climate_factor", ids["climate"]),
+                ("uvi_run", ids["run"]),
+                ("uvi_delivery_event", ids["event"]),
+                ("uvi_monthly_degree_day", ids["degree"]),
+                ("building_uvi_configuration", ids["configuration"]),
+                ("uvi_building_monthly_evidence", ids["evidence"]),
+                ("uvi_building_monthly_evidence_source", ids["evidence_source"]),
+            )
+            connection.execute(text("SET LOCAL ROLE lokara_app"))
+            for account_id, expected in ((seed.account_a, 1), (seed.account_b, 0)):
+                connection.execute(
+                    text("SELECT set_config('app.account_id', :account, true)"),
+                    {"account": account_id},
+                )
+                for table_name, row_id in rows:
+                    count = connection.scalar(
+                        text(f'SELECT count(*) FROM "{table_name}" WHERE id = :id'),
+                        {"id": row_id},
+                    )
+                    assert count == expected, (account_id, table_name, count)
+            raise _RollbackProbe
+
+
 class TestU4CrossAccountWrites:
     """docs/16 § 12: every U4 table proves its WITH CHECK on a real INSERT."""
 
@@ -578,6 +851,102 @@ class TestU4CrossAccountWrites:
                     "id": new_id(),
                     "account_a": seed.account_a,
                     "run": run_id,
+                },
+            ),
+        )
+        refusals: dict[str, str] = {}
+        for table_name, statement, params in inserts:
+            with (
+                pytest.raises(ProgrammingError) as refused,
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.execute(text(statement), params)
+            refusals[table_name] = str(refused.value)
+
+        not_refused_by_policy = {
+            table_name: message.splitlines()[0]
+            for table_name, message in refusals.items()
+            if "row-level security" not in message.lower()
+        }
+        assert not not_refused_by_policy, not_refused_by_policy
+
+
+class TestU4bCrossAccountWrites:
+    """docs/16 § 3.1/§ 12: every U4b prerequisite proves its WITH CHECK."""
+
+    def test_every_u4b_table_rejects_a_cross_account_insert(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """U4b-RLS-F01--F04: B cannot stamp authoritative UVI inputs with account A.
+
+        These are complete INSERT attempts through the non-owner app role. Missing
+        parents must not be what rejects them: the policy's WITH CHECK runs first,
+        and each request transaction is rolled back by account_scoped_session.
+        """
+        _, app = engines
+        inserts = (
+            (
+                "uvi_monthly_degree_day",
+                "INSERT INTO uvi_monthly_degree_day"
+                " (id, account_id, station_assignment_id, station_id, month,"
+                " monthly_degree_days, valid_day_count, source_file, source_id, provenance,"
+                " rechtsstand, verification_status, monthly_annual_share,"
+                " supersedes_degree_day_id) VALUES"
+                " (:id, :account_a, :assignment, '001', '2025-01-01', 590.25, 31,"
+                " 'monthly-source-202501', 'DWD:001:202501',"
+                " '{\"source\":\"DWD\"}'::jsonb, '08/2026',"
+                " 'verify-before-production', NULL, NULL)",
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "assignment": new_id(),
+                },
+            ),
+            (
+                "building_uvi_configuration",
+                "INSERT INTO building_uvi_configuration"
+                " (id, account_id, building_id, energy_source, energy_reference,"
+                " explicit_hkv_allocator, calorific_factor, valid_from, valid_to, source_type,"
+                " source_id,"
+                " rechtsstand, verification_status, supersedes_configuration_id) VALUES"
+                " (:id, :account_a, :building, 'Erdgas', 'HO', false, NULL, '2026-01-01',"
+                " NULL, 'UVI_CONFIGURATION', 'caller-source', '08/2026',"
+                " 'verify-before-production', NULL)",
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "building": seed.building_a,
+                },
+            ),
+            (
+                "uvi_building_monthly_evidence",
+                "INSERT INTO uvi_building_monthly_evidence"
+                " (id, account_id, building_id, main_meter_id, month,"
+                " measured_building_heat_kwh_x1000, building_hkv_movement_x1000, source_type,"
+                " source_id,"
+                " raw_evidence, supersedes_evidence_id) VALUES"
+                " (:id, :account_a, :building, :main_meter, '2025-01-01', 100000, NULL,"
+                " 'UVI_BUILDING_EVIDENCE', 'main-meter:202501',"
+                ' \'{"reading_ids":["source"]}\'::jsonb, NULL)',
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "building": seed.building_a,
+                    "main_meter": seed.meter_a,
+                },
+            ),
+            (
+                "uvi_building_monthly_evidence_source",
+                "INSERT INTO uvi_building_monthly_evidence_source"
+                " (id, account_id, building_monthly_evidence_id, main_meter_id,"
+                " meter_reading_id) VALUES"
+                " (:id, :account_a, :evidence, :main_meter, :reading)",
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "evidence": new_id(),
+                    "main_meter": seed.meter_a,
+                    "reading": seed.reading_a,
                 },
             ),
         )

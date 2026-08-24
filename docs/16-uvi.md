@@ -1,8 +1,10 @@
 # UVI — monthly consumption information and comparisons
 
-**Status:** complete D2 transcription; approved and merged 21.08.2026; UVI
-calculation/readings/document remain specification only; G1's pure W4 evaluator is locally
-merged
+**Status:** U0 completed the source transcription. U1–U5 are technically implemented: pure UVI
+calculation and provenance, versioned Heizspiegel rules, annual/monthly DWD normalization,
+account-scoped UVI persistence, owner-side generation, immutable run archives and a separate
+German renter document downloadable by the owner. This engineering status is not production
+clearance, renter publication, scheduled delivery, email delivery or legal approval.
 
 **Rechtsstand:** 07/2026 unless a row below carries its own date. `geprüft` means that the
 primary text was read, not that a lawyer approved the rule. Every `verify-before-production` flag
@@ -112,6 +114,9 @@ boundaries from the surrounding spans, subtract the boundary values and attach t
 IDs, dates, interpolation method and any tenancy/device split. Never call a six-week movement one
 month.
 
+The internal interpolation method `linear_by_elapsed_days` is rendered to renters only as
+“linear nach verstrichenen Tagen interpoliert”. The internal identifier never appears in a UVI.
+
 Normalized computation inputs are:
 
 - target renter context, tenancy, unit and building PLZ;
@@ -127,6 +132,75 @@ Normalized computation inputs are:
 Occupancy count was an unresolved alternative in the annex. The approved Block D convention is
 area normalization, so no occupant-count number enters the V1 calculation. Future occupancy work
 must not silently change the comparison basis.
+
+### 3.1 U4b — durable normalized inputs before generation
+
+U5 receives only tenancy and target month. It resolves every calculation input server-side; the
+request never supplies degree days, energy source, Heizspiegel values, conversion factors or HKV
+totals.
+
+`uvi_monthly_degree_day` is immutable and account-scoped. Each row links to the persisted
+`UviStationAssignment` and carries its station and month, exact monthly Kd as `Decimal`, valid-day
+count, DWD source file and source identity, provenance, `Rechtsstand` and verification status. It
+may carry a source-backed monthly share of the annual degree-day total for D2. This share is never
+silently derived: this specification supplies no authoritative annual denominator. A missing share
+blocks D2 and remains `verify-before-production`. A correction inserts a row with
+`supersedes_degree_day_id`; it must retain the same account, assignment, station and month. One row
+has at most one direct successor, self-reference and branching are refused, and the current value
+is the unique leaf of that correction chain. The predecessor is never updated.
+
+`building_uvi_configuration` is effective-dated and append-only. Each account-scoped version binds
+a building to one U2 canonical energy-source identifier, `EnergyReference`, the explicit HKV
+allocator marker, an optional exact `Decimal` calorific factor, the complete source identity pair
+`source_type` plus `source_id`, `Rechtsstand` and verification status. A changed configuration
+inserts a row with `supersedes_configuration_id`; it
+does not close or update the predecessor. The predecessor must belong to the same account and
+building, one row has at most one direct successor, and self-reference, branching and cycles are
+refused. A successor's `valid_from` is strictly later than its predecessor's. For month M,
+resolution first selects the deepest successor whose `valid_from` is on or before M. Only that
+selected row is then checked against its optional originally supplied `valid_to`. If its `valid_to`
+excludes M, generation blocks; an older superseded ancestor is never resurrected as a fallback. An
+open-ended predecessor may therefore be superseded by INSERT without mutation. Neither
+`HeatingCostEntry.label` nor `MeasurementUnit` determines any configuration fact. The
+whole-building size class remains derived from the sum of the building's unit areas; it is not
+duplicated here.
+
+`uvi_building_monthly_evidence` is the immutable building-side counterpart to a unit's normalized
+month. It carries account, building, calendar month, the selected building-level main meter and
+the complete source identity pair `source_type` plus `source_id`, non-empty raw provenance, and at
+least one of: exact measured building heat as
+`measured_building_heat_kwh_x1000` (`BigInteger`) or the building HKV movement × 1000. There is no
+Decimal-to-integer rounding step at this boundary. The main meter must belong to the same
+account/building, have `unit_id IS NULL`, `kind = HEAT` and `measurement_unit = KWH`; no tenancy or
+unit is fabricated for it.
+
+Each evidence row has at least one immutable account-scoped
+`uvi_building_monthly_evidence_source` link to a real `MeterReading`. Composite foreign keys bind
+the link to its evidence/account/main meter and its reading/account/meter, so every linked reading
+comes from exactly the selected main meter. The evidence parent exposes the needed composite
+identity, and `MeterReading` exposes `(id, account_id, meter_id)` as a unique parent key. A
+`DEFERRABLE INITIALLY DEFERRED` database constraint trigger checks the minimum-one-link invariant,
+so the evidence and its links may be inserted in either order within one transaction but cannot be
+committed incomplete. Links are append-only, RLS-scoped evidence; they are not a caller-supplied
+JSON substitute. Once linked, the referenced `MeterReading` rejects UPDATE and DELETE even when no
+normalized unit-month source link also references it. While any building-month evidence references
+a main meter, changes to that meter's `id`, `account_id`, `building_id`, `unit_id`, `kind` or
+`measurement_unit` are refused because they would alter the archived evidence identity or its
+eligibility. This narrow guard does not freeze unrelated meter metadata.
+
+A correction inserts `supersedes_evidence_id` with the same account, building and month, but may
+select a replacement main meter that independently satisfies the eligibility rules. There is one
+root chain per account/building/month, independent of meter identity, and each row has at most one
+direct successor. The unique correction head is deterministic; self-reference, branching and
+cross-context predecessors are refused. Existing evidence and source links are never updated or
+deleted.
+
+The pure normalized-month Block A boundary consumes the persisted monthly movement plus its
+measurement unit, energy reference and optional calorific factor. It never fabricates cumulative
+start/end readings. HKV additionally requires the explicit allocator, the same-month measured
+building-level heat total × 1000 and the unit/building HKV movements from the current
+`uvi_building_monthly_evidence` leaf. The existing raw-reading links remain the audit evidence
+behind the normalized unit movement.
 
 ## 4. Shared calculation and output rules
 
@@ -268,6 +342,19 @@ Rechtsstand 08/2026 and `verify-before-production`. Production Blocks C and D2 r
 the open PLZ-geodataset choice and the three missing UVI register rows, not by a missing monthly
 dataset.
 
+U4b persists the selected station's normalized monthly Kd beside the assignment as specified in
+§ 3.1. Persisting the value does not resolve the open PLZ-geodataset choice or clear either
+production flag.
+
+Generation resolves Block D before demanding weather or Heizspiegel inputs. If three valid
+same-category building units make Block D ready, a missing target or prior-year degree-day row does
+not block the run: Block C uses its approved raw fallback “nicht witterungsbereinigt”. A persisted
+station assignment without a selected normalized degree-day row remains ingestion evidence, but it
+is not archived as a calculation station snapshot. In that raw case the `uvi_run` assignment id,
+station id and distance are all null. The three snapshot fields are always all present or all null.
+If degree-day rows exist but the target row has no annual share, Block D still completes; the share
+is required only after the fewer-than-three-unit branch selects D2.
+
 ## 8. Block D and D2 — average user
 
 ### 8.1 Block D: building cross-section
@@ -318,6 +405,13 @@ The current example is gas, 250–500 m²: `114 - 24 = 90`; `90 * 80 = 7,200`;
 
 Every D2 output must print “Quelle: co2online gGmbH (Heizspiegel)”. The source permission is no
 longer a build blocker, but the finished § 6a sample output and licence record must be archived.
+
+The monthly degree-day share is a resolved, source-backed U4b input. It is not calculated from an
+assumed annual denominator. If no such share is stored for the target month, D2 blocks; Block D may
+still be used when its own three-valid-unit condition is met.
+
+Block D is selected before a Heizspiegel vintage is resolved. Its archived `heizspiegel_vintage`
+is therefore null. D2 alone requires and archives a resolved Heizspiegel vintage and row.
 
 The source has 18 rows:
 
@@ -427,10 +521,43 @@ Membership role. It needs current-month UVI, archive/history and mandatory conte
 authorization must scope every read to that renter context and unit; UI filtering is insufficient.
 The landlord's all-party calculation view is never exposed to a renter.
 
-Monthly generation produces a separate renter document, publishes it to the renter context and may
-email it when opted in. The archive is append-only. A delivery ledger records generated, published,
-emailed and failed states with timestamps. A retry appends status evidence; it does not rewrite the
-original UVI. Scheduled delivery remains M9 and portal publication remains M10 under `PLAN.md`.
+U5 monthly generation produces and archives a separate German renter document and exposes it only
+through an owner-authorized download. It does not publish that document to a renter context and
+does not schedule or send email. Portal publication remains M10; scheduled and email delivery
+remain M9. The U5 archive and `GENERATED` event are append-only; later delivery events must append
+evidence and must never rewrite the original UVI.
+
+Before U5 generation, U4b persists the exact server-side inputs in § 3.1. Generation resolves the
+configuration effective in each normalized month separately: target month, previous month and the
+same month in the prior year. It archives every resolved identity and value in `uvi_run`.
+Configuration resolution chooses the deepest successor eligible by `valid_from` before checking
+that selected row's `valid_to`; it never resurrects an ancestor. Generation resolves the unique
+correction leaf separately for every monthly reading and building-month evidence row it uses, and
+for each target/prior-year degree-day row. This applies to the target month, previous month and
+same month in the prior year, not only to the target month. Generation does not accept these values
+from the client or infer them from display labels.
+
+Target and Block D comparable selection admits only `kind = HEAT`. All selected rows use one
+compatible device category; water rows are never target readings or comparables even when their
+measurement unit could otherwise be converted.
+
+For all three normalized months, the immutable archive contains the normalized head and raw source
+ids, meter id/kind/unit, effective building-configuration identity and values, and the applicable
+building-month evidence identity and values. It also contains the target unit area; every selected
+normalized reading head and its raw source ids; and, for Block D, each comparable unit id, area,
+meter identity/category/unit, normalized head, raw source ids and computed heat. It also retains
+the normalized inputs to Blocks A–D/D2, the selected degree-day row identities and their complete
+source/provenance status, station-assignment identity when a degree-day value was selected, the
+building-configuration identity, and the resolved U2/Heizspiegel row and evidence when D2 was
+used. These identities participate in the canonical run hash, so replacing even a numerically
+equivalent comparable or source changes the hash without mutating an older run.
+
+Applicable `RuleEvidence` and `RuleConflict` remain structured archive data. This includes the
+configuration source, selected DWD rows, the station-assignment convention and the Heizspiegel
+source when used. The § 12 Abs. 1 S. 2 and S. 3 reduction risks are archived as structured codes
+with their verification status and an explicit no-automatic-deduction flag. No unapproved German
+renter wording is derived from those codes; `legal_risks_de` may remain empty until exact wording
+is approved.
 
 ## 11. Mandatory content and German output
 
@@ -445,25 +572,48 @@ list is identical. The exact current monthly § 6a/EED content list remains
 reduced annual list for non-consumption-based billing is preserved and must not be broadened.
 Reduction rights are shown as separate risks only. Lokara never deducts 3% or 15% automatically.
 
-## 12. Correctness and production gates
+Missing U4b prerequisites are data-quality or production blocks, not permission to invent a
+renter-facing absence sentence. The archive retains their structured flags; only approved exact
+labels or caller-supplied approved German copy may render.
 
-Implementation is complete only when:
+## 12. Engineering completion and production clearance
+
+### U1–U5 engineering completion
+
+The implemented technical path is complete only while:
 
 - the pure UVI computation has no framework, database, vendor or clock imports;
 - every source-named calculation and fallback fixture is executable against production code;
 - annual DWD import guards cover headers, leading zeroes, completeness, duplicates, range,
   idempotency, missing PLZ and factor direction;
-- the monthly dataset and station-assignment contract in § 7 are implemented, the PLZ geodataset is
-  chosen, the requested UVI register rows exist and Blocks C/D2 are no longer production-blocked;
+- the monthly dataset and station-assignment contracts in § 7 execute without silently choosing a
+  PLZ geodataset or clearing their production flags;
 - all 18 Heizspiegel rows, deductions, heat-pump exception, non-positive guard, over-500 fallback
   and attribution are versioned and tested;
 - renter isolation has a negative cross-unit test and every new tenant table has composite account
   isolation, RLS and `FORCE` RLS;
-- archive and delivery evidence is append-only and retry-safe;
+- generation and archive evidence is append-only and retry-safe; publication and delivery remain
+  outside U5;
+- U4b monthly degree-day, building-month evidence, raw-reading source links and effective
+  building-configuration records are immutable, account-safe, source-backed and resolved through
+  deterministic append-only correction chains for every month used;
+- normalized Block A consumes a monthly movement directly, preserves rule evidence/conflicts and
+  blocks missing conversion or HKV prerequisites without fake cumulative readings;
 - strict typing, lint, pure-package tests and the required statement/UI review pass.
 
+### Additional production clearance
+
+Technical U1–U5 completion does not clear production use. Production Blocks C and D2 remain blocked
+until Emir chooses the versioned PLZ geodataset and the three requested UVI register rows exist.
+The exact monthly § 6a/EED content list must be confirmed, versioned and dated. The intended legal
+identity of the notice published under GEG § 82, the year-round versus heating-season cadence, the
+flagged § 12 reduction risks, the heat-pump deduction convention and every remaining
+`verify-before-production`, `[UNSICHER]`, primary-source/legal check or missing Berkay wording keep
+their recorded status. None is cleared by a green technical path.
+
 No engine, adapter, schema, API, UI, PDF, scheduler or delivery implementation is part of the U0
-round-4 transcription slice.
+round-4 transcription slice. After that historical U0 boundary, U1–U5 implemented the bounded
+engineering path described above; M9 delivery and M10 renter publication remain separate work.
 
 ## 13. Source-named fixture map
 
@@ -555,4 +705,9 @@ U0 is documentation plus data-only fixtures and changes no production, schema, m
 engine, adapter, UI, PDF, scheduler or delivery code. G1 supplies only the pure W4 cadence evaluator;
 it adds no UVI reading, calculation, document, scheduling, delivery or portal consumer. Passing the
 oracle or G1 tests does not demonstrate a working UVI, choose the PLZ geodataset, create the missing
-UVI register rows or authorize production use. U1 builds the engine later.
+UVI register rows or authorize production use. After that historical U0 boundary, U1–U5 technically
+implement the engine/provenance channel, versioned Heizspiegel resolution, annual/monthly DWD
+normalization, account-scoped persistence, owner-side generation, immutable archive and separate
+German renter document downloadable by the owner. This does not clear the production blockers in
+§ 12, schedule or email delivery under M9, publish to the renter portal under M10, or establish legal
+approval.
