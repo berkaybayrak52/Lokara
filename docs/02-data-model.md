@@ -53,10 +53,16 @@ Building ──< CostEntry ──< AllocationKeyAssignment
          └──< Statement
 Tenancy ──< PersonCount
 Meter ──< MeterReading
+      └──< MonthlyMeterReading ──< MonthlyMeterReadingSource >── MeterReading
+Building ──< BuildingUviConfiguration
+         ├──< UviBuildingMonthlyEvidence ──< UviBuildingMonthlyEvidenceSource
+UviStationAssignment ──< UviMonthlyDegreeDay
+Tenancy ──< UviRun >── Unit
+             └──< UviDeliveryEvent
 ```
 
 The outer `Person` links are deliberate global-table exceptions. Every edge between
-account-scoped tables carries the same `account_id`; section 3 lists all 22 enforced edges.
+account-scoped tables carries the same `account_id`; section 3 records the enforced pattern.
 
 | Model area | Current shape | Status |
 | --- | --- | --- |
@@ -64,6 +70,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 22 enfo
 | Property and occupancy | `Building` (with `fiktivbelegung_mode` and `fiktivbelegung_waiver_note`), `Unit`, `Tenancy`, `TenancyParty`, `SelfUsePeriod`, `PersonCount` | **Shipped** |
 | Operating-cost inputs | `CostEntry`, `AllocationKeyAssignment` | **Shipped** |
 | Metering and heating inputs | `Meter`, `MeterReading`, `HeatingCostEntry` | **Shipped** |
+| Monthly UVI evidence, weather, configuration and archive | U4/U4b records in migrations `0022`/`0023`; U5 composes them into immutable `UviRun` inputs/results and a `GENERATED` event | **Technically implemented** for owner-side generation and document download; no scheduling, email or renter publication |
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
@@ -444,6 +451,25 @@ sources normalize into the same downstream shape. Effective corrections, tenant-
 estimates, device replacements and provenance survive the adapter boundary and feed the shared
 Page 01b result. A meter's calibration deadline feeds the shared
 guard system; null means not applicable for a device such as a heat-cost allocator, not “unknown.”
+
+### Monthly UVI evidence and archives
+
+Migrations `0022` and `0023` persist the U4/U4b boundary defined in `docs/16`:
+
+| Record | Durable role |
+| --- | --- |
+| `MonthlyMeterReading`, `MonthlyMeterReadingSource` | Immutable normalized calendar-month consumption and its raw reading links; a correction appends one direct successor. |
+| `UviStationAssignment`, `UviMonthlyDegreeDay` | Persisted PLZ/month station choice and immutable monthly DWD value, including exact source/provenance and correction identity. |
+| `DwdClimateFactor` | Immutable annual rolling DWD factor for one PLZ and exact period; it is not reused as monthly degree-day evidence. |
+| `BuildingUviConfiguration` | Effective-dated building energy/configuration inputs with source identity, Rechtsstand and verification status. |
+| `UviBuildingMonthlyEvidence`, `UviBuildingMonthlyEvidenceSource` | Immutable building-month heat/HKV evidence, its main-meter identity and authoritative raw reading links; a correction appends one direct successor. |
+| `UviRun`, `UviDeliveryEvent` | Immutable normalized input/result archive, resolved source snapshots and hash, followed by append-only lifecycle evidence. |
+
+U5 resolves the effective correction leaf for every month it consumes, records the normalized
+evidence in `UviRun`, creates only a `GENERATED` event and renders a separate German renter
+document for an authorized owner to download. This is an owner-side generation/archive boundary,
+not renter publication or delivery: scheduled and email delivery belong to M9, and portal
+publication belongs to M10.
 
 ## 5. Owner residual and Page 01 statement model
 
@@ -921,6 +947,7 @@ approved `docs/11` adds no schema or API.
 | Three matching jobs | **Locally merged**; no schema change, read through an account-scoped session only | M6-C3b |
 | Landlord *Zahlungen* screen | **Locally merged**; confirm/reject/duplicate only, no manual assignment, no schema change | M6-C3c |
 | W1/W2/W4 pure guard evaluator | **Shipped** as a pure engine; no database, API, UI, scheduler, delivery or PDF consumer | G1 |
+| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; production data/legal flags remain blocking, and no scheduled/email delivery or renter publication is included | U1–U5 / `docs/16` |
 | Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |

@@ -58,6 +58,11 @@ EXPECTED_TABLES = {
     "dwd_climate_factor",
     "uvi_run",
     "uvi_delivery_event",
+    # U4b authoritative normalized inputs (docs/16 § 3.1; migration 0023).
+    "uvi_monthly_degree_day",
+    "building_uvi_configuration",
+    "uvi_building_monthly_evidence",
+    "uvi_building_monthly_evidence_source",
 }
 
 

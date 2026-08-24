@@ -180,6 +180,9 @@ The rendered-output compatibility checks for these claims live in
   calculation and QA view. It must not be sent to a renter.
 - M6-B ships owner-only, audience-isolated technical archives with actual advances, Saldo and
   finalization evidence. They are not renter delivery, portal publication or legal-production output.
+- U5 generates and immutably archives a separate German UVI renter document that an authorized
+  owner can download. It does not publish to a renter portal or schedule/send email delivery;
+  those boundaries remain M10 and M9 respectively.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the four formal minimums and
   records exactly what the current PDF does and does not render.
 - A period longer than 12 months is a specified hard block before calculation or rendering; a
@@ -197,7 +200,10 @@ For the current PDF only, the demo gate checks the tag tree and marked-content f
 language, document title, searchable text, required legal copy and rendered figures. PDF tests also
 check the statement's legal-disclosure carriers and contrast rules. This is current artifact-level
 evidence; it is not a WCAG, BFSG or PDF/UA certification and does not establish product-wide
-accessibility. Every screen, workflow and future tenant document still needs its own verification.
+accessibility. The separate U5 UVI renter artifact has received artifact-level statement review,
+including its renter-facing absence copy and provenance presentation. That review is not renter
+delivery/publication evidence and is not a WCAG, BFSG or PDF/UA certification. Every screen and
+workflow still needs its own verification.
 
 ## Explicit pre-production gaps
 

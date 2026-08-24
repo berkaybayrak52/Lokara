@@ -15,6 +15,7 @@ from .statement import (
     StatementData,
     statement_html,
 )
+from .uvi_document import UviDocumentBlock, UviDocumentData, uvi_document_html
 
 __version__ = "0.1.0"
 
@@ -24,8 +25,11 @@ __all__ = [
     "PartyKey",
     "PdfOptions",
     "StatementData",
+    "UviDocumentBlock",
+    "UviDocumentData",
     "format_number_de",
     "rechtsstand_entry",
     "render_html_to_pdf",
     "statement_html",
+    "uvi_document_html",
 ]

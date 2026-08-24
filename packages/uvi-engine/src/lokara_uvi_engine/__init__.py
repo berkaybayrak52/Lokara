@@ -7,6 +7,7 @@ from .evaluators import (
     evaluate_block_d,
     evaluate_block_d2,
     evaluate_hkv_provisional,
+    evaluate_normalized_block_a,
     interpolate_month,
 )
 from .models import (
@@ -27,6 +28,7 @@ from .models import (
     InterpolatedBoundary,
     LinearInterpolationInput,
     LinearInterpolationResult,
+    NormalizedBlockAInput,
     ResolvedHeizspiegelRow,
     UviRuleBundle,
 )
@@ -49,6 +51,7 @@ __all__ = [
     "InterpolatedBoundary",
     "LinearInterpolationInput",
     "LinearInterpolationResult",
+    "NormalizedBlockAInput",
     "ResolvedHeizspiegelRow",
     "UviRuleBundle",
     "evaluate_block_a",
@@ -57,5 +60,6 @@ __all__ = [
     "evaluate_block_d",
     "evaluate_block_d2",
     "evaluate_hkv_provisional",
+    "evaluate_normalized_block_a",
     "interpolate_month",
 ]

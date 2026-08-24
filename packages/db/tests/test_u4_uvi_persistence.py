@@ -259,10 +259,12 @@ def upgraded_owner() -> Iterator[Engine]:
     engine.dispose()
 
 
-def test_u4_live_database_reached_revision_0022(upgraded_owner: Engine) -> None:
-    """The U4 database fixtures run against migration 0022, not stale metadata."""
+def test_u4_live_database_reached_current_head_after_0022(upgraded_owner: Engine) -> None:
+    """U4 runs on a schema at least as new as 0022; the repository head is 0023."""
     with upgraded_owner.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0022"
+        revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
+    assert revision == "0023"
+    assert int(revision) >= 22
 
 
 def test_u4_f08_all_six_records_are_database_append_only(upgraded_owner: Engine) -> None:
@@ -874,6 +876,70 @@ def _canonical_uvi_hash(connection: Connection, values: Mapping[str, object]) ->
     )
     assert isinstance(result, str)
     return result
+
+
+def test_u5_block_d_raw_weather_run_allows_null_optional_source_snapshots(
+    upgraded_owner: Engine,
+) -> None:
+    """U5-DB-PREREQ: Block D/raw Block C needs neither D2 vintage nor station snapshot."""
+    with u4_graph(upgraded_owner) as (connection, ids):
+        values = _uvi_values(
+            ids,
+            inputs=json.dumps({"target_unit_id": ids.unit, "weather_mode": "raw"}),
+            results=json.dumps({"block_c": "raw", "block_d": "ready"}),
+            heizspiegel_vintage=None,
+            assignment=None,
+            station_id=None,
+            distance=None,
+        )
+        values["sha256"] = _canonical_uvi_hash(connection, values)
+        connection.execute(_UVI_INSERT, values)
+        archived = connection.execute(
+            text(
+                "SELECT tenancy_id, unit_id, heizspiegel_vintage, station_assignment_id,"
+                " station_id, station_distance_km, sha256 FROM uvi_run WHERE id = :id"
+            ),
+            {"id": values["id"]},
+        ).one()
+        assert archived.tenancy_id == ids.tenancy
+        assert archived.unit_id == ids.unit
+        assert archived.heizspiegel_vintage is None
+        assert (
+            archived.station_assignment_id,
+            archived.station_id,
+            archived.station_distance_km,
+        ) == (None, None, None)
+        assert archived.sha256 == values["sha256"]
+
+
+@pytest.mark.parametrize(
+    ("assignment", "station_id", "distance"),
+    (
+        (None, "00433", Decimal("12.345")),
+        (None, None, Decimal("12.345")),
+        (None, "00433", None),
+        ("assigned", None, None),
+        ("assigned", "00433", None),
+        ("assigned", None, Decimal("12.345")),
+    ),
+)
+def test_u5_run_rejects_partial_station_snapshot(
+    upgraded_owner: Engine,
+    assignment: str | None,
+    station_id: str | None,
+    distance: Decimal | None,
+) -> None:
+    """The optional station evidence is one atomic identity, never a partial snapshot."""
+    with u4_graph(upgraded_owner) as (connection, ids):
+        values = _uvi_values(
+            ids,
+            heizspiegel_vintage=None,
+            assignment=ids.assignment if assignment is not None else None,
+            station_id=station_id,
+            distance=distance,
+        )
+        values["sha256"] = _canonical_uvi_hash(connection, values)
+        _expect_rejected(connection, _UVI_INSERT, values)
 
 
 @pytest.mark.parametrize(
