@@ -879,13 +879,6 @@ finding. Technical closure does not clear any `verify-before-production` marker.
 
 ### U — UVI comparison, calculation and document
 
-**U0 status:** the round-4 transcription is complete and locally merged as `738e048`, not pushed.
-`docs/16` §§ 7.1/7.2 carry the monthly `hdd_3807` dataset and the persisted station-to-PLZ
-convention, § 4 carries the display-rounding decision and § 8.2 carries the K13 vintage maintenance.
-The oracle gained four constants and no golden value moved. U0 is documentation plus data-only
-fixtures; no UVI engine, importer, schema, API, UI, PDF or delivery code exists. U1 implements the
-pure engine next.
-
 **Approved-spec prerequisite:** `docs/16`, spec-closed Slice A and the G1 cadence foundation.
 
 - Implement the specified heating-only comparison with labelled fallbacks and no extrapolation.
@@ -897,6 +890,65 @@ persisted station assignment are implemented, the PLZ geodataset is chosen, the 
 rows exist and the UVI document is tenant-isolated. Round 4 resolved the dataset and Block C
 rounding order; production Blocks C/D2 remain blocked by the unchosen PLZ geodataset and missing
 UVI register rows. G1 remains technically closed.
+
+**U0 status:** the round-4 transcription is complete and locally merged as `738e048`, not pushed.
+`docs/16` §§ 7.1/7.2 carry the monthly `hdd_3807` dataset and the persisted station-to-PLZ
+convention, § 4 carries the display-rounding decision and § 8.2 carries the K13 vintage maintenance.
+The oracle gained four constants and no golden value moved. U0 is documentation plus data-only
+fixtures.
+
+**U1 status:** the pure `packages/uvi-engine` is complete and locally merged, not pushed. It
+executes `docs/16` Blocks A, B, C with its raw fallback, D, D2, the HKV provisional path and linear
+mid-month interpolation against the nine `UVI_EXAMPLES` cases. Block C rounds the displayed kWh
+before deriving delta and percent, per § 4. The engine imports `lokara_domain` only and reuses no
+rules-store table. No importer, adapter, schema, API, UI, PDF or delivery code exists yet. U1
+satisfies the first `Done when` condition and no other.
+
+**U1 statement review.** The required `statement-reviewer` pass verified all nine German output
+strings byte-exactly against `docs/16` and found no wording defect. It found one structural gap
+instead: the engine has no provenance channel on its results. `packages/guard-engine`, merged one
+slice earlier, carries `GuardSourceIdentity` plus `source`, `rechtsstand` and `verification_status`
+on every rule bundle; `packages/uvi-engine` carries none of that. The consequences are that the
+unconfirmed Wärmepumpe deduction renders identically to a checked gas value, the § 8.2 over-500
+fallback label and the § 7.2 DWD attribution, station and distance have nowhere to travel, Block A
+cannot carry the § 5 provisional label, and two of four blocked HKV branches still return a
+renter-facing label. Four further points are missing German wording rather than missing code and are
+asked in `FRAGEN-an-Berkay-05.md`. U1 was merged with these limits recorded; U1b closes them, and no
+UVI output reaches a renter before U5.
+
+**Remaining execution order.** Five slices, each sized against U1, plus two items no agent can
+close.
+
+- **U1b — engine provenance and labelled suppression.** `packages/uvi-engine` gains the caller-
+  supplied source identity and rule-bundle shape the guard engine already uses, a pass-through for
+  the § 8.2 over-500 fallback label, the § 7.2 DWD attribution with station id and distance and its
+  50 km label, the § 5 provisional label on the Block A result, and consistent suppression: a
+  blocked result carries no renter-facing label. The shared shapes live in `lokara_domain`; the
+  merged guard engine keeps its own copies, and consolidating the two is a later cleanup. No
+  arithmetic result changes. Runs before U2 so the rules data is built against a settled input
+  type.
+- **U2 — Heizspiegel rules data.** `packages/rules-store` gains the versioned K13 table: the 18
+  `HEIZSPIEGEL_2025_ROWS`, the warm-water deductions (24, heat pump 8), the non-positive guard, the
+  over-500 m² fallback for Wärmepumpe and Holzpellets with its exact German label, the co2online
+  attribution and vintage resolution under the 1 October rule. A UVI for month M resolves the
+  vintage valid at M, never the newest. The engine keeps receiving the resolved row as a
+  caller-supplied input; engine purity forbids the reverse.
+- **U3 — DWD adapters.** `packages/adapters/src/lokara_adapters/dwd.py`: the § 9 annual
+  climate-factor import with all eight named guards and the nine verified PLZ/KF fixtures, the § 7.1
+  monthly `hdd_3807` parse and the § 7.2 station assignment as a deterministic function over a
+  caller-supplied PLZ-centroid table. Split the annual import from the monthly work if it runs long.
+- **U4 — schema and persistence.** Monthly readings, the append-only `uvi_run` archive with hash,
+  the persisted `(PLZ, month) → station, distance` assignment, the climate-factor table and the
+  delivery ledger. Every table carries `account_id`, composite foreign-key isolation, RLS and
+  `FORCE` RLS, with the negative cross-unit test `docs/16` § 12 requires. Needs `boundary-auditor`.
+- **U5 — generation and the renter document.** Landlord-side generation and the separate German
+  tenant document with the § 11 mandatory content, archived immutably. Renter portal publication
+  stays M10 and scheduled delivery stays M9. Needs `statement-reviewer`.
+- **Not agent work.** Choosing the PLZ geodataset is Emir's decision; `docs/16` § 7.2 names
+  OpenStreetMap-based centroids or a commercial dataset, and records that geocoding the building
+  address would be cleaner. The three missing UVI register rows need Berkay; they are requested in
+  `FRAGEN-an-Berkay-05.md` and the CSV stays at 180 rows until he answers. Until both land, Blocks C
+  and D2 stay production-blocked however much code exists.
 
 ### M7 — Tax export and AfA
 

@@ -1,0 +1,16 @@
+[project]
+name = "lokara-uvi-engine"
+version = "0.1.0"
+description = "Pure engine for unterjährige Verbrauchsinformation calculations"
+requires-python = ">=3.12"
+dependencies = ["lokara-domain"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lokara_uvi_engine"]
+
+[tool.uv.sources]
+lokara-domain = { workspace = true }

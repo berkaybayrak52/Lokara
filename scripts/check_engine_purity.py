@@ -158,6 +158,22 @@ LAYERS: tuple[Layer, ...] = (
             }
         ),
     ),
+    Layer(
+        "packages/uvi-engine/src",
+        forbidden_internal=frozenset(
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+                "lokara_matching_engine",
+                "lokara_guard_engine",
+            }
+        ),
+    ),
     # The matching engine (docs/15) is the same crown-jewel shape: domain only. Bank
     # matching is deterministic arithmetic over integer cents, so it never reaches the
     # provider edge — the adapter normalizes floats to cents before this layer sees them.

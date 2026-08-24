@@ -18,6 +18,7 @@ members = [
     "lokara-nk-engine",
     "lokara-pdf",
     "lokara-rules-store",
+    "lokara-uvi-engine",
 ]
 
 [manifest.dependency-groups]
@@ -33,6 +34,7 @@ dev = [
     { name = "lokara-nk-engine", editable = "packages/nk-engine" },
     { name = "lokara-pdf", editable = "packages/pdf" },
     { name = "lokara-rules-store", editable = "packages/rules-store" },
+    { name = "lokara-uvi-engine", editable = "packages/uvi-engine" },
     { name = "mypy", specifier = ">=1.14" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "ruff", specifier = ">=0.9" },
@@ -491,6 +493,17 @@ requires-dist = [
 name = "lokara-rules-store"
 version = "0.1.0"
 source = { editable = "packages/rules-store" }
+dependencies = [
+    { name = "lokara-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lokara-domain", editable = "packages/domain" }]
+
+[[package]]
+name = "lokara-uvi-engine"
+version = "0.1.0"
+source = { editable = "packages/uvi-engine" }
 dependencies = [
     { name = "lokara-domain" },
 ]

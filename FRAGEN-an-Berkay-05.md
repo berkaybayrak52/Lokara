@@ -154,6 +154,29 @@ ihren derzeit 180 Zeilen ohne Emirs Freigabe nicht:
    Kalenderjahres. Rechtsstand 08/2026. Auch dieser Eintrag ersetzt die überholten Lesarten der
    CSV-Zeilen 128/129.
 
+## docs/16 — vier Textfragen aus der U1-Prüfung
+
+Owning doc: `docs/16-uvi.md` §§ 4, 5, 7 und 8.2. Die UVI-Rechenkerne sind implementiert; die
+Prüfung des fertigen Codes hat vier Stellen gefunden, an denen der mieterseitige Text fehlt oder
+zwei zugelassene Quellen sich widersprechen. Lokara wählt hier nichts still aus.
+
+1. **Über-500-Fallback-Label: Punkt am Ende oder nicht?** `docs/16` § 8.2 druckt den Satz mit
+   Schlusspunkt: „Vergleichswert der Größenklasse 250–500 m²; für über 500 m² liegt für diesen
+   Energieträger noch kein Wert vor.“ Das freigegebene Oracle speichert denselben Satz **ohne**
+   Punkt. Beide sind freigegeben, also entscheidet Lokara nicht selbst. Ohne Punkt endet ein
+   vollständiger Satz im Mieterdokument unabgeschlossen.
+2. **Nulldivisor in den Blöcken C, D und D2.** § 4 sagt, ein Nulldivisor unterdrückt nur die
+   Prozentzahl und behält den absoluten Wert. Für Block B ist der Text vorgegeben
+   („kein Vormonatsverbrauch“); für C, D und D2 gibt es keinen. Der Mieter sieht dort heute eine
+   leere Stelle. Bitte gib den Wortlaut vor oder bestätige, dass eine Lokara-`Konvention` genügt.
+3. **Wortlaut des Interpolationshinweises.** § 7 verlangt, dass ein interpolierter Vorjahreswert
+   seinen Interpolationshinweis behält, gibt aber keinen Text vor. Wie soll der Satz lauten?
+4. **„liegt im ersten Bezugsjahr noch nicht vor“ als einzige Begründung.** § 7 schreibt diesen Satz
+   für einen fehlenden Vorjahreswert vor. Er wird damit auch gedruckt, wenn eine Datenlücke, ein
+   Zählerwechsel ohne verbundene Reihe oder ein Mieterwechsel die Ursache ist. Ein Mieter im
+   vierten Jahr liest dann etwas Falsches über sein eigenes Mietverhältnis. Soll es einen zweiten,
+   neutralen Satz für diesen Fall geben?
+
 ## Nicht erneut erfragt
 
 Runde 4 hat die dort genannten Entscheidungen und Lieferungen zu Seite 01b, Seite 02, AfA,
