@@ -62,7 +62,8 @@ before UI. Dates are communication events, not planning inputs.
   scheduler or PDF consumer. W2 now runs the unified six-year MessEV Eichfrist; the slice had
   reversed that merged round-4 decision, and the reversal was undone before the merge.
   `main` is ahead of `origin/main`, which still points to `f372f67`.
-  U is next; M9 reminder and delivery integration remains open.
+  U1–U5 are now technically complete and locally merged. M7 is next; M9 reminder/delivery and M10
+  renter publication remain open.
 
 ---
 
@@ -75,7 +76,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction. M6-A/B ship actual-advance reconciliation and owner-only technical final archives; M6-C1/C2/C3-0/C3a ship bank matching, ledger persistence, the matching service, five owner APIs and audited invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's Zahlungen screen are technically complete and locally merged. M10 renter delivery remains open. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. U1–U5 now implement monthly DWD/UVI engineering, but technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or UVI production authority. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
@@ -83,7 +84,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's *Zahlungen* screen are technically complete and locally merged. |
-| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete D2 transcription approved and merged 21.08.2026. U0 transcribes round 4's monthly `hdd_3807` dataset, persisted station-assignment convention, display-rounding decision and K13 vintage rule. Production Blocks C/D2 still require a chosen PLZ geodataset and three missing UVI register rows. UVI calculation, readings and document implementation do not exist; G1 supplies only the W4 cadence evaluator. |
+| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | U1–U3 ship the pure calculation and DWD adapters; U4/U4b ship monthly persistence and immutable archives through migration `0023`; U5 ships owner-side generation and the separate German renter PDF. Production Blocks C/D2 still require a chosen PLZ geodataset and three missing UVI register rows; scheduled delivery remains M9 and portal publication remains M10. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
 engine contract; it does not create a second competing heating specification.
@@ -149,10 +150,10 @@ Current trace status after merged `docs/09`, `docs/15` and approved `docs/12` tr
   explicit. Emir approved the transcription on 21.08.2026. G1 now executes exactly the nine
   selected W1/W2/W4 cases; the remaining Page-05 guards and every application consumer stay open.
 - UVI/DWD has a complete annex/Page/W4/register/non-goal/correspondence trace and source-named
-  data-only oracles for Blocks A–D2, all nine annual DWD PLZ values/import guards and all 18
-  Heizspiegel rows. Emir approved it and the slice was merged on 21.08.2026; UVI calculation,
-  readings and document work are not implemented, while G1 prepares only W4 cadence. Monthly DWD data and
-  station-to-PLZ authority remain production-blocking.
+  oracles for Blocks A–D2, all nine annual DWD PLZ values/import guards and all 18 Heizspiegel
+  rows. U1–U5 now implement calculation, adapters, monthly persistence, owner generation, immutable
+  archives and the separate renter document. The chosen PLZ geodataset, three missing register
+  rows and exact monthly content authority remain production-blocking.
 - Pages 03, 04, 06 and 07 have complete approved and merged transcriptions. Page 04 includes the
   exact 16-ID data oracle and final `docs/07` tax/archive reconciliation. Page 06 includes exactly
   `CLAUSES-F01…F19`; Page 07 includes exactly `14-F01…F14`.
@@ -273,8 +274,8 @@ not replace the complete documentation or reconciliation gates.
 | C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
 | M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7. |
 | M6 | **Technically complete; locally merged 24.08.2026** | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **C3b's scheduler port and three job entrypoints are locally merged**: no schema change, no endpoint, one consent precondition on every AIS pull. **C3c's Zahlungen screen is technically complete and locally merged**: a client-only owner screen that records one final confirm/reject/duplicate outcome, with no manual assignment and no backend change. That merge closes M6-C and completes M6; delivery and the renter portal remain M10. |
-| G | **Technically complete and reviewed 24.08.2026; uncommitted and unmerged** | Shared guard foundation | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration. |
-| U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
+| G | **Technically complete, reviewed and locally merged 24.08.2026** | Shared guard foundation | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration. |
+| U | **Technically complete, reviewed and locally merged 24.08.2026** | UVI comparison, calculation and document | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10. |
 | M7 | After U | Tax export and AfA | Implement approved `docs/09`–`docs/11`. Build computation paths and archives; flagged register values continue to block real output. |
 | M8 | After M7 | Document and letter engine | Implement approved `docs/13` with versioned clauses and risk gates. |
 | M9 | After M8 | Reminders, email and checklists | Extend the existing W1/W2/W4 foundation with the remaining guard projections, reminders, delivery and UVI scheduling from approved `docs/12`. |
@@ -885,11 +886,12 @@ finding. Technical closure does not clear any `verify-before-production` marker.
 - Add monthly readings, the UVI calculation and the separate tenant document.
 - Keep scheduled delivery in M9 and portal publication in M10.
 
-**Done when:** every `docs/16` calculation fixture passes, the specified monthly `hdd_3807` input and
-persisted station assignment are implemented, the PLZ geodataset is chosen, the missing UVI register
-rows exist and the UVI document is tenant-isolated. Round 4 resolved the dataset and Block C
-rounding order; production Blocks C/D2 remain blocked by the unchosen PLZ geodataset and missing
-UVI register rows. G1 remains technically closed.
+**Engineering is done when:** every `docs/16` calculation fixture passes, the specified monthly
+`hdd_3807` input and persisted station assignment are implemented, durable inputs and the archive
+are tenant-isolated, and owner generation plus the separate renter document pass both required
+reviews and the demo gate. **Production clearance additionally requires** the chosen PLZ geodataset,
+the three missing UVI register rows and the exact versioned monthly content authority. Round 4
+resolved the calculation order; it did not clear those production blockers.
 
 **U0 status:** the round-4 transcription is complete and locally merged as `738e048`, not pushed.
 `docs/16` §§ 7.1/7.2 carry the monthly `hdd_3807` dataset and the persisted station-to-PLZ
@@ -932,12 +934,10 @@ suppressed comparison. No arithmetic changed and no golden value moved. The merg
 The required `statement-reviewer` pass verified the renter-facing
 suppression and exact ready-state labels. It found that Block D2 returned only its resolved-row
 evidence and dropped distinct bundle evidence; a separate failing fixture and engine fix now retain
-both in deterministic, deduplicated order. The closing full gate is green. Two facts are recorded
-rather than fixed:
-`BlockAResult.label_de` exists but no evaluator populates it, so the § 5 provisional label produced
-by `evaluate_hkv_provisional` must be carried onto the Block A figure by the composing caller in U5,
-and nothing enforces that today; and `SourceIdentity` is defined and exported but no UVI type
-consumes it yet, which is U4's archive identity.
+both in deterministic, deduplicated order. The closing full gate is green. At U1b close,
+`BlockAResult.label_de` still needed the U5 composer to carry the § 5 provisional label and
+`SourceIdentity` still needed a durable U4 consumer. U4/U5 now close both handoffs through the
+immutable source-complete run archive and the separate renter document.
 
 **U2 status:** versioned Heizspiegel rules data is complete, statement-reviewed and locally merged.
 Feature commit `75cfaec` was merged as `2559848`; nothing is pushed. The 18 rows, five deductions,
@@ -965,25 +965,21 @@ incomplete archive provenance and unstable-distance findings. Focused tests pass
 tests pass 184 and the full gate passes 1,425 Python plus 84 web tests. Together with U3a this closes
 U3's adapter work. The PLZ geodataset remains unchosen and all production blocks stay visible.
 
-**Remaining execution order.** Execute U4 and U5, plus two items no agent can close. U4 starts from
-the finalized `main` after U3.
+**U4/U5 closure status.** U4 feature `74857a6` was merged as `7a18bec`. U5 feature `36d62b2` was
+merged as `a54350f`. Migration `0023` adds the server-side normalized prerequisites; owner-side
+generation resolves heat-only compatible readings and each month's effective configuration,
+archives complete source identities and canonical hashes, and renders one separate German renter
+document. The closing boundary audit and statement review report no findings. The demo gate passes
+1,542 Python and 84 web tests; the existing statement fingerprint remains
+`88eb8434eda65f8d7ff82826fc837a58` at 149269 bytes. Nothing is pushed.
 
-- **U3 — DWD adapters.** `packages/adapters/src/lokara_adapters/dwd.py`: the § 9 annual
-  climate-factor import with all eight named guards and the nine verified PLZ/KF fixtures, the § 7.1
-  monthly `hdd_3807` parse and the § 7.2 station assignment as a deterministic function over a
-  caller-supplied PLZ-centroid table. Split the annual import from the monthly work if it runs long.
-- **U4 — schema and persistence.** Monthly readings, the append-only `uvi_run` archive with hash,
-  the persisted `(PLZ, month) → station, distance` assignment, the climate-factor table and the
-  delivery ledger. Every table carries `account_id`, composite foreign-key isolation, RLS and
-  `FORCE` RLS, with the negative cross-unit test `docs/16` § 12 requires. Needs `boundary-auditor`.
-- **U5 — generation and the renter document.** Landlord-side generation and the separate German
-  tenant document with the § 11 mandatory content, archived immutably. Renter portal publication
-  stays M10 and scheduled delivery stays M9. Needs `statement-reviewer`.
-- **Not agent work.** Choosing the PLZ geodataset is Emir's decision; `docs/16` § 7.2 names
+**Remaining external authority.** Choosing the PLZ geodataset is Emir's decision; `docs/16` § 7.2 names
   OpenStreetMap-based centroids or a commercial dataset, and records that geocoding the building
   address would be cleaner. The three missing UVI register rows need Berkay; they are requested in
   `FRAGEN-an-Berkay-05.md` and the CSV stays at 180 rows until he answers. Until both land, Blocks C
-  and D2 stay production-blocked however much code exists.
+  and D2 stay production-blocked however much code exists. The exact monthly content list and the
+  other `verify-before-production` items in `docs/16` remain open. Scheduling is M9; renter portal
+  publication is M10.
 
 ### M7 — Tax export and AfA
 
