@@ -955,8 +955,17 @@ canonical heating engine remains the only annual adjustment calculation path. Fo
 49, all adapter tests pass 97 and the full gate passes 1,338 Python plus 84 web tests. Monthly
 `hdd_3807` and station assignment remain U3b.
 
-**Remaining execution order.** Execute U3b, U4 and U5, plus two items no agent can close. U3b starts
-from the finalized `main` after U3a.
+**U3b status:** monthly DWD normalization and deterministic station assignment are complete,
+boundary-audited and green but not committed. The parser retains all nine documented fields and
+canonical DWD evidence; assignment requires one station valid for at least 25 days in both months,
+uses caller-supplied versioned PLZ centroids and DWD-row coordinates, and returns reproducible
+source/convention/distance evidence with no invented German wording. Audit fixtures close
+coordinate drift, parser-origin bypass, incomplete archive provenance and unstable-distance
+findings. Focused tests pass 136, all adapter tests pass 184 and the full gate passes 1,425 Python
+plus 84 web tests. The PLZ geodataset remains unchosen and all production blocks stay visible.
+
+**Remaining execution order.** Land U3b, then execute U4 and U5, plus two items no agent can close.
+U4 starts from the finalized `main` after U3b.
 
 - **U3 — DWD adapters.** `packages/adapters/src/lokara_adapters/dwd.py`: the § 9 annual
   climate-factor import with all eight named guards and the nine verified PLZ/KF fixtures, the § 7.1

@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U3a is locally merged; U3b monthly DWD is next
+# LEAD-HANDOFF.md — U3b monthly DWD is green but uncommitted; U4 is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -18,7 +18,9 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 - **U2 is complete, reviewed and locally merged.** Feature commit `75cfaec` was merged as
   `2559848`; nothing is pushed.
 - **U3a is complete, boundary-audited and locally merged.** Feature commit `62b2918` was merged as
-  `fcc3ad8`; nothing is pushed. U3b monthly degree days is not started.
+  `fcc3ad8`; nothing is pushed.
+- **U3b is complete, boundary-audited, green and not committed.** Its monthly parser and station
+  assignment diff sits on `slice/u3b-dwd-monthly` at base `07e2982`. U4 is not started.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
@@ -88,9 +90,9 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 ---
 
-# U3a closure and the remaining U work — U3b to U5
+# U3b closure and the remaining U work — U4 and U5
 
-U3a is landed locally. U3b starts from the finalized `main`, never from the U3a branch.
+U3b is green but uncommitted. Land it before U4 so the schema slice starts from a clean `main`.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
@@ -207,7 +209,17 @@ file/period provenance was under-validated and the adapter duplicated the Page-0
 calculation. Separate failing fixtures closed both: filenames and rows now agree on one exact
 rolling 12-month period, publication cannot predate the period end, and calculation remains solely
 in `packages/heating-engine`. Focused tests pass 49, all adapter tests pass 97, and the full gate
-passes 1,338 Python plus 84 web tests. U3b below is untouched.
+passes 1,338 Python plus 84 web tests.
+
+**U3b monthly status:** complete, boundary-audited and green but uncommitted. It adds the
+tokenized nine-field `hdd_3807` normalization boundary and deterministic nearest station valid in
+both compared months, using only DWD-row coordinates and a caller-supplied versioned PLZ centroid.
+The result carries both source files, centroid identity/version, the versioned assignment
+`Konvention`, a canonical six-decimal great-circle distance and the over-50 km boolean—never German
+wording. Audit fixtures close coordinate drift, forged-record bypass, missing persistence evidence
+and unstable-distance findings. Focused DWD tests pass 136, all adapter tests pass 184, and the full
+gate passes 1,425 Python plus 84 web tests. The PLZ geodataset remains unchosen and production flags
+remain unchanged.
 
 ### Lanes
 
