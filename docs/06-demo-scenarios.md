@@ -22,7 +22,7 @@
 | **Shipped** | One fixed `SOLO` owner account; the six-screen seeded path; Scenarios 1–5; the 2025 landlord calculation and PDF |
 | **Shipped** | The secure M5 bootstrap read; it changes identity lookup, not onboarding or the visible demo |
 | **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
-| **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized. No *Zahlungen* screen or matching jobs. |
+| **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized; C3b's matching jobs are locally merged and the C3c *Zahlungen* screen is technically complete on its slice branch. None of the three is part of the six-screen path. |
 | **Future** | Scenario 6, the five-persona identity demo, role-aware account switching, renter/tax-adviser portals, investment entitlement and mobile |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for
@@ -166,7 +166,8 @@ M6-A/M6-B ship the owner-only technical archive boundary: actual paid advances, 
 finalization and one isolated archive per eligible tenancy. It does not change the demo PDF or add
 renter delivery/portal. C3a's matching service is technically complete, development-synchronized
 and locally merged, but it, C3b's jobs and the C3c landlord *Zahlungen* screen are not part of this
-six-screen path. C3b gives the demo bank account a computed PSD2 consent so the AIS pull still
+six-screen path. C3c adds a navigable screen and leaves the demo at six: the seed is unchanged and
+no statement figure, allocation or rendered byte depends on it. C3b gives the demo bank account a computed PSD2 consent so the AIS pull still
 works; no statement figure and no PDF byte depends on it. The statement period contract also
 remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.

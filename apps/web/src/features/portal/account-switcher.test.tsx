@@ -74,6 +74,43 @@ describe('M5 account contexts', () => {
     expect(html).not.toContain('Konto wechseln');
   });
 
+  // Every route behind the Zahlungen screen is `require_owner`
+  // (`apps/api/src/lokara_api/routers/payments.py`), so for an EMPLOYEE the nav
+  // entry could only ever dead-end in a 403. Hiding it is honesty about scope,
+  // not authorization — the API decides that independently (CLAUDE.md § 3.3).
+  it('offers the payments screen to an owner', () => {
+    const html = renderToStaticMarkup(
+      <PortalShellContent
+        accountId={OWNER.id}
+        account={OWNER}
+        accounts={[OWNER]}
+        pathname="/a/owner-1"
+      >
+        <p>Inhalt</p>
+      </PortalShellContent>,
+    );
+
+    expect(html).toContain('href="/a/owner-1/zahlungen"');
+  });
+
+  it('withholds the payments screen from an employee', () => {
+    const html = renderToStaticMarkup(
+      <PortalShellContent
+        accountId={EMPLOYEE.id}
+        account={EMPLOYEE}
+        accounts={[EMPLOYEE]}
+        pathname="/a/employee-1"
+      >
+        <p>Inhalt</p>
+      </PortalShellContent>,
+    );
+
+    // Non-vacuity: the employee shell does render a navigation, it just omits
+    // this one entry.
+    expect(html).toContain('href="/a/employee-1/objekte"');
+    expect(html).not.toContain('/zahlungen');
+  });
+
   it('shows the tax-adviser preparation state instead of the owner portal', () => {
     const html = renderToStaticMarkup(
       <PortalShellContent

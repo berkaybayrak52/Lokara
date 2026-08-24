@@ -85,8 +85,9 @@ M6-A/M6-B ship confirmed actual advances, Saldo/Nachzahlung/Guthaben branches, i
 finalization, archived bytes/hashes, isolated rendered tenant archives and the formal-minimum #3
 carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner endpoints, and
 M6-C3-0 verifies their database invariants. C3a's service and final `0021` are technically complete,
-development-synchronized and locally merged; C3b's job entrypoints are technically complete on
-locally merged. The C3c landlord *Zahlungen* screen remains open, and renter
+development-synchronized and locally merged; C3b's job entrypoints are technically complete and
+locally merged. The C3c landlord *Zahlungen* screen is technically complete on its slice branch and not yet
+merged; it changes no statement figure and no rendered byte. Renter
 delivery/portal remains M10. These archives are owner-only technical
 records, not legal-production or renter delivery output.
 
@@ -810,9 +811,10 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
 
 ## 9. Open dependencies — not permission to invent
 
-- **Remaining M6:** C3c's landlord *Zahlungen* screen. C3a is technically complete,
-  development-synchronized and locally merged, and C3b's three job entrypoints are technically
-  complete and locally merged; renter delivery/portal is M10.
+- **Remaining M6:** merging C3c. Its landlord *Zahlungen* screen is technically complete on
+  `slice/m6-c3c-zahlungen`. C3a is technically complete, development-synchronized and locally
+  merged, and C3b's three job entrypoints are technically complete and locally merged; renter
+  delivery/portal is M10.
 - **Live demo PDF:** operator/numerator derivation and actual-advance Saldo remain absent; M6-B's separate archive has them.
 - **Meters:** start/end readings and their consistency path are not carried to the statement.
 - **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in

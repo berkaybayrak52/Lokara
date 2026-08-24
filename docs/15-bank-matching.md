@@ -15,9 +15,11 @@ through it. M6-C2 ships the normalized bank adapter, nine account-scoped bank/re
 ledger tables and owner-scoped import/list/Page-01-handoff endpoints. M6-C3-0 closes the audited
 database invariants in migration `0020`. M6-C3a's matching service, final migration `0021` and
 exactly five owner APIs are technically complete, development-synchronized and locally merged into
-`main`. C3b's scheduler port and three job entrypoints are technically complete on
-locally merged into `main`; C3c's landlord *Zahlungen* screen remains open. The § 4 E2E
-signal is deliberately inert; see § 4 below.
+`main`. C3b's scheduler port and three job entrypoints are technically complete and
+locally merged into `main`; C3c's landlord *Zahlungen* screen is technically complete on its
+slice branch and not yet merged. The § 4 E2E
+signal is deliberately inert; see § 4 below — the C3c screen therefore renders it as *noch nicht
+ausgewertet* rather than as an unmet criterion.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
 contract for incoming renter payments. Matching is a proposal mechanism. It does not create a
@@ -624,8 +626,8 @@ test body, and never matched `async def`. Test bodies now come from `ast`, so a 
 test ends; all 38 tenant tables stayed covered, so none had been resting on glue.
 
 M6-C3a is technically complete, development-synchronized and locally merged, and C3b's three job
-entrypoints are technically complete and locally merged. M6-C3 remains open for
-C3c's landlord *Zahlungen* screen. It also inherits the gaps in `PLAN.md` § M6-C —
+entrypoints are technically complete and locally merged. M6-C3 closes when C3c is merged; its landlord *Zahlungen*
+screen is technically complete on its slice branch. It also inherits the gaps in `PLAN.md` § M6-C —
 `ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
 reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.
 
@@ -637,6 +639,8 @@ verify the engine, persistence, normalized stub adapter, service and owner endpo
 `main`; they do not approve production bank-matching behavior or any legal/product convention.
 C3b technically verifies the scheduler port, the three job entrypoints and the PSD2 consent
 precondition on local `main`; that is a technical result, not approval of the 180-day
-convention or of production bank matching. finAPI, the C3c landlord *Zahlungen* screen, manual
-assignment, automatic later use of renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
+convention or of production bank matching. C3c technically completes the landlord *Zahlungen* screen on its slice branch; that too is a
+technical result, and the § 4 weights it displays stay `Konvention`, `verify-before-production`,
+`Rechtsstand 07/2026`, presented as a decision aid and never as legal support for a match. finAPI,
+manual assignment, automatic later use of renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
 until its source gap is answered. The separate `docs/16` D2 transcription is approved and merged.

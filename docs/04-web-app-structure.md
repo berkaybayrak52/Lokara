@@ -54,8 +54,8 @@ These are **Future**, not empty shipped modules.
 ## Shipped web route compatibility map
 
 The page numbers below are compatibility anchors used by application and package source comments:
-pages 1–6 preserve the M3 names and page 7 preserves the canned M4 flow. Do not renumber them when
-navigation changes.
+pages 1–6 preserve the M3 names, page 7 preserves the canned M4 flow and page 8 is the M6-C3c
+Zahlungen screen. Do not renumber them when navigation changes.
 
 | Page | Name                   | Current route                                                      |
 | ---: | ---------------------- | ------------------------------------------------------------------ |
@@ -66,10 +66,15 @@ navigation changes.
 |    5 | Zähler                 | `/a/{accountId}/zaehler`                                           |
 |    6 | Abrechnung erstellen   | `/a/{accountId}/abrechnung`                                        |
 |    7 | Beleg-Upload           | `/a/{accountId}/beleg`                                             |
+|    8 | Zahlungen              | `/a/{accountId}/zahlungen`                                         |
 
-`/styleguide` is a separate shipped design-token/stack showcase, not page 8. `/` enters a sole
-`OWNER` or `EMPLOYEE` context and otherwise offers the caller's live contexts as URL links; it is
-not one of the numbered pages. A sole `TAX_ADVISOR` context is selected deliberately rather than
+Page 8 is owner-only, in navigation as well as in the API; see the C3c paragraph under
+"Shipped API surface" below.
+
+`/styleguide` is a separate shipped design-token/stack showcase and is not one of the numbered
+pages. Neither is `/`, which enters a sole
+`OWNER` or `EMPLOYEE` context and otherwise offers the caller's live contexts as URL links. A sole
+`TAX_ADVISOR` context is selected deliberately rather than
 entered automatically.
 
 ## Shipped API surface
@@ -160,9 +165,18 @@ The C3a slice adds exactly five further owner-only API routes:
 | `GET /a/{accountId}/payment-ledger` | Return immutable payments, reversals, credit and allocation snapshots newest first. |
 
 These five routes and `matching_service.py` are technically complete, development-synchronized and
-locally merged into `main`. There is still no *Zahlungen* client route; that is C3c. C3b's three
-jobs are technically complete and locally merged; they add no route and no
+locally merged into `main`. C3b's three jobs are technically complete and locally merged; they add no route and no
 screen.
+
+C3c adds the one *Zahlungen* client route, `/a/{accountId}/zahlungen`, technically complete on its
+slice branch and not yet merged. It is client-only — no endpoint, no schema, no migration. It reads
+the grouped proposals, the payment ledger, the bank transactions and the receivables, and writes one
+final outcome through the C3a decision route. Buttons appear only on an open `NEEDS_REVIEW` row;
+everything else is read-only evidence and the Zahlungsjournal has no edit, delete or reversal
+control. No renter name is displayed: no route resolves a `renter_id` to a `legal_name`, so the
+payer is identified by the bank `counterpart_name` and `purpose`. The nav entry is hidden for
+`EMPLOYEE` because every route behind it is `require_owner` — navigation honesty, not
+authorization.
 
 Migration `0020` closes the M6-C3-0 invariant repair below these routes: signed and locked
 allocation caps, renter-consistent reversals, confirmed transaction provenance for learned IBANs,
