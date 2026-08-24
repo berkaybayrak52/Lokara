@@ -165,8 +165,9 @@ including its `Rechtsstand` and the required tool-not-advice disclaimer.
 M6-A/M6-B ship the owner-only technical archive boundary: actual paid advances, Saldo, immutable
 finalization and one isolated archive per eligible tenancy. It does not change the demo PDF or add
 renter delivery/portal. C3a's matching service is technically complete, development-synchronized
-and locally merged, but it, C3b jobs and the C3c landlord *Zahlungen* screen are not part of this
-six-screen path. The statement period contract also
+and locally merged, but it, C3b's jobs and the C3c landlord *Zahlungen* screen are not part of this
+six-screen path. C3b gives the demo bank account a computed PSD2 consent so the AIS pull still
+works; no statement figure and no PDF byte depends on it. The statement period contract also
 remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
 

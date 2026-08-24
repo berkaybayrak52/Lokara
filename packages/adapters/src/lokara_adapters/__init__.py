@@ -51,6 +51,11 @@ from .meter import (
     consumption_by_meter,
     device_reading_segments,
 )
+from .scheduler import (
+    ScheduledJob,
+    SchedulerPort,
+    StubScheduler,
+)
 from .vision import (
     ExtractedInvoiceFields,
     FieldConfidences,
@@ -87,6 +92,8 @@ __all__ = [
     "PriceIndexValue",
     "ReadingReason",
     "ReadingSource",
+    "ScheduledJob",
+    "SchedulerPort",
     "SentEmail",
     "SourceDocument",
     "StubBankGateway",
@@ -94,6 +101,7 @@ __all__ = [
     "StubEmailGateway",
     "StubMeterGateway",
     "StubPriceIndexGateway",
+    "StubScheduler",
     "StubVisionGateway",
     "VisionGateway",
     "cents_from_provider_amount",

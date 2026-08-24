@@ -67,7 +67,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 22 enfo
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
-| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged, while C3b job wiring remains open |
+| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete on its slice branch and not merged |
 | Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
@@ -416,8 +416,10 @@ The Page 08 bank-matching contract is **complete, approved and merged** in `docs
 cases run through the M6-C1 engine. M6-C2 ships the receivable, bank, matching-evidence and
 payment-ledger schema, adapter and owner-scoped endpoints; M6-C3-0 closes the audited database
 invariants through migration `0020`. C3a's service and final `0021` are technically complete,
-development-synchronized and locally merged into `main`; C3b's jobs and C3c's landlord *Zahlungen*
-screen remain open.
+development-synchronized and locally merged into `main`. C3b's three job entrypoints are
+technically complete on `slice/m6-c3b-jobs` and not merged; they add no table, column or migration
+and read this schema only through an account-scoped session. C3c's landlord *Zahlungen* screen
+remains open.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
 
@@ -630,7 +632,8 @@ One normalized calculation must produce one immutable result and explicit audien
 | Calculation identity | Account, building, inclusive period and calculation/version identity. Basic persisted fields exist; the exact Page 01 input is not complete. |
 | Property header | Legal landlord, object address, total area, unit count, creation date, engine/rule versions and every applicable register `Rechtsstand`. |
 | Covered tenancy | `tenancy_id`, renters/addressee, delivery address, unit, clipped usage dates and days, person/area/consumption inputs. M6-B freezes the selected address and isolated archive; renter delivery remains incomplete. |
-| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; locally merged C3a books accepted matches into the ledger. Automatic later use of renter credit and the C3b job wiring remain open. Confirmed zero is valid. |
+| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; locally merged C3a books accepted matches into the ledger. Automatic later use of renter credit remains open; C3b's job wiring is technically complete on its
+slice branch and not merged. Confirmed zero is valid. |
 | Operating-cost result | Cost identity/classification, total, key, numerator, denominator, measurement unit, rounded renter share, § 35a inputs/result, warnings and provenance. |
 | Heating and CO₂ result | Every required block, ratio, numerator/denominator, device evidence, CO₂ figures, warnings and provenance defined in `docs/03`. |
 | Vacancy result | Origin unit/dates, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c) and evidence. The residual contract is settled; the full annex is not implemented. |
@@ -913,7 +916,7 @@ approved `docs/11` adds no schema or API.
 | Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |
 | M6-A temporal advances/confirmed actual advances and M6-B Saldo, settlements, finalization and owner-only archives | **Shipped** technical scope; no renter delivery or legal-production approval | M6-A/M6-B |
 | Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
-| Three matching jobs | **Future** | M6-C3b |
+| Three matching jobs | **Technically complete on `slice/m6-c3b-jobs`**, not merged; no schema change | M6-C3b |
 | Landlord *Zahlungen* screen | **Future**; confirm/reject/duplicate only, no manual assignment | M6-C3c |
 | Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |

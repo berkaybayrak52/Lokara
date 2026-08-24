@@ -13,7 +13,7 @@ in the threadpool, so the blocking psycopg driver never stalls the event loop
 """
 
 from collections.abc import Iterator
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, contextmanager
 from functools import lru_cache
 from typing import Annotated
 
@@ -26,7 +26,7 @@ from lokara_db import (
     account_scoped_session,
     create_db_engine,
 )
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
 from .auth import AuthContext, require_auth
@@ -46,6 +46,34 @@ def unmembered_account_session(account_id: str) -> AbstractContextManager[Sessio
     ``app.account_id`` underneath and must not be used for ordinary requests.
     """
     return account_scoped_session(_engine(), account_id)
+
+
+@contextmanager
+def job_account_session(engine: Engine, account_id: str) -> Iterator[Session]:
+    """An RLS-scoped session for one M6-C3b scheduled job run (`docs/15` § 5.6).
+
+    A job has no request and no caller to authorize, so there is nothing here to
+    verify a Membership against — which is exactly why it must not be free to open
+    its own session. It runs on the same ``app.account_id`` context as ordinary
+    traffic, under the non-owner ``lokara_app`` role, for one account id the caller
+    supplied. The engine is a parameter because the job runner is not a FastAPI
+    dependency and its tests bind their own.
+    """
+    with account_scoped_session(engine, account_id) as session:
+        # The engine is a parameter, so a caller could hand this the DIRECT_URL
+        # owner engine — the one every migration and seed script already holds. That
+        # role bypasses FORCEd RLS, and `run_match` resolves its scope from the row
+        # it found, so a job on that engine would settle across accounts with no
+        # error anywhere. Verified once per run, from the connection itself.
+        bypasses_rls = session.scalar(
+            text("SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user")
+        )
+        if bypasses_rls:
+            raise RuntimeError(
+                "job sessions must run on the non-owner lokara_app role; "
+                "the current role bypasses row-level security"
+            )
+        yield session
 
 
 def account_session_for_path(
