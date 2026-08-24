@@ -136,7 +136,7 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
 3. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
    M0–M5 and M6-A/M6-B/M6-C1/M6-C2/M6-C3-0/M6-C3a are built and green on local `main`. C3a is
    technically complete, development-synchronized and locally merged. C3b's scheduler port and
-   three job entrypoints are technically complete on `slice/m6-c3b-jobs` and not merged; the C3c
+   three job entrypoints are technically complete and locally merged; the C3c
    *Zahlungen* screen is next. Nothing is pushed.
    Work follows PLAN's **execution order** — ranked by *what closes the legally-required surface
    first* — rather than the milestone numbering. **It carries no deadline on purpose:** dates in

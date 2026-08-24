@@ -99,7 +99,7 @@ archived.
   (migrations `0017`/`0019`); M6-C3-0 migration `0020` hardens renter consistency, allocation caps,
   learned-IBAN provenance, trigger name resolution and RLS write observability. The C3a matching
   service and final `0021` are technically complete, development-synchronized and locally merged.
-  C3b's job entrypoints are technically complete on their slice branch and not merged: they add a
+  C3b's job entrypoints are technically complete and locally merged: they add a
   PSD2 consent precondition to every AIS pull, write nothing outside the sync path and delete no
   append-only evidence. The C3c *Zahlungen* screen remains open; renter delivery/portal remains M10. Tax/export
   archives remain M7 work and depend on approved `docs/10` and `docs/11`; delivery evidence and

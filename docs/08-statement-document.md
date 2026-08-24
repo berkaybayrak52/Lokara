@@ -86,7 +86,7 @@ finalization, archived bytes/hashes, isolated rendered tenant archives and the f
 carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner endpoints, and
 M6-C3-0 verifies their database invariants. C3a's service and final `0021` are technically complete,
 development-synchronized and locally merged; C3b's job entrypoints are technically complete on
-`slice/m6-c3b-jobs` and not merged. The C3c landlord *Zahlungen* screen remains open, and renter
+locally merged. The C3c landlord *Zahlungen* screen remains open, and renter
 delivery/portal remains M10. These archives are owner-only technical
 records, not legal-production or renter delivery output.
 
@@ -242,7 +242,7 @@ fails for arrears, changes and partial periods, and is forbidden. M6-A/M6-B sati
 with frozen, explicitly confirmed actual advances. M6-C1/M6-C2 now supply matching logic,
 receivables, accepted-allocation persistence and the immutable ledger boundary. C3a's application
 service is technically complete, development-synchronized and locally merged; C3b's jobs are
-technically complete on their slice branch and not merged. The live landlord preview still omits
+technically complete and locally merged. The live landlord preview still omits
 minimum #4; the separate M6-B final archive prints its frozen Saldo branch.
 
 ## 5. Shared rendered-document rules
@@ -812,7 +812,7 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
 
 - **Remaining M6:** C3c's landlord *Zahlungen* screen. C3a is technically complete,
   development-synchronized and locally merged, and C3b's three job entrypoints are technically
-  complete on `slice/m6-c3b-jobs` and not merged; renter delivery/portal is M10.
+  complete and locally merged; renter delivery/portal is M10.
 - **Live demo PDF:** operator/numerator derivation and actual-advance Saldo remain absent; M6-B's separate archive has them.
 - **Meters:** start/end readings and their consistency path are not carried to the statement.
 - **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in

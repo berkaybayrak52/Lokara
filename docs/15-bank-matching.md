@@ -16,7 +16,7 @@ ledger tables and owner-scoped import/list/Page-01-handoff endpoints. M6-C3-0 cl
 database invariants in migration `0020`. M6-C3a's matching service, final migration `0021` and
 exactly five owner APIs are technically complete, development-synchronized and locally merged into
 `main`. C3b's scheduler port and three job entrypoints are technically complete on
-`slice/m6-c3b-jobs` and not merged; C3c's landlord *Zahlungen* screen remains open. The § 4 E2E
+locally merged into `main`; C3c's landlord *Zahlungen* screen remains open. The § 4 E2E
 signal is deliberately inert; see § 4 below.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
@@ -356,7 +356,7 @@ generic owner-denial copy.
 
 ### 5.6 M6-C3b scheduled jobs and the scheduler boundary
 
-**Status:** technically complete on `slice/m6-c3b-jobs` and not merged, 24.08.2026. It changes no
+**Status:** technically complete and locally merged into `main`, 24.08.2026. It changes no
 Page-08 calculation rule and no `Rechtsstand 07/2026` value. Every decision, score and cent still
 comes from §§ 3–5.
 
@@ -624,7 +624,7 @@ test body, and never matched `async def`. Test bodies now come from `ast`, so a 
 test ends; all 38 tenant tables stayed covered, so none had been resting on glue.
 
 M6-C3a is technically complete, development-synchronized and locally merged, and C3b's three job
-entrypoints are technically complete on `slice/m6-c3b-jobs` and not merged. M6-C3 remains open for
+entrypoints are technically complete and locally merged. M6-C3 remains open for
 C3c's landlord *Zahlungen* screen. It also inherits the gaps in `PLAN.md` § M6-C —
 `ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
 reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.

@@ -161,7 +161,7 @@ The C3a slice adds exactly five further owner-only API routes:
 
 These five routes and `matching_service.py` are technically complete, development-synchronized and
 locally merged into `main`. There is still no *Zahlungen* client route; that is C3c. C3b's three
-jobs are technically complete on `slice/m6-c3b-jobs` and not merged; they add no route and no
+jobs are technically complete and locally merged; they add no route and no
 screen.
 
 Migration `0020` closes the M6-C3-0 invariant repair below these routes: signed and locked

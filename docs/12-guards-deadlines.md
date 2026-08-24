@@ -420,8 +420,8 @@ Page 05 excludes all ten items listed by both the Page and Non-Goals V1:
 
 `docs/16` depends on W4's cadence but owns UVI calculation, content and document isolation. The
 shipped M6-C2 ledger plus the technically complete, development-synchronized and locally merged
-C3a service can supply W3 payment events. C3b's `watch_deadlines` is technically complete on its
-slice branch and deliberately applies **no** guard rule from this document: it reports an overdue
+C3a service can supply W3 payment events. C3b's `watch_deadlines` is locally merged and
+deliberately applies **no** guard rule from this document: it reports an overdue
 receivable as days and cents, with no W3 threshold, stage, warning copy or escalation. Those arrive
 with the guard engine, versioned, and may consume Page-05 costs/interest under the approved bank
 contract. `docs/13` owns future clause
