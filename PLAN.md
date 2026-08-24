@@ -897,7 +897,8 @@ convention, § 4 carries the display-rounding decision and § 8.2 carries the K1
 The oracle gained four constants and no golden value moved. U0 is documentation plus data-only
 fixtures.
 
-**U1 status:** the pure `packages/uvi-engine` is complete and locally merged, not pushed. It
+**U1 status:** the pure `packages/uvi-engine` is complete and locally merged as `d02c838`, not
+pushed. It
 executes `docs/16` Blocks A, B, C with its raw fallback, D, D2, the HKV provisional path and linear
 mid-month interpolation against the nine `UVI_EXAMPLES` cases. Block C rounds the displayed kWh
 before deriving delta and percent, per § 4. The engine imports `lokara_domain` only and reuses no

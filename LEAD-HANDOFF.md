@@ -11,7 +11,8 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   six-year MessEV Eichfrist.
 - **U0 is complete and locally merged.** The round-4 UVI transcription, `738e048`, finalized by
   `0efbc7f`.
-- **U1 is complete and locally merged.** The pure `packages/uvi-engine` — slice commit `afc723c`.
+- **U1 is complete and locally merged.** The pure `packages/uvi-engine` — `afc723c` and the brief
+  commit `0a60721`, merged as `d02c838`.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`

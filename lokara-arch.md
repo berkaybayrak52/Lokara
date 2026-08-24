@@ -38,6 +38,11 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   meter-calibration and W4 UVI-cadence rules. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13`
   execute through production code. No API, persistence, UI, scheduler or PDF consumer exists yet.
 
+- U1 (`d02c838`) adds the pure `packages/uvi-engine`. `docs/16` Blocks A, B, C with its raw
+  fallback, D, D2, the HKV provisional path and linear mid-month interpolation execute against the
+  nine `UVI_EXAMPLES` cases. Its statement review found no wording defect and one structural gap:
+  the engine has no provenance channel, which U1b closes before U2.
+
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
 - Page 08 bank matching is implemented. `packages/matching-engine` runs all thirteen
   `BANKMATCH` cases through real code (M6-C1), and M6-C2 adds the nine account-scoped bank,
@@ -71,8 +76,9 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - Source-backed `docs/10`–`docs/14` and `docs/16` precede their remaining implementation.
   `docs/16` is transcription-complete after U0 (`738e048`): the monthly `hdd_3807` dataset, the
   persisted station-to-PLZ convention, the display-rounding rule and the K13 vintage maintenance are
-  specified. No UVI engine, importer or document exists, and production Blocks C/D2 stay blocked by
-  the unchosen PLZ geodataset and three missing register rows.
+  specified. U1 (`d02c838`) adds the pure engine; no importer, schema or document exists, and
+  production Blocks C/D2 stay blocked by the unchosen PLZ geodataset and three missing register
+  rows.
   `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
 
 ## Runtime topology
@@ -104,6 +110,10 @@ backend.
 - `packages/guard-engine` is the prepared G1 decision layer. It depends only on `packages/domain`,
   accepts explicit source identity, `today` and caller-resolved rule bundles, and never imports the
   rules store or ambient clock. It stores and delivers nothing; later consumers belong to U and M9.
+- `packages/uvi-engine` is the `docs/16` § 6a decision layer. It depends only on
+  `packages/domain`, rounds the displayed kWh before deriving delta and percent, and reuses no
+  rules-store table — in particular not `rules/degree_days.py`, which is the VDI 2067 § 9b
+  apportionment table and a different dataset. It stores and delivers nothing.
 - `packages/matching-engine` is the `docs/15` decision layer: signal scoring, the six-step decision
   order, § 366/§ 367 settlement, the Largest-Remainder principal split and reversal. It imports the
   standard library only — not even the domain package — and refuses `float` at its one import
