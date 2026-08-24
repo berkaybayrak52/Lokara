@@ -47,15 +47,28 @@ PAGE_05_GOLDENS: dict[str, dict[str, object]] = {
         "medium": "warm_water",
         "calibration_month": "2020-06",
         "today_month": "2025-08",
-        "device_types": ("cold_water", "warm_water", "heat_meter", "heat_exchanger_hot_water"),
+        "years_by_medium": {
+            "cold_water": 6,
+            "warm_water": 6,
+            "heat_meter": 6,
+            "heat_exchanger_hot_water": 6,
+            "electricity": 8,
+            "gas": 8,
+        },
         "years": 6,
         "valid_until": "2026-12-31",
         "months_until_expiry": 16,
-        "stage": "notice",
+        "stage": "none",
         "effective_from": "2021-11-04",
         "expiry_rule": "end_of_calendar_year",
+        "verification_status": "geprüft",
         "transition": (
             "UNSICHER: applies to already-installed devices only by provider communication"
+        ),
+        "superseded_source_result": (
+            "Page 05 prints Warmwasser 5 Jahre, 31.12.2025 and the Hinweis stage for this "
+            "case. The unified six-year MessEV period moves it to 31.12.2026 and out of the "
+            "<= 6 months notice window at heute=08.2025."
         ),
         "heating_cost_allocator_in_guard": False,
     },

@@ -34,13 +34,6 @@ def _ints(case: dict[str, object], key: str) -> tuple[int, ...]:
     return value
 
 
-def _texts(case: dict[str, object], key: str) -> tuple[str, ...]:
-    value = case[key]
-    assert isinstance(value, tuple)
-    assert all(isinstance(item, str) for item in value)
-    return value
-
-
 def _bool(case: dict[str, object], key: str) -> bool:
     value = case[key]
     assert isinstance(value, bool)
@@ -118,17 +111,25 @@ def test_w1_date_arithmetic_and_deadline_states() -> None:
     assert _bool(resolved, "resolved")
 
 
-def test_w2_uses_six_years_to_calendar_year_end_and_excludes_heat_allocators() -> None:
+def test_w2_uses_the_unified_six_year_messev_period() -> None:
     case = _case("12-F05")
-    assert _int(case, "years") == 6
-    assert set(_texts(case, "device_types")) == {
-        "cold_water",
-        "warm_water",
-        "heat_meter",
-        "heat_exchanger_hot_water",
+    assert case["years_by_medium"] == {
+        "cold_water": 6,
+        "warm_water": 6,
+        "heat_meter": 6,
+        "heat_exchanger_hot_water": 6,
+        "electricity": 8,
+        "gas": 8,
     }
+    assert _int(case, "years") == 6
     assert _date(case["valid_until"]) == date(2026, 12, 31)
+    assert _int(case, "months_until_expiry") == 16
+    assert case["stage"] == "none"
+    assert _date(case["effective_from"]) == date(2021, 11, 4)
     assert case["expiry_rule"] == "end_of_calendar_year"
+    assert case["verification_status"] == "geprüft"
+    assert "UNSICHER" in str(case["transition"])
+    assert "31.12.2025" in str(case["superseded_source_result"])
     assert case["heating_cost_allocator_in_guard"] is False
 
     missing = _case("12-F06")
