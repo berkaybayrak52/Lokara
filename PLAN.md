@@ -939,15 +939,16 @@ by `evaluate_hkv_provisional` must be carried onto the Block A figure by the com
 and nothing enforces that today; and `SourceIdentity` is defined and exported but no UVI type
 consumes it yet, which is U4's archive identity.
 
-**U2 status:** versioned Heizspiegel rules data is complete, statement-reviewed and green but not
-committed. The 18 rows, five deductions, non-positive import guard, two visible over-500 fallbacks,
-exact attribution and 1 October vintage resolution feed `ResolvedHeizspiegelRow`. Review found and
-the two-lane fix closed dynamic future-vintage row identity and effective-Rechtsstand provenance.
-Focused U2 tests pass 11, all rules-store tests pass 135, the fast gate passes 598 pure-package
-tests and the full gate passes 1,289 Python plus 84 web tests. Production flags remain unchanged.
+**U2 status:** versioned Heizspiegel rules data is complete, statement-reviewed and locally merged.
+Feature commit `75cfaec` was merged as `2559848`; nothing is pushed. The 18 rows, five deductions,
+non-positive import guard, two visible over-500 fallbacks, exact attribution and 1 October vintage
+resolution feed `ResolvedHeizspiegelRow`. Review found and the two-lane fix closed dynamic
+future-vintage row identity and effective-Rechtsstand provenance. Focused U2 tests pass 11, all
+rules-store tests pass 135, the fast gate passes 598 pure-package tests and the full gate passes
+1,289 Python plus 84 web tests. Production flags remain unchanged.
 
 **Remaining execution order.** Three slices, each sized against U1, plus two items no agent can
-close. U2 must be committed and landed before U3 starts.
+close. U3 starts from the finalized `main` after U2.
 
 - **U3 — DWD adapters.** `packages/adapters/src/lokara_adapters/dwd.py`: the § 9 annual
   climate-factor import with all eight named guards and the nine verified PLZ/KF fixtures, the § 7.1

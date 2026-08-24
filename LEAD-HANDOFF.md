@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U2 is green but uncommitted; three U slices remain, U3 first
+# LEAD-HANDOFF.md — U2 is locally merged; three U slices remain, U3 first
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -15,8 +15,8 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   commit `0a60721`, merged as `d02c838`.
 - **U1b is complete, reviewed and locally merged.** Feature commit `ed82202` was merged as
   `ee83535`. Its statement-review finding is resolved and the closing full gate is green.
-- **U2 is complete, reviewed, green and not committed.** Its three-file diff sits on
-  `slice/u2-heizspiegel-rules` at base `ab875d2`. Do not start U3 until U2 is landed.
+- **U2 is complete, reviewed and locally merged.** Feature commit `75cfaec` was merged as
+  `2559848`; nothing is pushed.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
@@ -88,8 +88,7 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 # U2 closure and the remaining U work — U3 to U5
 
-U2 is green but uncommitted. Land it before U3; otherwise U3's diff would contain the Heizspiegel
-rules module and fixture.
+U2 is landed locally. U3 must start from the finalized `main`, never from an older slice branch.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
