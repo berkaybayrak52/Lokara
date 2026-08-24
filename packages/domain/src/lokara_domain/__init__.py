@@ -35,6 +35,7 @@ from .money import (
 )
 from .occupancy import Occupancy, OccupancyOverlapError, Segment, build_unit_segments
 from .period import Period, days_between, overlap_days, period, periods_overlap
+from .provenance import RuleConflict, RuleEvidence, SourceIdentity
 
 __version__ = "0.1.0"
 
@@ -58,7 +59,10 @@ __all__ = [
     "Period",
     "ReadingReason",
     "ReadingSource",
+    "RuleConflict",
+    "RuleEvidence",
     "Segment",
+    "SourceIdentity",
     "WarmWaterFormula",
     "add_cents",
     "build_unit_segments",

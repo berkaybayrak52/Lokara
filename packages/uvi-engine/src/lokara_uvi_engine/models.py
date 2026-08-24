@@ -8,6 +8,25 @@ from decimal import Decimal
 
 from lokara_domain.energy import EnergyReference
 from lokara_domain.meter import MeasurementUnit, ReadingReason, ReadingSource
+from lokara_domain.provenance import RuleConflict, RuleEvidence
+
+
+@dataclass(frozen=True, slots=True)
+class UviRuleBundle:
+    evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedHeizspiegelRow:
+    energy_source: str
+    requested_size_class: str
+    actual_size_class: str
+    heizspiegel_mittel_kwh_m2a: Decimal
+    warm_water_deduction_kwh_m2a: Decimal
+    heizspiegel_vintage: str
+    fallback_label_de: str | None
+    evidence: tuple[RuleEvidence, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +46,9 @@ class BlockAResult:
     heat_kwh: int | None
     measurement_unit: MeasurementUnit
     energy_reference: EnergyReference
+    label_de: str | None
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
     data_quality_flag: str | None = None
 
 
@@ -42,6 +64,8 @@ class BlockBResult:
     delta_kwh: int | None
     percent: Decimal | None
     label_de: str | None
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +75,10 @@ class BlockCInput:
     monthly_degree_days_current: Decimal | None
     monthly_degree_days_previous_year: Decimal | None
     previous_year_interpolation_notice_de: str | None
+    station_id: str | None
+    distance_km: Decimal | None
+    dataset_attribution_de: str | None
+    dataset_as_of: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +91,13 @@ class BlockCResult:
     percent: Decimal | None
     label_de: str | None
     previous_year_interpolation_notice_de: str | None
+    attribution_de: str | None
+    station_id: str | None
+    distance_km: Decimal | None
+    dataset_as_of: str | None
+    station_distance_over_50_km: bool
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +124,8 @@ class BlockDResult:
     delta_kwh: int | None
     percent: Decimal | None
     basis_de: str | None
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
     data_quality_flag: str | None = None
 
 
@@ -96,12 +133,8 @@ class BlockDResult:
 class BlockD2Input:
     current_heat_kwh: int
     target_area_sqm: Decimal
-    energy_source: str
-    building_size_class: str
-    heizspiegel_mittel_kwh_m2a: Decimal
-    warm_water_deduction_kwh_m2a: Decimal
     monthly_degree_day_share: Decimal
-    heizspiegel_vintage: str
+    resolved_row: ResolvedHeizspiegelRow
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,10 +145,14 @@ class BlockD2Result:
     norm_month_kwh: int | None
     delta_kwh: int | None
     percent: Decimal | None
-    basis_de: str
-    label_de: str
-    attribution_de: str
+    basis_de: str | None
+    label_de: str | None
+    attribution_de: str | None
     heizspiegel_vintage: str
+    actual_size_class: str
+    fallback_label_de: str | None
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
     data_quality_flag: str | None = None
 
 
@@ -134,6 +171,8 @@ class HkvProvisionalResult:
     provisional_unit_kwh: int | None
     label_de: str | None
     measurement_unit: MeasurementUnit
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
     data_quality_flag: str | None = None
 
 
@@ -173,3 +212,5 @@ class LinearInterpolationResult:
     source_reading_sources: tuple[ReadingSource, ...]
     measurement_unit: MeasurementUnit
     energy_reference: EnergyReference
+    rule_evidence: tuple[RuleEvidence, ...]
+    unresolved_conflicts: tuple[RuleConflict, ...]
