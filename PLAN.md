@@ -83,7 +83,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's *Zahlungen* screen are technically complete and locally merged. |
-| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. UVI calculation, readings and document implementation do not exist; G1 prepares only the W4 cadence evaluator. |
+| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete D2 transcription approved and merged 21.08.2026. U0 transcribes round 4's monthly `hdd_3807` dataset, persisted station-assignment convention, display-rounding decision and K13 vintage rule. Production Blocks C/D2 still require a chosen PLZ geodataset and three missing UVI register rows. UVI calculation, readings and document implementation do not exist; G1 supplies only the W4 cadence evaluator. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
 engine contract; it does not create a second competing heating specification.
@@ -885,9 +885,11 @@ finding. Technical closure does not clear any `verify-before-production` marker.
 - Add monthly readings, the UVI calculation and the separate tenant document.
 - Keep scheduled delivery in M9 and portal publication in M10.
 
-**Done when:** every `docs/16` calculation fixture passes, the DWD conflicts are resolved and the
-UVI document is tenant-isolated. If the DWD inputs remain unresolved, U stays blocked; G1 remains
-technically closed.
+**Done when:** every `docs/16` calculation fixture passes, the specified monthly `hdd_3807` input and
+persisted station assignment are implemented, the PLZ geodataset is chosen, the missing UVI register
+rows exist and the UVI document is tenant-isolated. Round 4 resolved the dataset and Block C
+rounding order; production Blocks C/D2 remain blocked by the unchosen PLZ geodataset and missing
+UVI register rows. G1 remains technically closed.
 
 ### M7 — Tax export and AfA
 

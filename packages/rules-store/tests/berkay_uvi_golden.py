@@ -31,7 +31,7 @@ UVI_EXAMPLES: Final[dict[str, dict[str, object]]] = {
         "delta_kwh": -52,
         "percent": "-5.5",
         "input_status": "arithmetic_fixture_not_authoritative_monthly_dwd_data",
-        "rounding_note": "source_example_percent_uses_rounded_display_values",
+        "rounding_note": "round4_displayed_kwh_control_adjacent_percent",
     },
     "emir_spec_block_d_building_cross_section": {
         "target": {"area_sqm": 80, "kwh": 900},
@@ -129,9 +129,138 @@ DWD_ANNUAL_IMPORT_CONTRACT: Final[dict[str, object]] = {
     "direction": "factor_above_one_increases_adjusted_consumption",
     "missing_plz": "raw_labelled_comparison_never_implicit_one",
     "attribution": "Quelle: Deutscher Wetterdienst",
-    "monthly_degree_day_dataset": None,
-    "station_to_plz_mapping": None,
-    "monthly_uvi_status": "verify-before-production",
+    "monthly_degree_day_dataset": "DWD_hdd_3807",
+    "station_to_plz_mapping": "persisted_nearest_valid_station_convention",
+    "monthly_uvi_status": (
+        "specified; production blocked by unchosen PLZ geodataset and missing UVI register rows"
+    ),
+}
+
+
+DWD_MONTHLY_DEGREE_DAY_CONTRACT: Final[dict[str, object]] = {
+    "source": "Antwort-an-Emir_04.md § 7.1",
+    "rechtsstand": "08/2026",
+    "path": (
+        "opendata.dwd.de/climate_environment/CDC/derived_germany/techn/monthly/"
+        "heating_degreedays/hdd_3807/"
+    ),
+    "recent_since": "2019-01-01",
+    "older_data_directory": "historical",
+    "standard": "VDI 3807",
+    "heating_limit_celsius": 15,
+    "reference_room_temperature_celsius": 20,
+    "unit": "Kd",
+    "level": "station-based",
+    "columns": (
+        "station_id",
+        "latitude",
+        "longitude",
+        "station_name",
+        "month_yyyymm",
+        "valid_day_count",
+        "monthly_degree_days",
+        "heating_day_count",
+        "ten_year_mean",
+    ),
+    "file_structure": "one_file_per_month",
+    "update_frequency": "monthly",
+    "attribution": "Quelle: Deutscher Wetterdienst",
+    "nature": "external_source_DWD_GeoNutzV",
+    "flag": "verify-before-production",
+}
+
+
+DWD_STATION_ASSIGNMENT_CONTRACT: Final[dict[str, object]] = {
+    "source": "Antwort-an-Emir_04.md § 7.1",
+    "rechtsstand": "08/2026",
+    "steps": (
+        "PLZ_to_centroid_from_versioned_PLZ_geodataset",
+        "candidate_stations_with_valid_target_month_value",
+        "nearest_candidate_by_great_circle_distance",
+        "persist_assignment_per_PLZ_and_month",
+    ),
+    "min_valid_days": 25,
+    "distance_label_threshold_km_exclusive": 50,
+    "same_station_in_both_compared_months": True,
+    "no_common_station": "walk_next_nearest_fallback_chain",
+    "persistence_key": ("plz", "month"),
+    "persisted_fields": ("station_id", "distance_km"),
+    "persist_never_recompute": True,
+    "coordinates_source": "DWD_file",
+    "official_PLZ_degree_day_dataset_exists": False,
+    "PLZ_geodataset": None,
+    "PLZ_geodataset_status": "UNSICHER_unselected",
+    "V1_centroid_label": "Konvention",
+    "nature": "Konvention",
+    "flag": "verify-before-production",
+}
+
+
+UVI_DISPLAY_ROUNDING_RULE: Final[dict[str, object]] = {
+    "source": "Antwort-an-Emir_04.md § 7.2",
+    "rechtsstand": "08/2026",
+    "rule": (
+        "compute unrounded through the last displayed figure; round adjusted or expected kWh "
+        "first, then compute delta and percentage from displayed kWh"
+    ),
+    "rationale": "every consumer-document figure is reproducible from adjacent displayed figures",
+    "nature": "Konvention",
+    "block_reverification": (
+        {
+            "block": "B",
+            "rounded_path": "50 / 850 = 5.88 -> 5.9",
+            "exact_path": "identical_no_intermediate_rounding",
+            "approved_percent": "5.9",
+        },
+        {
+            "block": "C",
+            "rounded_path": "-52 / 952 = -5.46 -> -5.5",
+            "exact_path": "-51.61 / 951.61 = -5.42 -> -5.4",
+            "approved_percent": "-5.5",
+        },
+        {
+            "block": "D",
+            "rounded_path": "-140 / 1040 = -13.46 -> -13.5",
+            "exact_path": "identical_13.0_exact",
+            "approved_percent": "-13.5",
+        },
+        {
+            "block": "D2",
+            "rounded_path": "132 / 1368 = 9.649 -> 9.6",
+            "exact_path": "identical_1368_exact",
+            "approved_percent": "9.6",
+        },
+    ),
+    "only_divergent_block": "C",
+    "berkay_D2_verification_row": {
+        "figures": (1_733, 467, "27.0"),
+        "status": "superseded_heat_plus_hot_water_result_not_current",
+    },
+}
+
+
+HEIZSPIEGEL_VINTAGE_MAINTENANCE: Final[dict[str, object]] = {
+    "source": "Antwort-an-Emir_04.md § 7.3",
+    "rechtsstand": "08/2026",
+    "trigger": "yearly_on_01_October",
+    "publication_pattern": "autumn_for_previous_billing_year",
+    "steps": (
+        "store_new_comparison_table_as_new_file_and_retain_old_vintages",
+        "treat_changed_size_class_boundaries_as_schema_change",
+        "reread_vintage_dependent_combustion_warm_water_surcharge",
+        "recompute_heat_pump_deduction_as_combustion_surcharge_divided_by_JAZ_assumption",
+        "stop_import_if_middle_minus_warm_water_is_non_positive_for_any_combination",
+        "store_as_of_year_and_use_vintage_valid_at_UVI_month_M_never_newest",
+    ),
+    "JAZ_assumption": 3,
+    "JAZ_status": "Konvention_until_co2online_supplies_another_value",
+    "negative_guard_scope": "every_energy_source_x_size_class",
+    "negative_guard_hit": "stop_import_do_not_render",
+    "source_and_values_owner": "Berkay",
+    "import_guard_and_test_owner": "Emir",
+    "delivered_UVI_changes_retroactively": False,
+    "vintage_binding": "UVI_record_not_retrieval_time",
+    "heat_pump_8_kwh_status": "unconfirmed_verify-before-production_convention",
 }
 
 
@@ -493,4 +622,6 @@ SUPERSESSION_LEDGER: Final[dict[str, object]] = {
         "status": "history_only_replaced_by_approved_heat_only_example",
     },
     "missing_over_500_omit_or_extrapolate": "use_250_500_with_visible_label",
+    "monthly_DWD_dataset_missing": "resolved_by_round4_DWD_hdd_3807",
+    "block_C_rounding_order": "resolved_by_round4_displayed_values_win",
 }

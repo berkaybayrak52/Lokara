@@ -18,6 +18,7 @@ remains effective.
   3a95fd420731814e9e5be043028d4856.md`
 - `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
 - `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`
+- `Antwort-an-Emir_04.md` § 7
 
 The structured register controls values and production flags. Approved supersessions in this
 document control explicit method corrections. The data-only oracle is
@@ -59,9 +60,9 @@ The later sources settle these corrections:
 11. Missing monthly weather data produces a raw comparison labelled
     “nicht witterungsbereinigt”. It never inserts an implicit factor of `1.00`.
 
-The exact monthly DWD degree-day dataset and station-to-PLZ mapping remain
-`verify-before-production`. That missing authority blocks production Blocks C and D2, but not this
-transcription.
+Round 4 specifies the monthly DWD degree-day dataset and Lokara's station-to-PLZ assignment rule.
+Production Blocks C and D2 remain blocked by the unchosen PLZ geodataset and the three missing UVI
+register rows requested in `FRAGEN-an-Berkay-05.md`. The transcription itself is not blocked.
 
 ## 2. Legal and register inventory
 
@@ -76,7 +77,7 @@ below do not silently change a CSV flag.
 | 21 | K13 co2online average-user values; monthly UVI may not use the annual-statement online-reference escape | Heizspiegel method · § 6a Abs. 2 Nr. 3, Abs. 3 S. 1 Nr. 4 | Konvention · `verify-before-production` · 07/2026 |
 | 29 | annual § 6a block: source mix, THG/primary energy, taxes/fees, equipment/readout/billing costs, contacts, dispute notice, average-user and graphical prior-year comparison | `gesetze-im-internet.de/heizkostenv/__6a.html` · § 6a Abs. 3 S. 1 Nr. 1–5 | Verordnung · `geprüft` · 07/2026 |
 | 30 | retrofit deadline 31.12.2026 | consolidated HeizkostenV · § 5 Abs. 2 | Verordnung · `geprüft` · 07/2026 |
-| 35 | K12 DWD factor: TRY Potsdam/location, about 8,200 PLZ, rolling 12-month periods, about six-week delay, GeoNutzV attribution | DWD · § 6a Abs. 3 S. 3 HeizkostenV with § 82 Abs. 3 GEG | Konvention · `verify-before-production` · 07/2026 |
+| 35 | K12 annual DWD factor: TRY Potsdam/location, about 8,200 PLZ, rolling 12-month periods, about six-week delay, GeoNutzV attribution; the monthly degree-day dataset has no register row yet | DWD · § 6a Abs. 3 S. 3 HeizkostenV with § 82 Abs. 3 GEG | Konvention · `verify-before-production` · 07/2026 |
 | 43 | 3% reduction risk for missing/incomplete § 6a information | `gesetze-im-internet.de/heizkostenv/__12.html` · § 12 Abs. 1 S. 3 with § 6a | Verordnung · `verify-before-production` · 07/2026 |
 | 45 | comparison includes heat and hot water; weather-adjust heat only and show hot water raw | § 6a Abs. 3 S. 2–3 | Verordnung · `verify-before-production` · 07/2026 |
 | 50 | closed § 7 Abs. 2 heating-cost catalogue, including § 6a information costs; § 8 Abs. 2 adds water costs | §§ 7 Abs. 2/4 and 8 Abs. 2/4 | Verordnung · `verify-before-production` · 07/2026 |
@@ -133,12 +134,28 @@ UVI calculation is pure: normalized values in, deterministic result and warnings
 database, framework, adapter, clock or vendor library. Legal/conventional values are resolved from
 versioned rules data by the caller and retain their as-of date.
 
-Calculate with exact decimal values. Round the final consumption/delta to whole kWh, half up. Round
-the final percentage to one decimal place, half up. The Block C annex text says to compute on
-unrounded values, but its worked result calculates `-52 / 952 = -5.5%` from displayed rounded
-values. The oracle preserves the printed result and flags that rounding-order inconsistency for
-resolution before implementation. A missing value is absent, not zero. A zero denominator
-suppresses only the percentage and keeps the absolute value.
+Calculate on unrounded values up to the last figure that is displayed. Round the displayed
+adjusted/expected consumption and delta to whole kWh, half up, then derive every adjacent displayed
+figure from those displayed values. In particular, compute the displayed percentage from the
+rounded kWh and round it to one decimal place, half up. This makes every value reproducible from the
+figures printed beside it; the renter does not have the unrounded intermediates.
+
+This presentation rule is a `Konvention`, Rechtsstand 08/2026 (source:
+`Antwort-an-Emir_04.md` § 7.2). All four approved examples were re-verified without changing a
+golden value:
+
+| Block | via rounded values | via exact values | doc example |
+| --- | --- | --- | --- |
+| B | `50 / 850 = 5.88 -> +5.9%` | identical; no intermediate rounding | `+5.9%` |
+| C | `-52 / 952 = -5.46 -> -5.5%` | `-51.61 / 951.61 = -5.42 -> -5.4%` | `-5.5%` |
+| D | `-140 / 1040 = -13.46 -> -13.5%` | identical; `13.0` is exact | `-13.5%` |
+| D2 | `132 / 1368 = 9.649 -> +9.6%` | identical; `1368` is exact | `+9.6%` |
+
+Block C is the only divergent path, and its approved example already uses the displayed values.
+Berkay's round-4 verification row for D2 used the superseded `467 / 1733 = +27.0%` figures; the
+current approved `1368 / +132 / +9.6%` figures above remain unchanged and follow the same rule. A
+missing value is absent, not zero. A zero denominator suppresses only the percentage and keeps the
+absolute value.
 
 Blocks A–D2 are heat-consumption comparisons. They allocate no cents. Any required price/cost
 information is normalized factual content from its source; no UVI module redistributes the annual
@@ -191,17 +208,65 @@ percent = delta / prior_adjusted * 100
 
 The annex arithmetic case uses `900`, `1,000`, `590` and `620`: adjusted prior year
 `951.6129… → 952 kWh`, delta `-51.6129… → -52 kWh`, **-5.5%** from the displayed `-52 / 952`.
-The source's exact-value instruction would instead yield `-5.4%`; that unresolved rounding-order
-conflict is explicit. The two degree-day inputs are an arithmetic fixture, not approved production
-DWD rows.
+The former exact-value wording would instead yield `-5.4%`; round 4 resolves the conflict in favour
+of the reproducible displayed result. The two degree-day inputs remain an arithmetic fixture, not
+production DWD rows.
 
 Missing prior-year consumption prints “liegt im ersten Bezugsjahr noch nicht vor”. Missing or zero
 prior-year monthly degree days falls back to `current / prior` and visibly prints
 “nicht witterungsbereinigt”. It never supplies `1.00`. Interpolated prior-year consumption retains
 its interpolation notice.
 
-Production is blocked until an authoritative monthly DWD dataset and station-to-PLZ mapping are
-specified, versioned and covered. The annual climate-factor files in § 9 do not resolve this.
+### 7.1 Round 4 — monthly degree-day dataset (source: `Antwort-an-Emir_04.md` § 7.1, Rechtsstand 08/2026)
+
+| Property | Contract |
+| --- | --- |
+| source | `opendata.dwd.de/climate_environment/CDC/derived_germany/techn/monthly/heating_degreedays/hdd_3807/`; `recent/` from 2019-01-01, `historical/` before |
+| content | monthly degree-day sums per **VDI 3807** |
+| heating limit | **15 °C**; only days whose daily mean is below it count |
+| reference room temperature | **20 °C** |
+| unit | **Kelvin × day (Kd)** |
+| level | **station-based**; coordinates are in the file |
+| columns | station id · latitude · longitude · station name · month (`yyyymm`) · valid-day count · monthly degree days · heating-day count · ten-year mean |
+| structure | one file per month, updated monthly |
+| licence | DWD terms / **GeoNutzV**; “Quelle: Deutscher Wetterdienst” is mandatory |
+
+The dataset is an external DWD source. The annual PLZ climate factors in § 9 remain a different
+dataset and cannot supply Block C monthly degree days.
+
+### 7.2 Round 4 — station-to-PLZ assignment (source: `Antwort-an-Emir_04.md` § 7.1, Rechtsstand 08/2026)
+
+DWD publishes PLZ-level values only for the annual climate factors in § 9, for about 8,200 delivery
+PLZ, rolling 12-month periods and the Potsdam reference. Degree days exist only per station; there
+is no official PLZ-to-degree-day dataset. Lokara therefore uses its own deterministic, versioned
+`Konvention`:
+
+```text
+1. PLZ -> centroid (latitude/longitude) from a versioned PLZ geodataset
+2. candidates = stations with a valid value in the target month
+                (valid-day count >= 25; fewer means the month is incomplete)
+3. assignment = nearest candidate by great-circle distance on coordinates from
+                the DWD file, never a separately maintained station list
+4. persist per (PLZ, month) with station id and distance in km
+```
+
+- **Persist, never recompute.** A renter's comparison figure must not move because a station drops
+  out, and an archived UVI must remain reproducible.
+- **Treat a station change between compared months as a data-quality case.** Use a station with a
+  valid value in both months. If none exists, walk the next-nearest fallback chain. Attach a visible
+  label when the distance exceeds **50 km**.
+- **Carry the distance and display it when large.** Distance is part of the quality evidence.
+- **Use the DWD file's own coordinates.** Do not maintain a second station-coordinate source.
+
+`[UNSICHER]` The PLZ geodataset is not chosen. Candidates are OpenStreetMap-based PLZ centroids or
+a commercial dataset. Large rural-area centroids may sit several kilometres from the building;
+geocoding the building address would be cleaner. For V1, the centroid is sufficient only when
+labelled as a convention.
+
+Dataset nature: external source (DWD, GeoNutzV). Assignment nature: `Konvention`. Both carry
+Rechtsstand 08/2026 and `verify-before-production`. Production Blocks C and D2 remain blocked by
+the open PLZ-geodataset choice and the three missing UVI register rows, not by a missing monthly
+dataset.
 
 ## 8. Block D and D2 — average user
 
@@ -282,9 +347,36 @@ include heat plus hot water. For over-500 m² Wärmepumpe and Holzpellets only, 
 and print: “Vergleichswert der Größenklasse 250–500 m²; für über 500 m² liegt für diesen
 Energieträger noch kein Wert vor.” This fallback is not guaranteed conservative.
 
+#### Round 4 — K13 Heizspiegel vintage maintenance (source: `Antwort-an-Emir_04.md` § 7.3, Rechtsstand 08/2026)
+
+co2online usually publishes the Heizspiegel in autumn for the previous billing year. Check for a
+new vintage every year on **1 October**:
+
+1. Pull the new comparison table as a **new file**. Retain all old vintages so archived UVIs remain
+   reproducible.
+2. Check the size-class boundaries. Changed boundaries are a **schema change**, not only a data
+   update.
+3. Re-read the method's warm-water surcharge. The `24` value is vintage-dependent and must never be
+   carried forward without checking the new method.
+4. Recompute `ww_wp = ww_verbrenner / JAZ_assumption`. If the combustion surcharge changes, the
+   heat-pump value changes with it. JAZ `3` remains a `Konvention` until co2online supplies another
+   source.
+5. Run `(mittel - ww) <= 0` for every energy-source x size-class combination. Any hit stops the
+   import; do not render.
+6. Store the vintage in the rules store with its as-of year. A UVI for month M always uses the
+   vintage valid at M, never the newest vintage.
+
+Berkay owns source and values; Emir owns import, guard and test. A delivered UVI must never change
+retroactively: its vintage binds to the UVI record, not retrieval time.
+
+Round 4 does **not** confirm the heat-pump `8 kWh/(m²·a)` deduction. It remains the convention
+`24 / JAZ 3`, visibly labelled as an assumption and `verify-before-production`; the co2online reply
+is outstanding, and the published heat-pump value Berkay found is euro-based rather than kWh-based.
+
 ## 9. DWD rolling 12-month climate-factor import
 
-This importer serves Page 01b's annual comparison. It does not provide Block C monthly degree days.
+This importer serves Page 01b's annual comparison. It does not provide Block C monthly degree days;
+those come from § 7.1.
 
 | Property | Contract |
 | --- | --- |
@@ -361,7 +453,8 @@ Implementation is complete only when:
 - every source-named calculation and fallback fixture is executable against production code;
 - annual DWD import guards cover headers, leading zeroes, completeness, duplicates, range,
   idempotency, missing PLZ and factor direction;
-- the monthly dataset/station mapping authority exists and Blocks C/D2 are no longer red;
+- the monthly dataset and station-assignment contract in § 7 are implemented, the PLZ geodataset is
+  chosen, the requested UVI register rows exist and Blocks C/D2 are no longer production-blocked;
 - all 18 Heizspiegel rows, deductions, heat-pump exception, non-positive guard, over-500 fallback
   and attribution are versioned and tested;
 - renter isolation has a negative cross-unit test and every new tenant table has composite account
@@ -369,8 +462,8 @@ Implementation is complete only when:
 - archive and delivery evidence is append-only and retry-safe;
 - strict typing, lint, pure-package tests and the required statement/UI review pass.
 
-No engine, adapter, schema, API, UI, PDF, scheduler or delivery implementation is part of this D2
-slice.
+No engine, adapter, schema, API, UI, PDF, scheduler or delivery implementation is part of the U0
+round-4 transcription slice.
 
 ## 13. Source-named fixture map
 
@@ -386,6 +479,10 @@ slice.
 | `approved_linear_mid_month_interpolation` | elapsed-day boundaries and provenance; February `280 kWh` |
 | `DWD_ANNUAL_CLIMATE_FACTOR_PLZ_FIXTURES` | all nine PLZ values including leading zero |
 | `DWD_ANNUAL_IMPORT_CONTRACT` | headers, range, completeness, duplicate, idempotency and direction guards |
+| `DWD_MONTHLY_DEGREE_DAY_CONTRACT` | monthly VDI 3807 dataset, thresholds, structure and attribution |
+| `DWD_STATION_ASSIGNMENT_CONTRACT` | deterministic persisted station assignment and open PLZ-geodataset choice |
+| `UVI_DISPLAY_ROUNDING_RULE` | displayed-value rule, four-block re-verification and superseded D2 row |
+| `HEIZSPIEGEL_VINTAGE_MAINTENANCE` | annual 1 October check, six maintenance steps and vintage-at-M invariant |
 | `HEIZSPIEGEL_2025_ROWS` | all 18 source rows exactly |
 | `HEIZSPIEGEL_D2_CONTRACT` | deductions, heat-pump exception, non-positive guard, fallback and attribution |
 | `UVI_REGISTER_ROWS` | exact 12-row identity and every production flag |
@@ -428,6 +525,7 @@ are also outside this document.
 | Non-Goals V1 Page 01b | § 14 and oracle | all eleven entries mapped; dated deferral preserved |
 | README-for-Emir | introduction, §§ 2, 12 | arithmetic evidence retained; no red flag cleared |
 | Historical correspondence | `docs/03` Appendix D | single retirement ledger; all UVI corrections above remain durable |
+| `Antwort-an-Emir_04.md` § 7 | §§ 4, 7.1, 7.2, 8.2 and oracle | monthly dataset, assignment convention, display rounding and K13 vintage maintenance transcribed |
 
 ## 16. Compact supersession and unresolved ledger
 
@@ -443,15 +541,18 @@ are also outside this document.
 | old D2 result `1,733 kWh, +467 kWh, +27.0%` | historical only; current result is in § 8.2 |
 | missing over-500 heat-pump/pellet value omitted or extrapolated | use 250–500 with visible label |
 | W4 month-end means settled year-round duty | not settled; retain year-round/heating-season uncertainty |
-| exact monthly DWD dataset and station-to-PLZ map | unresolved; `verify-before-production` and blocks production C/D2 |
-| Block C exact-value instruction versus printed `-52 / 952 = -5.5%` | unresolved; oracle preserves printed result and blocks silent implementation choice |
-| Wärmepumpe deduction 8 and annual deduction freshness | convention/year-specific source check remains `verify-before-production` |
+| exact monthly DWD dataset and station-to-PLZ rule | resolved by round 4; hdd_3807 plus the persisted nearest-valid-station convention |
+| Block C exact-value instruction versus printed `-52 / 952 = -5.5%` | resolved by round 4; displayed values win, so `-5.5%` remains |
+| PLZ geodataset and three requested UVI register rows | unresolved; `verify-before-production` and blocks production C/D2 |
+| Wärmepumpe deduction 8 | unconfirmed convention; co2online reply remains open and `verify-before-production` |
+| W4 year-round/heating-season flag | unresolved |
+| exact monthly § 6a content list | unresolved; versioned source required before production |
 | BAnz notice under GEG § 82 is legally the intended § 6a notice | pre-legal; specialist review remains open |
 
 ## 17. Approval and implementation boundary
 
-The approved D2 slice was documentation plus data-only fixtures and changed no production, schema,
-migration, API, engine, adapter, UI or PDF code. G1 now prepares only the pure W4 cadence evaluator;
-it adds no UVI reading, calculation, document, scheduling, delivery or portal consumer. Passing
-oracle or G1 tests does not demonstrate a working UVI, clear the unresolved monthly DWD authority,
-or authorize production use.
+U0 is documentation plus data-only fixtures and changes no production, schema, migration, API,
+engine, adapter, UI, PDF, scheduler or delivery code. G1 supplies only the pure W4 cadence evaluator;
+it adds no UVI reading, calculation, document, scheduling, delivery or portal consumer. Passing the
+oracle or G1 tests does not demonstrate a working UVI, choose the PLZ geodataset, create the missing
+UVI register rows or authorize production use. U1 builds the engine later.
