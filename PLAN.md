@@ -917,17 +917,31 @@ renter-facing label. Four further points are missing German wording rather than 
 asked in `FRAGEN-an-Berkay-05.md`. U1 was merged with these limits recorded; U1b closes them, and no
 UVI output reaches a renter before U5.
 
-**Remaining execution order.** Five slices, each sized against U1, plus two items no agent can
+**U1b status:** engine provenance and labelled suppression is **technically complete and green, but
+not committed**. It sits uncommitted on `slice/u1b-uvi-provenance`, which is at `df04018`.
+`lokara_domain.provenance` now holds `SourceIdentity`, `RuleEvidence` and `RuleConflict` with the
+guard engine's exact field names; every UVI evaluator takes a caller-supplied `UviRuleBundle` and
+every result returns the evidence and unresolved conflicts it used. `BlockCResult` carries the § 7.2
+DWD attribution, station id, distance and an over-50 km boolean; `BlockD2Input` takes a
+`ResolvedHeizspiegelRow` bundle instead of bare `Decimal` deductions, and `BlockD2Result` returns the
+size class actually used and a caller-supplied `fallback_label_de`. A blocked result now carries no
+renter-facing label anywhere: `basis_de`, `label_de` and `attribution_de` are `None` under a
+suppressed comparison. No arithmetic changed and no golden value moved. The merged
+`packages/guard-engine` was left untouched as briefed.
+
+**U1b is not merged.** The required `statement-reviewer` pass verified the renter-facing
+suppression and exact ready-state labels. It found that Block D2 returned only its resolved-row
+evidence and dropped distinct bundle evidence; a separate failing fixture and engine fix now retain
+both in deterministic, deduplicated order. The closing full gate is green. Two facts are recorded
+rather than fixed:
+`BlockAResult.label_de` exists but no evaluator populates it, so the § 5 provisional label produced
+by `evaluate_hkv_provisional` must be carried onto the Block A figure by the composing caller in U5,
+and nothing enforces that today; and `SourceIdentity` is defined and exported but no UVI type
+consumes it yet, which is U4's archive identity.
+
+**Remaining execution order.** Four slices, each sized against U1, plus two items no agent can
 close.
 
-- **U1b — engine provenance and labelled suppression.** `packages/uvi-engine` gains the caller-
-  supplied source identity and rule-bundle shape the guard engine already uses, a pass-through for
-  the § 8.2 over-500 fallback label, the § 7.2 DWD attribution with station id and distance and its
-  50 km label, the § 5 provisional label on the Block A result, and consistent suppression: a
-  blocked result carries no renter-facing label. The shared shapes live in `lokara_domain`; the
-  merged guard engine keeps its own copies, and consolidating the two is a later cleanup. No
-  arithmetic result changes. Runs before U2 so the rules data is built against a settled input
-  type.
 - **U2 — Heizspiegel rules data.** `packages/rules-store` gains the versioned K13 table: the 18
   `HEIZSPIEGEL_2025_ROWS`, the warm-water deductions (24, heat pump 8), the non-positive guard, the
   over-500 m² fallback for Wärmepumpe and Holzpellets with its exact German label, the co2online

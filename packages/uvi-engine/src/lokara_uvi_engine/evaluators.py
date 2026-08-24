@@ -26,6 +26,7 @@ from .models import (
     InterpolatedBoundary,
     LinearInterpolationInput,
     LinearInterpolationResult,
+    UviRuleBundle,
 )
 
 _ONE = Decimal(1)
@@ -60,7 +61,7 @@ def _display_percent(delta_kwh: int, reference_kwh: int) -> Decimal | None:
     )
 
 
-def evaluate_block_a(input_: BlockAInput) -> BlockAResult:
+def evaluate_block_a(input_: BlockAInput, rules: UviRuleBundle) -> BlockAResult:
     """Derive monthly heat from compatible scaled readings."""
 
     if isinstance(input_.reading_start_x1000, bool) or isinstance(input_.reading_end_x1000, bool):
@@ -73,6 +74,9 @@ def evaluate_block_a(input_: BlockAInput) -> BlockAResult:
             heat_kwh=None,
             measurement_unit=input_.measurement_unit,
             energy_reference=input_.energy_reference,
+            label_de=None,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="negative_unsegmented_movement",
         )
 
@@ -87,6 +91,9 @@ def evaluate_block_a(input_: BlockAInput) -> BlockAResult:
                 heat_kwh=None,
                 measurement_unit=input_.measurement_unit,
                 energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
                 data_quality_flag="missing_calorific_factor",
             )
         _require_finite_nonnegative(factor, "calorific_factor_kwh_per_unit")
@@ -98,6 +105,9 @@ def evaluate_block_a(input_: BlockAInput) -> BlockAResult:
             heat_kwh=None,
             measurement_unit=input_.measurement_unit,
             energy_reference=input_.energy_reference,
+            label_de=None,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="hkv_requires_provisional_building_total",
         )
 
@@ -107,10 +117,13 @@ def evaluate_block_a(input_: BlockAInput) -> BlockAResult:
         heat_kwh=_whole_kwh(movement_kwh),
         measurement_unit=input_.measurement_unit,
         energy_reference=input_.energy_reference,
+        label_de=None,
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )
 
 
-def evaluate_block_b(input_: BlockBInput) -> BlockBResult:
+def evaluate_block_b(input_: BlockBInput, rules: UviRuleBundle) -> BlockBResult:
     """Compare current displayed heat with the previous displayed month."""
 
     _require_nonnegative_integer(input_.current_heat_kwh, "current_heat_kwh")
@@ -121,6 +134,8 @@ def evaluate_block_b(input_: BlockBInput) -> BlockBResult:
             delta_kwh=None,
             percent=None,
             label_de="liegt für den Vormonat noch nicht vor",
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
         )
     _require_nonnegative_integer(previous, "previous_month_heat_kwh")
     delta = input_.current_heat_kwh - previous
@@ -130,16 +145,20 @@ def evaluate_block_b(input_: BlockBInput) -> BlockBResult:
             delta_kwh=delta,
             percent=None,
             label_de="kein Vormonatsverbrauch",
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
         )
     return BlockBResult(
         status="ready",
         delta_kwh=delta,
         percent=_display_percent(delta, previous),
         label_de=None,
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )
 
 
-def evaluate_block_c(input_: BlockCInput) -> BlockCResult:
+def evaluate_block_c(input_: BlockCInput, rules: UviRuleBundle) -> BlockCResult:
     """Compare to prior-year heat, weather-adjusting only with usable degree days."""
 
     _require_nonnegative_integer(input_.current_heat_kwh, "current_heat_kwh")
@@ -154,6 +173,15 @@ def evaluate_block_c(input_: BlockCInput) -> BlockCResult:
             percent=None,
             label_de="liegt im ersten Bezugsjahr noch nicht vor",
             previous_year_interpolation_notice_de=input_.previous_year_interpolation_notice_de,
+            attribution_de=input_.dataset_attribution_de,
+            station_id=input_.station_id,
+            distance_km=input_.distance_km,
+            dataset_as_of=input_.dataset_as_of,
+            station_distance_over_50_km=(
+                input_.distance_km is not None and input_.distance_km > Decimal(50)
+            ),
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
         )
     _require_nonnegative_integer(previous, "previous_year_heat_kwh")
     current_days = input_.monthly_degree_days_current
@@ -185,6 +213,15 @@ def evaluate_block_c(input_: BlockCInput) -> BlockCResult:
         percent=_display_percent(delta, reference),
         label_de=label,
         previous_year_interpolation_notice_de=input_.previous_year_interpolation_notice_de,
+        attribution_de=input_.dataset_attribution_de,
+        station_id=input_.station_id,
+        distance_km=input_.distance_km,
+        dataset_as_of=input_.dataset_as_of,
+        station_distance_over_50_km=(
+            input_.distance_km is not None and input_.distance_km > Decimal(50)
+        ),
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )
 
 
@@ -200,7 +237,7 @@ def _is_valid_comparable(unit: ComparableUnit, category: str) -> bool:
     )
 
 
-def evaluate_block_d(input_: BlockDInput) -> BlockDResult:
+def evaluate_block_d(input_: BlockDInput, rules: UviRuleBundle) -> BlockDResult:
     """Calculate the comparable building cross-section or select D2."""
 
     if input_.minimum_valid_units_including_target != 3:
@@ -217,6 +254,8 @@ def evaluate_block_d(input_: BlockDInput) -> BlockDResult:
             delta_kwh=None,
             percent=None,
             basis_de=None,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="missing_or_non_positive_target_area",
         )
     if target.heat_kwh is None:
@@ -228,6 +267,8 @@ def evaluate_block_d(input_: BlockDInput) -> BlockDResult:
             delta_kwh=None,
             percent=None,
             basis_de=None,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="missing_target_heat_kwh",
         )
     _require_nonnegative_integer(target.heat_kwh, "target.heat_kwh")
@@ -245,6 +286,8 @@ def evaluate_block_d(input_: BlockDInput) -> BlockDResult:
             delta_kwh=None,
             percent=None,
             basis_de=None,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
         )
 
     intensities = tuple(
@@ -263,17 +306,21 @@ def evaluate_block_d(input_: BlockDInput) -> BlockDResult:
         delta_kwh=delta,
         percent=_display_percent(delta, expected),
         basis_de="Vergleich im Gebäude",
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )
 
 
-def evaluate_block_d2(input_: BlockD2Input) -> BlockD2Result:
+def evaluate_block_d2(input_: BlockD2Input, rules: UviRuleBundle) -> BlockD2Result:
     """Calculate the heat-only, degree-day-weighted Heizspiegel fallback."""
 
     _require_nonnegative_integer(input_.current_heat_kwh, "current_heat_kwh")
+    resolved_row = input_.resolved_row
+    rule_evidence = tuple(dict.fromkeys((*rules.evidence, *resolved_row.evidence)))
     for name, value in (
         ("target_area_sqm", input_.target_area_sqm),
-        ("heizspiegel_mittel_kwh_m2a", input_.heizspiegel_mittel_kwh_m2a),
-        ("warm_water_deduction_kwh_m2a", input_.warm_water_deduction_kwh_m2a),
+        ("heizspiegel_mittel_kwh_m2a", resolved_row.heizspiegel_mittel_kwh_m2a),
+        ("warm_water_deduction_kwh_m2a", resolved_row.warm_water_deduction_kwh_m2a),
         ("monthly_degree_day_share", input_.monthly_degree_day_share),
     ):
         _require_finite_nonnegative(value, name)
@@ -281,10 +328,10 @@ def evaluate_block_d2(input_: BlockD2Input) -> BlockD2Result:
         raise ValueError("target_area_sqm must be > 0")
     if input_.monthly_degree_day_share > 1:
         raise ValueError("monthly_degree_day_share must be <= 1")
-    if not input_.heizspiegel_vintage:
+    if not resolved_row.heizspiegel_vintage:
         raise ValueError("heizspiegel_vintage must not be empty")
 
-    heat_only = input_.heizspiegel_mittel_kwh_m2a - input_.warm_water_deduction_kwh_m2a
+    heat_only = resolved_row.heizspiegel_mittel_kwh_m2a - resolved_row.warm_water_deduction_kwh_m2a
     if heat_only <= 0:
         return BlockD2Result(
             status="blocked",
@@ -293,10 +340,14 @@ def evaluate_block_d2(input_: BlockD2Input) -> BlockD2Result:
             norm_month_kwh=None,
             delta_kwh=None,
             percent=None,
-            basis_de=_D2_BASIS,
-            label_de=_D2_LABEL,
-            attribution_de=_D2_ATTRIBUTION,
-            heizspiegel_vintage=input_.heizspiegel_vintage,
+            basis_de=None,
+            label_de=None,
+            attribution_de=None,
+            heizspiegel_vintage=resolved_row.heizspiegel_vintage,
+            actual_size_class=resolved_row.actual_size_class,
+            fallback_label_de=None,
+            rule_evidence=rule_evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="non_positive_heat_only_mittel",
         )
     norm_annual_exact = heat_only * input_.target_area_sqm
@@ -314,11 +365,17 @@ def evaluate_block_d2(input_: BlockD2Input) -> BlockD2Result:
         basis_de=_D2_BASIS,
         label_de=_D2_LABEL,
         attribution_de=_D2_ATTRIBUTION,
-        heizspiegel_vintage=input_.heizspiegel_vintage,
+        heizspiegel_vintage=resolved_row.heizspiegel_vintage,
+        actual_size_class=resolved_row.actual_size_class,
+        fallback_label_de=resolved_row.fallback_label_de,
+        rule_evidence=rule_evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )
 
 
-def evaluate_hkv_provisional(input_: HkvProvisionalInput) -> HkvProvisionalResult:
+def evaluate_hkv_provisional(
+    input_: HkvProvisionalInput, rules: UviRuleBundle
+) -> HkvProvisionalResult:
     """Distribute a measured rolling building heat total by HKV units."""
 
     if input_.measurement_unit is not MeasurementUnit.HKV_UNITS:
@@ -327,6 +384,8 @@ def evaluate_hkv_provisional(input_: HkvProvisionalInput) -> HkvProvisionalResul
             provisional_unit_kwh=None,
             label_de=None,
             measurement_unit=input_.measurement_unit,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="measurement_unit_is_not_hkv_units",
         )
     if not input_.explicit_hkv_allocator:
@@ -335,6 +394,8 @@ def evaluate_hkv_provisional(input_: HkvProvisionalInput) -> HkvProvisionalResul
             provisional_unit_kwh=None,
             label_de=None,
             measurement_unit=input_.measurement_unit,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="missing_explicit_hkv_allocator_marker",
         )
     _require_finite_nonnegative(input_.unit_hkv_units, "unit_hkv_units")
@@ -343,8 +404,10 @@ def evaluate_hkv_provisional(input_: HkvProvisionalInput) -> HkvProvisionalResul
         return HkvProvisionalResult(
             status="blocked",
             provisional_unit_kwh=None,
-            label_de=_HKV_LABEL,
+            label_de=None,
             measurement_unit=input_.measurement_unit,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="non_positive_building_hkv_units",
         )
     building_heat = input_.measured_rolling_building_heat_kwh
@@ -352,8 +415,10 @@ def evaluate_hkv_provisional(input_: HkvProvisionalInput) -> HkvProvisionalResul
         return HkvProvisionalResult(
             status="blocked",
             provisional_unit_kwh=None,
-            label_de=_HKV_LABEL,
+            label_de=None,
             measurement_unit=input_.measurement_unit,
+            rule_evidence=rules.evidence,
+            unresolved_conflicts=rules.unresolved_conflicts,
             data_quality_flag="missing_measured_rolling_building_heat_total",
         )
     _require_nonnegative_integer(building_heat, "measured_rolling_building_heat_kwh")
@@ -363,6 +428,8 @@ def evaluate_hkv_provisional(input_: HkvProvisionalInput) -> HkvProvisionalResul
         provisional_unit_kwh=_whole_kwh(provisional),
         label_de=_HKV_LABEL,
         measurement_unit=input_.measurement_unit,
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )
 
 
@@ -384,7 +451,9 @@ def _interpolate_at(readings: tuple[HeatReading, ...], boundary: date) -> Decima
     raise ValueError(f"missing readings around month boundary: {boundary.isoformat()}")
 
 
-def interpolate_month(input_: LinearInterpolationInput) -> LinearInterpolationResult:
+def interpolate_month(
+    input_: LinearInterpolationInput, rules: UviRuleBundle
+) -> LinearInterpolationResult:
     """Interpolate calendar-month boundaries by elapsed days and retain provenance."""
 
     if input_.month.day != 1:
@@ -425,4 +494,6 @@ def interpolate_month(input_: LinearInterpolationInput) -> LinearInterpolationRe
         source_reading_sources=tuple(reading.source for reading in readings),
         measurement_unit=input_.measurement_unit,
         energy_reference=input_.energy_reference,
+        rule_evidence=rules.evidence,
+        unresolved_conflicts=rules.unresolved_conflicts,
     )

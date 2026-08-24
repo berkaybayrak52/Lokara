@@ -27,6 +27,8 @@ from .models import (
     InterpolatedBoundary,
     LinearInterpolationInput,
     LinearInterpolationResult,
+    ResolvedHeizspiegelRow,
+    UviRuleBundle,
 )
 
 __all__ = [
@@ -47,6 +49,8 @@ __all__ = [
     "InterpolatedBoundary",
     "LinearInterpolationInput",
     "LinearInterpolationResult",
+    "ResolvedHeizspiegelRow",
+    "UviRuleBundle",
     "evaluate_block_a",
     "evaluate_block_b",
     "evaluate_block_c",
