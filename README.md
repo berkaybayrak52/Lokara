@@ -134,7 +134,9 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
    (`scripts/check_red_sentinel.py`): announced at `fast`, fatal at `full`.
    Gates are trusted; agents are not.
 3. **`PLAN.md`** — milestones M0→M10 with binding DoDs. **Start here for what to build next.**
-   M0–M5 and M6-A/M6-B/M6-C1/M6-C2/M6-C3-0 are built and green; M6-C3 is the next feature slice.
+   M0–M5 and M6-A/M6-B/M6-C1/M6-C2/M6-C3-0/M6-C3a are built and green on local `main`. C3a is
+   technically complete, development-synchronized and locally merged; C3b jobs and the C3c
+   *Zahlungen* screen are next. Nothing is pushed by this local merge.
    Work follows PLAN's **execution order** — ranked by *what closes the legally-required surface
    first* — rather than the milestone numbering. **It carries no deadline on purpose:** dates in
    `lokara-arch.md` are communication events (when something gets shown), never planning inputs,
@@ -170,7 +172,8 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
      conventions and missing concept sources remain blocked.
    - `15-bank-matching.md` — Page 08's approved normalized transaction, scoring, settlement,
      reversal and duplicate-handling contract, with all 13 source-backed fixtures plus the current
-     M6-C1/M6-C2/M6-C3-0 implementation boundary.
+     M6-C1/M6-C2/M6-C3-0 boundary plus the technically complete, development-synchronized and
+     locally merged C3a service/API boundary.
    - `16-uvi.md` — UVI monthly-consumption, comparison, DWD import, Heizspiegel fallback,
      tenant-document and delivery-evidence contract, with source-named data-only fixtures.
 

@@ -67,7 +67,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 22 enfo
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
-| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence is shipped, while workflow wiring remains M6-C3 |
+| Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged, while C3b job wiring remains open |
 | Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
@@ -415,8 +415,9 @@ unresolved classifications remain `verify-before-production`.
 The Page 08 bank-matching contract is **complete, approved and merged** in `docs/15`. All thirteen
 cases run through the M6-C1 engine. M6-C2 ships the receivable, bank, matching-evidence and
 payment-ledger schema, adapter and owner-scoped endpoints; M6-C3-0 closes the audited database
-invariants through migration `0020`. The matching service, jobs and landlord *Zahlungen* screen
-remain M6-C3 work.
+invariants through migration `0020`. C3a's service and final `0021` are technically complete,
+development-synchronized and locally merged into `main`; C3b's jobs and C3c's landlord *Zahlungen*
+screen remain open.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
 
@@ -629,7 +630,7 @@ One normalized calculation must produce one immutable result and explicit audien
 | Calculation identity | Account, building, inclusive period and calculation/version identity. Basic persisted fields exist; the exact Page 01 input is not complete. |
 | Property header | Legal landlord, object address, total area, unit count, creation date, engine/rule versions and every applicable register `Rechtsstand`. |
 | Covered tenancy | `tenancy_id`, renters/addressee, delivery address, unit, clipped usage dates and days, person/area/consumption inputs. M6-B freezes the selected address and isolated archive; renter delivery remains incomplete. |
-| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; the ledger exists, while automatic matching-to-reconciliation wiring remains open in M6-C3. Confirmed zero is valid. |
+| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; locally merged C3a books accepted matches into the ledger. Automatic later use of renter credit and the C3b job wiring remain open. Confirmed zero is valid. |
 | Operating-cost result | Cost identity/classification, total, key, numerator, denominator, measurement unit, rounded renter share, § 35a inputs/result, warnings and provenance. |
 | Heating and CO₂ result | Every required block, ratio, numerator/denominator, device evidence, CO₂ figures, warnings and provenance defined in `docs/03`. |
 | Vacancy result | Origin unit/dates, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c) and evidence. The residual contract is settled; the full annex is not implemented. |
@@ -778,7 +779,7 @@ M6 owns the handoff in this order:
 4. The ledger, not the statement or receivable, feeds tax and deterministic exports through a
    year-versioned `TaxCategoryMapping`.
 
-### M6-C2 — bank matching, receivables and the payment ledger
+### M6-C2/C3a — bank matching, receivables and the payment ledger
 
 Approved `docs/15` owns the calculation contract; this section owns only the persisted shape.
 The engine in `packages/matching-engine` decides, and these tables store what it read and what
@@ -791,11 +792,11 @@ foreign keys (migration `0017`):
 | `BankTransaction` | `docs/15` § 3.1 in full: signed `amount_cents`, the three separate dates, nullable counterpart/reference/provider fields and `is_potential_duplicate`. Identity is `(account_id, bank_account_id, provider_transaction_id)` — **never the provider id alone**, because providers do not allocate ids globally. `bank_booking_date`, not `finapi_booking_date`, decides whether a receivable is due. |
 | `Receivable` | `docs/15` § 3.2. The four nominal components sum to `expected_cents` (database check). `0 ≤ open_cents ≤ expected_cents`. `category` is `rent` or `nk_nachzahlung`. Carries `stored_reference`, which is **unused** — see the note below. |
 | `RenterMatchingProfile` | `docs/15` § 3.3, one per `(account_id, renter_id)`. `known_ibans` is derived from active `IbanHistory` rows and is deliberately not a column: a stored copy would be a second truth to keep in sync. |
-| `IbanHistory` | `docs/15` § 3.3, temporal (`valid_from`/`valid_to`), never overwritten. A non-null IBAN is learned only after a user confirms a Review proposal; null is never learned. |
-| `MatchProposal` | `docs/15` § 4: every component signal stored individually, plus `confidence`, `decision`, `convention_version` and the German reason. The components are stored because a confidence alone cannot be re-derived or audited later, and the § 4 Review ranking reads them. |
+| `IbanHistory` | `docs/15` § 3.3, temporal (`valid_from`/`valid_to` are timezone-aware instants), never overwritten. A non-null IBAN is learned only after a user confirms the rank-1 Review proposal; `valid_from` equals that confirmation instant and null is never learned. |
+| `MatchProposal` | `docs/15` § 4: every component signal stored individually, plus deterministic positive `rank`, `confidence`, `decision`, `convention_version` and the German reason. Rank is unique per transaction; each immutable run is inserted once, contiguous from 1, and all rows share one decision, reason and convention version. |
 | `MatchConfirmation` | `docs/15` § 4: actor and time, as a separate row. Confirmation never rewrites the proposal it confirms. |
-| `PaymentLedgerEntry` | `docs/15` § 5.3, append-only by database trigger. A reversal appends a compensating entry linked through `reverses_entry_id`; nothing is edited or deleted. |
-| `PaymentAllocation` | `docs/15` §§ 5.1–5.2: what one entry paid on one debt, split by § 367 BGB order and then by nominal component (database check: the four components sum to `principal_cents`). Append-only by the same trigger. |
+| `PaymentLedgerEntry` | `docs/15` § 5.3, append-only by database trigger. A PAYMENT cites only rank-1 `AUTO_MATCH` evidence or a rank-1 `NEEDS_REVIEW` proposal with a final `CONFIRMED` decision. A reversal appends a compensating entry linked through `reverses_entry_id`; nothing is edited or deleted. |
+| `PaymentAllocation` | `docs/15` §§ 5.1–5.2: what one entry paid on one debt, split by § 367 BGB order and then by nominal component. New C3a writes store a complete before/after projection snapshot; legacy rows may keep an all-null pair and cannot be auto-reversed. Rent components sum to principal; `nk_nachzahlung` principal keeps all four named rent/advance components at zero. Append-only by the same trigger. |
 
 **Isolation was never the gap; everything inside one account was.** `0017` got RLS and the
 composite `(id, account_id)` edges right, and constrained nothing else — so a `payment_allocation`
@@ -821,6 +822,35 @@ Migration `0018` limits the components-sum check to `category = 'rent'`. An `nk_
 rent, garage or advance component, and § 5.2 makes the cost concrete: the paid NK-advance component
 feeds the annual actual-advance total Page 01 consumes, so parking a Nachzahlung there to satisfy
 the arithmetic would double-count it as an advance that was never paid.
+
+#### C3a additions in migration `0021`
+
+The final amended `0021` is technically verified from the disposable `lokara_c3a_check` database
+and locally merged into `main`. Development matches that schema exactly after one validated
+transactional hand-delta. Column types, constraints, trigger
+timing/deferrability, hardened function definitions, search paths and hashes are identical; evidence
+counts and all 68 legacy Auto confirmations are unchanged.
+
+- Existing proposals receive deterministic ranks. Before future-only insert triggers are installed,
+  migration validation rejects—rather than rewrites—any backfilled transaction group whose ranks
+  are not contiguous from 1 or whose decision, German reason or convention version differs.
+- A transaction's proposal run is insert-once and sealed. Rank is positive and unique per bank
+  transaction; confirmation and PAYMENT evidence may cite only rank 1.
+- Only rank-1 `NEEDS_REVIEW` may receive `CONFIRMED`, `REJECTED` or `DUPLICATE` evidence. A PAYMENT
+  requires either rank-1 `AUTO_MATCH` or rank-1 confirmed Review evidence.
+- Deferred reconciliation requires `credit_cents = amount_cents - assigned_cents` for PAYMENT.
+  REVERSAL credit is zero and its allocations negate the original allocations; a full return also
+  accounts for the original unallocated credit without fabricating a receivable allocation.
+- New allocations carry a complete before/after projection pair. An all-null pair remains legal
+  only for legacy compatibility and is insufficient for automatic reversal.
+- `IbanHistory.valid_from`/`valid_to` are timezone-aware instants. A newly learned mapping starts at
+  the exact confirmation timestamp.
+- Rent principal must be classified across base rent, NK advance, heating advance and garage.
+  `nk_nachzahlung` principal deliberately carries zero in all four named components, preventing a
+  statement balance from being misreported as a paid advance.
+
+The Largest-Remainder tie authority remains missing. Tests prove refusal and atomic rollback; no
+tie-break is invented.
 
 **`Receivable.stored_reference` is a placeholder, not a contract.** `docs/15` § 4 awards 15 points
 when a transaction's E2E or mandate reference matches a "stored reference", but §§ 3.2–3.3 define
@@ -882,8 +912,9 @@ approved `docs/11` adds no schema or API.
 | Page 02 catalogue, classifications, NK half-up rounding and owner residual | Technically implemented by Slice C; flagged authority remains production-blocking | Slice C |
 | Page 08 bank-matching specification | **Approved and merged** in `docs/15`; F03 resolved with all thirteen oracle cases executable | D2 / `docs/15` |
 | M6-A temporal advances/confirmed actual advances and M6-B Saldo, settlements, finalization and owner-only archives | **Shipped** technical scope; no renter delivery or legal-production approval | M6-A/M6-B |
-| Payment ledger, bank matching and matching evidence | **Shipped** engine/schema/adapter/owner-endpoint scope; migration `0020` invariants verified | M6-C1/M6-C2/M6-C3-0 |
-| Matching service, jobs and landlord *Zahlungen* screen | **Future** | M6-C3 |
+| Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
+| Three matching jobs | **Future** | M6-C3b |
+| Landlord *Zahlungen* screen | **Future**; confirm/reject/duplicate only, no manual assignment | M6-C3c |
 | Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |

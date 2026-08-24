@@ -13,8 +13,10 @@
 **Implementation status:** M6-C1 ships the pure matching engine and all thirteen fixtures run
 through it. M6-C2 ships the normalized bank adapter, nine account-scoped bank/receivable/matching/
 ledger tables and owner-scoped import/list/Page-01-handoff endpoints. M6-C3-0 closes the audited
-database invariants in migration `0020`. The matching service, jobs and landlord *Zahlungen* screen
-remain M6-C3. The § 4 E2E signal is deliberately inert; see § 4 below.
+database invariants in migration `0020`. M6-C3a's matching service, final migration `0021` and
+exactly five owner APIs are technically complete, development-synchronized and locally merged into
+`main`. C3b's three jobs and C3c's landlord *Zahlungen* screen remain open. The § 4 E2E
+signal is deliberately inert; see § 4 below.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
 contract for incoming renter payments. Matching is a proposal mechanism. It does not create a
@@ -40,7 +42,7 @@ supplies the thirteenth case and its own summation checks. Neither source clears
 `verify-before-production` flag. The CSV controls structured values, legal nature, source and flag;
 the original Page and this approved contract supply the expanded method where the CSV row is shorthand. Emir approved
 this transcription on 20.08.2026, and the slice was merged into `main` with a no-fast-forward merge.
-The M6-C1/M6-C2/M6-C3-0 implementation boundary above is technically verified; finAPI remains
+The M6-C1/M6-C2/M6-C3-0/C3a implementation boundary is shipped on local `main`; finAPI remains
 stubbed, the legal/product conventions retain their flags, and M6-A/M6-B technical
 advance/finalization archives do not change this contract.
 
@@ -238,9 +240,9 @@ reconcile the cent remainder by Largest Remainder
 
 The reconciled components must sum exactly to `P`; the paid NK-advance component feeds the annual
 actual-advance total used by Page 01. `F11` yields 78,704 / 13,889 / 7,407 cents and needs no final
-cent redistribution. Page 08 does not specify the tie-break between equal fractional remainders;
-that missing deterministic convention must be added to the authoritative source before a future
-implementation claims the unexercised tie branch.
+cent redistribution. Page 08 does not specify the tie-break between equal fractional remainders.
+The engine and persisted service tests prove refusal and full rollback for that branch; no
+tie-break is invented. The source gap remains unresolved.
 
 ### 5.3 Immutable events and reversal
 
@@ -254,6 +256,81 @@ mandate reference; only then use the Page fallback `(IBAN, amount, date)`, withi
 Append compensating entries that reverse the original allocations exactly, restore the receivable
 projection and emit `payment_returned` for the Page 05 guard. Do not rescore or create a replacement
 positive payment. `F06` restores 108,000 cents and nets the payment ledger to zero.
+
+### 5.4 M6-C3a persistence and service boundary
+
+**Status:** technically complete, development-synchronized and locally merged into `main`. The
+final amended `0021` is verified from the disposable `lokara_c3a_check` database, and development
+matches its exact catalog after one validated transactional hand-delta. Evidence counts and all 68
+legacy Auto confirmations remain unchanged.
+This section does not change
+the Page-08 calculation rules or their `Rechtsstand 07/2026`. It defines how C3a persists and
+exposes the already-approved engine result.
+
+One bank transaction has one immutable proposal run. The service locks the transaction before
+processing; a repeated or concurrent call returns the stored run and may create at most one ledger
+result. Every engine candidate is stored as one `MatchProposal` with a deterministic rank unique
+inside the transaction. An Unmatched result with no candidate is still auditable: it receives one
+ranked evidence row whose receivable and renter are null. Existing proposal rows are backfilled
+deterministically when migration `0021` adds the rank. Before future-only triggers are installed,
+the migration validates every backfilled transaction group and fails rather than rewriting evidence
+if ranks are not contiguous from 1 or decision, German reason or convention version differs.
+
+Candidate selection joins only `open` or `partial` receivables to a matching profile in the same
+account. Active IBAN ownership comes only from `IbanHistory.valid_to IS NULL`. The database keeps
+its uppercase decisions; the engine and API keep their approved lowercase values. The service
+translates between them and does not widen the database CHECK.
+
+A positive `AUTO_MATCH` settles immediately. A `NEEDS_REVIEW` or `UNMATCHED` proposal moves zero
+cents. A final `CONFIRMED` review settles only the engine's rank-1 candidate; a caller cannot name
+another receivable. Final `REJECTED` and `DUPLICATE` decisions preserve evidence and settle
+nothing. Repeating the same final decision is idempotent; attempting a different later outcome is
+a conflict. A non-null IBAN is learned only after explicit confirmation, with the confirmation
+timestamp as `valid_from`, and an already-active mapping is not duplicated.
+
+Every new `PAYMENT` ledger row must cite either an `AUTO_MATCH` proposal or a
+`NEEDS_REVIEW` proposal whose decision row is `CONFIRMED`. A rejection, duplicate, unmatched or
+unconfirmed review can never book money. This evidence check runs after the row operation so a
+foreign-account insert reaches its RLS `WITH CHECK` policy before a parent lookup can mask it.
+
+For every payment, at deferred constraint time:
+
+```text
+assigned_cents = sum(costs_cents + interest_cents + principal_cents)
+credit_cents = amount_cents - assigned_cents
+```
+
+A reversal has zero credit. Each new allocation stores nullable before/after receivable projection
+snapshots sufficient to reconstruct the engine result: open costs, interest and principal, total
+open cents, and status. New service writes always populate a complete pair. Existing legacy rows
+remain nullable for migration compatibility, but an incomplete legacy snapshot cannot be reversed
+automatically.
+
+A negative movement uses the engine reversal path and appends one compensating ledger entry. It
+restores the recorded projections and emits `payment_returned`. The complete operation is refused
+and rolled back for an ambiguous original, a partial return, missing or incomplete legacy
+snapshots, or a later allocation that makes the stored after-snapshot no longer equal the current
+projection. A Largest-Remainder tie likewise raises a conflict and rolls back the whole operation.
+Zero-value movements stay as imported evidence and create neither a proposal nor a ledger row.
+
+### 5.5 M6-C3a owner API
+
+C3a adds exactly five owner-scoped capabilities under `/a/{account_id}`:
+
+1. `PUT /renters/{renter_id}/matching-profile` normalizes and upserts surname plus an optional
+   payment code.
+2. `POST /bank-transactions/{transaction_id}/match` runs or returns the immutable proposal run.
+3. `GET /match-proposals` returns transaction-grouped German reasons, lowercase decisions, ranked
+   candidates, signals, confidence, confirmation and ledger reference.
+4. `POST /bank-transactions/{transaction_id}/decision` records the final `confirmed`, `rejected`
+   or `duplicate` outcome. The client cannot choose a receivable.
+5. `GET /payment-ledger` returns immutable payments, reversals, credit and before/after allocation
+   snapshots newest first.
+
+Every endpoint requires `OWNER` membership in the URL account. An employee and an owner of a
+different account cannot read, decide or book these rows. Missing resources and conflicts use
+German 404/409 messages. C3a intentionally adds no pagination and does not change the existing
+generic owner-denial copy.
 
 ## 6. Account-isolation and immutability requirements
 
@@ -400,17 +477,18 @@ itself incomplete — splitting at the next `def` still glued a following class 
 test body, and never matched `async def`. Test bodies now come from `ast`, so a chunk ends where the
 test ends; all 38 tenant tables stayed covered, so none had been resting on glue.
 
-M6-C3 remains open: the matching service, landlord *Zahlungen* screen and three job entrypoints. It
-also inherits the recorded shape gaps in `PLAN.md` § M6-C —
+M6-C3a is technically complete, development-synchronized and locally merged. M6-C3 remains open for
+C3b's three job entrypoints and C3c's landlord *Zahlungen* screen. It also inherits the
+gaps in `PLAN.md` § M6-C —
 `ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
 reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.
 
 ## 11. Approval and implementation boundary
 
 All thirteen cases, register rows, model boundaries and correspondence coverage are fully
-transcribed. Emir approved the transcription on 20.08.2026. M6-C1/M6-C2/M6-C3-0 technically verify
-the engine, persistence, normalized stub adapter, owner endpoints and database invariants; they do
-not approve production bank-matching behavior or any legal/product convention. finAPI, the matching
-service, jobs and landlord *Zahlungen* screen remain unshipped, and the § 4 stored-reference signal
-stays inert until its source gap is answered. The separate `docs/16` D2 transcription is approved
-and merged.
+transcribed. Emir approved the transcription on 20.08.2026. M6-C1/M6-C2/M6-C3-0/C3a technically
+verify the engine, persistence, normalized stub adapter, service and owner endpoints on local
+`main`; they do not approve production bank-matching behavior or any legal/product convention.
+finAPI, C3b jobs, the C3c landlord *Zahlungen* screen, manual assignment, automatic later use of
+renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
+until its source gap is answered. The separate `docs/16` D2 transcription is approved and merged.

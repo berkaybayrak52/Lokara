@@ -1,17 +1,19 @@
-"""M6-C2 owner-scoped bank, receivable and Page-01 handoff endpoints (docs/15).
+"""Owner-scoped payment routes from M6-C2 and M6-C3a (docs/15).
 
-Deliberately thin. The matching decisions live in `packages/matching-engine` and
-the normalization in `packages/adapters`; this module only moves rows across the
-HTTP boundary and enforces who may do it. No scoring, ordering or settlement rule
-is re-expressed here — a second copy of a legal rule is a second thing to get
-wrong.
+M6-C2 supplies bank import/list, receivable list and Page-01 handoff routes. M6-C3a
+adds matching-profile upsert, match execution, grouped proposals, final decisions
+and the immutable payment-ledger list. The calculation lives in
+`packages/matching-engine`, normalization in `packages/adapters`, and persistence
+orchestration in `matching_service`; this router enforces the HTTP boundary and
+owner authorization without copying those rules.
 
-The Zahlungen screen, the confirmation flow and the job entrypoints are M6-C3.
+The C3b job entrypoints and C3c landlord Zahlungen screen remain future work.
 """
 
 from datetime import date
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from lokara_adapters import StubBankGateway
 from lokara_db import (
     BankAccount,
@@ -24,11 +26,21 @@ from lokara_db import (
     TenancyParty,
     new_id,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
+from ..auth import AuthContext, require_auth
 from ..authorization import require_owner
 from ..deps import PathAccountSession
+from ..matching_service import (
+    MatchingConflictError,
+    MatchingNotFoundError,
+    decide_match,
+    list_ledger,
+    list_proposals,
+    run_match,
+    upsert_matching_profile,
+)
 
 router = APIRouter(prefix="/a/{account_id}")
 
@@ -98,6 +110,25 @@ class BankTransactionListOut(BaseModel):
 class ImportResultOut(BaseModel):
     imported: int
     skipped_as_duplicate: int
+
+
+class MatchingProfileIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    surname: str = Field(min_length=1, max_length=200)
+    payment_code: str | None = Field(default=None, max_length=200)
+
+
+class MatchingDecisionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["confirmed", "rejected", "duplicate"]
+
+
+def _matching_http_error(error: Exception) -> HTTPException:
+    if isinstance(error, MatchingNotFoundError):
+        return HTTPException(status_code=404, detail=str(error))
+    return HTTPException(status_code=409, detail=str(error))
 
 
 def _receivable_out(row: Receivable) -> ReceivableOut:
@@ -352,6 +383,57 @@ def list_bank_transactions(session: PathAccountSession) -> BankTransactionListOu
             for r in rows
         ]
     )
+
+
+@router.put("/renters/{renter_id}/matching-profile")
+def put_matching_profile(
+    renter_id: str,
+    body: MatchingProfileIn,
+    session: PathAccountSession,
+) -> dict[str, object]:
+    require_owner(session)
+    try:
+        return upsert_matching_profile(session, renter_id, body.surname, body.payment_code)
+    except (MatchingNotFoundError, MatchingConflictError) as error:
+        raise _matching_http_error(error) from error
+
+
+@router.post("/bank-transactions/{transaction_id}/match")
+def match_bank_transaction(
+    transaction_id: str,
+    session: PathAccountSession,
+) -> dict[str, object]:
+    require_owner(session)
+    try:
+        return run_match(session, transaction_id)
+    except (MatchingNotFoundError, MatchingConflictError) as error:
+        raise _matching_http_error(error) from error
+
+
+@router.get("/match-proposals")
+def get_match_proposals(session: PathAccountSession) -> dict[str, object]:
+    require_owner(session)
+    return list_proposals(session)
+
+
+@router.post("/bank-transactions/{transaction_id}/decision")
+def decide_bank_transaction(
+    transaction_id: str,
+    body: MatchingDecisionIn,
+    session: PathAccountSession,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+) -> dict[str, object]:
+    require_owner(session)
+    try:
+        return decide_match(session, transaction_id, body.outcome, auth.person_id)
+    except (MatchingNotFoundError, MatchingConflictError) as error:
+        raise _matching_http_error(error) from error
+
+
+@router.get("/payment-ledger")
+def get_payment_ledger(session: PathAccountSession) -> dict[str, object]:
+    require_owner(session)
+    return list_ledger(session)
 
 
 __all__ = ["router"]

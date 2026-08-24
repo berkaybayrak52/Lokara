@@ -1636,8 +1636,8 @@ class IbanHistory(Base):
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
     renter_id: Mapped[str]
     normalized_iban: Mapped[str]
-    valid_from: Mapped[date]
-    valid_to: Mapped[date | None]
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     learned_from_transaction_id: Mapped[str | None]
     confirmed_match_id: Mapped[str | None]
     confirmed_by: Mapped[str | None]
@@ -1689,6 +1689,10 @@ class MatchProposal(Base):
     bank_transaction_id: Mapped[str]
     receivable_id: Mapped[str | None]
     renter_id: Mapped[str | None]
+    # Compatibility default for older single-candidate callers. The C3a service
+    # supplies every explicit engine rank; the database uniqueness rule rejects two
+    # omitted ranks inside one transaction.
+    rank: Mapped[int] = mapped_column(default=1)
     signal_iban: Mapped[int]
     signal_amount: Mapped[int]
     signal_code_or_surname: Mapped[int]
@@ -1712,8 +1716,15 @@ class MatchProposal(Base):
         CheckConstraint(
             "confidence >= 0 AND confidence <= 100", name="ck_match_proposal_confidence"
         ),
+        CheckConstraint("rank > 0", name="ck_match_proposal_rank_positive"),
         Index("ix_match_proposal_account", "account_id"),
         Index("ix_match_proposal_transaction", "account_id", "bank_transaction_id"),
+        Index(
+            "uq_match_proposal_transaction_rank",
+            "bank_transaction_id",
+            "rank",
+            unique=True,
+        ),
     )
 
 
@@ -1776,6 +1787,10 @@ class PaymentLedgerEntry(Base):
             name="ck_payment_ledger_reversal_shape",
         ),
         CheckConstraint("credit_cents >= 0", name="ck_payment_ledger_credit_positive"),
+        CheckConstraint(
+            "kind <> 'REVERSAL' OR credit_cents = 0",
+            name="ck_payment_ledger_reversal_credit_zero",
+        ),
         Index("ix_payment_ledger_account", "account_id"),
         Index("ix_payment_ledger_transaction", "account_id", "bank_transaction_id"),
         # Migration 0019. Two reversals of one payment reopen twice the debt of a
@@ -1806,20 +1821,58 @@ class PaymentAllocation(Base):
     heating_advance_cents: Mapped[int]
     garage_cents: Mapped[int]
     resulting_status: Mapped[str]
+    before_open_costs_cents: Mapped[int | None]
+    before_open_interest_cents: Mapped[int | None]
+    before_open_principal_cents: Mapped[int | None]
+    before_open_cents: Mapped[int | None]
+    before_status: Mapped[str | None]
+    after_open_costs_cents: Mapped[int | None]
+    after_open_interest_cents: Mapped[int | None]
+    after_open_principal_cents: Mapped[int | None]
+    after_open_cents: Mapped[int | None]
+    after_status: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
         _scoped_fk("payment_allocation", "ledger_entry_id", "payment_ledger_entry"),
         _scoped_fk("payment_allocation", "receivable_id", "receivable"),
         _scoped_pair("payment_allocation"),
-        CheckConstraint(
-            "base_rent_cents + nk_advance_cents + heating_advance_cents + garage_cents"
-            " = principal_cents",
-            name="ck_payment_allocation_components_sum",
-        ),
+        # Migration 0021 enforces the category-dependent component rule in an AFTER
+        # trigger: rent components sum to principal, while an nk_nachzahlung keeps its
+        # neutral principal and carries four zero named components.
         CheckConstraint(
             "resulting_status IN ('open', 'partial', 'settled')",
             name="ck_payment_allocation_status",
+        ),
+        CheckConstraint(
+            "((before_open_costs_cents IS NULL"
+            " AND before_open_interest_cents IS NULL"
+            " AND before_open_principal_cents IS NULL"
+            " AND before_open_cents IS NULL"
+            " AND before_status IS NULL"
+            " AND after_open_costs_cents IS NULL"
+            " AND after_open_interest_cents IS NULL"
+            " AND after_open_principal_cents IS NULL"
+            " AND after_open_cents IS NULL"
+            " AND after_status IS NULL) OR"
+            " (before_open_costs_cents IS NOT NULL"
+            " AND before_open_interest_cents IS NOT NULL"
+            " AND before_open_principal_cents IS NOT NULL"
+            " AND before_open_cents IS NOT NULL"
+            " AND before_status IS NOT NULL"
+            " AND after_open_costs_cents IS NOT NULL"
+            " AND after_open_interest_cents IS NOT NULL"
+            " AND after_open_principal_cents IS NOT NULL"
+            " AND after_open_cents IS NOT NULL"
+            " AND after_status IS NOT NULL))",
+            name="ck_payment_allocation_projection_snapshots_complete",
+        ),
+        CheckConstraint(
+            "before_status IS NULL OR ("
+            "before_status IN ('open', 'partial', 'settled')"
+            " AND after_status IN ('open', 'partial', 'settled')"
+            " AND after_status = resulting_status)",
+            name="ck_payment_allocation_projection_snapshot_status",
         ),
         # The kind-dependent sign rule is not a CHECK and cannot be one: whether a
         # component may be negative depends on the parent entry's `kind`, which a CHECK

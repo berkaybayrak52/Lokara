@@ -128,7 +128,7 @@ finalization, history and stored-document download. The separate tenant archive 
 rendered and isolated, but is not a renter route, portal item, email/delivery feature or
 legal-production approval. The live demo PDF remains unchanged.
 
-## Shipped M6-C2/M6-C3-0 bank and payment boundary
+## Bank and payment boundary: shipped through locally merged C3a
 
 Four owner-only routes, all under `/a/{accountId}` and all behind `require_owner` on top of the
 membership check the path session already performs. The URL naming an account is never
@@ -149,12 +149,26 @@ falls due on receipt of a proper statement — and the customary 30 days is a `K
 handoff asks for the date and refuses without it rather than making that convention Lokara's
 answer on every statement.
 
-Neither the *Zahlungen* screen nor any client route consumes these yet; that is M6-C3.
+The C3a slice adds exactly five further owner-only API routes:
+
+| C3a route | Contract |
+| --- | --- |
+| `PUT /a/{accountId}/renters/{renterId}/matching-profile` | Normalize and upsert surname and optional payment code. |
+| `POST /a/{accountId}/bank-transactions/{transactionId}/match` | Run or return the transaction's immutable proposal run. |
+| `GET /a/{accountId}/match-proposals` | Return transaction-grouped German reasons, lowercase decisions, ranked candidates, confirmation and ledger reference. |
+| `POST /a/{accountId}/bank-transactions/{transactionId}/decision` | Record one final `confirmed`, `rejected` or `duplicate` outcome; the client cannot select a receivable. |
+| `GET /a/{accountId}/payment-ledger` | Return immutable payments, reversals, credit and allocation snapshots newest first. |
+
+These five routes and `matching_service.py` are technically complete, development-synchronized and
+locally merged into `main`. There is still no *Zahlungen* client route; that is C3c. C3b's three
+jobs also remain open.
 
 Migration `0020` closes the M6-C3-0 invariant repair below these routes: signed and locked
 allocation caps, renter-consistent reversals, confirmed transaction provenance for learned IBANs,
 qualified trigger lookups, and observable RLS `WITH CHECK` enforcement. It changes no HTTP route or
-public model. The pure engine is still not joined to these tables by an application service.
+public model. C3a joins the pure engine to these tables on local `main`. The final amended `0021` is
+verified from `lokara_c3a_check`; development matches its column, constraint, trigger and
+hardened-function catalog exactly after the validated transactional hand-delta.
 
 ## Shipped Beleg-Upload boundary
 

@@ -1242,6 +1242,36 @@ def test_f06_reversal_uses_the_iban_amount_date_fallback_only_without_a_referenc
     assert result.guard_signal == _str(case, "guard_handoff")
 
 
+def test_full_return_of_overpayment_reverses_allocations_and_original_credit() -> None:
+    """F04 + § 5.3: the bank returns the full movement, including unallocated credit.
+
+    The compensating allocation rows negate only money that reached receivables. The
+    original credit closes the remaining equality; it must not be fabricated as a debt
+    allocation merely to make the signed transaction amount reconcile.
+    """
+    case = _case("BANKMATCH-F04")
+    original = _transaction(
+        amount_cents=_int(case, "amount"),
+        end_to_end_reference="E2E-F04-RETURN",
+        purpose=None,
+    )
+    settlement = settle(original, (_july_rent(), _august_rent()))
+    assert _assigned(settlement) == _int(case, "assigned")
+    assert settlement.credit_cents == _int(case, "credit")
+    returned = _transaction(
+        provider_transaction_id="prov-f04-full-return",
+        amount_cents=-_int(case, "amount"),
+        end_to_end_reference="E2E-F04-RETURN",
+        purpose=None,
+    )
+
+    result = reverse(returned, original, (settlement,))
+    compensated = sum(entry.amount_cents for entry in result.compensating_entries)
+
+    assert compensated == -_int(case, "assigned")
+    assert compensated - settlement.credit_cents == returned.amount_cents
+
+
 # --------------------------------------------------------------------------------------
 # Account isolation and money typing (docs/15 §§ 3.1, 4, 6; CLAUDE.md §§ 3.1, 3.3).
 # --------------------------------------------------------------------------------------

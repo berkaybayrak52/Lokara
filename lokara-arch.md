@@ -39,8 +39,10 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   `BANKMATCH` cases through real code (M6-C1), and M6-C2 adds the nine account-scoped bank,
   receivable, IBAN-history, proposal and payment-ledger tables, the `docs/15` § 3.1 adapter and the
   owner-scoped endpoints including the Page-01 handoff. M6-C3-0 migration `0020` verifies the
-  audited renter, cap, provenance, trigger-resolution and RLS-write invariants. The matching
-  service, landlord *Zahlungen* screen and job entrypoints are M6-C3. The § 4 stored-reference
+  audited renter, cap, provenance, trigger-resolution and RLS-write invariants. C3a connects the
+  engine to Postgres and adds exactly five owner APIs; it is technically complete,
+  development-synchronized and locally merged. C3b jobs and the C3c landlord *Zahlungen* screen
+  remain open. The § 4 stored-reference
   signal is deliberately inert: the field it scores against is named by § 4 and defined nowhere
   in § 3.
 
@@ -49,10 +51,10 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - Page 01 and Page 01b contracts and their data-only or capability evidence live in `docs/02`,
   `docs/03` and `docs/08`; their named implementation gaps remain open.
 - M6-A/M6-B ship temporal/actual advances, Saldo settlements, immutable owner-only finalization and
-  separately rendered tenant archives; M6-C1/M6-C2 ship the matching engine, its persistence and
-  the owner-scoped endpoints, and M6-C3-0 closes their audited database invariants. The matching
-  service, *Zahlungen* screen and job entrypoints (M6-C3) and renter delivery/portal (M10) remain
-  open.
+  separately rendered tenant archives; M6-C1/M6-C2 ship the matching engine, persistence and base
+  owner endpoints, and M6-C3-0 closes their audited database invariants. C3a's service/final `0021`
+  is technically complete, development-synchronized and locally merged. C3b jobs, C3c *Zahlungen*
+  UI and M10 renter delivery/portal remain open.
 - Real external providers stay behind adapter contracts and require their own integration,
   security and compliance evidence.
 
