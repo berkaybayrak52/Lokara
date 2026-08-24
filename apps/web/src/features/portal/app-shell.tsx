@@ -26,6 +26,13 @@ interface NavItem {
   label: string;
   /** Path prefixes (relative to /a/{id}) that count as "inside" this item. */
   activePrefixes: string[];
+  /**
+   * Nav-only visibility, NOT authorization. The API re-authorizes every request
+   * independently (CLAUDE.md § 3.3) and a hidden link protects nothing; this
+   * predicate only keeps the menu honest, so it never offers a route that is
+   * guaranteed to answer 403 for the caller's role.
+   */
+  visibleFor?: (role: string) => boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -43,6 +50,14 @@ const NAV_ITEMS: NavItem[] = [
     href: (id) => `/a/${id}/abrechnung`,
     label: 'Abrechnung erstellen',
     activePrefixes: ['/abrechnung'],
+  },
+  {
+    href: (id) => `/a/${id}/zahlungen`,
+    label: 'Zahlungen',
+    activePrefixes: ['/zahlungen'],
+    // Every payment route is behind `require_owner` (`routers/payments.py`), so
+    // for an EMPLOYEE this entry could only ever dead-end in an error page.
+    visibleFor: (role) => role === 'OWNER',
   },
 ];
 
@@ -111,49 +126,55 @@ export function PortalShellContent({
           <span className="font-display text-lg font-bold">Lokara</span>
         </Link>
 
-        {!taxAdvisor && account ? <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
-          {NAV_ITEMS.map((item) => {
-            const href = item.href(accountId);
-            const active =
-              item.activePrefixes.length === 0
-                ? pathname === href
-                : item.activePrefixes.some((prefix) =>
-                    pathname.startsWith(`/a/${accountId}${prefix}`),
-                  );
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? 'page' : undefined}
-                className={
-                  'rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out ' +
-                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ' +
-                  (active ? 'bg-mint font-semibold text-forest' : 'text-ink hover:bg-mint/60')
-                }
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+        {!taxAdvisor && account ? (
+          <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
+            {NAV_ITEMS.filter(
+              (item) => item.visibleFor === undefined || item.visibleFor(account.role),
+            ).map((item) => {
+              const href = item.href(accountId);
+              const active =
+                item.activePrefixes.length === 0
+                  ? pathname === href
+                  : item.activePrefixes.some((prefix) =>
+                      pathname.startsWith(`/a/${accountId}${prefix}`),
+                    );
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? 'page' : undefined}
+                  className={
+                    'rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out ' +
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ' +
+                    (active ? 'bg-mint font-semibold text-forest' : 'text-ink hover:bg-mint/60')
+                  }
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
 
-          {UPCOMING.length > 0 ? (
-            <p className="mt-6 mb-1 px-3 text-xs font-semibold tracking-wide text-slate uppercase">
-              In Arbeit
-            </p>
-          ) : null}
-          {UPCOMING.map((label) => (
-            <span
-              key={label}
-              aria-disabled="true"
-              className="cursor-not-allowed rounded-lg px-3 py-2 text-sm text-slate"
-            >
-              {label}
-              <span className="ml-2 rounded bg-mint px-1.5 py-0.5 text-[10px] font-semibold text-forest">
-                bald
+            {UPCOMING.length > 0 ? (
+              <p className="mt-6 mb-1 px-3 text-xs font-semibold tracking-wide text-slate uppercase">
+                In Arbeit
+              </p>
+            ) : null}
+            {UPCOMING.map((label) => (
+              <span
+                key={label}
+                aria-disabled="true"
+                className="cursor-not-allowed rounded-lg px-3 py-2 text-sm text-slate"
+              >
+                {label}
+                <span className="ml-2 rounded bg-mint px-1.5 py-0.5 text-[10px] font-semibold text-forest">
+                  bald
+                </span>
               </span>
-            </span>
-          ))}
-        </nav> : <div className="flex-1" />}
+            ))}
+          </nav>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {account ? (
           // shrink-0 so a long nav never squeezes it, and truncate so a long
@@ -170,16 +191,18 @@ export function PortalShellContent({
               <div className="mt-3 border-t border-mint pt-3">
                 <p className="text-xs font-semibold text-slate">Konto wechseln</p>
                 <ul className="mt-1 space-y-1" aria-label="Konto wechseln">
-                  {accounts.filter((candidate) => candidate.id !== accountId).map((candidate) => (
-                    <li key={candidate.id}>
-                      <Link
-                        href={`/a/${candidate.id}`}
-                        className="block rounded px-1 py-1 text-xs text-green underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        {candidate.name}
-                      </Link>
-                    </li>
-                  ))}
+                  {accounts
+                    .filter((candidate) => candidate.id !== accountId)
+                    .map((candidate) => (
+                      <li key={candidate.id}>
+                        <Link
+                          href={`/a/${candidate.id}`}
+                          className="block rounded px-1 py-1 text-xs text-green underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        >
+                          {candidate.name}
+                        </Link>
+                      </li>
+                    ))}
                 </ul>
               </div>
             ) : null}

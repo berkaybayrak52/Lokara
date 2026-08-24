@@ -506,3 +506,159 @@ export const ExtractionResponseSchema = z.object({
   duplicate: ExtractionDuplicateSchema.nullable(),
 });
 export type ExtractionResponse = z.infer<typeof ExtractionResponseSchema>;
+
+// ── Zahlungen / Bank-Matching (docs/15; M6-C2 routes + M6-C3a matching) ──────
+//
+// These five payloads are snake_case ON THE WIRE, unlike every other schema in
+// this file. That is not a mistake to "fix" here: apps/api routers/payments.py
+// declares its response models on plain pydantic `BaseModel` instead of the
+// camelCasing `ApiModel` in schemas.py, and matching_service.py returns raw
+// dicts that never pass through an alias generator at all. Verified against
+// apps/api/tests/test_m6c2_bank_api.py:371 and
+// apps/api/tests/test_m6c3a_matching_service.py:920.
+//
+// The mirror must match what the server actually sends; renaming these to
+// camelCase would make every response fail to parse. Aligning the SERVER on
+// ApiModel is a C3a/C2 change, not a client one.
+
+/** docs/15 § 4 decision — the Decision StrEnum, lowercase on the wire. */
+export const MatchDecisionSchema = z.enum(['auto_match', 'needs_review', 'unmatched', 'deduped']);
+export type MatchDecision = z.infer<typeof MatchDecisionSchema>;
+
+/** The landlord's final answer to a Needs-Review proposal, lowercase. */
+export const MatchOutcomeSchema = z.enum(['confirmed', 'rejected', 'duplicate']);
+export type MatchOutcome = z.infer<typeof MatchOutcomeSchema>;
+
+/** Each value is 0 (signal not met) or its docs/15 § 4 weight. */
+export const MatchSignalsSchema = z.object({
+  iban: z.number().int(),
+  amount: z.number().int(),
+  code_or_surname: z.number().int(),
+  end_to_end: z.number().int(),
+  period: z.number().int(),
+});
+
+export const MatchCandidateSchema = z.object({
+  proposal_id: z.string(),
+  rank: z.number().int(),
+  /** NULL on the engine's rank-1 "no candidate" evidence row. */
+  receivable_id: z.string().nullable(),
+  renter_id: z.string().nullable(),
+  signals: MatchSignalsSchema,
+  /** min(100, sum(signals)) — already capped by the server. */
+  confidence: z.number().int(),
+});
+
+export const MatchConfirmationSchema = z.object({
+  outcome: MatchOutcomeSchema,
+  confirmed_by: z.string(),
+  confirmed_at: z.string(),
+});
+
+export const MatchProposalGroupSchema = z.object({
+  transaction_id: z.string(),
+  decision: MatchDecisionSchema,
+  /** Authored by the server; the client shows it verbatim. */
+  reason_de: z.string().nullable(),
+  candidates: z.array(MatchCandidateSchema),
+  confirmation: MatchConfirmationSchema.nullable(),
+  ledger_entry_id: z.string().nullable(),
+  created_at: z.string(),
+});
+export type MatchProposalGroup = z.infer<typeof MatchProposalGroupSchema>;
+
+export const MatchProposalListResponseSchema = z.object({
+  transactions: z.array(MatchProposalGroupSchema),
+});
+
+export const BankTransactionOutSchema = z.object({
+  id: z.string(),
+  bank_account_id: z.string(),
+  provider_transaction_id: z.string(),
+  amount_cents: z.number().int(),
+  bank_booking_date: z.string(),
+  counterpart_name: z.string().nullable(),
+  purpose: z.string().nullable(),
+  is_potential_duplicate: z.boolean(),
+});
+export type BankTransactionOut = z.infer<typeof BankTransactionOutSchema>;
+
+export const BankTransactionListResponseSchema = z.object({
+  transactions: z.array(BankTransactionOutSchema),
+});
+
+export const ReceivableOutSchema = z.object({
+  id: z.string(),
+  renter_id: z.string(),
+  tenancy_id: z.string(),
+  source_type: z.string(),
+  source_id: z.string().nullable(),
+  /** "2026-03" or a free label — opaque to the client. */
+  period: z.string(),
+  due_date: z.string(),
+  expected_cents: z.number().int(),
+  open_cents: z.number().int(),
+  status: z.string(),
+  category: z.string(),
+});
+export type ReceivableOut = z.infer<typeof ReceivableOutSchema>;
+
+export const ReceivableListResponseSchema = z.object({
+  receivables: z.array(ReceivableOutSchema),
+});
+
+/** The open amounts of one receivable immediately before/after an allocation. */
+export const PaymentAllocationSnapshotSchema = z.object({
+  open_costs_cents: z.number().int(),
+  open_interest_cents: z.number().int(),
+  open_principal_cents: z.number().int(),
+  open_cents: z.number().int(),
+  status: z.string(),
+});
+
+export const PaymentAllocationSchema = z.object({
+  id: z.string(),
+  receivable_id: z.string(),
+  /** § 367 BGB order: costs, then interest, then principal. */
+  costs_cents: z.number().int(),
+  interest_cents: z.number().int(),
+  principal_cents: z.number().int(),
+  components: z.object({
+    base_rent_cents: z.number().int(),
+    nk_advance_cents: z.number().int(),
+    heating_advance_cents: z.number().int(),
+    garage_cents: z.number().int(),
+  }),
+  resulting_status: z.string(),
+  before: PaymentAllocationSnapshotSchema,
+  after: PaymentAllocationSnapshotSchema,
+});
+
+export const PaymentLedgerEntrySchema = z.object({
+  id: z.string(),
+  bank_transaction_id: z.string(),
+  match_proposal_id: z.string(),
+  kind: z.enum(['payment', 'reversal']),
+  /** >= 0 for a payment, < 0 for a reversal. */
+  amount_cents: z.number().int(),
+  /** Renter credit from an overpayment; 0 for a reversal. Never paid out (docs/15 § 9). */
+  credit_cents: z.number().int(),
+  ordering_version: z.number().int(),
+  /** Non-null exactly when kind === 'reversal'. */
+  reverses_entry_id: z.string().nullable(),
+  created_at: z.string(),
+  allocations: z.array(PaymentAllocationSchema),
+});
+export type PaymentLedgerEntry = z.infer<typeof PaymentLedgerEntrySchema>;
+
+export const PaymentLedgerListResponseSchema = z.object({
+  entries: z.array(PaymentLedgerEntrySchema),
+});
+
+/** POST …/decision — 200. A 409 carries a German `detail` instead. */
+export const MatchDecisionResultSchema = z.object({
+  transaction_id: z.string(),
+  outcome: MatchOutcomeSchema,
+  selected_rank: z.number().int().nullable(),
+  ledger_entry_id: z.string().nullable(),
+});

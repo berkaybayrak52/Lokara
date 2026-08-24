@@ -418,8 +418,8 @@ payment-ledger schema, adapter and owner-scoped endpoints; M6-C3-0 closes the au
 invariants through migration `0020`. C3a's service and final `0021` are technically complete,
 development-synchronized and locally merged into `main`. C3b's three job entrypoints are
 technically complete and locally merged into `main`; they add no table, column or migration
-and read this schema only through an account-scoped session. C3c's landlord *Zahlungen* screen
-remains open.
+and read this schema only through an account-scoped session. C3c's landlord *Zahlungen* screen is technically complete on its slice branch
+and not yet merged; it is client-only and adds no table, column or migration either.
 
 ### Meters: `MeterKind` and `MeasurementUnit` are independent axes
 
@@ -917,7 +917,7 @@ approved `docs/11` adds no schema or API.
 | M6-A temporal advances/confirmed actual advances and M6-B Saldo, settlements, finalization and owner-only archives | **Shipped** technical scope; no renter delivery or legal-production approval | M6-A/M6-B |
 | Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
 | Three matching jobs | **Locally merged**; no schema change, read through an account-scoped session only | M6-C3b |
-| Landlord *Zahlungen* screen | **Future**; confirm/reject/duplicate only, no manual assignment | M6-C3c |
+| Landlord *Zahlungen* screen | **Technically complete on its slice branch, not merged**; confirm/reject/duplicate only, no manual assignment, no schema change | M6-C3c |
 | Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |

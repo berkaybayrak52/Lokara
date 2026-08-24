@@ -27,6 +27,25 @@ export function centsToEurInput(cents: number): string {
 }
 
 /**
+ * Cents → "1.234,56 €" for DISPLAY (German grouping, decimal comma, € sign).
+ *
+ * Distinct from `centsToEurInput`, which stays ungrouped and signless because a
+ * `<input>` value has to round-trip back through `parseEurToCents`. Negatives
+ * are real here: a Stornobuchung in the Zahlungsjournal carries negative cents.
+ *
+ * Integer arithmetic only — the euros and the cents are split before anything
+ * is rendered, so no float ever holds a money value.
+ */
+export function centsToEurDisplay(cents: number): string {
+  const sign = cents < 0 ? '-' : '';
+  const abs = Math.abs(cents);
+  const euros = Math.floor(abs / 100)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${sign}${euros},${String(abs % 100).padStart(2, '0')} €`;
+}
+
+/**
  * "1.800", "241,5", "168500,25" → register value × 1000. Max 3 decimals.
  *
  * Meter registers are not money: a water meter reads to the litre (3 decimals)

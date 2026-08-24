@@ -45,11 +45,12 @@ switching are shipped. The pure bank-matching engine, bank/receivable/payment-le
 adapter and base owner endpoints are shipped on `main`; C3a's matching service and five owner APIs
 are technically complete, development-synchronized to final `0021` and locally merged into `main`.
 C3b's scheduler port and three job entrypoints are technically complete and locally merged into
-`main`. Renter activation/portal, tax-adviser guest access, the C3c landlord *Zahlungen*
-screen, tax export, contracts, billing and native apps remain future milestones in `PLAN.md`.
+`main`. The C3c landlord *Zahlungen* screen is technically complete on its slice branch and not yet
+merged. Renter activation/portal, tax-adviser guest access, tax export, contracts, billing and
+native apps remain future milestones in `PLAN.md`.
 
-Future product breadth includes renter delivery, UVI, Anlage V/DATEV, guards/reminders, the
-C3c matching UI and mobile clients. Those are roadmap dependencies, not shipped capabilities.
+Future product breadth includes renter delivery, UVI, Anlage V/DATEV, guards/reminders and
+mobile clients. Those are roadmap dependencies, not shipped capabilities.
 
 ## Competitive thesis
 

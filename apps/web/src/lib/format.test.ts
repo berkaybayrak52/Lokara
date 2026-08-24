@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  centsToEurDisplay,
   centsToEurInput,
   isoToGermanDate,
   meterValueToDisplay,
@@ -42,6 +43,42 @@ describe('centsToEurInput', () => {
     for (const cents of [1, 95000, 95050, 123456]) {
       expect(parseEurToCents(centsToEurInput(cents))).toBe(cents);
     }
+  });
+});
+
+describe('centsToEurDisplay', () => {
+  it('formats amounts below the first separator with two decimals', () => {
+    expect(centsToEurDisplay(0)).toBe('0,00 €');
+    expect(centsToEurDisplay(1)).toBe('0,01 €');
+    expect(centsToEurDisplay(50)).toBe('0,50 €');
+    expect(centsToEurDisplay(20_005)).toBe('200,05 €'); // cents need zero-padding
+    expect(centsToEurDisplay(95_000)).toBe('950,00 €');
+    expect(centsToEurDisplay(99_999)).toBe('999,99 €'); // last ungrouped value
+  });
+
+  it('groups thousands with dots', () => {
+    expect(centsToEurDisplay(100_000)).toBe('1.000,00 €'); // first grouped value
+    expect(centsToEurDisplay(123_456)).toBe('1.234,56 €');
+    expect(centsToEurDisplay(100_000_000)).toBe('1.000.000,00 €');
+    expect(centsToEurDisplay(123_456_789_012)).toBe('1.234.567.890,12 €');
+  });
+
+  it('renders negatives with a leading minus (Stornobuchung)', () => {
+    expect(centsToEurDisplay(-1)).toBe('-0,01 €');
+    expect(centsToEurDisplay(-50)).toBe('-0,50 €');
+    expect(centsToEurDisplay(-20_005)).toBe('-200,05 €');
+    expect(centsToEurDisplay(-100_000)).toBe('-1.000,00 €');
+    expect(centsToEurDisplay(-123_456)).toBe('-1.234,56 €');
+    expect(centsToEurDisplay(-123_456_789_012)).toBe('-1.234.567.890,12 €');
+  });
+
+  it('stays distinct from the ungrouped, signless input format', () => {
+    expect(centsToEurInput(123_456)).toBe('1234,56');
+    expect(centsToEurDisplay(123_456)).toBe('1.234,56 €');
+    expect(centsToEurInput(-123_456)).toBe('-1234,56');
+    expect(centsToEurDisplay(-123_456)).toBe('-1.234,56 €');
+    // the input variant is the one that has to round-trip back through the parser
+    expect(parseEurToCents(centsToEurInput(123_456))).toBe(123_456);
   });
 });
 
