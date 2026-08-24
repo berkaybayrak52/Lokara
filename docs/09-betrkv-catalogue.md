@@ -78,7 +78,7 @@ cleared.
 
 ## 3. Versioned catalogue interface
 
-The future rules-store row is resolved at
+The Slice-C rules-store row is resolved at
 `leistungBis ?? belegDatum`, with inclusive day-granular validity:
 
 ```text
@@ -106,8 +106,8 @@ verificationFlag: geprüft | verify-before-production
 `afaKlasseVorschlag` and `anlageVKategorie` are dependency seams, not values owned here. Approved
 `docs/10-afa.md` defines the former's exact proposals. Approved `docs/11-tax-export.md`
 defines the year-versioned mapping structure and the exact Page-04 reference categories. It does
-not populate `anlageVKategorie` for every Page-02 row, so the complete catalogue mapping remains
-future M7 work.
+not populate `anlageVKategorie` for every Page-02 row. Prepared M7 adds versioned mapping records
+and UI, but the complete runtime catalogue mapping remains blocked and unmerged.
 
 ### 3.1 Allocable catalogue rows
 
@@ -199,9 +199,9 @@ The object also receives `nichtUmlagefaehigGesamtCent`. No renter amount is calc
 ## 5. Binding rule order
 
 All capping and split arithmetic is rounded `ROUND_HALF_UP` to whole cents before Page 01 receives
-the integer. Renter shares are later rounded line-by-line by Page 01. The future NK switch must use
-the single property-level owner residual described in `docs/02` and `docs/08`; largest remainder is
-the current implementation only and remains unchanged in this documentation slice.
+the integer. Renter shares are later rounded line-by-line by Page 01. Slice C uses the single
+property-level owner residual described in `docs/02` and `docs/08`; the earlier largest-remainder
+path is no longer the current catalogue implementation.
 
 ### R1 — Resolve the catalogue row
 

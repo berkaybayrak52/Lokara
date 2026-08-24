@@ -34,6 +34,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    LargeBinary,
     Numeric,
     UniqueConstraint,
     func,
@@ -490,6 +491,7 @@ class Unit(Base):
     __table_args__ = (
         _scoped_fk("unit", "building_id", "building"),
         _scoped_pair("unit"),
+        UniqueConstraint("id", "account_id", "building_id", name="uq_unit_tax_event_context"),
         Index("ix_unit_account", "account_id"),
         Index("ix_unit_building", "building_id"),
     )
@@ -2508,6 +2510,370 @@ class PaymentAllocation(Base):
     )
 
 
+# ── M7: immutable AfA and tax-export evidence. ──
+
+
+class AfaRecordVersion(Base):
+    __tablename__ = "afa_record_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    tax_year: Mapped[int]
+    version: Mapped[int]
+    input_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    result_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    rule_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    rechtsstand: Mapped[str]
+    production_blocked: Mapped[bool]
+    supersedes_afa_record_version_id: Mapped[str | None]
+    generated_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("afa_record_version", "building_id", "building"),
+        ForeignKeyConstraint(
+            [
+                "supersedes_afa_record_version_id",
+                "account_id",
+                "building_id",
+                "tax_year",
+            ],
+            [
+                "afa_record_version.id",
+                "afa_record_version.account_id",
+                "afa_record_version.building_id",
+                "afa_record_version.tax_year",
+            ],
+            name="afa_record_version_supersedes_afa_record_version_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("afa_record_version"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            "tax_year",
+            name="uq_afa_record_version_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id", "building_id", "tax_year", "version", name="uq_afa_record_version"
+        ),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_afa_record_version_id",
+            name="uq_afa_record_version_direct_successor",
+        ),
+        CheckConstraint("version > 0", name="ck_afa_record_version_positive"),
+        CheckConstraint(
+            "id <> supersedes_afa_record_version_id", name="ck_afa_record_version_not_self"
+        ),
+        Index("ix_afa_record_version_account", "account_id"),
+    )
+
+
+class TaxEvent(Base):
+    __tablename__ = "tax_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    unit_id: Mapped[str | None]
+    payment_date: Mapped[date | None]
+    due_date: Mapped[date | None]
+    category: Mapped[str | None]
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    direction: Mapped[str]
+    receipt_reference: Mapped[str]
+    source: Mapped[str]
+    version: Mapped[int]
+    source_payment_allocation_id: Mapped[str | None]
+    source_component: Mapped[str]
+    supersedes_tax_event_id: Mapped[str | None]
+    source_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    recorded_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("tax_event", "building_id", "building"),
+        ForeignKeyConstraint(
+            ["unit_id", "account_id", "building_id"],
+            ["unit.id", "unit.account_id", "unit.building_id"],
+            name="tax_event_unit_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_fk("tax_event", "source_payment_allocation_id", "payment_allocation"),
+        ForeignKeyConstraint(
+            [
+                "supersedes_tax_event_id",
+                "account_id",
+                "building_id",
+                "source_component",
+            ],
+            [
+                "tax_event.id",
+                "tax_event.account_id",
+                "tax_event.building_id",
+                "tax_event.source_component",
+            ],
+            name="tax_event_supersedes_tax_event_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("tax_event"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            "source_component",
+            name="uq_tax_event_correction_context",
+        ),
+        Index(
+            "uq_tax_event_payment_allocation_component",
+            "account_id",
+            "source_payment_allocation_id",
+            "source_component",
+            unique=True,
+            postgresql_where=text(
+                "supersedes_tax_event_id IS NULL AND source_payment_allocation_id IS NOT NULL"
+            ),
+        ),
+        UniqueConstraint(
+            "account_id", "supersedes_tax_event_id", name="uq_tax_event_direct_successor"
+        ),
+        CheckConstraint("amount_cents >= 0", name="ck_tax_event_amount_non_negative"),
+        CheckConstraint("direction IN ('einnahme', 'ausgabe')", name="ck_tax_event_direction"),
+        CheckConstraint("source IN ('finapi', 'manuell', 'rechnung')", name="ck_tax_event_source"),
+        CheckConstraint("version > 0", name="ck_tax_event_version_positive"),
+        CheckConstraint(
+            "source_component IN ('manual', 'costs', 'interest', 'principal', "
+            "'base_rent', 'nk_advance', 'heating_advance', 'garage')",
+            name="ck_tax_event_source_component",
+        ),
+        CheckConstraint("id <> supersedes_tax_event_id", name="ck_tax_event_not_self"),
+        Index("ix_tax_event_account", "account_id"),
+    )
+
+
+class TaxAdviserProfileVersion(Base):
+    __tablename__ = "tax_adviser_profile_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    version: Mapped[int]
+    profile_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    production_blocked: Mapped[bool]
+    supersedes_profile_version_id: Mapped[str | None]
+    generated_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk(
+            "tax_adviser_profile_version",
+            "supersedes_profile_version_id",
+            "tax_adviser_profile_version",
+        ),
+        _scoped_pair("tax_adviser_profile_version"),
+        UniqueConstraint("account_id", "version", name="uq_tax_adviser_profile_version"),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_profile_version_id",
+            name="uq_tax_adviser_profile_direct_successor",
+        ),
+        CheckConstraint("version > 0", name="ck_tax_adviser_profile_version_positive"),
+        CheckConstraint(
+            "id <> supersedes_profile_version_id", name="ck_tax_adviser_profile_not_self"
+        ),
+        Index("ix_tax_adviser_profile_version_account", "account_id"),
+    )
+
+
+class TaxMappingVersion(Base):
+    __tablename__ = "tax_mapping_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tax_year: Mapped[int]
+    version: Mapped[int]
+    mapping_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    source_version: Mapped[str]
+    rechtsstand: Mapped[str]
+    production_blocked: Mapped[bool]
+    supersedes_mapping_version_id: Mapped[str | None]
+    generated_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["supersedes_mapping_version_id", "account_id", "tax_year"],
+            [
+                "tax_mapping_version.id",
+                "tax_mapping_version.account_id",
+                "tax_mapping_version.tax_year",
+            ],
+            name="tax_mapping_version_supersedes_mapping_version_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("tax_mapping_version"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "tax_year",
+            name="uq_tax_mapping_version_correction_context",
+        ),
+        UniqueConstraint("account_id", "tax_year", "version", name="uq_tax_mapping_version"),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_mapping_version_id",
+            name="uq_tax_mapping_direct_successor",
+        ),
+        CheckConstraint("version > 0", name="ck_tax_mapping_version_positive"),
+        CheckConstraint("id <> supersedes_mapping_version_id", name="ck_tax_mapping_not_self"),
+        Index("ix_tax_mapping_version_account", "account_id"),
+    )
+
+
+class TaxExportReadinessAttempt(Base):
+    __tablename__ = "tax_export_readiness_attempt"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    afa_record_version_id: Mapped[str | None]
+    adviser_profile_version_id: Mapped[str | None]
+    mapping_version_id: Mapped[str]
+    tax_year: Mapped[int]
+    export_kind: Mapped[str]
+    input_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    findings_snapshot: Mapped[list[object]] = mapped_column(JSON)
+    production_blocked: Mapped[bool]
+    generated_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("tax_export_readiness_attempt", "building_id", "building"),
+        _scoped_fk("tax_export_readiness_attempt", "afa_record_version_id", "afa_record_version"),
+        _scoped_fk(
+            "tax_export_readiness_attempt",
+            "adviser_profile_version_id",
+            "tax_adviser_profile_version",
+        ),
+        _scoped_fk("tax_export_readiness_attempt", "mapping_version_id", "tax_mapping_version"),
+        _scoped_pair("tax_export_readiness_attempt"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            "tax_year",
+            "export_kind",
+            name="uq_tax_export_readiness_attempt_archive_context",
+        ),
+        CheckConstraint(
+            "export_kind IN ('anlage_v_pdf', 'anlage_v_csv', 'datev_extf')",
+            name="ck_tax_export_readiness_kind",
+        ),
+        Index("ix_tax_export_readiness_attempt_account", "account_id"),
+    )
+
+
+class TaxExportArchive(Base):
+    __tablename__ = "tax_export_archive"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    readiness_attempt_id: Mapped[str]
+    building_id: Mapped[str]
+    tax_year: Mapped[int]
+    export_kind: Mapped[str]
+    version: Mapped[int]
+    input_snapshot: Mapped[dict[str, object]] = mapped_column(JSON)
+    production_blocked: Mapped[bool]
+    sha256: Mapped[str]
+    supersedes_archive_id: Mapped[str | None]
+    generated_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["readiness_attempt_id", "account_id", "building_id", "tax_year", "export_kind"],
+            [
+                "tax_export_readiness_attempt.id",
+                "tax_export_readiness_attempt.account_id",
+                "tax_export_readiness_attempt.building_id",
+                "tax_export_readiness_attempt.tax_year",
+                "tax_export_readiness_attempt.export_kind",
+            ],
+            name="tax_export_archive_readiness_attempt_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["supersedes_archive_id", "account_id", "building_id", "tax_year", "export_kind"],
+            [
+                "tax_export_archive.id",
+                "tax_export_archive.account_id",
+                "tax_export_archive.building_id",
+                "tax_export_archive.tax_year",
+                "tax_export_archive.export_kind",
+            ],
+            name="tax_export_archive_supersedes_archive_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("tax_export_archive"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            "tax_year",
+            "export_kind",
+            name="uq_tax_export_archive_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "building_id",
+            "tax_year",
+            "export_kind",
+            "version",
+            name="uq_tax_export_archive_version",
+        ),
+        UniqueConstraint(
+            "account_id", "supersedes_archive_id", name="uq_tax_export_archive_direct_successor"
+        ),
+        CheckConstraint("version > 0", name="ck_tax_export_archive_version_positive"),
+        CheckConstraint("length(sha256) = 64", name="ck_tax_export_archive_sha256"),
+        CheckConstraint(
+            "export_kind IN ('anlage_v_pdf', 'anlage_v_csv', 'datev_extf')",
+            name="ck_tax_export_archive_kind",
+        ),
+        CheckConstraint("id <> supersedes_archive_id", name="ck_tax_export_archive_not_self"),
+        Index("ix_tax_export_archive_account", "account_id"),
+    )
+
+
+class TaxExportArtifact(Base):
+    __tablename__ = "tax_export_artifact"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    archive_id: Mapped[str]
+    artifact_kind: Mapped[str]
+    content_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    sha256: Mapped[str]
+    mime_type: Mapped[str]
+    filename: Mapped[str]
+    production_blocked: Mapped[bool]
+    generated_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("tax_export_artifact", "archive_id", "tax_export_archive"),
+        _scoped_pair("tax_export_artifact"),
+        UniqueConstraint(
+            "account_id", "archive_id", "artifact_kind", name="uq_tax_export_artifact_kind"
+        ),
+        CheckConstraint("length(sha256) = 64", name="ck_tax_export_artifact_sha256"),
+        Index("ix_tax_export_artifact_account", "account_id"),
+    )
+
+
 # Tables scoped by their own account_id column — the Alembic migration enables
 # FORCEd RLS on each of these plus `account`, which is scoped by its own id.
 # `building_assignment` joined this tuple with migration 0004: its scope used to be
@@ -2563,4 +2929,11 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "match_confirmation",
     "payment_ledger_entry",
     "payment_allocation",
+    "afa_record_version",
+    "tax_event",
+    "tax_adviser_profile_version",
+    "tax_mapping_version",
+    "tax_export_readiness_attempt",
+    "tax_export_archive",
+    "tax_export_artifact",
 )

@@ -45,14 +45,17 @@ switching are shipped. The pure bank-matching engine, bank/receivable/payment-le
 adapter and base owner endpoints are shipped on `main`; C3a's matching service and five owner APIs
 are technically complete, development-synchronized to final `0021` and locally merged into `main`.
 C3b's scheduler port and three job entrypoints are technically complete and locally merged into
-`main`, and so is the C3c landlord *Zahlungen* screen, which completes M6. Renter activation/portal, tax-adviser guest access, tax export, contracts, billing and
-native apps remain future milestones in `PLAN.md`.
+`main`, and so is the C3c landlord *Zahlungen* screen, which completes M6. Renter activation/portal,
+contracts, billing and native apps remain future milestones in `PLAN.md`. M7 tax-adviser access,
+AfA and tax export are **prepared but unmerged** on `slice/m7-afa-tax-export`: the M7-A and M7-B
+engine/database layers are focused-green, but the artifact/API boundary remains in a declared RED
+window and is neither shipped nor production-approved.
 
 The locally merged G1 slice provides pure W1 statement-deadline, W2 meter-calibration and
 W4 UVI-cadence evaluators. It has no database, API, UI, scheduler, provider, delivery or PDF
-consumer. Future product breadth still includes renter delivery, UVI readings/calculation/document,
-W3 and W5–W8, M9 reminders and delivery, Anlage V/DATEV and mobile clients. Those are roadmap
-dependencies, not shipped capabilities.
+consumer. Future product breadth still includes renter delivery, W3 and W5–W8, M9 reminders and
+delivery and mobile clients. Anlage V/DATEV has a prepared branch-local M7 foundation, not a shipped
+or usable production export. Those are roadmap or prepared dependencies, not shipped capabilities.
 
 ## Competitive thesis
 

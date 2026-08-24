@@ -10,10 +10,18 @@
 **Fixtures:** exactly `11-F01`–`11-F16` in
 `packages/rules-store/tests/berkay_11_golden.py`
 
-**Implementation status:** specification and data-only oracle only. No export engine, rules data,
-schema, API, screen, adapter, archive, PDF or production DATEV output is added by this slice.
+**Implementation status — prepared but unmerged, 25.08.2026:** `slice/m7-afa-tax-export` contains
+the pure `packages/export-engine`, versioned runtime-blocked rule data, migration `0024`, tax API,
+restricted `/steuern` workspace and German Anlage-V projection. The engine/database run passed
+`193` focused tests and the web suite passes `106`; the server-generated PDF/CSV/EXTF artifact/API
+adapter is paused with ten focused failures. The latest development schema parity and all closure
+gates/reviews remain open.
 
-This document defines two deterministic future outputs from one payment ledger: an
+No real output is approved. Anlage-V lines, SKR accounts, EXTF parameters, Soll/Haben orientation,
+the BFH citation, Disagio and maintenance mapping remain blocked. The verified-test-only server
+profile is technical test evidence, not runtime authority.
+
+This document defines two deterministic outputs from one payment ledger: an
 `Anlage-V-Übersicht` as PDF/CSV and a DATEV EXTF booking batch. Neither output calculates its own
 source amounts. Both consume accepted ledger entries, year-versioned mappings, the Page-03 AfA
 handoff and an adviser profile. The readiness check runs before generation and keeps missing or
@@ -65,7 +73,7 @@ change `28. Juli 2026 17:16`. The exact current groups are:
 `geprüft` means the primary text was checked, not lawyer-approved. It does not convert an adjacent
 implementation convention into settled law.
 
-## 3. Future inputs and immutable outputs
+## 3. Inputs and immutable outputs
 
 All money is integer cents. Dates are day-accurate. Account numbers are strings because leading
 zeros and length depend on the selected chart. No float crosses the boundary.
@@ -83,8 +91,8 @@ richtung, kategorie?, faelligkeitsdatum?, belegReferenz, quelle, version
 - `quelle` is `finapi`, `manuell` or `rechnung`.
 - Categories come from Page 02 plus `kaltmiete`, `nk_vorauszahlung`, `nk_nachzahlung`,
   `nk_guthaben`, `kaution`, `schuldzinsen` and `afa`.
-- Missing `datum` is a red hard block. Missing `kategorie` is a yellow readiness finding, so the
-  future normalized pre-export view must be able to represent that incomplete state.
+- Missing `datum` is a red hard block. Missing `kategorie` is a yellow readiness finding; prepared
+  `TaxEvent` represents both nullable states.
 - `faelligkeitsdatum` is nullable and is used for the 10-day rule only when a supported due item
   exists. `belegReferenz` provides the trace back to the ledger entry.
 - Every correction appends a version; this document approves no schema or mutation endpoint.
@@ -99,16 +107,16 @@ afaAbziehbarCent, zinsAbziehbarCent, disagioAbziehbarCent, erhaltungsaufwandCent
 
 The interest value is always a marked proposal from the loan plan and needs confirmation against
 the annual bank certificate. A missing AfA record is yellow, leaves the AfA line empty and links to
-the future AfA workflow. Page 04 never reconstructs the Page-03 basis, rate or loan schedule.
+the prepared AfA workflow. Page 04 never reconstructs the Page-03 basis, rate or loan schedule.
 
 The reference aggregation maps `afaAbziehbarCent` and `zinsAbziehbarCent`. The source names
 `disagioAbziehbarCent` and `erhaltungsaufwandCent` as handoff fields but supplies no separate
-Anlage-V rows for them; `instandhaltung` also exists as a ledger category. A future mapping must
-settle the lines and prevent maintenance double-counting before those two values enter an export.
+Anlage-V rows for them; `instandhaltung` also exists as a ledger category. The mapping gap remains
+blocked: prepared M7 excludes both values until the lines and maintenance deduplication are settled.
 
 ### 3.3 Tax-adviser profile
 
-The future `stbProfil` carries `beraternummer`, `mandantennummer`, `kontenrahmen` (`skr03` or
+The prepared `stbProfil` version carries `beraternummer`, `mandantennummer`, `kontenrahmen` (`skr03` or
 `skr04`), `sachkontenlaenge` and `wjBeginn`. The first two are required only when DATEV is selected;
 their absence is a red hard block. SKR03, four-digit accounts and 1 January are source defaults,
 not approved schema defaults. The `TAX_ADVISOR` guest remains read-only except for this profile's
@@ -124,7 +132,7 @@ validFrom, validTo?, verificationFlag, sourceVersion,
 accountOverride?, overrideByTaxAdvisor?, overrideAt?
 ```
 
-The structure is binding for future implementation. Every concrete 2025 line and SKR account in
+The structure is binding for implementation. Every concrete 2025 line and SKR account in
 the source table is a realistic placeholder and remains `verify-before-production`. The selected
 layout follows the **tax year**, not the file-creation year, and every overview states the form year
 and source status.
@@ -136,7 +144,7 @@ Page-02 catalogue row.
 
 ### 3.5 Readiness result
 
-The future readiness result is immutable evidence for one attempted export. It records the export
+The prepared readiness result is immutable evidence for one attempted export. It records the export
 kind, object, tax year, input/mapping/profile versions, ordered findings, severity (`rot` or `gelb`),
 acknowledgements, chosen tax-year override where allowed, and whether generation was blocked.
 
@@ -147,7 +155,7 @@ gap; and detected VAT case. Every finding returns to its owning correction flow.
 
 ### 3.6 Export result and archive
 
-The future pure boundary is:
+The prepared pure boundary is:
 
 ```text
 f(ledgerSnapshot, afaHandoff, mappingVersion, adviserProfileVersion, parameters)
@@ -155,8 +163,10 @@ f(ledgerSnapshot, afaHandoff, mappingVersion, adviserProfileVersion, parameters)
 ```
 
 An archive version freezes those input references, the readiness result, tax year, rule and mapping
-versions, applicable `Rechtsstand`, generated bytes, filename, timestamp and content hash. Re-export
-creates `vN+1`; it never overwrites `vN`. The archive contract does not by itself establish a
+versions, applicable `Rechtsstand`, generated bytes, filename, timestamp and content hash. Prepared
+`0024` versions one stable account/building/year/export-kind stream across readiness attempts;
+re-export creates `vN+1` and never overwrites `vN`. The app adapter that generates and archives the
+exact server-produced bytes is still RED. The archive contract does not by itself establish a
 universal retention period: § 147a AO's checked six-year rule is conditional, and the separate
 privacy retention schedule remains unresolved.
 
@@ -302,7 +312,9 @@ Every amount below is integer cents. Variant fixtures never change the reference
 3. Pull the official target-version EXTF field list, header and Festschreibung semantics.
 4. Prove account pairing and Soll/Haben orientation with a real DATEV Kanzlei-Rechnungswesen import.
 5. Verify a controlling BFH file number for the 10-day-rule proposition before displaying it.
-6. Keep the Page-03 AfA handoff blockers visible; Page 04 cannot clear Weg B or K09 uncertainty.
+6. Keep the Page-03 AfA handoff blockers visible; Page 04 cannot clear Weg B or K09's
+   `verify-before-production` authority status, even though Page 03 selects the month-granular
+   453,798-cent technical result.
 7. The exact class-specific privacy retention schedule remains a separate source-backed gap.
 8. Assign Anlage-V lines for Disagio and handed-off maintenance and prevent double-counting against
    ledger `instandhaltung` before those fields enter an export.
@@ -338,7 +350,7 @@ comes from the original Page, the register and the approved rules and fixtures h
 | --- | --- | --- | --- |
 | Metadata, purpose, dependencies and two-output architecture | §§ 1, 3 | source-surface test | complete |
 | Norms, case-law gap and K01–K11 | §§ 2, 4, 8–9 | register/blocker tuples | complete; flags retained |
-| Inputs and future contracts | § 3 | contract-surface constants | complete; no schema claim |
+| Inputs and immutable-output contracts | § 3 | contract-surface constants plus prepared M7 tests | specification complete; prepared schema/app remains unmerged and RED |
 | R1–R9 | § 5 | F01–F16 arithmetic/format checks | complete |
 | E01–E15, including E05a–c | § 6 | exact edge map + readiness/archive checks | complete |
 | Worked examples F01–F16 | § 7 | exact 16-ID oracle | complete |

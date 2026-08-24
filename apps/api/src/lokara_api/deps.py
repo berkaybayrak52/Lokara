@@ -119,3 +119,27 @@ def account_session_for_path(
 
 
 PathAccountSession = Annotated[Session, Depends(account_session_for_path)]
+
+
+def tax_account_session_for_path(
+    account_id: str,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+) -> Iterator[Session]:
+    """Account session for tax routes; action authorization stays in the router."""
+    with account_scoped_session(_engine(), account_id) as session:
+        membership = session.scalar(
+            select(Membership).where(
+                Membership.person_id == auth.person_id,
+                Membership.account_id == account_id,
+                Membership.revoked_at.is_(None),
+            )
+        )
+        if membership is None:
+            raise HTTPException(
+                status_code=403, detail="Caller holds no membership in this account"
+            )
+        session.info["tax_role"] = membership.role
+        yield session
+
+
+TaxAccountSession = Annotated[Session, Depends(tax_account_session_for_path)]

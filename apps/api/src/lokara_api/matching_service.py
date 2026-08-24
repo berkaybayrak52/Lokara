@@ -20,6 +20,8 @@ from lokara_db import (
     Receivable,
     Renter,
     RenterMatchingProfile,
+    Tenancy,
+    Unit,
     new_id,
 )
 from lokara_matching_engine import (
@@ -40,6 +42,8 @@ from lokara_matching_engine import (
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from .routers.tax import materialize_payment_allocation_components
 
 type JsonObject = dict[str, object]
 
@@ -369,34 +373,58 @@ def _settle_payment(
     session.add(entry)
     session.flush()
     by_id = {row.id: row for row in receivables}
+    recorded_at = datetime.now(UTC)
     for allocation in result.allocations:
         row = by_id[allocation.receivable_id]
         components = _persisted_principal_components(row, allocation.principal_components)
-        session.add(
-            PaymentAllocation(
-                id=new_id(),
-                account_id=transaction.account_id,
-                ledger_entry_id=entry.id,
-                receivable_id=row.id,
-                costs_cents=allocation.costs_cents,
-                interest_cents=allocation.interest_cents,
-                principal_cents=allocation.principal_cents,
-                base_rent_cents=components[0],
-                nk_advance_cents=components[1],
-                heating_advance_cents=components[2],
-                garage_cents=components[3],
-                resulting_status=allocation.status,
-                before_open_costs_cents=allocation.open_costs_cents_before,
-                before_open_interest_cents=allocation.open_interest_cents_before,
-                before_open_principal_cents=row.open_principal_cents,
-                before_open_cents=allocation.open_cents_before,
-                before_status=allocation.status_before,
-                after_open_costs_cents=allocation.open_costs_cents,
-                after_open_interest_cents=allocation.open_interest_cents,
-                after_open_principal_cents=allocation.open_cents,
-                after_open_cents=allocation.open_cents,
-                after_status=allocation.status,
-            )
+        persisted = PaymentAllocation(
+            id=new_id(),
+            account_id=transaction.account_id,
+            ledger_entry_id=entry.id,
+            receivable_id=row.id,
+            costs_cents=allocation.costs_cents,
+            interest_cents=allocation.interest_cents,
+            principal_cents=allocation.principal_cents,
+            base_rent_cents=components[0],
+            nk_advance_cents=components[1],
+            heating_advance_cents=components[2],
+            garage_cents=components[3],
+            resulting_status=allocation.status,
+            before_open_costs_cents=allocation.open_costs_cents_before,
+            before_open_interest_cents=allocation.open_interest_cents_before,
+            before_open_principal_cents=row.open_principal_cents,
+            before_open_cents=allocation.open_cents_before,
+            before_status=allocation.status_before,
+            after_open_costs_cents=allocation.open_costs_cents,
+            after_open_interest_cents=allocation.open_interest_cents,
+            after_open_principal_cents=allocation.open_cents,
+            after_open_cents=allocation.open_cents,
+            after_status=allocation.status,
+        )
+        session.add(persisted)
+        building_id = session.scalar(
+            select(Unit.building_id)
+            .join(Tenancy, Tenancy.unit_id == Unit.id)
+            .where(Tenancy.id == row.tenancy_id)
+        )
+        if building_id is None:
+            raise MatchingConflictError("Das Objekt der Forderung wurde nicht gefunden.")
+        unit_id = session.scalar(select(Tenancy.unit_id).where(Tenancy.id == row.tenancy_id))
+        if unit_id is None:
+            raise MatchingConflictError("Die Einheit der Forderung wurde nicht gefunden.")
+        materialize_payment_allocation_components(
+            account_id=transaction.account_id,
+            building_id=building_id,
+            unit_id=unit_id,
+            allocation=persisted,
+            payment_date=transaction.bank_booking_date,
+            recorded_at=recorded_at,
+            source_context={
+                "ledger_entry_id": entry.id,
+                "ledger_kind": entry.kind,
+                "bank_transaction_id": transaction.id,
+            },
+            session=session,
         )
         row.open_costs_cents = allocation.open_costs_cents
         row.open_interest_cents = allocation.open_interest_cents
@@ -604,31 +632,54 @@ def _reverse_payment(session: Session, returned: BankTransaction) -> JsonObject:
         restored = restored_by_receivable[compensation.receivable_id]
         receivable = by_id[compensation.receivable_id]
         components = _persisted_principal_components(receivable, compensation.principal_components)
-        session.add(
-            PaymentAllocation(
-                id=new_id(),
-                account_id=returned.account_id,
-                ledger_entry_id=entry.id,
-                receivable_id=receivable.id,
-                costs_cents=compensation.costs_cents,
-                interest_cents=compensation.interest_cents,
-                principal_cents=compensation.principal_cents,
-                base_rent_cents=components[0],
-                nk_advance_cents=components[1],
-                heating_advance_cents=components[2],
-                garage_cents=components[3],
-                resulting_status=restored.status,
-                before_open_costs_cents=stored.after_open_costs_cents,
-                before_open_interest_cents=stored.after_open_interest_cents,
-                before_open_principal_cents=stored.after_open_principal_cents,
-                before_open_cents=stored.after_open_cents,
-                before_status=stored.after_status,
-                after_open_costs_cents=stored.before_open_costs_cents,
-                after_open_interest_cents=stored.before_open_interest_cents,
-                after_open_principal_cents=stored.before_open_principal_cents,
-                after_open_cents=stored.before_open_cents,
-                after_status=stored.before_status,
-            )
+        persisted = PaymentAllocation(
+            id=new_id(),
+            account_id=returned.account_id,
+            ledger_entry_id=entry.id,
+            receivable_id=receivable.id,
+            costs_cents=compensation.costs_cents,
+            interest_cents=compensation.interest_cents,
+            principal_cents=compensation.principal_cents,
+            base_rent_cents=components[0],
+            nk_advance_cents=components[1],
+            heating_advance_cents=components[2],
+            garage_cents=components[3],
+            resulting_status=restored.status,
+            before_open_costs_cents=stored.after_open_costs_cents,
+            before_open_interest_cents=stored.after_open_interest_cents,
+            before_open_principal_cents=stored.after_open_principal_cents,
+            before_open_cents=stored.after_open_cents,
+            before_status=stored.after_status,
+            after_open_costs_cents=stored.before_open_costs_cents,
+            after_open_interest_cents=stored.before_open_interest_cents,
+            after_open_principal_cents=stored.before_open_principal_cents,
+            after_open_cents=stored.before_open_cents,
+            after_status=stored.before_status,
+        )
+        session.add(persisted)
+        building_id = session.scalar(
+            select(Unit.building_id)
+            .join(Tenancy, Tenancy.unit_id == Unit.id)
+            .where(Tenancy.id == receivable.tenancy_id)
+        )
+        if building_id is None:
+            raise MatchingConflictError("Das Objekt der Forderung wurde nicht gefunden.")
+        unit_id = session.scalar(select(Tenancy.unit_id).where(Tenancy.id == receivable.tenancy_id))
+        if unit_id is None:
+            raise MatchingConflictError("Die Einheit der Forderung wurde nicht gefunden.")
+        materialize_payment_allocation_components(
+            account_id=returned.account_id,
+            building_id=building_id,
+            unit_id=unit_id,
+            allocation=persisted,
+            payment_date=returned.bank_booking_date,
+            recorded_at=datetime.now(UTC),
+            source_context={
+                "ledger_entry_id": entry.id,
+                "ledger_kind": entry.kind,
+                "bank_transaction_id": returned.id,
+            },
+            session=session,
         )
         receivable.open_costs_cents = restored.open_costs_cents
         receivable.open_interest_cents = restored.open_interest_cents

@@ -49,8 +49,8 @@ before UI. Dates are communication events, not planning inputs.
   preserved. No slice was pushed.
 - M5 is complete and merged into `main` as `a748729`: secure bootstrap, backend
   membership/assigned-building authorization and the URL-based account chooser/switcher are
-  shipped. Renter activation/portal remains M10; adviser profile, mapping and tax functions remain
-  M7. **All of M6 is locally merged into `main`**: M6-A
+  shipped. Renter activation/portal remains M10; adviser profile, mapping and tax functions ship
+  with M7. **All of M6 is locally merged into `main`**: M6-A
   (temporal advances, `d82abcc`), M6-B (finalized archives, `f578f2f`), M6-C1 (the pure matching
   engine, `8306b68`) and M6-C2 (bank persistence, the § 3.1 adapter and owner-scoped endpoints,
   `92e1318`), followed by M6-C3-0's migration-`0020` invariant repair. **M6-C3a is technically
@@ -62,8 +62,10 @@ before UI. Dates are communication events, not planning inputs.
   scheduler or PDF consumer. W2 now runs the unified six-year MessEV Eichfrist; the slice had
   reversed that merged round-4 decision, and the reversal was undone before the merge.
   `main` is ahead of `origin/main`, which still points to `f372f67`.
-  U1–U5 are now technically complete and locally merged. M7 is next; M9 reminder/delivery and M10
-  renter publication remain open.
+  U1–U5 are now technically complete and locally merged. M7-0 through M7-E are **technically
+  complete and locally merged** from `slice/m7-afa-tax-export`; M7-F's three read-only reviews are
+  the one outstanding closure item, and every M7 authority flag still blocks production output.
+  M8, M9 reminder/delivery and M10 renter publication remain open.
 
 ---
 
@@ -78,8 +80,8 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction. M6-A/B ship actual-advance reconciliation and owner-only technical final archives; M6-C1/C2/C3-0/C3a ship bank matching, ledger persistence, the matching service, five owner APIs and audited invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's Zahlungen screen are technically complete and locally merged. M10 renter delivery remains open. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. U1–U5 now implement monthly DWD/UVI engineering, but technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or UVI production authority. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
-| Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
-| Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
+| Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The normalized pure engine, server-owned rules and the AfA API/web boundary are locally merged and green under `scripts/gate.sh full`. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. F11 selects 453,798 ct, while K09 authority, Weg B and the missing Gutachten share still block production. |
+| Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The pure export engine, rules, the strengthened `0024` model and the server-owned artifact/API adapter are locally merged and green under `scripts/gate.sh full`. Artifact bytes are generated by the server from domain inputs; a caller can never supply them. Seven register rows are `geprüft`; six and all affected runtime outputs remain blocked. |
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. G1 executes the nine selected W1/W2/W4 cases (`12-F01`–`F06`, `F11`–`F13`) through the pure guard engine on `main`. Sixteen of the 18 Page-specific register rows remain `verify-before-production`; rows 128 and 129 were closed by round 4 against § 34 Abs. 2 MessEV and MessEV Anlage 7 and still need matching register entries. W3 and W5–W8 plus all consumers remain open. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
@@ -276,7 +278,7 @@ not replace the complete documentation or reconciliation gates.
 | M6 | **Technically complete; locally merged 24.08.2026** | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **C3b's scheduler port and three job entrypoints are locally merged**: no schema change, no endpoint, one consent precondition on every AIS pull. **C3c's Zahlungen screen is technically complete and locally merged**: a client-only owner screen that records one final confirm/reject/duplicate outcome, with no manual assignment and no backend change. That merge closes M6-C and completes M6; delivery and the renter portal remain M10. |
 | G | **Technically complete, reviewed and locally merged 24.08.2026** | Shared guard foundation | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration. |
 | U | **Technically complete, reviewed and locally merged 24.08.2026** | UVI comparison, calculation and document | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10. |
-| M7 | After U | Tax export and AfA | Implement approved `docs/09`–`docs/11`. Build computation paths and archives; flagged register values continue to block real output. |
+| M7 | **M7-0…M7-E technically complete and locally merged 25.08.2026; M7-F reviews open** | Tax export and AfA | The pure AfA and export engines, versioned rules, migration `0024`, the account-scoped API, the tax workspace and the Anlage-V PDF/CSV/EXTF paths are merged and green under fast, full and non-fresh demo gates. The three fresh read-only reviews of M7-F have not been run, and all flagged register values continue to block real output. |
 | M8 | After M7 | Document and letter engine | Implement approved `docs/13` with versioned clauses and risk gates. |
 | M9 | After M8 | Reminders, email and checklists | Extend the existing W1/W2/W4 foundation with the remaining guard projections, reminders, delivery and UVI scheduling from approved `docs/12`. |
 | M10 | After M9 | Portals, investment, billing and native apps | Implement renter activation and portal work, the approved `docs/14` investment cockpit, billing and mobile apps. |
@@ -347,6 +349,7 @@ The following remain `verify-before-production` placeholders:
 - all Anlage-V line numbers;
 - SKR03/SKR04 accounts;
 - DATEV EXTF parameters;
+- K09's month-granular use-change convention, although `10-F11` technically selects 453,798 ct;
 - three BFH case numbers marked `ZITAT UNSICHER`;
 - the Page 04 ten-day-rule BFH citation.
 
@@ -983,17 +986,110 @@ document. The closing boundary audit and statement review report no findings. Th
 
 ### M7 — Tax export and AfA
 
-**Approved-spec prerequisite:** `docs/09`–`docs/11`, including every fixture and every
-`verify-before-production` marker.
+**Scope and authority boundary:** implement M7 technically from approved `docs/09`–`docs/11`.
+Reuse Slice C's Page-02 implementation; do not rebuild it. Technical completion never means
+production or legal approval. Current authority flags continue to block production exports, and no
+step below is complete until its named evidence exists.
 
-- Pure `packages/export-engine` for Anlage V and DATEV EXTF.
-- DATEV output is byte-exact Windows-1252 with semicolons and CRLF.
-- Readiness check and immutable export archive with hash and timestamp.
-- Pure `packages/afa-engine`, AfA wizard, 15% guard and loan-interest prefill.
-- Preserve every `verify-before-production` flag from the M7 warning above.
+**Status — 25.08.2026: M7-0…M7-E technically complete and locally merged; M7-F reviews open.**
+M7-B's verified-export adapter, which was the declared RED window, is closed: artifact bytes are now
+generated by the server from domain inputs and frozen by an internal `archive_verified_test_artifacts`
+boundary, the readiness projection carries no tenant identity, and archive versions and supersession
+run per logical export stream (account, building, tax year, export kind), never per readiness
+attempt. `.lokara-red` was removed only after the focused suite went green.
 
-**Done when:** DATEV and Anlage-V golden tests pass byte-exactly and the export is archived
-immutably. Production use remains blocked until flagged values are verified.
+Evidence: `scripts/gate.sh fast` and `scripts/gate.sh full` are green — `1709` pytest, `106` vitest,
+strict mypy over `234` source files, engine purity, agent parity, RLS coverage `55` tenant tables and
+FK isolation `97` foreign keys. The non-fresh demo path is green, and `scripts/pdf_fingerprint.sh`
+reports the ordinary NK/heating statement unchanged at `88eb8434eda65f8d7ff82826fc837a58` /
+`149269` bytes, so M7 altered nothing a landlord already read. The development database was
+reconciled to the final `0024` and its seven M7 tables now match the models column for column.
+
+**This is technical closure only, and M7-F is not finished.** The three fresh read-only reviews —
+`boundary-auditor`, `statement-reviewer` and `docs-reconciler` — have not been run against the
+completed slice; earlier clean reviews predate the normalized M7-A/M7-B work and are not closure
+evidence. Every applicable authority limit stands: K09's month-granular convention, Weg-B
+placeholders, the missing Gutachten share, all Anlage-V line numbers, SKR03/SKR04 accounts, DATEV
+EXTF parameters and Soll/Haben orientation remain `verify-before-production` and continue to block
+real output. Successful archive behaviour uses the explicitly verified test-only rule bundle;
+runtime mappings stay blocked.
+
+#### M7-0 — AfA authority reconciliation
+
+- Keep K09's selected technical result: `10-F11 = 453,798 ct`.
+- Preserve the authoritative CSV status `verify-before-production`; remove the incorrect
+  `geprüft` fixture claim.
+- Reconcile stale K09 statements in `docs/02`, `docs/10`, `docs/11` and this plan.
+- Preserve Weg-B placeholders and the `leistungBis` versus `abfluss` boundary.
+
+#### M7-A — Pure AfA engine
+
+- Create RED executable tests before implementation, then add pure `packages/afa-engine`.
+- A1 covers acquisition, allocation, rates, annual series, self-use and predecessor continuation.
+- A2 covers later costs, the 15% guard, loans, Disagio and the Page-04 handoff.
+- Execute all `10-F01…F34` using integer cents, basis points and exact `Decimal`.
+- The public boundary is
+  `calculate_afa_record(AfaInput, AfaRuleBundle, tax_year) -> AfaResult`.
+- Every result returns deterministic findings, source evidence, `Rechtsstand` and
+  `production_blocked`.
+
+#### M7-B — Pure export engine and rules
+
+- Create RED executable tests for `11-F01…F16`, then add pure `packages/export-engine`.
+- Implement `assign_tax_year`, `evaluate_export_readiness`, `build_anlage_v_overview`,
+  `encode_anlage_v_csv` and `encode_datev_extf`.
+- Implement tax-year assignment, readiness, Anlage-V aggregation/CSV and DATEV EXTF encoding.
+- Add versioned AfA rules, Anlage-V layouts, SKR mappings and the EXTF profile to `rules-store`.
+- Every output has deterministic ordering, an explicit generation time and resolved rule evidence.
+- Keep all unverified lines, accounts, EXTF parameters and Soll/Haben orientation blocked.
+- Exclude Disagio and handed-off maintenance until their mapping and deduplication gap is resolved.
+
+#### M7-C — Persistence
+
+- Add migration `0024`.
+- Add immutable, account-scoped records for AfA versions, normalized tax events, adviser-profile
+  versions, mapping versions, readiness attempts, export archives and archived artifacts.
+- Materialize accepted M6 payment components idempotently without guessing missing categories.
+- Preserve nullable dates/categories so readiness can report them.
+- Enforce composite foreign keys, RLS, refused cross-account writes, append-only corrections and
+  immutable archive bytes.
+
+#### M7-D — API and authorization
+
+- Add AfA preview/create/history endpoints.
+- Add tax-event list/create/correction endpoints.
+- Add adviser-profile and year-mapping endpoints.
+- Add readiness, generation, history and archived-download endpoints.
+- `OWNER` receives full M7 access. `TAX_ADVISOR` receives read access plus profile/mapping writes
+  only. `EMPLOYEE` receives no tax access.
+- Failed generation stores readiness evidence but no artifact.
+
+#### M7-E — Web and PDF
+
+- Add `/a/{accountId}/steuern` with object/year selection.
+- Add the AfA wizard, readiness view, adviser/mapping settings and immutable export history.
+- Replace the tax-adviser placeholder with the restricted tax workspace.
+- Render the Anlage-V overview as German PDF and CSV.
+- Keep renter names out of adviser and export payloads.
+- Show every production blocker and disable real downloads while applicable authority remains
+  unverified.
+
+#### M7-F — Review and closure
+
+- Run the boundary audit after schema/API work.
+- Run the statement review for the tax UI and Anlage-V PDF.
+- Run docs reconciliation and update current-state documents.
+- Verify every golden fixture, authorization, RLS, immutability, deterministic bytes and
+  archived-byte retrieval.
+- Prove migration `0024` on an empty disposable database and compare development schema parity.
+- Run fast, full and non-fresh demo gates.
+- Record the existing statement PDF fingerprint before and after.
+- Update this plan with actual completion evidence and remaining production blockers.
+
+**Outside M7:** ELSTER, DATEV network transfer, VAT calculation, M8, M9, M10 and investment KPIs.
+Successful archive behavior uses an explicitly verified test rule bundle; current runtime mappings
+remain blocked. The missing AfA wizard concept file is not reconstructed; the UI follows approved
+`docs/10`.
 
 ### M8 — Document and letter engine
 
