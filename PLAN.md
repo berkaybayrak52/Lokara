@@ -879,6 +879,13 @@ finding. Technical closure does not clear any `verify-before-production` marker.
 
 ### U — UVI comparison, calculation and document
 
+**U0 status:** the round-4 transcription is complete and locally merged as `738e048`, not pushed.
+`docs/16` §§ 7.1/7.2 carry the monthly `hdd_3807` dataset and the persisted station-to-PLZ
+convention, § 4 carries the display-rounding decision and § 8.2 carries the K13 vintage maintenance.
+The oracle gained four constants and no golden value moved. U0 is documentation plus data-only
+fixtures; no UVI engine, importer, schema, API, UI, PDF or delivery code exists. U1 implements the
+pure engine next.
+
 **Approved-spec prerequisite:** `docs/16`, spec-closed Slice A and the G1 cadence foundation.
 
 - Implement the specified heating-only comparison with labelled fallbacks and no extrapolation.

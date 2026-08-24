@@ -9,9 +9,9 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   M6.
 - **G1 is complete and locally merged.** `55c97b1`, `f0c3583` and `a8deb9a` merged as `6c257f8`,
   finalized by `b5e380e`. W2 executes the unified six-year MessEV Eichfrist.
-- **U0 is complete and locally merged.** The round-4 UVI transcription `cd36deb` closes the two
-  blockers `docs/16` had carried since 21.08: the monthly degree-day dataset and the Block C
-  rounding order. No golden value moved.
+- **U0 is complete and locally merged.** The round-4 UVI transcription — `cd36deb` and the brief
+  commit `1a11a3f` — merged as `738e048`. It closes the two blockers `docs/16` had carried since
+  21.08: the monthly degree-day dataset and the Block C rounding order. No golden value moved.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation` and

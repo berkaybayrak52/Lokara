@@ -69,6 +69,10 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - Real Supabase Auth/Storage/hosted Postgres, Redis-backed rate limiting or workers, payments,
   production bank/Vision/email/DATEV/Destatis providers and native mobile apps are not wired.
 - Source-backed `docs/10`–`docs/14` and `docs/16` precede their remaining implementation.
+  `docs/16` is transcription-complete after U0 (`738e048`): the monthly `hdd_3807` dataset, the
+  persisted station-to-PLZ convention, the display-rounding rule and the K13 vintage maintenance are
+  specified. No UVI engine, importer or document exists, and production Blocks C/D2 stay blocked by
+  the unchosen PLZ geodataset and three missing register rows.
   `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
 
 ## Runtime topology
