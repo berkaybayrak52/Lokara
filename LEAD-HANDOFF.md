@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U3a annual DWD is green but uncommitted; U3b is next
+# LEAD-HANDOFF.md — U3a is locally merged; U3b monthly DWD is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -17,8 +17,8 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   `ee83535`. Its statement-review finding is resolved and the closing full gate is green.
 - **U2 is complete, reviewed and locally merged.** Feature commit `75cfaec` was merged as
   `2559848`; nothing is pushed.
-- **U3a is complete, boundary-audited, green and not committed.** Its annual DWD adapter diff sits
-  on `slice/u3a-dwd-annual` at base `2e6efeb`. U3b monthly degree days is not started.
+- **U3a is complete, boundary-audited and locally merged.** Feature commit `62b2918` was merged as
+  `fcc3ad8`; nothing is pushed. U3b monthly degree days is not started.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
@@ -90,7 +90,7 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 # U3a closure and the remaining U work — U3b to U5
 
-U3a is green but uncommitted. Land it before U3b so the monthly slice starts from a clean `main`.
+U3a is landed locally. U3b starts from the finalized `main`, never from the U3a branch.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
@@ -200,7 +200,7 @@ Block C. Neither is `rules/degree_days.py`, which is the VDI 2067 § 9b apportio
 
 Split this into two slices if the annual guards run long. They are independent.
 
-**U3a annual status:** complete, boundary-audited and green but uncommitted. It adds the normalized
+**U3a annual status:** complete, boundary-audited and locally merged as `fcc3ad8`. It adds the normalized
 annual port and stub, strict CSV/`_k.csv`/XML parsing, all eight guards, the nine verified values,
 explicit raw fallback and deterministic incoming-wins merge. The audit found two boundary gaps:
 file/period provenance was under-validated and the adapter duplicated the Page-01b climate
