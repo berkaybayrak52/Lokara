@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U0 merged; U1 (the pure uvi-engine) is next
+# LEAD-HANDOFF.md — U1 merged; U1b (engine provenance) is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -7,162 +7,185 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 
 - **M6 is complete and locally merged.** C3c's landlord *Zahlungen* screen closed M6-C and with it
   M6.
-- **G1 is complete and locally merged.** `55c97b1`, `f0c3583` and `a8deb9a` merged as `6c257f8`,
-  finalized by `b5e380e`. W2 executes the unified six-year MessEV Eichfrist.
-- **U0 is complete and locally merged.** The round-4 UVI transcription — `cd36deb` and the brief
-  commit `1a11a3f` — merged as `738e048`. It closes the two blockers `docs/16` had carried since
-  21.08: the monthly degree-day dataset and the Block C rounding order. No golden value moved.
+- **G1 is complete and locally merged.** `6c257f8`, finalized by `b5e380e`. W2 executes the unified
+  six-year MessEV Eichfrist.
+- **U0 is complete and locally merged.** The round-4 UVI transcription, `738e048`, finalized by
+  `0efbc7f`.
+- **U1 is complete and locally merged.** The pure `packages/uvi-engine` — slice commit `afc723c`.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
-- `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation` and
-  `slice/u0-round4-uvi-transcription` are merged and can be deleted whenever Emir wants.
+- `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
+  and `slice/u1-uvi-engine` are merged and can be deleted whenever Emir wants.
 
-## What U0 shipped
+## What U1 shipped
 
-`docs/16` § 7.1 names the monthly dataset: DWD `hdd_3807`, monthly degree-day sums per VDI 3807,
-heating limit 15 °C, reference room temperature 20 °C, unit Kelvin × day, station-based with the
-coordinates in the file itself. § 7.2 is Lokara's own station-to-PLZ `Konvention`, because DWD
-publishes PLZ-level values only for the annual climate factors: nearest candidate station with at
-least 25 valid days, the same station in both compared months, persisted per `(PLZ, month)` with
-station id and distance, visibly labelled beyond 50 km, and never recomputed — § 6a is a
-Nachweispflicht and an archived UVI must stay reproducible.
+`packages/uvi-engine` executes `docs/16` Blocks A, B, C with its raw fallback, D, D2, the HKV
+provisional path and linear mid-month interpolation, against the nine `UVI_EXAMPLES` cases. Frozen
+`slots=True` dataclasses in, deterministic results out, `Decimal` with `ROUND_HALF_UP` and no
+`float`.
 
-§ 4 carries the decided rounding order: round the displayed kWh first, then derive delta and
-percentage from the displayed values, so every figure on a consumer document is reproducible from
-the figures printed beside it. All four approved examples were re-verified; Block C is the only
-divergent path and its example already printed `-52 / 952 = -5.5 %`.
+Block C follows the § 4 display-rounding decision: the weather-adjusted reference is rounded to
+whole kWh first, then delta and percent are derived from the displayed values. Missing or zero
+degree days give a raw comparison labelled `nicht witterungsbereinigt`, never an implicit `1.00`.
+Block D's three-valid-unit minimum including the target cannot be lowered by the caller. Block D2
+refuses a non-positive heat-only reference. The HKV path returns blocked, not zero, when the
+building total is missing.
 
-§ 8.2 adds the six-step K13 Heizspiegel vintage maintenance with its 1 October trigger. Step 6 is
-the one that had only been implied: a UVI for month M uses the vintage valid at M, never the newest.
+The engine imports `lokara_domain` only. It does not reuse `rules/degree_days.py`, which is the
+VDI 2067 § 9b apportionment table and a different dataset.
 
-The oracle gained `DWD_MONTHLY_DEGREE_DAY_CONTRACT`, `DWD_STATION_ASSIGNMENT_CONTRACT`,
-`UVI_DISPLAY_ROUNDING_RULE` and `HEIZSPIEGEL_VINTAGE_MAINTENANCE`, and resolved the two `None`
-fields in `DWD_ANNUAL_IMPORT_CONTRACT`. It stays data-only and claims no engine.
-
-`FRAGEN-an-Berkay-05.md` requests five register rows: the monthly dataset, the station convention,
-the display-rounding rule and the two MessEV entries left over from G1. The CSV was not edited.
+**U1 satisfies exactly one of `PLAN.md` § U's five `Done when` conditions.** No importer, adapter,
+schema, API, UI, PDF or delivery code exists. Production Blocks C and D2 stay blocked by the
+unchosen PLZ geodataset and the three missing UVI register rows.
 
 ---
 
-# Next slice — U1: the pure uvi-engine
+# Next slice — U1b: result provenance and labelled suppression
 
-## Why this slice, and why it is not blocked
+## Why this slice, and why it comes before U2
 
-U1 turns the nine data-only cases in `UVI_EXAMPLES` into `packages/uvi-engine`, exactly as G1 turned
-the nine `12-Fxx` cases into `packages/guard-engine`. `docs/16` is now a complete calculation
-contract; nothing in it is unresolved that the arithmetic needs.
+The required `statement-reviewer` pass on U1 verified all nine German strings byte-exactly against
+`docs/16` and found no wording defect. It found a structural one: **the engine has no provenance
+channel.**
 
-**The unchosen PLZ geodataset does not block this slice.** The engine receives degree days,
-Heizspiegel rows and comparable units as caller-supplied normalized inputs, the same way
-`evaluate_meter_calibration` receives a `MeterCalibrationRuleBundle`. Choosing a geodataset and
-importing DWD files is adapter and importer work for a later slice. Do not let it into U1.
+`packages/guard-engine`, merged one slice earlier, already solved this. Its `models.py` carries
+`GuardSourceIdentity`, `RuleEvidence` with `source`, `register_row`, `legal_basis`, `rechtsstand`
+and `verification_status`, and `RuleConflict` with `production_blocking`; every bundle carries them
+and `GuardResult` returns them. `packages/uvi-engine` carries none of it, because the U1 brief did
+not ask for it. That omission is mine, not the implementer's — U1 built exactly what it was briefed
+to build, and its arithmetic is correct.
 
-`docs/16` § 12 still gates *production*: implementing the engine clears none of the
-`verify-before-production` flags and produces no sendable document.
+Five consequences, each verified against the merged code:
+
+1. **The unconfirmed Wärmepumpe deduction renders as settled.** `BlockD2Input` takes
+   `warm_water_deduction_kwh_m2a: Decimal` with no status, so a heat-pump D2 is indistinguishable
+   from a gas D2. `docs/16` § 8.2 requires the `24 / JAZ 3` convention to be *"visibly labelled as
+   an assumption"* and `verify-before-production`. `CLAUDE.md` § 6 requires `Rechtsstand MM/JJJJ` on
+   legal output; `BlockD2Result.heizspiegel_vintage` is the only as-of value in any result type.
+2. **The § 8.2 over-500 fallback label has nowhere to travel.** Row selection is correctly the
+   rules data's job, not the engine's — that is U2. But `building_size_class` is an input that never
+   reaches the result, so an over-500 Wärmepumpe building borrowing the 250–500 row renders exactly
+   like a genuine 250–500 building. § 8.2 adds that the fallback *"is not guaranteed conservative"*.
+3. **Block C carries no DWD attribution, station or distance.** § 7.1 makes
+   `Quelle: Deutscher Wetterdienst` mandatory under GeoNutzV, and § 7.2 requires the distance to be
+   carried and visibly labelled above 50 km. `BlockCResult` has no field for any of it, while
+   `BlockD2Result` does carry `attribution_de` — the asymmetry is the tell.
+4. **Block A cannot carry the § 5 provisional label.** § 5 places
+   `provisorisch, Endwert erst zur Jahresabrechnung` on Block A's HKV branch. The engine splits that
+   into `evaluate_hkv_provisional`, which is defensible, but `BlockAResult` has no `label_de`, so a
+   caller composing the two has no typed obligation to carry the label onto the figure it prints.
+5. **Blocked results still carry renter-facing labels.** `evaluate_hkv_provisional` returns
+   `label_de=None` on two blocked branches (`evaluators.py:325-339`) and `label_de=_HKV_LABEL` on
+   the other two (`evaluators.py:344-358`). The blocked D2 branch (`evaluators.py:289-301`) returns
+   `basis_de`, `label_de` and `attribution_de` populated under a suppressed comparison.
+
+This runs **before U2** so the Heizspiegel resolver is written against a settled input type instead
+of being rewritten once U1b lands.
 
 ## Lanes and mechanics
 
-Three lanes, because `.claude/hooks/write-scope.sh:93-99` limits `engine-implementer` to
-`packages/*/src/*` — it cannot create a package or edit build files.
+Two lanes. No build-file scaffolding: `packages/uvi-engine` and `packages/domain` are both already
+workspace members, already in `[tool.mypy] files`, already in `testpaths` and already in the fast
+gate's pure list at `scripts/gate.sh:85-89`.
 
-**Step 1 — the main session scaffolds.** Five places, all verified:
+**Step 1 — `spec-scribe`** extends `packages/uvi-engine/tests/test_page_uvi_u1_golden.py` and adds
+`packages/domain/tests/` coverage for the new value objects. **Every existing assertion and every
+existing golden number stays exactly as it is.** This slice changes result *shape*, never result
+*arithmetic*. Then open the red window: write `.lokara-red` with one line naming the slice and
+reason, e.g. `slice/u1b-uvi-provenance · docs/16 provenance fixtures land before the fields`. It is
+untracked and gitignored; `fast` announces it, `full` and `demo` treat it as a hard failure; fewer
+than 10 characters is rejected as an anonymous off switch.
 
-1. `packages/uvi-engine/pyproject.toml`, modeled on `packages/guard-engine/pyproject.toml`:
-   name `lokara-uvi-engine`, `dependencies = ["lokara-domain"]`, hatchling, wheel package
-   `src/lokara_uvi_engine`.
-2. Root `pyproject.toml`, four lists: `[tool.uv.workspace] members`, the `dev` dependency group,
-   `[tool.uv.sources]`, `[tool.mypy] files` (both `src` and `tests`) and
-   `[tool.pytest.ini_options] testpaths`.
-3. `scripts/check_engine_purity.py` `LAYERS`: add `packages/uvi-engine/src` with the crown-jewel
-   `forbidden_internal` set — `lokara_rules_store`, `lokara_adapters`, `lokara_db`, `lokara_api`,
-   `lokara_pdf`, `lokara_nk_engine`, `lokara_heating_engine`, `lokara_matching_engine`,
-   `lokara_guard_engine`.
-4. `scripts/gate.sh:85-88`, the `fast` pure-package pytest list.
-5. `uv sync`, so the new member is installed editable.
+**Step 2 — `engine-implementer`** writes `packages/domain/src/lokara_domain/provenance.py` and
+extends `packages/uvi-engine/src/lokara_uvi_engine/{models,evaluators}.py` until green, then deletes
+the sentinel. It may not touch the tests.
 
-**Step 2 — `spec-scribe` writes the executable fixture** at
-`packages/uvi-engine/tests/test_page_uvi_u1_golden.py`. Follow
-`packages/guard-engine/tests/test_page05_g1_golden.py`: it **restates** the fixture values as module
-constants and asserts them through production code. Do **not** import `berkay_uvi_golden` across
-package boundaries — that oracle is rules-store's own data evidence, and a cross-package test import
-depends on pytest's `sys.path` insertion order. Two files, two jobs.
+## What to build
 
-This opens the mandatory red window. Write `.lokara-red` with one line naming the slice and the
-reason, e.g. `slice/u1-uvi-engine · docs/16 Block A-D2 fixtures land before the engine`. It is
-untracked and gitignored; `fast` announces it and does not block, `full` and `demo` treat it as a
-hard failure. Fewer than 10 characters is rejected as an anonymous off switch.
+**`lokara_domain.provenance`** — one home, not a second definition. Mirror the guard engine's field
+names exactly so the two can be consolidated later without a third spelling:
 
-**Step 3 — `engine-implementer` writes `packages/uvi-engine/src/lokara_uvi_engine/`** until the
-fixture is green, then deletes `.lokara-red`. It may not touch the tests. Split `models.py` and
-`evaluators.py` the way `lokara_guard_engine` does, and ship `py.typed`.
+| Type | Fields |
+| --- | --- |
+| `SourceIdentity` | `source_type`, `source_id` |
+| `RuleEvidence` | `source`, `register_row`, `legal_basis`, `rechtsstand`, `verification_status` |
+| `RuleConflict` | `code`, `description`, `production_blocking`, `applies_to_media` |
 
-## What the engine must implement
+Frozen `slots=True` dataclasses, no imports beyond the standard library. Leave
+`packages/guard-engine` **untouched**: it is merged and statement-reviewed, and adopting the shared
+types there is a separate cleanup recorded in `PLAN.md`, not part of this slice.
 
-Frozen `slots=True` dataclasses in, deterministic results out. `decimal.Decimal` with
-`ROUND_HALF_UP`, never `float`. No rules-store import, no ambient clock, no I/O.
+**`packages/uvi-engine`** — every evaluator takes a caller-supplied bundle carrying
+`evidence: tuple[RuleEvidence, ...]` and `unresolved_conflicts: tuple[RuleConflict, ...]`, and every
+result returns the evidence it used, exactly as `GuardResult.rule_evidence` does. Then, per block:
 
-| `docs/16` | Case in the oracle | Rule |
-| --- | --- | --- |
-| § 5 | `emir_spec_block_a_kwh` | reading movement ×1000 → whole kWh |
-| § 6 | `emir_spec_block_b_previous_month` | previous-month delta and percent |
-| § 7 | `emir_spec_block_c_weather_adjusted` | degree-day adjustment; **round the displayed kWh first**, then derive delta and percent from the displayed values (§ 4) |
-| § 7 | `approved_block_c_raw_weather_fallback` | missing or zero degree days → raw comparison labelled “nicht witterungsbereinigt”; never an implicit factor `1.00` |
-| § 8.1 | `emir_spec_block_d_building_cross_section` | building cross-section; at least three valid units **including** the target, else no Block D |
-| § 8.2 | `approved_block_d2_heat_only` | Heizspiegel heat-only after the warm-water deduction, degree-day share, area; `(mittel − ww) <= 0` refuses rather than renders |
-| § 3 | `approved_hkv_provisional` | provisional unit kWh from HKV units; a missing building total returns blocked, not zero |
-| § 3 | `approved_linear_mid_month_interpolation` | linear by elapsed days, provenance retained on the result |
-
-Reuse the domain value objects instead of inventing parallels: `lokara_domain.meter`
-(`MeasurementUnit`, `ReadingReason`, `ReadingSource`) and `lokara_domain.energy`
-(`EnergyReference`). German output strings are part of the result, per `docs/16` § 11.
+| Type | Change |
+| --- | --- |
+| `BlockAResult` | add `label_de: str \| None` so the § 5 provisional label rides on the Block A figure |
+| `BlockCInput` | add the degree-day provenance the § 7.2 convention produces: station id, distance in km, dataset attribution, as-of |
+| `BlockCResult` | return `attribution_de`, `station_id`, `distance_km` and a boolean for the over-50 km case |
+| `BlockD2Input` | the warm-water deduction arrives inside a resolved-row bundle carrying its evidence, not as a bare `Decimal` |
+| `BlockD2Result` | return the size class actually used, an optional caller-supplied `fallback_label_de`, and the bundle's evidence |
+| every blocked result | no renter-facing label. `basis_de`, `label_de` and `attribution_de` become `str \| None` where they are not already, and are `None` when `status` is `blocked` |
 
 ## Must not do
 
-- No importer, adapter, schema, migration, API, UI, PDF, scheduler or delivery code. U1 is the pure
-  engine and its fixture, nothing else.
-- **Do not reuse `packages/rules-store/src/lokara_rules_store/rules/degree_days.py`.** That is the
-  VDI 2067 Gradtagszahl mid-period apportionment table for § 9b HeizkostenV (Zehntelpromille summing
-  to 10,000) — a different dataset from § 6a Block C monthly degree days, and the trap this slice is
-  most likely to fall into.
-- Do not choose the PLZ geodataset, and do not implement station assignment. Both are later work and
-  both remain `verify-before-production`.
-- Do not change a value in `docs/16` or the rules-store oracle. If the engine disagrees with a
-  printed example, stop and ask — `CLAUDE.md` § 4.
-- Do not pull the heat-pump 8 kWh/(m²·a) deduction to `geprüft`.
+- **Do not change a single number.** Every golden value in `UVI_EXAMPLES` and every existing
+  assertion stays. If a number moves, the slice is wrong — stop and ask.
+- **Do not invent German wording.** Four texts are missing from `docs/16` and are asked in
+  `FRAGEN-an-Berkay-05.md`: the over-500 label's trailing full stop, the zero-denominator
+  suppression texts for Blocks C, D and D2, the interpolation notice, and a neutral alternative to
+  `liegt im ersten Bezugsjahr noch nicht vor`. The 50 km label has no prescribed wording either.
+  Until Berkay answers, the engine carries a **flag or a caller-supplied string**, never a phrase
+  Lokara wrote.
+- **Do not import `lokara_guard_engine` or `lokara_rules_store` into the engine.**
+  `scripts/check_engine_purity.py` forbids both, and that boundary is the point. Shared shapes go to
+  `lokara_domain`.
+- Do not select the Heizspiegel row or resolve a vintage. That is U2.
+- Do not implement station assignment or read a DWD file. That is U3, and the PLZ geodataset is
+  still unchosen.
+- Do not pull the heat-pump `8 kWh/(m²·a)` deduction to `geprüft`. Carrying its
+  `verification_status` is exactly the opposite of confirming it.
 - Do not edit `berkay-work/`. The CSV stays at 180 rows.
 - Do not stage `Antwort-an-Emir_04.md`. Never `git add -A`.
-- Do not run `scripts/verify_demo_path.sh --fresh`; U1 needs no schema and it destroys local
+- Do not run `scripts/verify_demo_path.sh --fresh`; U1b needs no schema and it destroys local
   Postgres.
 
 ## Acceptance and stop condition
 
 ```bash
-uv run pytest packages/uvi-engine/tests -q
+uv run pytest packages/uvi-engine/tests packages/domain/tests -q
 scripts/gate.sh full
 ```
 
 The full gate must run with `.lokara-red` deleted; it is fatal there by design. Stop when the gate
-is green and `git status` shows only the scaffolding files, `packages/uvi-engine/` and the untracked
+is green and `git status` shows only `packages/domain/`, `packages/uvi-engine/` and the untracked
 `Antwort-an-Emir_04.md`.
 
 **Then show Emir the diff and wait. Do not commit.** Per `AGENTS.md` § 4, an agent past roughly
 40 turns without its deliverable stops and reports what it has rather than spending further.
 
+## After U1b
+
+`PLAN.md` § U carries the full order: U2 the Heizspiegel rules data, U3 the DWD adapters, U4 the
+schema and RLS, U5 the renter document. Two items are not agent work and gate the milestone
+regardless of code: Emir chooses the PLZ geodataset, and Berkay supplies the three missing UVI
+register rows and the four missing texts.
+
 ---
 
 ## Database state
 
-Unchanged: development matches migration `0021` and Alembic is at `0021`. G1, U0 and U1 require no
-schema change. Do not reset the Docker volume. The validated backup remains at
+Unchanged: development matches migration `0021` and Alembic is at `0021`. G1, U0, U1, U1b and U2
+require no schema change; U4 does. Do not reset the Docker volume. The validated backup remains at
 `/tmp/lokara-m6c3a-pre-migration-20260824.dump`.
 
 ## Evidence
 
-For U0 as merged, `scripts/gate.sh fast` is green with 566 pure-package tests, and the full gate is
-green including 84 web tests. Strict mypy and engine purity are clean. `uv run pytest
-packages/rules-store/tests -q` passes 124 tests. No rendered output changed, so no statement review
-was required and the normalized PDF fingerprint stays `88eb8434eda65f8d7ff82826fc837a58` at
-149269 bytes.
+For U1 as merged, `scripts/gate.sh full` is green, including 84 web tests, and `fast` is green with
+583 pure-package tests, up 17 from U0's 566. Strict mypy and engine purity are clean.
+`uv run pytest packages/uvi-engine/tests -q` passes 17 tests. No rendered output changed, so the
+normalized PDF fingerprint stays `88eb8434eda65f8d7ff82826fc837a58` at 149269 bytes.
 
 ## Recorded, not fixed
 
@@ -179,14 +202,25 @@ was required and the normalized PDF fingerprint stays `88eb8434eda65f8d7ff82826f
   proposal does not link to the journal entry it produced.
 - The *Zahlungen* screen has never been exercised against a live API: the four queries and the 409
   conflict path are unverified at runtime.
+- `docs/16` prescribes no German wording for four renter-facing cases the U1 review surfaced: the
+  zero-denominator suppression in Blocks C, D and D2, the interpolation notice, the over-50 km
+  distance label, and whether the § 8.2 over-500 label ends in a full stop. They are asked in
+  `FRAGEN-an-Berkay-05.md`; until answered, U1b carries flags and caller-supplied strings only.
+- `liegt im ersten Bezugsjahr noch nicht vor` is `docs/16` § 7's prescribed text for any missing
+  prior-year value, so it also prints for a data gap, a device change or a renter change. A
+  fourth-year renter then reads something untrue. The engine matches the doc; the wording is
+  Berkay's to change and is asked.
+- `packages/guard-engine` keeps its own `GuardSourceIdentity`, `RuleEvidence` and `RuleConflict`
+  after U1b puts the shared shapes in `lokara_domain`. Consolidating them is a later cleanup; it
+  would churn a merged, statement-reviewed slice for no behavioural gain.
 - Berkay's own round-4 rounding verification checks Block D2 against the superseded `467 / 1733`
   figures. The rule holds for the current `1368 / +132 / +9.6 %`; `docs/16` § 4 records this rather
   than restating his row as current.
 
 ## Unresolved authority — technical closure is not legal approval
 
-- **U0 cleared exactly two UVI items.** Production Blocks C and D2 remain blocked by the unchosen
-  PLZ geodataset and by three missing UVI register rows. U1 does not change that.
+- **U1 cleared no flag.** Production Blocks C and D2 remain blocked by the unchosen PLZ geodataset
+  and by three missing UVI register rows. Neither U1b nor U2 changes that.
 - The heat-pump `8 kWh/(m²·a)` deduction stays the convention `24 / JAZ 3` and
   `verify-before-production`. Round 4 explicitly refuses to confirm it; the co2online reply is open.
 - CSV rows 128 and 129 still print the superseded five-year Eichfrist readings. Two new register
