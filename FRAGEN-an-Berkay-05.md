@@ -130,6 +130,30 @@ und muss mit Berkay geklärt werden, bevor sie produktiv gilt. Alle drei bleiben
    dass er einen erkannten Zahlungseingang nicht selbst zuordnen kann — bitte sag, ob das so bleiben
    soll.
 
+## Rechtsstand-Register — fünf fehlende Einträge
+
+Owning docs: `docs/16-uvi.md` §§ 4, 7 und 8.2 sowie `docs/12-guards-deadlines.md` W2.
+
+Bitte ergänze fünf eigene Zeilen im autoritativen Rechtsstand-Register. Lokara ändert die CSV mit
+ihren derzeit 180 Zeilen ohne Emirs Freigabe nicht:
+
+1. **Monatlicher VDI-3807-Gradtagsdatensatz `hdd_3807`.** Externe Quelle DWD unter
+   `opendata.dwd.de/climate_environment/CDC/derived_germany/techn/monthly/heating_degreedays/`
+   mit DWD-Nutzungsbedingungen/GeoNutzV und Pflichtangabe „Quelle: Deutscher Wetterdienst“.
+2. **Stations-zu-PLZ-Zuordnung.** Lokara-`Konvention`: versionierter PLZ-Zentroid, mindestens 25
+   gültige Tage, nächste gemeinsame Station für beide Vergleichsmonate, persistiert je
+   `(PLZ, Monat)` mit Stations-ID und Distanz; sichtbares Label bei mehr als 50 km. Rechtsstand
+   08/2026, `verify-before-production`; der PLZ-Geodatensatz ist noch nicht gewählt.
+3. **Block-C-Darstellungsrundung.** Lokara-`Konvention`: zunächst die angezeigten kWh runden, dann
+   Differenz und Prozent aus den angezeigten Werten berechnen. Deshalb bleibt das Beispiel bei
+   `-52 / 952 = -5,5 %`. Rechtsstand 08/2026.
+4. **MessEV Anlage 7.** Die in Runde 4 geprüften Eichfristen: Kaltwasser-, Warmwasser-, Wärme- und
+   Wärmetauscher-Warmwasserzähler jeweils sechs Jahre, auf Grundlage MessEV Anlage 7 Nr.
+   5.5.1/5.5.2 und 7.1/7.2. Dieser Eintrag ersetzt die überholten Lesarten der CSV-Zeilen 128/129.
+5. **§ 34 Abs. 2 MessEV.** Eine Eichfrist von einem Jahr oder länger endet mit Ablauf des
+   Kalenderjahres. Rechtsstand 08/2026. Auch dieser Eintrag ersetzt die überholten Lesarten der
+   CSV-Zeilen 128/129.
+
 ## Nicht erneut erfragt
 
 Runde 4 hat die dort genannten Entscheidungen und Lieferungen zu Seite 01b, Seite 02, AfA,
