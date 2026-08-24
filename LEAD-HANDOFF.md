@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U2 is locally merged; three U slices remain, U3 first
+# LEAD-HANDOFF.md — U3a annual DWD is green but uncommitted; U3b is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -17,6 +17,8 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   `ee83535`. Its statement-review finding is resolved and the closing full gate is green.
 - **U2 is complete, reviewed and locally merged.** Feature commit `75cfaec` was merged as
   `2559848`; nothing is pushed.
+- **U3a is complete, boundary-audited, green and not committed.** Its annual DWD adapter diff sits
+  on `slice/u3a-dwd-annual` at base `2e6efeb`. U3b monthly degree days is not started.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
@@ -86,9 +88,9 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 ---
 
-# U2 closure and the remaining U work — U3 to U5
+# U3a closure and the remaining U work — U3b to U5
 
-U2 is landed locally. U3 must start from the finalized `main`, never from an older slice branch.
+U3a is green but uncommitted. Land it before U3b so the monthly slice starts from a clean `main`.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
@@ -187,7 +189,7 @@ Rechtsstand. The re-review has no open U2 finding. The heat-pump deduction remai
 
 ---
 
-## 2. U3 — the DWD adapters
+## U3 — split after U3a; U3b remains
 
 ### Why
 
@@ -197,6 +199,15 @@ factor** for Page 01b's yearly comparison, § 7.1 is the **monthly `hdd_3807` de
 Block C. Neither is `rules/degree_days.py`, which is the VDI 2067 § 9b apportionment table.
 
 Split this into two slices if the annual guards run long. They are independent.
+
+**U3a annual status:** complete, boundary-audited and green but uncommitted. It adds the normalized
+annual port and stub, strict CSV/`_k.csv`/XML parsing, all eight guards, the nine verified values,
+explicit raw fallback and deterministic incoming-wins merge. The audit found two boundary gaps:
+file/period provenance was under-validated and the adapter duplicated the Page-01b climate
+calculation. Separate failing fixtures closed both: filenames and rows now agree on one exact
+rolling 12-month period, publication cannot predate the period end, and calculation remains solely
+in `packages/heating-engine`. Focused tests pass 49, all adapter tests pass 97, and the full gate
+passes 1,338 Python plus 84 web tests. U3b below is untouched.
 
 ### Lanes
 
