@@ -947,8 +947,15 @@ future-vintage row identity and effective-Rechtsstand provenance. Focused U2 tes
 rules-store tests pass 135, the fast gate passes 598 pure-package tests and the full gate passes
 1,289 Python plus 84 web tests. Production flags remain unchanged.
 
-**Remaining execution order.** Three slices, each sized against U1, plus two items no agent can
-close. U3 starts from the finalized `main` after U2.
+**U3a status:** the annual DWD climate-factor adapter is complete, boundary-audited and green but
+not committed. It normalizes strict CSV, comma-CSV and XML inputs, enforces file/row period and
+publication provenance, all eight annual guards, exact source metadata, explicit raw fallback and
+retry-safe pure merge behavior. The canonical heating engine remains the only annual adjustment
+calculation path. Focused tests pass 49, all adapter tests pass 97 and the full gate passes 1,338
+Python plus 84 web tests. Monthly `hdd_3807` and station assignment remain U3b.
+
+**Remaining execution order.** Land U3a, then execute U3b, U4 and U5, plus two items no agent can
+close. U3b starts from the finalized `main` after U3a.
 
 - **U3 — DWD adapters.** `packages/adapters/src/lokara_adapters/dwd.py`: the § 9 annual
   climate-factor import with all eight named guards and the nine verified PLZ/KF fixtures, the § 7.1

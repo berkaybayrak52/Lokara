@@ -28,6 +28,21 @@ from .destatis import (
     PriceIndexValue,
     StubPriceIndexGateway,
 )
+from .dwd import (
+    DWD_ANNUAL_SOURCE_VERSION,
+    DWD_ATTRIBUTION,
+    LATEST_VERIFIED_ANNUAL_PUBLICATION,
+    AnnualClimateFactor,
+    AnnualClimateFactorGateway,
+    AnnualClimateFactorPublication,
+    AnnualClimateFactorResolution,
+    DwdAnnualImportError,
+    StubAnnualClimateFactorGateway,
+    merge_annual_climate_factors,
+    parse_annual_climate_factor_csv,
+    parse_annual_climate_factor_xml,
+    resolve_annual_climate_factor,
+)
 from .email import (
     DeliveryStatus,
     EmailDeliveryReceipt,
@@ -67,7 +82,14 @@ from .vision import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "DWD_ANNUAL_SOURCE_VERSION",
+    "DWD_ATTRIBUTION",
+    "LATEST_VERIFIED_ANNUAL_PUBLICATION",
     "VPI_SERIES_CODE",
+    "AnnualClimateFactor",
+    "AnnualClimateFactorGateway",
+    "AnnualClimateFactorPublication",
+    "AnnualClimateFactorResolution",
     "BankGateway",
     "BankTransaction",
     "DatevDeliveryReference",
@@ -75,6 +97,7 @@ __all__ = [
     "DatevGateway",
     "DeliveredExport",
     "DeliveryStatus",
+    "DwdAnnualImportError",
     "EmailDeliveryReceipt",
     "EmailGateway",
     "ExtractedInvoiceFields",
@@ -96,6 +119,7 @@ __all__ = [
     "SchedulerPort",
     "SentEmail",
     "SourceDocument",
+    "StubAnnualClimateFactorGateway",
     "StubBankGateway",
     "StubDatevGateway",
     "StubEmailGateway",
@@ -107,5 +131,9 @@ __all__ = [
     "cents_from_provider_amount",
     "consumption_by_meter",
     "device_reading_segments",
+    "merge_annual_climate_factors",
     "normalize_transaction",
+    "parse_annual_climate_factor_csv",
+    "parse_annual_climate_factor_xml",
+    "resolve_annual_climate_factor",
 ]
