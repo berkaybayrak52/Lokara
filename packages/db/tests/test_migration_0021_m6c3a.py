@@ -368,9 +368,8 @@ def _two_candidate_batch(
     return first, second
 
 
-def test_0021_is_head_and_metadata_has_rank_and_snapshots(owner: Engine) -> None:
-    with owner.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0021"
+def test_0021_metadata_has_rank_and_snapshots(owner: Engine) -> None:
+    """The 0021 columns remain intact when later migrations are at head."""
     proposal_columns = {
         column["name"]: column for column in inspect(owner).get_columns("match_proposal")
     }

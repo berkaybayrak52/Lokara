@@ -16,6 +16,7 @@ Conventions:
 
 import enum
 from datetime import date, datetime
+from decimal import Decimal
 
 from lokara_domain import (
     AllocationKey,
@@ -33,12 +34,13 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    Numeric,
     UniqueConstraint,
     func,
     text,
 )
 from sqlalchemy import Enum as SaEnum
-from sqlalchemy.dialects.postgresql import ExcludeConstraint
+from sqlalchemy.dialects.postgresql import JSONB, ExcludeConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .ids import new_id
@@ -1379,6 +1381,7 @@ class MeterReading(Base):
     __table_args__ = (
         _scoped_fk("meter_reading", "meter_id", "meter"),
         _scoped_fk("meter_reading", "tenancy_id", "tenancy"),
+        _scoped_pair("meter_reading"),
         CheckConstraint(
             "(estimated_consumption_x1000 IS NULL AND estimation_basis IS NULL) OR "
             "(estimated_consumption_x1000 IS NOT NULL AND estimated_consumption_x1000 >= 0 "
@@ -1388,6 +1391,239 @@ class MeterReading(Base):
         Index("ix_meter_reading_account", "account_id"),
         Index("ix_meter_reading_meter", "meter_id"),
         Index("ix_meter_reading_tenancy", "tenancy_id"),
+    )
+
+
+class MonthlyMeterReading(Base):
+    """One immutable normalized calendar-month movement for UVI calculation.
+
+    A correction inserts a successor through ``supersedes_reading_id``. The raw
+    point-in-time ``meter_reading`` evidence remains unchanged.
+    """
+
+    __tablename__ = "monthly_meter_reading"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    meter_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    unit_id: Mapped[str]
+    month: Mapped[date]
+    consumption_x1000: Mapped[int] = mapped_column(BigInteger)
+    reason: Mapped[ReadingReason]
+    source: Mapped[ReadingSource]
+    interpolation_method: Mapped[str]
+    supersedes_reading_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("monthly_meter_reading", "meter_id", "meter"),
+        _scoped_fk("monthly_meter_reading", "tenancy_id", "tenancy"),
+        _scoped_fk("monthly_meter_reading", "unit_id", "unit"),
+        _scoped_fk("monthly_meter_reading", "supersedes_reading_id", "monthly_meter_reading"),
+        _scoped_pair("monthly_meter_reading"),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_reading_id",
+            name="uq_monthly_meter_reading_direct_successor",
+        ),
+        CheckConstraint("consumption_x1000 >= 0", name="ck_monthly_meter_reading_non_negative"),
+        CheckConstraint(
+            "id <> supersedes_reading_id", name="ck_monthly_meter_reading_not_self_superseding"
+        ),
+        CheckConstraint(
+            "(reason = 'CORRECTION'::reading_reason) = (supersedes_reading_id IS NOT NULL)",
+            name="ck_monthly_meter_reading_correction_predecessor",
+        ),
+        CheckConstraint("EXTRACT(DAY FROM month) = 1", name="ck_monthly_meter_reading_month_start"),
+        Index("ix_monthly_meter_reading_account", "account_id"),
+        Index("ix_monthly_meter_reading_meter_month", "meter_id", "month"),
+        Index("ix_monthly_meter_reading_tenancy_month", "tenancy_id", "month"),
+    )
+
+
+class MonthlyMeterReadingSource(Base):
+    """One immutable, account-safe raw reading behind a normalized month."""
+
+    __tablename__ = "monthly_meter_reading_source"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    monthly_meter_reading_id: Mapped[str]
+    meter_reading_id: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk(
+            "monthly_meter_reading_source",
+            "monthly_meter_reading_id",
+            "monthly_meter_reading",
+        ),
+        _scoped_fk("monthly_meter_reading_source", "meter_reading_id", "meter_reading"),
+        _scoped_pair("monthly_meter_reading_source"),
+        UniqueConstraint(
+            "account_id",
+            "monthly_meter_reading_id",
+            "meter_reading_id",
+            name="uq_monthly_meter_reading_source_identity",
+        ),
+        Index("ix_monthly_meter_reading_source_account", "account_id"),
+        Index(
+            "ix_monthly_meter_reading_source_monthly",
+            "monthly_meter_reading_id",
+        ),
+        Index("ix_monthly_meter_reading_source_raw", "meter_reading_id"),
+    )
+
+
+class UviStationAssignment(Base):
+    """Persisted PLZ/month station choice; archived UVI never recomputes it."""
+
+    __tablename__ = "uvi_station_assignment"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    postal_code: Mapped[str]
+    month: Mapped[date]
+    station_id: Mapped[str]
+    distance_km: Mapped[Decimal] = mapped_column(Numeric(9, 3))
+    source_type: Mapped[str]
+    source_id: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_pair("uvi_station_assignment"),
+        UniqueConstraint(
+            "account_id",
+            "postal_code",
+            "month",
+            name="uq_uvi_station_assignment_postal_month",
+        ),
+        CheckConstraint("postal_code ~ '^[0-9]{5}$'", name="ck_uvi_station_assignment_postal_code"),
+        CheckConstraint(
+            "EXTRACT(DAY FROM month) = 1", name="ck_uvi_station_assignment_month_start"
+        ),
+        CheckConstraint("distance_km >= 0", name="ck_uvi_station_assignment_distance_km"),
+        Index("ix_uvi_station_assignment_account", "account_id"),
+        Index("ix_uvi_station_assignment_lookup", "account_id", "postal_code", "month"),
+    )
+
+
+class DwdClimateFactor(Base):
+    """One immutable DWD PLZ factor for an exact rolling period."""
+
+    __tablename__ = "dwd_climate_factor"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    postal_code: Mapped[str]
+    period_from: Mapped[date]
+    period_to: Mapped[date]
+    factor: Mapped[Decimal] = mapped_column(Numeric(6, 4))
+    source_type: Mapped[str]
+    source_id: Mapped[str]
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_pair("dwd_climate_factor"),
+        UniqueConstraint(
+            "account_id",
+            "postal_code",
+            "period_from",
+            "period_to",
+            name="uq_dwd_climate_factor_identity",
+        ),
+        CheckConstraint("postal_code ~ '^[0-9]{5}$'", name="ck_dwd_climate_factor_postal_code"),
+        CheckConstraint("period_to >= period_from", name="ck_dwd_climate_factor_period_ordered"),
+        CheckConstraint("factor >= 0.40 AND factor <= 1.80", name="ck_dwd_climate_factor_range"),
+        Index("ix_dwd_climate_factor_account", "account_id"),
+        Index(
+            "ix_dwd_climate_factor_lookup",
+            "account_id",
+            "postal_code",
+            "period_from",
+            "period_to",
+        ),
+    )
+
+
+class UviRun(Base):
+    """Immutable UVI inputs, results and resolved source snapshots."""
+
+    __tablename__ = "uvi_run"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    unit_id: Mapped[str]
+    month: Mapped[date]
+    inputs: Mapped[dict[str, object]] = mapped_column(JSONB)
+    results: Mapped[dict[str, object]] = mapped_column(JSONB)
+    heizspiegel_vintage: Mapped[str]
+    source_type: Mapped[str]
+    source_id: Mapped[str]
+    station_assignment_id: Mapped[str]
+    station_id: Mapped[str]
+    station_distance_km: Mapped[Decimal] = mapped_column(Numeric(9, 3))
+    sha256: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("uvi_run", "tenancy_id", "tenancy"),
+        _scoped_fk("uvi_run", "unit_id", "unit"),
+        _scoped_fk("uvi_run", "station_assignment_id", "uvi_station_assignment"),
+        _scoped_pair("uvi_run"),
+        CheckConstraint("EXTRACT(DAY FROM month) = 1", name="ck_uvi_run_month_start"),
+        CheckConstraint("station_distance_km >= 0", name="ck_uvi_run_station_distance_km"),
+        CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", name="ck_uvi_run_sha256"),
+        CheckConstraint(
+            "jsonb_typeof(inputs) = 'object' AND inputs <> '{}'::jsonb",
+            name="ck_uvi_run_inputs_nonempty_object",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(results) = 'object' AND results <> '{}'::jsonb",
+            name="ck_uvi_run_results_nonempty_object",
+        ),
+        CheckConstraint(
+            "btrim(heizspiegel_vintage, E' \\t\\n\\r') <> ''",
+            name="ck_uvi_run_heizspiegel_vintage_nonblank",
+        ),
+        CheckConstraint(
+            "btrim(source_type, E' \\t\\n\\r') <> ''",
+            name="ck_uvi_run_source_type_nonblank",
+        ),
+        CheckConstraint(
+            "btrim(source_id, E' \\t\\n\\r') <> ''",
+            name="ck_uvi_run_source_id_nonblank",
+        ),
+        Index("ix_uvi_run_account", "account_id"),
+        Index("ix_uvi_run_tenancy_month", "tenancy_id", "month"),
+        Index("ix_uvi_run_unit_month", "unit_id", "month"),
+    )
+
+
+class UviDeliveryEvent(Base):
+    """Append-only UVI delivery evidence; every retry creates another row."""
+
+    __tablename__ = "uvi_delivery_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    uvi_run_id: Mapped[str]
+    status: Mapped[str]
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("uvi_delivery_event", "uvi_run_id", "uvi_run"),
+        _scoped_pair("uvi_delivery_event"),
+        CheckConstraint(
+            "status IN ('GENERATED', 'PUBLISHED', 'EMAILED', 'FAILED')",
+            name="ck_uvi_delivery_event_status",
+        ),
+        Index("ix_uvi_delivery_event_account", "account_id"),
+        Index("ix_uvi_delivery_event_run", "uvi_run_id", "occurred_at"),
     )
 
 
@@ -1933,6 +2169,12 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "confirmed_cost_classification",
     "meter",
     "meter_reading",
+    "monthly_meter_reading",
+    "monthly_meter_reading_source",
+    "uvi_station_assignment",
+    "dwd_climate_factor",
+    "uvi_run",
+    "uvi_delivery_event",
     "heating_cost_entry",
     "bank_account",
     "bank_transaction",
