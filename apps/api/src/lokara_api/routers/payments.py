@@ -10,7 +10,7 @@ owner authorization without copying those rules.
 The C3b job entrypoints and C3c landlord Zahlungen screen remain future work.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,6 +31,7 @@ from sqlalchemy import select
 
 from ..auth import AuthContext, require_auth
 from ..authorization import require_owner
+from ..bank_sync import ConsentExpiredError, import_transactions
 from ..deps import PathAccountSession
 from ..matching_service import (
     MatchingConflictError,
@@ -53,6 +54,18 @@ _NO_COMPONENTS = {
     "garage_cents": 0,
 }
 _PAGE01_SOURCE = "PAGE01_STATEMENT"
+
+# docs/15 § 5.6: a pull without a standing PSD2 consent is refused, not defaulted.
+_CONSENT_DETAIL = {
+    "consent_missing": (
+        "Für dieses Bankkonto ist keine PSD2-Einwilligung hinterlegt. "
+        "Bitte verbinden Sie das Konto erneut."
+    ),
+    "consent_expired": (
+        "Die PSD2-Einwilligung für dieses Bankkonto ist abgelaufen. "
+        "Bitte verbinden Sie das Konto erneut."
+    ),
+}
 
 
 class HandoffIn(BaseModel):
@@ -300,6 +313,11 @@ def import_bank_transactions(
     That is distinct from `is_potential_duplicate`, which keeps its transaction and
     forces Review.
 
+    The dedupe rule and the PSD2 consent precondition live in `bank_sync`, because
+    M6-C3b's scheduled sync pulls through the same primitive; two copies of the
+    `docs/15` § 3.1 identity rule could drift. A missing or expired
+    `consent_expires_at` refuses the pull with 409 rather than assuming one.
+
     finAPI stays stubbed (`docs/01` D7). The gateway is constructed here rather
     than injected because there is exactly one implementation until the real AISP
     slice; that is where a port dependency belongs.
@@ -320,46 +338,21 @@ def import_bank_transactions(
     if session.get(BankAccount, bank_account_id) is None:
         raise HTTPException(status_code=404, detail="Bankkonto nicht gefunden")
 
-    known = set(
-        session.scalars(
-            select(BankTransaction.provider_transaction_id).where(
-                BankTransaction.bank_account_id == bank_account_id
-            )
-        ).all()
-    )
-
-    imported = 0
-    skipped = 0
-    for normalized in StubBankGateway().list_transactions(
-        bank_account_id, body.window_from, body.window_to
-    ):
-        if normalized.provider_transaction_id in known:
-            skipped += 1
-            continue
-        session.add(
-            BankTransaction(
-                id=new_id(),
-                account_id=account_id,
-                bank_account_id=bank_account_id,
-                provider_transaction_id=normalized.provider_transaction_id,
-                amount_cents=normalized.amount_cents,
-                bank_booking_date=normalized.bank_booking_date,
-                finapi_booking_date=normalized.finapi_booking_date,
-                value_date=normalized.value_date,
-                counterpart_iban=normalized.counterpart_iban,
-                counterpart_name=normalized.counterpart_name,
-                purpose=normalized.purpose,
-                end_to_end_reference=normalized.end_to_end_reference,
-                counterpart_mandate_reference=normalized.counterpart_mandate_reference,
-                bank_transaction_code=normalized.bank_transaction_code,
-                provider_type=normalized.provider_type,
-                is_potential_duplicate=normalized.is_potential_duplicate,
-            )
+    try:
+        outcome = import_transactions(
+            session,
+            account_id=account_id,
+            bank_account_id=bank_account_id,
+            window_from=body.window_from,
+            window_to=body.window_to,
+            gateway=StubBankGateway(),
+            now=datetime.now(UTC),
         )
-        known.add(normalized.provider_transaction_id)
-        imported += 1
-    session.flush()
-    return ImportResultOut(imported=imported, skipped_as_duplicate=skipped)
+    except ConsentExpiredError as error:
+        raise HTTPException(status_code=409, detail=_CONSENT_DETAIL[error.reason]) from error
+    return ImportResultOut(
+        imported=outcome.imported, skipped_as_duplicate=outcome.skipped_as_duplicate
+    )
 
 
 @router.get("/bank-transactions")

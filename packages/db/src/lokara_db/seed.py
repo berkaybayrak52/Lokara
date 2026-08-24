@@ -11,7 +11,7 @@ bypasses the FORCEd RLS. TODO(supabase): the Supabase owner is a non-superuser,
 so there the seed must set the app.account_id context first.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from lokara_domain import (
     AllocationKey,
@@ -239,6 +239,12 @@ def seed_demo(session: Session) -> None:
             provider_account_id="demo-mietkonto",
             normalized_iban="DE02701500000000594937",
             display_name="Mietkonto Musterstraße 12",
+            # docs/15 § 5.6: a pull needs a standing PSD2 consent, and the demo must
+            # be able to pull. Computed rather than a fixed date on purpose — a
+            # hard-coded far-future value would model a consent longer than the
+            # 180-day ceiling (`AIS_CONSENT_MAX_DAYS`), which is exactly the state
+            # the reconsent job is meant to flag. No calculation reads this column.
+            consent_expires_at=datetime.now(UTC) + timedelta(days=180),
         )
     )
     for renter_id, legal_name in _RENTERS:
@@ -453,7 +459,10 @@ def reset_demo(session: Session) -> None:
     For the pitch: a rehearsal, a headless test run or a live mis-click leaves
     stray buildings and readings behind, and "Objekte" then opens on a list
     full of *Testgasse 5*. This puts the account back to precisely the state
-    `seed_demo` produces — same ids, same numbers.
+    `seed_demo` produces — same ids, same numbers, with one deliberate exception:
+    `bank_account.consent_expires_at` is re-derived from the current instant, so a
+    demo seeded months ago can still pull. No id, statement figure, allocation or
+    PDF byte reads that column.
 
     Confirmed classifications, allocation-key history and cost entries are
     immutable evidence, so reset retains them (voided costs are excluded from

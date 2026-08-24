@@ -15,7 +15,8 @@ through it. M6-C2 ships the normalized bank adapter, nine account-scoped bank/re
 ledger tables and owner-scoped import/list/Page-01-handoff endpoints. M6-C3-0 closes the audited
 database invariants in migration `0020`. M6-C3a's matching service, final migration `0021` and
 exactly five owner APIs are technically complete, development-synchronized and locally merged into
-`main`. C3b's three jobs and C3c's landlord *Zahlungen* screen remain open. The § 4 E2E
+`main`. C3b's scheduler port and three job entrypoints are technically complete on
+`slice/m6-c3b-jobs` and not merged; C3c's landlord *Zahlungen* screen remains open. The § 4 E2E
 signal is deliberately inert; see § 4 below.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
@@ -45,6 +46,27 @@ this transcription on 20.08.2026, and the slice was merged into `main` with a no
 The M6-C1/M6-C2/M6-C3-0/C3a implementation boundary is shipped on local `main`; finAPI remains
 stubbed, the legal/product conventions retain their flags, and M6-A/M6-B technical
 advance/finalization archives do not change this contract.
+
+**Unresolved authority added by M6-C3b — the 180-day AIS consent window.** The authoritative
+`berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` contains **no** row for bank-account
+consent, PSD2, SCA or AIS; a case-insensitive grep for `consent`, `PSD2`, `SCA`, `AIS`,
+`Einwilligung` and `Zustimmung` matches exactly one row, W5 *Zustimmungs-/Wirksamkeits-/Klagefrist
+Mieterhöhung*, which is unrelated. `AIS_CONSENT_MAX_DAYS = 180` in
+`apps/api/src/lokara_api/jobs.py` is therefore a **Lokara `Konvention`**, flagged
+`verify-before-production`, `Rechtsstand 08/2026`, citing PSD2 RTS Art. 10 (Commission Delegated
+Regulation (EU) 2018/389, as amended) as an **unverified** primary source — the amending regulation
+and the current wording of the renewal period were not checked against the primary text, so this
+citation must not be repeated as settled law. It is not a legal deadline in this document and it
+is not Berkay-confirmed.
+
+Its use is deliberately narrow. The jobs **never default an expiry from it**: consent state is read
+only from the stored `bank_account.consent_expires_at`, a `NULL` value means "no consent" rather
+than "180 days from now", and no job writes that column. The constant is used solely as a ceiling
+check — a stored expiry further than `AIS_CONSENT_MAX_DAYS` in the future is reported as the
+`ConsentFinding` state `"exceeds_max_window"`, a report and nothing more. Nothing is refused,
+shortened or deleted because of it, and no legal claim is made about how long a landlord's AIS
+consent may run. Resolving this needs either a primary-source check of the applicable RTS article
+or a register row; until then the flag stays visible.
 
 ## 2. Legal rules versus matching conventions
 
@@ -332,6 +354,130 @@ different account cannot read, decide or book these rows. Missing resources and 
 German 404/409 messages. C3a intentionally adds no pagination and does not change the existing
 generic owner-denial copy.
 
+### 5.6 M6-C3b scheduled jobs and the scheduler boundary
+
+**Status:** technically complete on `slice/m6-c3b-jobs` and not merged, 24.08.2026. It changes no
+Page-08 calculation rule and no `Rechtsstand 07/2026` value. Every decision, score and cent still
+comes from §§ 3–5.
+
+C3b adds three job entrypoints in `apps/api/src/lokara_api/jobs.py` and one scheduler port in
+`packages/adapters/src/lokara_adapters/scheduler.py`. It adds no endpoint, no engine rule and no
+convention.
+
+**The three jobs.**
+
+1. `sync_bank_transactions(session, *, account_id, window_from, window_to, gateway, now) ->
+   SyncResult`. Per connected bank account it pulls the § 3.1 window through the `BankGateway`
+   port, stores what is new, then runs § 4 matching over what it stored. `SyncResult` carries
+   `account_id` and a `bank_accounts` tuple of `BankAccountSyncResult`, sorted by
+   `bank_account_id`. Each result carries `skipped_reason` (`None`, `"consent_missing"` or
+   `"consent_expired"`), `imported`, `skipped_as_duplicate`, `auto_matched`, `needs_review`,
+   `unmatched`, `deduped`, `reversed_payments`, `settled` and a `refused` tuple of `JobRefusal`
+   (`bank_transaction_id`, `reason`).
+2. `expire_bank_consents(session, *, account_id, now) -> tuple[ConsentFinding, ...]`. It reports
+   only. A `ConsentFinding` carries `bank_account_id`, `display_name`, `state` (`"missing"`,
+   `"expired"` or `"exceeds_max_window"`) and `expires_at`.
+3. `watch_deadlines(session, *, account_id, today, now) -> DeadlineWatchResult`. It reports only.
+   The result carries `overdue_receivables` — `OverdueReceivable` rows of `receivable_id`,
+   `renter_id`, `period`, `due_date`, `days_overdue` and `open_cents`, sorted by
+   `(due_date, receivable_id)` — and the same `consent_findings` tuple.
+
+`run_for_accounts(engine, account_ids, job) -> tuple[T, ...]` runs one job per id and returns one
+result per id, in the order given.
+
+**Time is an input, never the clock.** `today` and `now` are parameters on every job. No job calls
+`datetime.now()` or `date.today()`. A job whose result depends on the wall clock is not a golden
+fixture, and a § 11 EStG payment date that shifts with the runner's timezone is a defect that
+reaches a statement. Naive (timezone-unaware) datetimes are refused rather than assumed to be UTC.
+
+**One account per run.** Every job takes an explicit `account_id` and reads through one
+account-scoped session; `run_for_accounts` opens one per id, through `deps.job_account_session`,
+and never shares a transaction across accounts. The session boundary stays in `deps.py` because
+`scripts/check_pre_context_reads.py` requires it — a job is not an exception to that rule, and the
+first implementation of `run_for_accounts` failed that gate for calling `account_scoped_session`
+directly. `job_account_session` additionally refuses a role that bypasses RLS: the engine is a
+parameter, the owner `DIRECT_URL` engine bypasses FORCEd RLS, and `run_match` resolves its scope
+from the row it found — so a job wired to that engine would settle across accounts with no error
+anywhere. C3b adds **no** pre-context read: `app_bootstrap_contexts(text)` remains the only one
+(`CLAUDE.md` § 3.3), and `scripts/check_pre_context_reads.py` is unchanged and green.
+A scheduled job has no HTTP request and no membership behind it, so the account context is carried
+by the caller, not discovered by the job.
+
+**Import moves out of the router.** The transaction-import loop currently inlined in
+`apps/api/src/lokara_api/routers/payments.py` becomes `bank_sync.import_transactions(...) ->
+ImportOutcome` (`imported`, `skipped_as_duplicate`, `imported_transaction_ids`), so the endpoint
+and the job share one import path rather than two drifting copies. The § 3.1 distinction is
+unchanged: an exact `provider_transaction_id` re-import is skipped silently and creates no second
+row, while `is_potential_duplicate` keeps its transaction and forces Review.
+
+**Matching runs inside sync, and § 5.4 still decides.** Sync is two phases: it imports from every
+connected bank account first, then matches the merged result in
+`(bank_booking_date, provider_transaction_id)` order, so a run is reproducible and § 5.1's due
+before not-due ordering sees payments in the order the bank booked them. The phases are separate
+for a reason — § 5.1 settles a renter's receivables across *all* of their payments, and a renter's
+rent and garage may arrive on two different accounts, so matching one bank account to completion
+before opening the next would order settlement by `bank_account_id` first and only then by date.
+`apps/api/tests/test_m6c3b_jobs.py` pins that with a fixture rather than a comment: one renter is
+paid twice, the earlier booking sits on the bank account whose id sorts later, and the asserted
+allocations differ between the two orders. A positive `AUTO_MATCH`
+therefore settles on a schedule instead of on a click — the decision, the § 367 order and the
+split are exactly the ones § 5 already approved. A `NEEDS_REVIEW` or `UNMATCHED` result still
+moves zero cents; nothing in C3b confirms a proposal, and no schedule may stand in for the user
+decision § 5.4 requires. Each `run_match` runs inside a `session.begin_nested()` SAVEPOINT: one
+transaction whose match refuses (an ambiguous reversal, a Largest-Remainder tie, an incomplete
+legacy snapshot) is recorded in `refused` and rolled back alone, without discarding the imports
+and settlements of the rest of the run.
+
+The SAVEPOINT alone does not achieve that, and the first implementation did not. Migration `0021`
+declares `match_proposal_run_consistency`, `payment_ledger_reconciliation` and
+`payment_allocation_reconciliation` `DEFERRABLE INITIALLY DEFERRED`, because a settlement inserts
+its ledger entry before its allocations and is consistent only once both are in. Under C3a one
+request was one `run_match` was one transaction, so the deferred check ran at the same COMMIT. A
+job matches many transactions in one transaction, so a violation would have surfaced at the outer
+COMMIT — discarding every import and settlement of the whole run, the exact opposite of what this
+paragraph promises, and reported as `settled` before it was checked. Each savepoint therefore
+issues `SET CONSTRAINTS ALL IMMEDIATE` after its `run_match` and restores `ALL DEFERRED`, and an
+`IntegrityError` is refused like any other refusal. Exactly those three constraints are deferrable
+in this schema, so `ALL` names them and nothing else.
+
+**Consent is a precondition of the pull, not of the data.** `import_transactions` refuses to call
+the gateway when the bank account's `consent_expires_at` is `NULL` or `<= now`, raising
+`ConsentExpiredError("consent_missing")` or `ConsentExpiredError("consent_expired")`; sync records
+that as the bank account's `skipped_reason` and imports nothing for it. Reading a landlord's
+account without live consent is the one thing an AIS integration must not do, and a stub is not an
+excuse to build the habit.
+
+**"Cleanup" never deletes a bank transaction.** `expire_bank_consents` stops future pulls. It does
+not delete, redact or rewrite a `bank_transaction`, a proposal, a confirmation or a ledger row:
+§ 6 and § 147 AO make those append-only, and an expired consent changes what may be fetched next,
+never what was already booked. There is no consent-driven deletion path in Lokara.
+
+**The watcher reports facts and applies no guard rule.** `watch_deadlines` reads overdue
+receivables and consent state and returns them. It applies no `docs/12` guard rule, no threshold,
+no warning copy, no severity and no escalation ladder, and it writes nothing — no guard row, no
+reminder, no notification, no email. `days_overdue` is `today - due_date` in whole days and
+`open_cents` is the stored open amount; both are facts already in the database. § 9 keeps late
+interest and reminder fees out of V1, and the `docs/12` guard conventions are not settled here.
+Wiring these facts into the `docs/12` Guard/Wächter mechanism is a later slice with its own
+transcription.
+
+**Open gap: account enumeration.** `run_for_accounts` is given its account ids. Nothing in C3b
+discovers them, because the only way to list accounts before account context exists is a second
+pre-context read, and `CLAUDE.md` § 3.3 permits exactly one. A real scheduler must therefore learn
+its account ids from its caller — an operator-supplied list, a per-account trigger, or a
+deliberately designed and least-privileged enumeration function. Closing this needs a boundary
+decision recorded in `docs/02` and `scripts/check_pre_context_reads.py`, not a convenience query.
+Until it is made, C3b's jobs are callable but not self-scheduling.
+
+**No runner is installed.** Redis, Arq and Celery stay uninstalled (`docs/01` D7). `SchedulerPort`
+is a Protocol with `register(job)` and `due_jobs(now)`; `ScheduledJob` is a frozen
+`(name, account_id, interval_days, last_run_at)` record; `StubScheduler` is the only
+implementation. It refuses `interval_days < 1` and naive datetimes with `ValueError`, replaces an
+entry registered again under the same `(name, account_id)`, returns due jobs sorted by
+`(name, account_id)`, treats `last_run_at is None` as due, and **executes nothing** — `due_jobs`
+is a query with no side effect. The port exists so the process boundary is designed before a queue
+is chosen, not so a queue can be smuggled in.
+
 ## 6. Account-isolation and immutability requirements
 
 - `BankTransaction`, `Receivable`, `RenterMatchingProfile`, `IbanHistory`, `MatchProposal`,
@@ -477,9 +623,9 @@ itself incomplete — splitting at the next `def` still glued a following class 
 test body, and never matched `async def`. Test bodies now come from `ast`, so a chunk ends where the
 test ends; all 38 tenant tables stayed covered, so none had been resting on glue.
 
-M6-C3a is technically complete, development-synchronized and locally merged. M6-C3 remains open for
-C3b's three job entrypoints and C3c's landlord *Zahlungen* screen. It also inherits the
-gaps in `PLAN.md` § M6-C —
+M6-C3a is technically complete, development-synchronized and locally merged, and C3b's three job
+entrypoints are technically complete on `slice/m6-c3b-jobs` and not merged. M6-C3 remains open for
+C3c's landlord *Zahlungen* screen. It also inherits the gaps in `PLAN.md` § M6-C —
 `ordering_version` and `convention_version` are free text where `CLAUDE.md` § 6 wants a rules-store
 reference, and `receivable.source_id` is polymorphic and therefore carries no composite FK.
 
@@ -489,6 +635,8 @@ All thirteen cases, register rows, model boundaries and correspondence coverage 
 transcribed. Emir approved the transcription on 20.08.2026. M6-C1/M6-C2/M6-C3-0/C3a technically
 verify the engine, persistence, normalized stub adapter, service and owner endpoints on local
 `main`; they do not approve production bank-matching behavior or any legal/product convention.
-finAPI, C3b jobs, the C3c landlord *Zahlungen* screen, manual assignment, automatic later use of
-renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
+C3b technically verifies the scheduler port, the three job entrypoints and the PSD2 consent
+precondition on its slice branch; that is a technical result, not approval of the 180-day
+convention or of production bank matching. finAPI, the C3c landlord *Zahlungen* screen, manual
+assignment, automatic later use of renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
 until its source gap is answered. The separate `docs/16` D2 transcription is approved and merged.

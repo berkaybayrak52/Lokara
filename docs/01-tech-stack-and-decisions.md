@@ -40,7 +40,7 @@ Future members are separate:
 | Validation | Pydantic at the API boundary; Zod on clients | **Shipped** |
 | PDF | HTML to PDF through Playwright Chromium | **Shipped** |
 | Money | integer cents and `decimal.Decimal`, never float | **Shipped invariant** |
-| Jobs/rate limits | Redis with Celery or Arq when a real worker slice needs it | **Future** |
+| Jobs/rate limits | Redis with Celery or Arq when a real worker slice needs it; M6-C3b's jobs run behind a vendor-free scheduler port | **Future** |
 | Mobile | Expo / React Native against the same API | **Future M10** |
 | Payments | Stripe for web; RevenueCat for mobile IAP | **Future** |
 | Production hosting | EU/DE target, currently Hetzner | **Selected, not deployed** |
@@ -91,8 +91,16 @@ provider candidates behind the bank adapter. The current bank edge is a stub.
 The Page 08 matching contract is complete, approved and merged in `docs/15`. Its oracle preserves
 `BANKMATCH-F03` as the two-part E12 duplicate case. M6-C1/M6-C2 ship the pure engine, normalized bank
 adapter, nine bank/receivable/matching/ledger tables and owner-scoped endpoints; M6-C3-0 hardens
-their database invariants. The real provider, matching service, jobs and landlord *Zahlungen*
-screen remain unshipped.
+their database invariants.
+
+M6-C3a shipped the matching service and five owner-scoped endpoints. M6-C3b shipped the three
+scheduled job entrypoints — bank sync, reconsent reporting and the deadline watcher — behind
+`lokara_adapters.SchedulerPort` with an in-memory `StubScheduler`. No broker or worker is
+installed; the port answers only which jobs are due, and the caller executes them. The AIS pull now
+has a consent precondition: a missing or expired `bank_account.consent_expires_at` refuses the
+pull. The 180-day PSD2 ceiling behind it is a flagged convention, not a verified legal value —
+`docs/15` §§ 1 and 5.6 carry it. The real provider and the landlord *Zahlungen* screen remain
+unshipped.
 
 ## D6 — Transactional email
 
