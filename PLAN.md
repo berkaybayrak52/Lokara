@@ -917,8 +917,8 @@ renter-facing label. Four further points are missing German wording rather than 
 asked in `FRAGEN-an-Berkay-05.md`. U1 was merged with these limits recorded; U1b closes them, and no
 UVI output reaches a renter before U5.
 
-**U1b status:** engine provenance and labelled suppression is **technically complete and green, but
-not committed**. It sits uncommitted on `slice/u1b-uvi-provenance`, which is at `df04018`.
+**U1b status:** engine provenance and labelled suppression is **technically complete, reviewed and
+locally merged**. Feature commit `ed82202` was merged as `ee83535`; nothing is pushed.
 `lokara_domain.provenance` now holds `SourceIdentity`, `RuleEvidence` and `RuleConflict` with the
 guard engine's exact field names; every UVI evaluator takes a caller-supplied `UviRuleBundle` and
 every result returns the evidence and unresolved conflicts it used. `BlockCResult` carries the § 7.2
@@ -929,7 +929,7 @@ renter-facing label anywhere: `basis_de`, `label_de` and `attribution_de` are `N
 suppressed comparison. No arithmetic changed and no golden value moved. The merged
 `packages/guard-engine` was left untouched as briefed.
 
-**U1b is not merged.** The required `statement-reviewer` pass verified the renter-facing
+The required `statement-reviewer` pass verified the renter-facing
 suppression and exact ready-state labels. It found that Block D2 returned only its resolved-row
 evidence and dropped distinct bundle evidence; a separate failing fixture and engine fix now retain
 both in deterministic, deduplicated order. The closing full gate is green. Two facts are recorded

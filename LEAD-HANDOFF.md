@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U1b is green but unlanded; four U slices remain, U2 first
+# LEAD-HANDOFF.md — U1b is locally merged; four U slices remain, U2 first
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -13,14 +13,13 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   `0efbc7f`.
 - **U1 is complete and locally merged.** The pure `packages/uvi-engine` — `afc723c` and the brief
   commit `0a60721`, merged as `d02c838`.
-- **U1b is complete, green and *not committed*.** It sits uncommitted on
-  `slice/u1b-uvi-provenance`, which is at `df04018`. Read *What U1b shipped* below **before you
-  touch anything**: if U2 starts on this tree without landing U1b first, U2's diff will contain it.
+- **U1b is complete, reviewed and locally merged.** Feature commit `ed82202` was merged as
+  `ee83535`. Its statement-review finding is resolved and the closing full gate is green.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
-  and `slice/u1-uvi-engine` are merged and can be deleted whenever Emir wants.
-  `slice/u1b-uvi-provenance` is **not** one of them — it still carries unlanded work.
+  `slice/u1-uvi-engine` and `slice/u1b-uvi-provenance` are merged and can be deleted whenever Emir
+  wants.
 
 ## What U1 shipped
 
@@ -43,10 +42,10 @@ VDI 2067 § 9b apportionment table and a different dataset.
 schema, API, UI, PDF or delivery code exists. Production Blocks C and D2 stay blocked by the
 unchosen PLZ geodataset and the three missing UVI register rows.
 
-## What U1b shipped — reviewed, green and unlanded
+## What U1b shipped — reviewed, green and locally merged
 
-U1b closed the structural gap the U1 statement review found. It is **complete and green and it is
-not committed**: `git status` shows it as working-tree changes on `slice/u1b-uvi-provenance`.
+U1b closed the structural gap the U1 statement review found. It is complete, reviewed and locally
+merged as `ee83535`; nothing is pushed.
 
 `packages/domain/src/lokara_domain/provenance.py` is the one home for the shared shapes:
 `SourceIdentity`, `RuleEvidence` (`source`, `register_row`, `legal_basis`, `rechtsstand`,
@@ -87,9 +86,8 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 # The remaining U work — four slices, in this order
 
-**Land U1b first.** It is green but uncommitted, and everything below assumes it is in the tree.
-Emir authorizes that commit; until he does, do not start U2 on top of it — a U2 commit staged from
-this working tree would swallow U1b's seven files.
+U1b is landed locally. U2 starts from the clean `main` that contains `ee83535` and the status-only
+finalization commit; it must not start from an older slice branch.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
