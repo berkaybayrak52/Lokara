@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U3b monthly DWD is green but uncommitted; U4 is next
+# LEAD-HANDOFF.md — U3 is locally merged; U4 schema and persistence is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -19,8 +19,8 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   `2559848`; nothing is pushed.
 - **U3a is complete, boundary-audited and locally merged.** Feature commit `62b2918` was merged as
   `fcc3ad8`; nothing is pushed.
-- **U3b is complete, boundary-audited, green and not committed.** Its monthly parser and station
-  assignment diff sits on `slice/u3b-dwd-monthly` at base `07e2982`. U4 is not started.
+- **U3b is complete, boundary-audited and locally merged.** Feature commit `a37f9a3` was merged as
+  `78c5cce`; nothing is pushed. Together with U3a, this closes U3's adapter work. U4 is not started.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
@@ -92,7 +92,7 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 # U3b closure and the remaining U work — U4 and U5
 
-U3b is green but uncommitted. Land it before U4 so the schema slice starts from a clean `main`.
+U3 is landed locally. U4 starts from the finalized `main`, never from either U3 slice branch.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
@@ -211,7 +211,7 @@ rolling 12-month period, publication cannot predate the period end, and calculat
 in `packages/heating-engine`. Focused tests pass 49, all adapter tests pass 97, and the full gate
 passes 1,338 Python plus 84 web tests.
 
-**U3b monthly status:** complete, boundary-audited and green but uncommitted. It adds the
+**U3b monthly status:** complete, boundary-audited and locally merged as `78c5cce`. It adds the
 tokenized nine-field `hdd_3807` normalization boundary and deterministic nearest station valid in
 both compared months, using only DWD-row coordinates and a caller-supplied versioned PLZ centroid.
 The result carries both source files, centroid identity/version, the versioned assignment
