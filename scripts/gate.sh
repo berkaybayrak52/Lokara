@@ -85,7 +85,8 @@ case "$LEVEL" in
     run "pytest (pure packages)" uv run pytest -q \
       packages/domain/tests packages/nk-engine/tests \
       packages/heating-engine/tests packages/rules-store/tests \
-      packages/guard-engine/tests packages/matching-engine/tests
+      packages/guard-engine/tests packages/uvi-engine/tests \
+      packages/matching-engine/tests
     ;;
   full|demo)
     # LOKARA_REQUIRE_DB / LOKARA_REQUIRE_PDF turn an unreachable Postgres or a missing
