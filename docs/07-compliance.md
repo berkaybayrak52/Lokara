@@ -101,7 +101,7 @@ archived.
   service and final `0021` are technically complete, development-synchronized and locally merged.
   C3b's job entrypoints are technically complete and locally merged: they add a
   PSD2 consent precondition to every AIS pull, write nothing outside the sync path and delete no
-  append-only evidence. The C3c *Zahlungen* screen is technically complete on its slice branch and not yet merged; it
+  append-only evidence. The C3c *Zahlungen* screen is technically complete and locally merged; it
   records one final, immutable confirm/reject/duplicate outcome and offers no way to edit or delete
   an append-only ledger entry. Renter delivery/portal remains M10. Tax/export
   archives remain M7 work and depend on approved `docs/10` and `docs/11`; delivery evidence and

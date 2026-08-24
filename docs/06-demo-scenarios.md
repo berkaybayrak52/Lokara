@@ -22,7 +22,7 @@
 | **Shipped** | One fixed `SOLO` owner account; the six-screen seeded path; Scenarios 1–5; the 2025 landlord calculation and PDF |
 | **Shipped** | The secure M5 bootstrap read; it changes identity lookup, not onboarding or the visible demo |
 | **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
-| **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized; C3b's matching jobs are locally merged and the C3c *Zahlungen* screen is technically complete on its slice branch. None of the three is part of the six-screen path. |
+| **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized; C3b's matching jobs and the C3c *Zahlungen* screen are locally merged. None of the three is part of the six-screen path. |
 | **Future** | Scenario 6, the five-persona identity demo, role-aware account switching, renter/tax-adviser portals, investment entitlement and mobile |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for

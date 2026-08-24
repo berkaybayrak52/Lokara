@@ -1,89 +1,86 @@
-# LEAD-HANDOFF.md — M6-C3b complete and locally merged
+# LEAD-HANDOFF.md — M6 complete; G (shared guard foundation) is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
 
 ## Current state — 24.08.2026
 
-- M6-C3b is technically complete and locally merged into `main`. Slice commit `1e86059` was merged
-  as `4927dc1`. **Nothing was pushed.**
+- **M6 is technically complete and locally merged.** C3c's landlord *Zahlungen* screen was
+  committed as `92e0dcd` and merged into `main` as `6995bc4`, which closes M6-C and with it M6.
+  **Nothing is pushed.** No branch has a remote.
+- Every `M6-C closed when` condition is now met on `main`: all thirteen `BANKMATCH` fixtures pass
+  through the service and persistence, the three job entrypoints are callable, a landlord can
+  confirm or reject a Review proposal in the UI, every isolation boundary is green and the rendered
+  statement is unchanged.
+- The next stage in `PLAN.md`'s execution order is **G — the shared guard foundation** against
+  approved `docs/12`, then U (UVI), then M7.
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
-- M6-C3a remains technically complete, development-synchronized and locally merged into `main`.
-- The slice is `packages/adapters/src/lokara_adapters/scheduler.py`
-  (`ScheduledJob`, `SchedulerPort`, `StubScheduler`), `apps/api/src/lokara_api/bank_sync.py`,
-  `apps/api/src/lokara_api/jobs.py`, `deps.job_account_session`, and the acceptance files
-  `apps/api/tests/test_m6c3b_jobs.py` (10) and `packages/adapters/tests/test_scheduler_port.py` (12).
-- The jobs add no endpoint, no table, no column and no migration. Alembic stays at `0021`.
-- Sync imports from every connected bank account, then matches the merged result in
-  `(bank_booking_date, provider_transaction_id)` order. A § 4 `AUTO_MATCH` settles on a schedule;
-  `NEEDS_REVIEW` still moves no money. `expire_bank_consents` and `watch_deadlines` write nothing.
+- `slice/m6-c3c-zahlungen` is merged and can be deleted whenever Emir wants; it is kept for now.
+
+## What C3c shipped
+
+Client-only: `apps/web/src/features/zahlungen/` (`proposal-view.ts`, `queries.ts`,
+`zahlungen-page.tsx`, `review-list.tsx`, `ledger-list.tsx`), the route
+`apps/web/src/app/a/[accountId]/zahlungen/page.tsx`, five snake_case Zod mirrors in
+`lib/contracts.ts`, `centsToEurDisplay` in `lib/format.ts`, one gated `NAV_ITEMS` entry in
+`features/portal/app-shell.tsx`, and `esbuild: { jsx: 'automatic' }` in `apps/web/vitest.config.ts`
+so a `.tsx` render test compiles under the automatic runtime the components are written against.
+
+No endpoint, no table, no column, no migration. Alembic stays at `0021` and no backend file
+changed.
+
+Acceptance files: `features/zahlungen/proposal-view.test.ts` (23) for the pure joiner and
+`features/zahlungen/zahlungen-view.test.tsx` (12) rendering the screen to static markup for the
+properties the joiner cannot hold — no decision control off an open `NEEDS_REVIEW` row, no reversal
+control in the journal. Two nav cases in `features/portal/account-switcher.test.tsx` and four
+`centsToEurDisplay` cases in `lib/format.test.ts`.
 
 ## Database state
 
-Unchanged from the C3a handoff: development matches the final amended migration `0021`, and Alembic
-is at `0021`. C3b required no schema change. Do not reset the Docker volume and do not run
-`scripts/verify_demo_path.sh --fresh`. The validated backup remains at
-`/tmp/lokara-m6c3a-pre-migration-20260824.dump`.
-
-The demo seed now sets `bank_account.consent_expires_at` on the demo bank account, computed as
-`now + 180 days`, so the AIS pull still works after the consent precondition. `reset_demo` names it
-as the one column its "same ids, same numbers" promise no longer covers. No statement figure,
-allocation or PDF byte reads it.
+Unchanged: development matches migration `0021` and Alembic is at `0021`. C3c required no schema
+change. Do not reset the Docker volume and do not run `scripts/verify_demo_path.sh --fresh`. The
+validated backup remains at `/tmp/lokara-m6c3a-pre-migration-20260824.dump`.
 
 ## Evidence
 
-`scripts/gate.sh fast`, `full` and `demo` are green: 1,233 Python and 43 web tests,
-`mypy --strict` clean over 200 files, `check_pre_context_reads.py`, `check_rls_coverage.py`,
-`check_fk_isolation.py` and `check_engine_purity.py` clean. The PDF is unchanged at
-`88eb8434eda65f8d7ff82826fc837a58` / 149269 bytes. The nine DB-backed job tests were re-run with
-`LOKARA_REQUIRE_DB=1`, so they provably hit Postgres. The merged-FIFO fixture was verified to fail
-under the previous per-bank-account ordering, so it discriminates rather than merely passing.
+`scripts/gate.sh fast`, `full` and `demo` are green on the merged tree: 1,233 Python and 84 web
+tests, `mypy --strict` clean, `check_pre_context_reads.py`, `check_rls_coverage.py`,
+`check_fk_isolation.py` and `check_engine_purity.py` clean. The rendered statement is unchanged at
+149269 bytes, 22 goldens present and 8 scale-leak canaries absent. The red window was proved real:
+the fixture failed with a missing-module error before `proposal-view.ts` existed.
 
-## What the boundary audit changed
-
-Two HIGH and three lesser findings were fixed rather than recorded:
-
-- `deps.job_account_session` refuses a session whose role bypasses RLS. `run_for_accounts` takes an
-  engine, the owner `DIRECT_URL` engine bypasses FORCEd RLS, and `run_match` resolves its scope from
-  the row it found — a job wired to that engine would have settled across accounts with no error.
-- `0021`'s three reconciliation constraints are `DEFERRABLE INITIALLY DEFERRED`, so releasing a
-  savepoint proved nothing: a violation would have surfaced at the outer COMMIT and discarded the
-  whole run after it was already counted as `settled`. Each savepoint now forces
-  `SET CONSTRAINTS ALL IMMEDIATE`, restores `ALL DEFERRED`, and refuses `IntegrityError`.
-- The dedupe set carries its own `account_id` predicate; sync no longer orders settlement by
-  `bank_account_id` before the booking date; `reset_demo`'s determinism claim is corrected.
+**The demo PDF's MD5 is not a reproducible invariant.** The PDF embeds `/CreationDate` and
+`/ModDate`, so the hash changes on every render while the byte count stays at 149269. The
+`88eb8434eda65f8d7ff82826fc837a58` recorded in earlier handoffs was only ever valid for one render
+instant, and no gate ever checked it. Use the byte count plus `assert_statement_pdf`'s content
+assertions instead, and do not "verify" that hash again.
 
 ## Recorded, not fixed
 
-- `matching_service.run_match` resolves a `BankTransaction` by id alone. That is the C3a contract,
-  now backed by the RLS-role guard above. Changing its signature is a C3a change, not a C3b one.
-- The DB-backed API fixtures commit undeletable append-only rows into the developer database with no
-  teardown. Inherited from `test_m6c3a_matching_service.py`; C3b adds a second account per run.
-- `AIS_CONSENT_MAX_DAYS = 180` is a code literal, duplicated as `180` in the seed, where
-  `CLAUDE.md` § 6 wants a rules-store value. It cannot be registered until the register has a row.
+- `require_owner` answers 403 with the English, route-inaccurate detail
+  `"Only owners may create buildings"` (`authorization.py`), which the client prints verbatim.
+- The ledger renders `created_at` through a timezone-naive string split, so a late-evening booking
+  on a UTC server can show the previous calendar day. Backend/timezone decision.
+- `match_proposal.convention_version` is persisted but not exposed by `_candidate_json` or
+  `list_proposals`, so the screen's `Rechtsstand` stamp is a page-level constant. That payload gap
+  is C3a's.
+- The error copy *"Bitte API und Datenbank prüfen"* is developer-facing, but it is the house
+  convention in seven other screens; diverging on one screen would be worse.
+- `Ablehnen` and `Dublette` write an immutable record with no confirmation step, and a decided
+  proposal does not link to the journal entry it produced.
+- The screen has never been exercised against a live API: the four queries and the 409 conflict
+  path are unverified at runtime.
 
-## Unresolved authority
+## Unresolved authority — M6 is technically closed, not legally approved
 
-- The 180-day AIS consent window has **no row** in
-  `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`. It is a Lokara `Konvention`,
-  `verify-before-production`, `Rechtsstand 08/2026`, on an unverified reading of PSD2 RTS Art. 10.
-  No expiry is ever defaulted from it; a `NULL` consent refuses the pull instead.
-- No cross-account enumeration exists. `account` is scoped by its own id and `CLAUDE.md` § 3.3
-  allows exactly one pre-context read, so a real scheduler must be handed its account ids.
-  `docs/15` § 5.6 records the gap as open.
-- Every Page-08 weight and threshold keeps `verify-before-production` at `Rechtsstand 07/2026`.
-  Green gates are not legal-production approval.
+- Every Page-08 weight and threshold keeps `verify-before-production` at `Rechtsstand 07/2026`. The
+  screen presents confidence as a decision aid and states it is not legal proof of a match. Green
+  gates are not legal-production approval.
+- No renter name is displayed anywhere, because no route resolves a `renter_id` to a `legal_name`.
+  The payer is identified by the bank `counterpart_name` and `purpose`.
+- The § 4 stored-reference signal stays inert until Berkay answers the open question in
+  `FRAGEN-an-Berkay-05.md`.
+- The 180-day AIS consent window still has no row in the authoritative register (C3b).
 
-## Process deviation to know about
-
-`.lokara-red` declared that the C3b fixtures would land before the implementation. They did not: the
-source was written in parallel with the fixture author. The `CLAUDE.md` § 10 separation held — the
-fixture author worked from the pinned contract in its brief and never read `jobs.py` or
-`bank_sync.py` — but the red run had to be proved by blocking the modules on the import path rather
-than by their absence.
-
-## What remains in M6
-
-**C3c — open:** the landlord *Zahlungen* screen. It may confirm, reject or mark duplicate; it does
-not provide manual assignment. M6 is not closed until it ships. Renter delivery, portal publication
-and email stay with M10.
+Per `CLAUDE.md`, these carry forward: once the milestone programme is complete, they need their own
+execution order and every affected path must be re-verified before production use.

@@ -41,8 +41,8 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   owner-scoped endpoints including the Page-01 handoff. M6-C3-0 migration `0020` verifies the
   audited renter, cap, provenance, trigger-resolution and RLS-write invariants. C3a connects the
   engine to Postgres and adds exactly five owner APIs; it is technically complete,
-  development-synchronized and locally merged. C3b jobs are technically complete and locally merged; the C3c landlord *Zahlungen*
-  screen is technically complete on its slice branch and not yet merged. It is a client-only
+  development-synchronized and locally merged. C3b jobs and the C3c landlord *Zahlungen*
+  screen are technically complete and locally merged. The screen is a client-only
   owner screen: one final confirm/reject/duplicate outcome, no manual assignment, no backend
   change. The § 4 stored-reference
   signal is deliberately inert: the field it scores against is named by § 4 and defined nowhere
@@ -55,8 +55,8 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - M6-A/M6-B ship temporal/actual advances, Saldo settlements, immutable owner-only finalization and
   separately rendered tenant archives; M6-C1/M6-C2 ship the matching engine, persistence and base
   owner endpoints, and M6-C3-0 closes their audited database invariants. C3a's service/final `0021`
-  is technically complete, development-synchronized and locally merged. C3b jobs are locally merged and the C3c *Zahlungen*
-  UI is technically complete on its slice branch; M10 renter delivery/portal remains open.
+  is technically complete, development-synchronized and locally merged. C3b jobs and the C3c *Zahlungen*
+  UI are locally merged, which completes M6; M10 renter delivery/portal remains open.
 - Real external providers stay behind adapter contracts and require their own integration,
   security and compliance evidence.
 

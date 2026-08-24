@@ -168,8 +168,8 @@ These five routes and `matching_service.py` are technically complete, developmen
 locally merged into `main`. C3b's three jobs are technically complete and locally merged; they add no route and no
 screen.
 
-C3c adds the one *Zahlungen* client route, `/a/{accountId}/zahlungen`, technically complete on its
-slice branch and not yet merged. It is client-only — no endpoint, no schema, no migration. It reads
+C3c adds the one *Zahlungen* client route, `/a/{accountId}/zahlungen`, technically complete and
+locally merged. It is client-only — no endpoint, no schema, no migration. It reads
 the grouped proposals, the payment ledger, the bank transactions and the receivables, and writes one
 final outcome through the C3a decision route. Buttons appear only on an open `NEEDS_REVIEW` row;
 everything else is read-only evidence and the Zahlungsjournal has no edit, delete or reversal
