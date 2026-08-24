@@ -453,6 +453,151 @@ class TestCrossAccountIsolation:
             session.flush()
 
 
+class TestU4CrossAccountWrites:
+    """docs/16 § 12: every U4 table proves its WITH CHECK on a real INSERT."""
+
+    def test_every_u4_table_rejects_a_cross_account_insert(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """U4-RLS-F01--F05: B cannot stamp UVI evidence with account A.
+
+        Each statement supplies the complete intended row shape.  The exact
+        row-level-security error matters: a NOT NULL, FK or append-only trigger
+        error would not prove the policy's WITH CHECK side.
+        """
+        owner, app = engines
+        monthly_reading_id = new_id()
+        station_assignment_id = new_id()
+        run_id = new_id()
+        run_hash_params = {
+            "tenancy": seed.tenancy_a,
+            "unit": seed.unit_a,
+            "month": date(2026, 7, 1),
+            "inputs": '{"current_kwh":"100"}',
+            "results": '{"block_a_kwh":"100"}',
+            "vintage": "2025",
+            "source_type": "METER_SERIES",
+            "source_id": seed.reading_a,
+            "assignment": station_assignment_id,
+            "station_id": "00433",
+            "distance": "12.345",
+        }
+        with owner.connect() as connection:
+            run_sha256 = connection.scalar(
+                text(
+                    "SELECT encode(digest(convert_to(jsonb_build_object("
+                    " 'tenancy_id', CAST(:tenancy AS text),"
+                    " 'unit_id', CAST(:unit AS text), 'month', CAST(:month AS date),"
+                    " 'inputs', CAST(:inputs AS jsonb), 'results', CAST(:results AS jsonb),"
+                    " 'heizspiegel_vintage', CAST(:vintage AS text),"
+                    " 'source_type', CAST(:source_type AS text),"
+                    " 'source_id', CAST(:source_id AS text),"
+                    " 'station_assignment_id', CAST(:assignment AS text),"
+                    " 'station_id', CAST(:station_id AS text),"
+                    " 'station_distance_km', CAST(:distance AS numeric(9,3))"
+                    ")::text, 'UTF8'), 'sha256'), 'hex')"
+                ),
+                run_hash_params,
+            )
+        assert isinstance(run_sha256, str)
+        inserts = (
+            (
+                "monthly_meter_reading",
+                "INSERT INTO monthly_meter_reading"
+                " (id, account_id, meter_id, tenancy_id, unit_id, month,"
+                " consumption_x1000, reason, source, interpolation_method,"
+                " supersedes_reading_id)"
+                " VALUES (:id, :account_a, :meter, :tenancy, :unit, '2026-07-01',"
+                " 1000, 'PERIODIC', 'MANUAL', 'NONE', NULL)",
+                {
+                    "id": monthly_reading_id,
+                    "account_a": seed.account_a,
+                    "meter": seed.meter_a,
+                    "tenancy": seed.tenancy_a,
+                    "unit": seed.unit_a,
+                },
+            ),
+            (
+                "monthly_meter_reading_source",
+                "INSERT INTO monthly_meter_reading_source"
+                " (id, account_id, monthly_meter_reading_id, meter_reading_id)"
+                " VALUES (:id, :account_a, :monthly, :raw)",
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "monthly": monthly_reading_id,
+                    "raw": seed.reading_a,
+                },
+            ),
+            (
+                "uvi_station_assignment",
+                "INSERT INTO uvi_station_assignment"
+                " (id, account_id, postal_code, month, station_id, distance_km,"
+                " source_type, source_id)"
+                " VALUES (:id, :account_a, '10115', '2026-07-01', '00433', 12.345,"
+                " 'DWD_MONTHLY', '2026-07:00433')",
+                {"id": station_assignment_id, "account_a": seed.account_a},
+            ),
+            (
+                "dwd_climate_factor",
+                "INSERT INTO dwd_climate_factor"
+                " (id, account_id, postal_code, period_from, period_to, factor,"
+                " source_type, source_id, published_at)"
+                " VALUES (:id, :account_a, '10115', '2025-01-01', '2025-12-31', 1.14,"
+                " 'DWD_CLIMATE_FACTOR', 'KF_20250101_20251231:10115',"
+                " '2026-02-15T00:00:00+00:00')",
+                {"id": new_id(), "account_a": seed.account_a},
+            ),
+            (
+                "uvi_run",
+                "INSERT INTO uvi_run"
+                " (id, account_id, tenancy_id, unit_id, month, inputs, results,"
+                " heizspiegel_vintage, source_type, source_id, station_assignment_id,"
+                " station_id, station_distance_km, sha256)"
+                " VALUES (:id, :account_a, :tenancy, :unit, '2026-07-01',"
+                ' CAST(\'{"current_kwh":"100"}\' AS jsonb),'
+                " CAST('{\"block_a_kwh\":\"100\"}' AS jsonb), '2025', 'METER_SERIES',"
+                " :source_id, :station_assignment, '00433', 12.345, :sha256)",
+                {
+                    "id": run_id,
+                    "account_a": seed.account_a,
+                    "tenancy": seed.tenancy_a,
+                    "unit": seed.unit_a,
+                    "source_id": seed.reading_a,
+                    "station_assignment": station_assignment_id,
+                    "sha256": run_sha256,
+                },
+            ),
+            (
+                "uvi_delivery_event",
+                "INSERT INTO uvi_delivery_event"
+                " (id, account_id, uvi_run_id, status, occurred_at)"
+                " VALUES (:id, :account_a, :run, 'GENERATED',"
+                " '2026-08-01T00:00:00+00:00')",
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "run": run_id,
+                },
+            ),
+        )
+        refusals: dict[str, str] = {}
+        for table_name, statement, params in inserts:
+            with (
+                pytest.raises(ProgrammingError) as refused,
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.execute(text(statement), params)
+            refusals[table_name] = str(refused.value)
+
+        not_refused_by_policy = {
+            table_name: message.splitlines()[0]
+            for table_name, message in refusals.items()
+            if "row-level security" not in message.lower()
+        }
+        assert not not_refused_by_policy, not_refused_by_policy
+
+
 class TestM6BArchiveGuards:
     """M6-B rows are RLS-scoped evidence, not ordinary mutable cache rows."""
 

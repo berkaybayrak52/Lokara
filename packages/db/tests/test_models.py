@@ -51,6 +51,13 @@ EXPECTED_TABLES = {
     "match_confirmation",
     "payment_ledger_entry",
     "payment_allocation",
+    # U4 UVI persistence (docs/16 §§ 3, 7.2, 9, 10, 12; migration 0022).
+    "monthly_meter_reading",
+    "monthly_meter_reading_source",
+    "uvi_station_assignment",
+    "dwd_climate_factor",
+    "uvi_run",
+    "uvi_delivery_event",
 }
 
 
