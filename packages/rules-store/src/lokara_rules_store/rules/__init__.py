@@ -8,6 +8,7 @@ from .co2_emission_factors import CO2_FALLBACK_EMISSION_FACTORS
 from .co2_split import CO2_SPLIT_TABLE
 from .degree_days import DEGREE_DAY_TABLE
 from .heating_split import DEFAULT_CONSUMPTION_SHARE, HEATING_SPLIT_BOUNDS
+from .heizspiegel import HEIZSPIEGEL_RULES
 from .warm_water import WARM_WATER_FORMULA
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "DEFAULT_CONSUMPTION_SHARE",
     "DEGREE_DAY_TABLE",
     "HEATING_SPLIT_BOUNDS",
+    "HEIZSPIEGEL_RULES",
     "WARM_WATER_FORMULA",
 ]

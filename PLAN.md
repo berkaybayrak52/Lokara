@@ -939,15 +939,16 @@ by `evaluate_hkv_provisional` must be carried onto the Block A figure by the com
 and nothing enforces that today; and `SourceIdentity` is defined and exported but no UVI type
 consumes it yet, which is U4's archive identity.
 
-**Remaining execution order.** Four slices, each sized against U1, plus two items no agent can
-close.
+**U2 status:** versioned Heizspiegel rules data is complete, statement-reviewed and green but not
+committed. The 18 rows, five deductions, non-positive import guard, two visible over-500 fallbacks,
+exact attribution and 1 October vintage resolution feed `ResolvedHeizspiegelRow`. Review found and
+the two-lane fix closed dynamic future-vintage row identity and effective-Rechtsstand provenance.
+Focused U2 tests pass 11, all rules-store tests pass 135, the fast gate passes 598 pure-package
+tests and the full gate passes 1,289 Python plus 84 web tests. Production flags remain unchanged.
 
-- **U2 — Heizspiegel rules data.** `packages/rules-store` gains the versioned K13 table: the 18
-  `HEIZSPIEGEL_2025_ROWS`, the warm-water deductions (24, heat pump 8), the non-positive guard, the
-  over-500 m² fallback for Wärmepumpe and Holzpellets with its exact German label, the co2online
-  attribution and vintage resolution under the 1 October rule. A UVI for month M resolves the
-  vintage valid at M, never the newest. The engine keeps receiving the resolved row as a
-  caller-supplied input; engine purity forbids the reverse.
+**Remaining execution order.** Three slices, each sized against U1, plus two items no agent can
+close. U2 must be committed and landed before U3 starts.
+
 - **U3 — DWD adapters.** `packages/adapters/src/lokara_adapters/dwd.py`: the § 9 annual
   climate-factor import with all eight named guards and the nine verified PLZ/KF fixtures, the § 7.1
   monthly `hdd_3807` parse and the § 7.2 station assignment as a deterministic function over a

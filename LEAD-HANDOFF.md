@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — U1b is locally merged; four U slices remain, U2 first
+# LEAD-HANDOFF.md — U2 is green but uncommitted; three U slices remain, U3 first
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -15,6 +15,8 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
   commit `0a60721`, merged as `d02c838`.
 - **U1b is complete, reviewed and locally merged.** Feature commit `ed82202` was merged as
   `ee83535`. Its statement-review finding is resolved and the closing full gate is green.
+- **U2 is complete, reviewed, green and not committed.** Its three-file diff sits on
+  `slice/u2-heizspiegel-rules` at base `ab875d2`. Do not start U3 until U2 is landed.
 - `main` is ahead of `origin/main`, which is still `f372f67`. **Nothing is pushed.**
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen`, `slice/g-shared-guard-foundation`, `slice/u0-round4-uvi-transcription`
@@ -84,10 +86,10 @@ Two things are recorded, not fixed, and both belong to a later slice:
 
 ---
 
-# The remaining U work — four slices, in this order
+# U2 closure and the remaining U work — U3 to U5
 
-U1b is landed locally. U2 starts from the clean `main` that contains `ee83535` and the status-only
-finalization commit; it must not start from an older slice branch.
+U2 is green but uncommitted. Land it before U3; otherwise U3's diff would contain the Heizspiegel
+rules module and fixture.
 
 Work them **top to bottom, one at a time.** Each slice is self-contained and each ends the same
 way: the full gate green with `.lokara-red` deleted, then **show Emir the diff and wait. Do not
@@ -121,15 +123,13 @@ not rushed.
 - Do not run `scripts/verify_demo_path.sh --fresh` for U2 or U3 — neither needs a schema and it
   destroys local Postgres. U4 and U5 touch the database; ask Emir before any reset.
 
-## 1. U2 — the versioned Heizspiegel rules data
+## U2 delivered — the versioned Heizspiegel rules data
 
 ### Why
 
 `docs/16` § 12 requires that "all 18 Heizspiegel rows, deductions, heat-pump exception, non-positive
-guard, over-500 fallback and attribution are versioned and tested". None of it exists in production
-code; it lives only in the data-only oracle. Block D2 cannot be fed until it does. U1b already
-settled the engine input type, so the resolver has a fixed target: it fills
-`ResolvedHeizspiegelRow`.
+guard, over-500 fallback and attribution are versioned and tested". U2 now carries them in
+production rules data and resolves the fixed U1b target `ResolvedHeizspiegelRow`.
 
 ### Lanes
 
@@ -137,14 +137,14 @@ No build-file scaffolding — `packages/rules-store` is already a workspace memb
 `[tool.mypy] files`, already in `[tool.pytest.ini_options] testpaths` and already in the fast gate's
 pure list at `scripts/gate.sh:85-89`.
 
-`spec-scribe` writes `packages/rules-store/tests/test_heizspiegel_rules.py`, restating the 18 rows,
+`spec-scribe` wrote `packages/rules-store/tests/test_heizspiegel_rules.py`, restating the 18 rows,
 the five deductions and the D2 contract as module constants and asserting them through code that
 does not exist yet. **Restate; do not import `berkay_uvi_golden`.** That oracle is the
 transcription's own data evidence, and a test importing it proves only that two copies of one file
-agree. Then open the red window.
+agree. It then opened the red window.
 
-`engine-implementer` writes `packages/rules-store/src/lokara_rules_store/rules/heizspiegel.py`,
-exports it from `rules/__init__.py` in the existing alphabetical style, and deletes the sentinel.
+`engine-implementer` wrote `packages/rules-store/src/lokara_rules_store/rules/heizspiegel.py`,
+exported it from `rules/__init__.py` in the existing alphabetical style, and deleted the sentinel.
 
 ### What the data must carry
 
@@ -179,6 +179,12 @@ carries `RuleEvidence` with the register source, the `Rechtsstand` and the verif
 uv run pytest packages/rules-store/tests -q
 scripts/gate.sh full
 ```
+
+Both commands are green: 135 rules-store tests and the full gate with 1,289 Python and 84 web
+tests. The required statement review found two provenance gaps; separate failing fixtures and the
+engine fix now retain each future vintage's own row identity plus both publication and effective
+Rechtsstand. The re-review has no open U2 finding. The heat-pump deduction remains a visible
+`verify-before-production` convention for U5 to render without invented German wording.
 
 ---
 
@@ -400,10 +406,9 @@ The validated backup remains at `/tmp/lokara-m6c3a-pre-migration-20260824.dump`.
 
 ## Evidence
 
-On the working tree that carries U1b, `scripts/gate.sh full` is green with 1,278 Python and 84 web
-tests. Strict mypy and engine purity are clean, and
-`uv run pytest packages/uvi-engine/tests packages/domain/tests -q` passes 121. Nothing in U renders
-yet, so the normalized PDF fingerprint stays
+On the working tree that carries U2, `scripts/gate.sh full` is green with 1,289 Python and 84 web
+tests. Strict mypy and engine purity are clean; the U2 focused suite passes 11 and all rules-store
+tests pass 135. Nothing in U renders yet, so the normalized PDF fingerprint stays
 `88eb8434eda65f8d7ff82826fc837a58` at 149269 bytes.
 
 ## Recorded, not fixed
