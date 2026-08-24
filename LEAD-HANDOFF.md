@@ -7,13 +7,18 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 
 - **M6 is technically complete and locally merged.** C3c's landlord *Zahlungen* screen was
   committed as `92e0dcd` and merged into `main` as `6995bc4`, which closes M6-C and with it M6.
-  Current `main` and `origin/main` both point to `f372f67`.
 - Every `M6-C closed when` condition is now met on `main`: all thirteen `BANKMATCH` fixtures pass
   through the service and persistence, the three job entrypoints are callable, a landlord can
   confirm or reject a Review proposal in the UI, every isolation boundary is green and the rendered
   statement is unchanged.
-- **G1 is technically complete and reviewed on `slice/g-shared-guard-foundation`.** It remains
-  uncommitted, unmerged and unpushed. The next stage after G1 closure is U (UVI), then M7.
+- **G1 is technically complete and locally merged.** The slice landed as three commits — the W2
+  six-year correction `55c97b1`, the engine `f0c3583` and the status pass `a8deb9a` — and merged
+  as `6c257f8`. It is not pushed: `main` is ahead of `origin/main`, which is still `f372f67`.
+  The next stage is U (UVI), then M7.
+- **W2 changed before the merge.** The slice had reversed the merged round-4 Eichfrist decision
+  back to five years. Emir confirmed six. `12-F05` now expires 31.12.2026 with 16 months left and
+  sits at stage `none`; only the non-blocking retrofit-transition label remains. CSV rows 128 and
+  129 still print the superseded readings and need new register entries.
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen` is merged and can be deleted whenever Emir wants; it is kept for now.
 

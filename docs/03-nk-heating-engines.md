@@ -379,7 +379,7 @@ slice and remains Slice B work.
 a labelled fallback, never an implicit factor of one. The annual import contract and resolved
 range/date inputs are in approved `docs/16`. The pure annual comparison now accepts normalized
 annual DWD factors, validates the approved range and returns either adjusted values, an explicitly
-raw-labelled fallback or a no-prior notice. G1 prepares only the pure W4 cadence evaluator;
+raw-labelled fallback or a no-prior notice. G1 provides only the pure W4 cadence evaluator;
 monthly readings/import, UVI calculation/document, scheduling and delivery remain future work.
 
 Compact arithmetic, with every quotient kept as exact `Decimal`:
@@ -553,7 +553,7 @@ documents reference their numbers.
 | H5 persistence and integration | **Shipped**: exact device factor, segment metadata, adapter and `HeatingInput` handoff | K11 remains `verify-before-production` |
 | H7 net/control/risk behavior | **Shipped in the pure orchestrator**: net/gross branches, control sum, F29 block and F30 risks | Confirmed OCR/API input remains Slice B |
 | Shared readiness/provenance/risk channel | **Shipped** for F02, F12, F17, F20, F21, F23–F26c, F30/F31 | Final wording/cumulation choices remain provisional |
-| H8 annual comparison | **Shipped for normalized annual factors and raw/no-prior fallbacks** | G1 prepares W4 cadence only; monthly import/readings, UVI calculation/document, scheduling and delivery remain future work |
+| H8 annual comparison | **Shipped for normalized annual factors and raw/no-prior fallbacks** | G1 provides W4 cadence only; monthly import/readings, UVI calculation/document, scheduling and delivery remain future work |
 
 Slice A supplies one H0–H7 pipeline, the shared readiness channel, normalized-factor H8, all 34
 fixture obligations executable end to end and statement projection. This is technical closure, not

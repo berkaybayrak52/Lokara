@@ -27,6 +27,7 @@ lokara/
 │  ├─ heating-engine/         # pure Python heating/CO₂ calculation
 │  ├─ rules-store/            # versioned rule data resolved by callers
 │  ├─ matching-engine/        # pure Python docs/15 bank matching and settlement
+│  ├─ guard-engine/           # pure Python docs/12 W1/W2/W4 guard evaluation
 │  ├─ adapters/               # ports plus current stubs/adapters
 │  ├─ db/                     # SQLAlchemy, Alembic and RLS
 │  ├─ pdf/                    # HTML→PDF through Playwright Chromium
@@ -39,11 +40,8 @@ lokara/
 The uv workspace contains `apps/api` and every Python package shown above except `ui`. The Bun
 workspace contains exactly `apps/web` and `packages/ui`.
 
-## Prepared but unmerged repository structure
-
-`packages/guard-engine` is an explicit uv member on `slice/g-shared-guard-foundation`. It contains
-pure W1, W2 and W4 evaluators and is absent from `main`. It has no API route, web/runtime consumer,
-database record, scheduler, provider, delivery path or PDF projection.
+`packages/guard-engine` has no API route, web/runtime consumer, database record, scheduler,
+provider, delivery path or PDF projection.
 
 `apps/mobile`, AfA/export/KPI engines, Redis and workers are absent. Real Supabase, Vision, bank,
 email and MDL providers are also absent; current external edges use local infrastructure or stubs.

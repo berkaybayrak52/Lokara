@@ -1,7 +1,7 @@
 # Guards and deadlines — shared trigger, escalation and resolution contract
 
-**Status:** complete D2 transcription; bounded G1 engine technically complete and reviewed on
-`slice/g-shared-guard-foundation` (uncommitted and unmerged) 24.08.2026
+**Status:** complete D2 transcription; bounded G1 engine technically complete, reviewed and
+locally merged 24.08.2026
 
 **Authoritative source:**
 `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
@@ -473,6 +473,6 @@ production behavior.
 
 The approved D2 transcription was data-only. G1 now executes exactly `12-F01`–`12-F06` and
 `12-F11`–`12-F13` through the pure `lokara_guard_engine` package and its three public evaluators.
-The reviewed slice is technically complete but remains uncommitted and unmerged. It makes no
+The reviewed slice is technically complete and locally merged. It makes no
 schema, migration, API, adapter, UI, scheduler, e-mail, push or PDF change. Later U and M9
 integration remains assigned to `PLAN.md`.

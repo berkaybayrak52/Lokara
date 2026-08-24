@@ -32,15 +32,11 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - `docs/09-betrkv-catalogue.md` and its data-only oracle are technically implemented through Slice C.
   Its flagged authority still blocks production use.
 
-### Prepared but unmerged
-
-- G1 on `slice/g-shared-guard-foundation` adds the pure `packages/guard-engine` with caller-supplied
-  W1 statement-deadline, W2 meter-calibration and W4 UVI-cadence rules. Exactly
-  `12-F01`–`12-F06` and `12-F11`–`12-F13` execute through production code. The slice is technically
-  complete and reviewed but uncommitted and unmerged; no API, persistence, UI, scheduler or PDF
-  consumer exists yet.
-
 ### Shipped
+
+- G1 adds the pure `packages/guard-engine` with caller-supplied W1 statement-deadline, W2
+  meter-calibration and W4 UVI-cadence rules. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13`
+  execute through production code. No API, persistence, UI, scheduler or PDF consumer exists yet.
 
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
 - Page 08 bank matching is implemented. `packages/matching-engine` runs all thirteen

@@ -56,10 +56,12 @@ before UI. Dates are communication events, not planning inputs.
   `92e1318`), followed by M6-C3-0's migration-`0020` invariant repair. **M6-C3a is technically
   complete, development-synchronized and locally merged. C3b's three job entrypoints and C3c's
   landlord Zahlungen screen (`6995bc4`) are technically complete and locally merged, which closes
-  M6-C and with it M6. Current `main` and `origin/main` both point to `f372f67`.**
-- **G1 is technically complete and reviewed on the uncommitted, unmerged
-  `slice/g-shared-guard-foundation`.** The pure `packages/guard-engine` executes W1, W2 and W4 for
-  `12-F01`–`12-F06` and `12-F11`–`12-F13`. It adds no database, API, UI, scheduler or PDF consumer.
+  M6-C and with it M6.**
+- **G1 is technically complete and locally merged (`6c257f8`).** The pure `packages/guard-engine`
+  executes W1, W2 and W4 for `12-F01`–`12-F06` and `12-F11`–`12-F13`. It adds no database, API, UI,
+  scheduler or PDF consumer. W2 now runs the unified six-year MessEV Eichfrist; the slice had
+  reversed that merged round-4 decision, and the reversal was undone before the merge.
+  `main` is ahead of `origin/main`, which still points to `f372f67`.
   U is next; M9 reminder and delivery integration remains open.
 
 ---
@@ -77,7 +79,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The data-only oracle covers both ledger views, § 11 assignment, splits, readiness, archive and blocked EXTF conventions. Seven register rows are `geprüft`; six remain `verify-before-production`. No implementation exists; flagged values block real output. |
-| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. G1 executes the nine selected W1/W2/W4 cases (`12-F01`–`F06`, `F11`–`F13`) through the pure guard engine on an uncommitted, unmerged slice. Sixteen of the 18 Page-specific register rows remain `verify-before-production`; rows 128 and 129 were closed by round 4 against § 34 Abs. 2 MessEV and MessEV Anlage 7 and still need matching register entries. W3 and W5–W8 plus all consumers remain open. |
+| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. G1 executes the nine selected W1/W2/W4 cases (`12-F01`–`F06`, `F11`–`F13`) through the pure guard engine on `main`. Sixteen of the 18 Page-specific register rows remain `verify-before-production`; rows 128 and 129 were closed by round 4 against § 34 Abs. 2 MessEV and MessEV Anlage 7 and still need matching register entries. W3 and W5–W8 plus all consumers remain open. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's *Zahlungen* screen are technically complete and locally merged. |
@@ -329,8 +331,8 @@ The D1–D3 documentation and correspondence-retirement gates precede the A–C 
 reconciliation gate. Do not resume M5 or start later feature work until D1–D3 are approved, A–C are
 spec-closed and the full and demo gates pass. The three earlier Page 01b fixes remain complete only
 for their named scope; they do not count as full Page 01b coverage. UVI implementation is no longer
-blocked by the co2online licence. G1 and Slice A are technically green, but G1 remains uncommitted
-and unmerged and the U-specific source gaps remain. A real § 6a output must still be checked later.
+blocked by the co2online licence. G1 and Slice A are technically green and locally merged; the
+U-specific source gaps remain. A real § 6a output must still be checked later.
 
 Slice A started without Berkay answers and keeps both choices visible: current structural block-(c)
 copy remains provisional, and every 3-percent risk is shown separately without an automatic sum or
@@ -859,8 +861,8 @@ those timestamps and produces the stable fingerprint `88eb8434eda65f8d7ff82826fc
 
 ### G1 — shared guard foundation
 
-**Status:** technically complete and statement-reviewed 24.08.2026 on
-`slice/g-shared-guard-foundation`; uncommitted, unmerged and unpushed.
+**Status:** technically complete and statement-reviewed 24.08.2026; locally merged as `6c257f8`
+and not pushed.
 
 The pure `packages/guard-engine` implements `evaluate_statement_deadline`,
 `evaluate_meter_calibration` and `evaluate_uvi_cadence` against exactly `12-F01`–`12-F06` and

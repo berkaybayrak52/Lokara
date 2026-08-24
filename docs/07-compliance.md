@@ -185,7 +185,7 @@ The rendered-output compatibility checks for these claims live in
 - A period longer than 12 months is a specified hard block before calculation or rendering; a
   shorter period remains day-exact. After the § 556 deadline, the landlord's late `Nachforderung`
   is suppressed while a renter `Guthaben` remains payable. Approved `docs/12` owns the shared guard
-  contract. G1 prepares pure W1/W2/W4 evaluation only; persistence, reminders, delivery and the
+  contract. G1 provides pure W1/W2/W4 evaluation only; persistence, reminders, delivery and the
   remaining guard families stay future work.
 
 ## Accessibility evidence and limits

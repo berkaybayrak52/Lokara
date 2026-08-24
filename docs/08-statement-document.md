@@ -87,7 +87,7 @@ carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner
 M6-C3-0 verifies their database invariants. C3a's service and final `0021` are technically complete,
 development-synchronized and locally merged; C3b's job entrypoints are technically complete and
 locally merged, and so is the C3c landlord *Zahlungen* screen, which changes no statement figure
-and no rendered byte. Prepared G1 likewise has no statement/PDF consumer and leaves the normalized
+and no rendered byte. Merged G1 likewise has no statement/PDF consumer and leaves the normalized
 fingerprint and seeded figures unchanged. Renter
 delivery/portal remains M10. These archives are owner-only technical
 records, not legal-production or renter delivery output.
@@ -96,7 +96,7 @@ records, not legal-production or renter delivery output.
 
 Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to
 approved `docs/11`; shared deadline orchestration to approved `docs/12`; bank matching to
-`docs/15`; and UVI/DWD rules to approved `docs/16`. G1 prepares W1/W2/W4 evaluation only; no
+`docs/15`; and UVI/DWD rules to approved `docs/16`. G1 provides W1/W2/W4 evaluation only; no
 statement projection, reminder or delivery consumer exists. This file records those boundaries and
 does not duplicate or invent their contracts.
 

@@ -17,8 +17,8 @@ planned or mentioned in the architecture.
 | Bun/Turborepo | `apps/web`, `packages/ui` |
 | uv | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/matching-engine`, `packages/guard-engine`, `packages/adapters`, `packages/db`, `packages/pdf` |
 
-`packages/guard-engine` is **Prepared but unmerged** on
-`slice/g-shared-guard-foundation`; every other member above is present on `main`.
+Every member above is present on `main`; `packages/guard-engine` joined it with the locally
+merged G1 slice.
 
 Future members are separate:
 

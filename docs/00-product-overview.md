@@ -48,7 +48,7 @@ C3b's scheduler port and three job entrypoints are technically complete and loca
 `main`, and so is the C3c landlord *Zahlungen* screen, which completes M6. Renter activation/portal, tax-adviser guest access, tax export, contracts, billing and
 native apps remain future milestones in `PLAN.md`.
 
-The uncommitted, unmerged G1 slice prepares pure W1 statement-deadline, W2 meter-calibration and
+The locally merged G1 slice provides pure W1 statement-deadline, W2 meter-calibration and
 W4 UVI-cadence evaluators. It has no database, API, UI, scheduler, provider, delivery or PDF
 consumer. Future product breadth still includes renter delivery, UVI readings/calculation/document,
 W3 and W5–W8, M9 reminders and delivery, Anlage V/DATEV and mobile clients. Those are roadmap

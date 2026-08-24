@@ -68,7 +68,7 @@ account-scoped tables carries the same `account_id`; section 3 lists all 22 enfo
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
-| Pure guard evaluation | W1 statement deadline, W2 meter calibration and W4 UVI cadence; no persisted guard/reminder records | **Prepared but unmerged** on `slice/g-shared-guard-foundation` |
+| Pure guard evaluation | W1 statement deadline, W2 meter calibration and W4 UVI cadence; no persisted guard/reminder records | **Shipped** as a pure engine; no schema or API |
 | Tax mapping, adviser profile, readiness result and export archive | Future M7 records; exact behavior is approved in `docs/11` | **Specified** |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
@@ -920,7 +920,7 @@ approved `docs/11` adds no schema or API.
 | Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
 | Three matching jobs | **Locally merged**; no schema change, read through an account-scoped session only | M6-C3b |
 | Landlord *Zahlungen* screen | **Locally merged**; confirm/reject/duplicate only, no manual assignment, no schema change | M6-C3c |
-| W1/W2/W4 pure guard evaluator | **Prepared but unmerged**; no database, API, UI, scheduler, delivery or PDF consumer | G1 |
+| W1/W2/W4 pure guard evaluator | **Shipped** as a pure engine; no database, API, UI, scheduler, delivery or PDF consumer | G1 |
 | Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Specified with unresolved month/day authority choice; no implementation | `docs/10-afa.md` / M7 |
@@ -931,7 +931,7 @@ approved `docs/11` adds no schema or API.
 Other later temporal or immutable records arrive only with their owning milestones: `AfaRecord`,
 `Loan`, shared guard/reminder records, `LettingEffort`, tickets, export archives, subprocessors,
 activation codes, IBAN history, delivery logs, clause/contract versions and prospect objects.
-The prepared pure guard engine does not approve or create those guard/reminder records.
+The merged pure guard engine does not approve or create those guard/reminder records.
 `docs/13` defines only their future logical references, composition evidence and risk routing; it
 does not approve a schema or provide clause text. `docs/14` likewise defines only the future
 Prüfobjekt snapshot, provenance, partial-result, annuity, sensitivity and Bank-PDF boundaries; it

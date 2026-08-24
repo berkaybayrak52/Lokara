@@ -1,8 +1,8 @@
 # UVI — monthly consumption information and comparisons
 
 **Status:** complete D2 transcription; approved and merged 21.08.2026; UVI
-calculation/readings/document remain specification only; G1's pure W4 evaluator is prepared but
-unmerged
+calculation/readings/document remain specification only; G1's pure W4 evaluator is locally
+merged
 
 **Rechtsstand:** 07/2026 unless a row below carries its own date. `geprüft` means that the
 primary text was read, not that a lawyer approved the rule. Every `verify-before-production` flag
