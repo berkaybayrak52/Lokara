@@ -63,6 +63,14 @@ EXPECTED_TABLES = {
     "building_uvi_configuration",
     "uvi_building_monthly_evidence",
     "uvi_building_monthly_evidence_source",
+    # M7 AfA and tax export persistence (docs/10–11; migration 0024).
+    "afa_record_version",
+    "tax_event",
+    "tax_adviser_profile_version",
+    "tax_mapping_version",
+    "tax_export_readiness_attempt",
+    "tax_export_archive",
+    "tax_export_artifact",
 }
 
 

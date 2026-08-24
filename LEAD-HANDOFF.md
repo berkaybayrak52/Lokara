@@ -1,60 +1,85 @@
-# Lead handoff — U5 closed locally
+# Lead handoff — M7 is merged; M7-F reviews are what remain
 
-`main` contains U5 feature `36d62b2`, merged locally as `a54350f` on 24.08.2026. Nothing is pushed.
+M7-0 through M7-E are technically complete and locally merged into `main` from
+`slice/m7-afa-tax-export` on 25.08.2026. Nothing was pushed. `.lokara-red` is gone: the declared
+RED window closed when its focused suite went green, and the file is never committed.
 
-## What is complete
+Technical closure is not production or legal approval. Every authority flag below still blocks real
+output.
 
-U1–U5 are technically complete and reviewed:
+## What closed the RED window
 
-- U1/U1b provide the pure UVI calculation, structured rule evidence/conflicts and labelled
-  suppression.
-- U2 provides versioned Heizspiegel rules and resolved row evidence.
-- U3 provides annual and monthly DWD normalization plus deterministic persisted station assignment.
-- U4 adds migration `0022`: monthly readings, station assignments, climate factors, immutable
-  `uvi_run` archives and delivery events with account-scoped foreign keys, RLS and append-only
-  guards.
-- U4b adds migration `0023`: monthly degree days, effective-dated building configuration,
-  building-month evidence and immutable raw-reading source links. Configuration and building
-  evidence persist the full `source_type` plus `source_id` identity.
-- U5 adds owner-side generation and archived PDF retrieval. It resolves heat-only compatible meter
-  rows and each represented month's effective configuration, evaluates normalized Block A and
-  Blocks B/C/D-or-D2, hashes complete source snapshots, writes a new immutable run on retry, and
-  renders one separate German renter document.
+The window was declared for the verified-export adapter, where the server still accepted
+caller-supplied artifact bytes and keyed archive streams on the readiness attempt. All four causes
+are resolved:
 
-U5 does not publish to a renter portal and does not send email. Publication remains M10; scheduled
-delivery and its retry ledger remain M9.
+- `generate_verified_test_export(account_id, readiness_attempt_id, generated_at, session)` resolves
+  the rule bundle itself and builds the bytes from domain inputs. It takes no `bundle` and no
+  `content_bytes`. A client payload can never supply a verified-test bundle.
+- `archive_verified_test_artifacts` is the internal exact-byte boundary. It freezes the readiness
+  findings, blockers and both `Rechtsstand` values it loaded, and refuses a readiness snapshot with
+  no `blockers` key rather than defaulting one.
+- Archive versions and supersession run per logical export stream — account, building, tax year and
+  export kind — never per readiness attempt, so a second attempt for the same stream supersedes the
+  first.
+- The readiness projection handed to the export engine carries no tenant identity: cash-basis facts
+  plus the stored provenance snapshot, and nothing naming an account, a building or a unit.
+- A tax-event correction is its own model. It supersedes one stored row and reads building,
+  allocation, component and receipt reference from that row, so a correction can never re-parent an
+  event or move it to another stream.
 
-## Review and verification
+## Evidence
 
-- Focused U5 suite: 202 passed.
-- Closing boundary audit: no findings.
-- Closing renter-document review: no findings.
-- Demo gate: green with 1,542 Python tests and 84 web tests.
-- RLS coverage: 48 tenant tables; FK isolation: 82 tenant foreign keys.
-- PDF fingerprint remained `88eb8434eda65f8d7ff82826fc837a58`, 149269 bytes.
-- `.lokara-red` is absent.
+| Gate | Result |
+| --- | --- |
+| `scripts/gate.sh fast` | green |
+| `scripts/gate.sh full` | green — `1709` pytest, `106` vitest |
+| `mypy --strict` | clean over `234` source files |
+| `scripts/verify_demo_path.sh` (non-fresh) | green |
+| `scripts/pdf_fingerprint.sh` | `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes — unchanged |
+| RLS coverage | `55` tenant tables ENABLEd + FORCEd + policied WITH CHECK + cross-account-write tested |
+| FK isolation | `97` tenant-to-tenant foreign keys, all carrying `account_id` |
+| Pre-context reads | one bounded SECURITY DEFINER function, one bootstrap caller |
 
-The development database remains at Alembic `0023`. Because it had already been stamped before the
-uncommitted migration gained `source_type`, an exact additive parity delta added the two non-null
-columns and matching checks without resetting or deleting data. Existing immutable RLS fixture rows
-were preserved with the explicit legacy source type `LEGACY_RLS_FIXTURE`; no lasting default remains.
+The unchanged statement fingerprint is the specific claim that M7 altered nothing a landlord already
+reads.
 
-## Production blockers remain open
+## Development database
 
-Technical closure is not legal or production approval:
+The development database had been synchronized to an earlier draft of `0024`, which is why its
+`tax_event` lacked `receipt_reference`, `source`, `unit_id` and `version` and its
+`tax_export_archive` lacked `building_id`, `tax_year` and `export_kind`. With Emir's authorization
+the M7 objects from that draft were dropped, the revision was stamped back to `0023` and `0024` was
+re-applied. The seven M7 tables now match the models column for column. Supabase was never touched.
 
-- Emir still must choose the PLZ geodataset.
-- Berkay still must supply the three missing UVI register rows; the CSV remains at 180 rows.
-- The exact monthly § 6a/EED content list needs a versioned authoritative source.
-- The Wärmepumpe deduction, W4 heating-season scope and BAnz/GEG authority questions remain
-  `verify-before-production` as recorded in `docs/16-uvi.md` and `FRAGEN-an-Berkay-05.md`.
-- Lokara never applies the 3% or 15% reductions automatically.
+Two test fixtures had been written against the draft schema and were repaired by `spec-scribe`, not
+by the implementer:
 
-## Next execution boundary
+- the fake session in `test_verified_archive_versions_and_supersession_are_per_logical_export_stream`
+  matched candidate archives by readiness id, which the stream query it mandates can never bind, so
+  its three assertions were unreachable;
+- the M7 RLS probe row omitted three NOT NULL columns, so the isolation test died on an insert
+  before RLS was ever exercised.
 
-`PLAN.md` places M7 next: tax export and AfA from approved `docs/09`–`docs/11`. Do not pull M9 UVI
-scheduling or M10 renter publication forward.
+## What remains — M7-F
 
-Before the next slice, check `main`, local changes and the current handoff. Preserve the unrelated
-untracked `Antwort-an-Emir_04.md`, `berkay-specs.md` and `berkay-work/UI-specs/`; never use
-`git add -A`. Do not run `scripts/verify_demo_path.sh --fresh` without Emir's explicit permission.
+1. Run a fresh `boundary-auditor` over the merged M7 schema, endpoints and roles.
+2. Run a fresh `statement-reviewer` over the tax workspace and the Anlage-V PDF.
+3. Run a fresh `docs-reconciler` over `docs/09`–`docs/11` against the merged code.
+
+Earlier clean reviews predate the normalized M7-A/M7-B work and are not closure evidence. Nothing in
+M7 may be described as production-ready until these run and their findings are resolved.
+
+## Authority limits that still stand
+
+- K09's month-granular use-change convention, although `10-F11` technically selects 453,798 ct.
+- Weg-B placeholders and the missing Gutachten share.
+- All Anlage-V line numbers, SKR03/SKR04 accounts, DATEV EXTF parameters and Soll/Haben orientation.
+- Successful archive behaviour uses the explicitly verified test-only rule bundle. Runtime mappings
+  remain blocked, and the API refuses a real export with
+  `Export gesperrt: Die Quellen müssen zuerst geprüft werden.`
+
+## Preserve unrelated work
+
+`Antwort-an-Emir_04.md`, `berkay-specs.md` and `berkay-work/UI-specs/` remain untracked by Emir's
+decision and were not staged. Do not use `git add -A`. Push requires separate authorization.

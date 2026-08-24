@@ -6,8 +6,18 @@
 `berkay-work/Spec-Seiten/03 · AfA (Abschreibung) 3a95fd4207318179b865c8a1c9e4b487.md`
 **Fixtures:** exactly `10-F01`–`10-F34` in
 `packages/rules-store/tests/berkay_10_golden.py`
-**Implementation status:** specification and data-only oracle only. No AfA engine, schema, API,
-screen, PDF, migration, tax export or production rules-store data is added by this slice.
+**Implementation status — prepared but unmerged, 25.08.2026:** `slice/m7-afa-tax-export` contains a
+normalized pure `packages/afa-engine`, server-resolved AfA rules, immutable `AfaRecordVersion` in
+migration `0024`, owner API endpoints and the `/steuern` AfA workspace. The engine/rules run passed
+`192` focused tests; the last isolated M7-A API run passed `51`. The later M7-B app change is paused
+in a declared RED window, so none of this is merged or technically closed.
+
+The normalized engine covers acquisition/new-build, contract and BMF allocation, annual and
+month-granular series, temporal self-use, predecessor continuation, later costs with independent
+`leistungBis`, the 15% guard, loan/Disagio/interest, report and movable-asset paths. F29's incomplete
+BMF input and the missing Gutachten share stay evidence-limited and production-blocked. K09 remains
+`verify-before-production` despite the selected technical `453,798 ct` result. Prepared code is not
+production rules approval.
 
 This document turns a purchase, construction or unentgeltlicher Erwerb into the annual object AfA,
 the deductible share, the remaining book value, the 15% guard and an annual loan-interest prefill.
@@ -42,7 +52,7 @@ preserved exactly as arithmetic evidence while NHK 725 EUR/m², index 180, BGF f
 ## 2. Legal basis and complete register surface
 
 Legal values belong in the versioned rules store with an as-of date. They must not become constants
-inside a future engine. Page 03 cites:
+inside the engine. Page 03 cites:
 
 - § 7 Abs. 4 S. 1 Nr. 2 lit. a–c EStG for the residential 3%, 2% and 2.5% rates;
 - § 7 Abs. 4 S. 1 Nr. 1 EStG for the V1-blocked business-building path;
@@ -152,10 +162,12 @@ absent and an advisor handoff is produced.
 6. `10-K06`: building share below 50% or above 95% gives a notice; contract/BMF difference above 10 percentage points gives a warning; neither blocks.
 7. `10-K07`: rental ratio uses usable area, never income; it affects deductibility, not basis or rate.
 8. `10-K08`: denominator is hundredth-m² × month.
-9. `10-K09`: a started rental month counts fully. `10-F11` selects **453,798 ct**; the prior
-   day-exact **447,887 ct** result is discarded. On letting → self-use, the letting ends with the
-   month before self-use begins (unless self-use begins on a month-end). This is § 7 Abs. 1 S. 4
-   EStG, Rechtsstand 08/2026, `geprüft`.
+9. `10-K09`: the selected technical convention counts a started rental month fully. `10-F11`
+   therefore selects **453,798 ct**; the prior day-exact **447,887 ct** alternative is not the
+   implementation result. On letting → self-use, the letting ends with the month before self-use
+   begins (unless self-use begins on a month-end). The authoritative CSV classifies this analogy to
+   § 7 Abs. 1 S. 4 EStG as `verify-before-production`, `Konvention`, Rechtsstand 07/2026. Technical
+   selection does not clear that production block.
 10. `10-K10`: every generated money amount rounds `ROUND_HALF_UP` once to cents; ratios stay exact; rates use basis points.
 11. `10-K11`: the final year takes the remaining book value; the same residual rule closes Disagio.
 12. `10-K12`: the 15% clock uses mandatory `leistungBis`, not invoice/payment date. It is separate from Page 02 `abfluss`; no schema is approved here.
@@ -197,9 +209,9 @@ the rate. R4b only detects degressive AfA, § 7b, monument status and a report l
 non-core-renovated building.
 
 R5 sums rented area-months against `wohnflaecheGesamt×12`. Excess self-use or overlapping periods
-hard-block. Under the unresolved K09 source route, a month with a rental start/end is counted fully
-as rented. R6 basis is building acquisition cost plus later production cost effective from its
-year. Use never changes the basis.
+hard-block. Under the selected but `verify-before-production` K09 convention, a month with a rental
+start/end is counted fully as rented. R6 basis is building acquisition cost plus later production
+cost effective from its year. Use never changes the basis.
 
 R7 computes full annual AfA, then first/sale-year months. R8 applies the rental numerator only over
 R7-allowed months. `afaNichtAbziehbar=afaJahrObjekt-afaAbziehbar`; it is lost, not postponed. R9
@@ -223,7 +235,7 @@ spreads it through the fixed-interest period with first/final residual years. R1
 interest fully for proven direct rental assignment, zero for direct private assignment, or by R5
 area-months. Direct assignment requires separate loan and payment paths.
 
-R13 hands future Page 04/Page 07 one object/year tuple: year, basis, rate or report life, annual full
+R13 hands Page 04/Page 07 one object/year tuple: year, basis, rate or report life, annual full
 AfA, months, object AfA, deductible/non-deductible AfA, closing book value, deductible interest and
 Disagio, maintenance and the 15%-guard threshold/cumulative/window/status.
 
@@ -348,13 +360,14 @@ savings claim, while partner selection remains open.
 
 - Pull the current BMF purchase-price Excel, import/version its tables and recompute F02. Until
   then Weg B is blocked, including NHK 725 EUR/m², index 180, BGF 1.35 and minimum 30%.
-- Decide K09: month-granular F11 result 453,798 or day-granular 447,887. The unresolved 5,911-cent
-  difference blocks production use-change output.
+- Verify K09 against controlling authority before production. The technical path is settled on the
+  month-granular F11 result 453,798 rather than the day-granular 447,887 alternative, but the CSV
+  still marks the convention `verify-before-production`.
 - Establish the controlling EStR version for R 7.4 and R 4.2.
 - Verify § 7b thresholds before any notice contains numbers.
 - Verify the three uncertain BFH citations before displaying or exporting them.
-- A future data model must require `leistungBis` independently of Page 02 `abfluss`; this slice
-  records the contract and adds no schema.
+- Prepared M7 requires `leistungBis` independently of Page 02 `abfluss` in normalized AfA facts and
+  freezes those facts in the versioned input snapshot. No separate normalized work table is merged.
 - A future partner process may consume the personalized shorter-life-report result; no partner is
   selected here.
 - The Page's old request to add `afaKlasseVorschlag` is settled at the contract level by the three
@@ -412,7 +425,7 @@ comes from the original Page, the current register and the approved rules and fi
 | Output wording | § 8 | F15/F16 plus hard-block cases | complete |
 | Owned/deferred/out-of-scope | § 10 | 13 non-goal identities | complete |
 | Open points 1–9 | § 9 and ownership notes | blockers/proposals in oracle | complete |
-| Current register CSV + 46 entry notes | § 2 | 46 complete metadata tuples; 4 checked/42 blocked | complete |
+| Current register CSV + 46 entry notes | § 2 | 46 complete metadata tuples; 4 checked/42 blocked, including blocked K09 | complete |
 | Non-Goals V1 | § 10 | 13 exact identities | complete |
 | README-for-Emir audit | §§ 1, 7, 9 | arithmetic green without clearing flags | complete |
 | Cross-source flag history | §§ 1–2 and `docs/03` Appendix D | current four checked flags | complete |

@@ -153,6 +153,7 @@ def test_variante_s_is_isolated_and_self_use_never_changes_the_afa_basis() -> No
         choice, "annual_afa"
     )
     assert choice["started_rental_month_counts_fully"] is True
+    assert choice["verification_flag"] == "verify-before-production"
     reverse = choice["reverse_change"]
     assert isinstance(reverse, dict)
     assert reverse["august_counts_as_letting"] is False

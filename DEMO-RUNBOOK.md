@@ -206,6 +206,9 @@ If the stack fails, show the verified artifact and numbers.
 
 ## 6. Do not demo
 
-- Mobile, bank sync, tax export, contracts or renter/tax-adviser portals. They are roadmap work.
+- Mobile, bank sync, contracts or renter portals. They are roadmap work.
+- The branch-local M7 tax/AfA workspace or tax-adviser route. It is prepared but unmerged, its
+  server-generated artifact/API contract is RED, it has no seeded adviser persona, and runtime
+  output remains blocked.
 - The five personas in `docs/06` as clickable UI. They are a model, not finished screens.
 - OCR as a live integration. The screen is real, but extraction is canned. Say that clearly.

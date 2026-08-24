@@ -32,6 +32,15 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - `docs/09-betrkv-catalogue.md` and its data-only oracle are technically implemented through Slice C.
   Its flagged authority still blocks production use.
 
+### Prepared but unmerged
+
+- `slice/m7-afa-tax-export` adds normalized pure `packages/afa-engine` and
+  `packages/export-engine`, versioned AfA/export rules, migration `0024`, seven immutable
+  account-scoped M7 records, the restricted tax API/workspace and a German Anlage-V projection.
+  M7-A and the M7-B engine/database layers are focused-green; the M7-B server-generated artifact
+  adapter is paused with ten focused API failures. `.lokara-red` is present, the latest development
+  schema parity is not reconciled, and no M7 code is committed, merged, pushed or production-ready.
+
 ### Shipped
 
 - G1 adds the pure `packages/guard-engine` with caller-supplied W1 statement-deadline, W2
@@ -121,20 +130,26 @@ backend.
   order, § 366/§ 367 settlement, the Largest-Remainder principal split and reversal. It imports the
   standard library only — not even the domain package — and refuses `float` at its one import
   boundary. It stores nothing; `packages/db` holds what it read and what it decided.
+- Prepared M7 adds `packages/afa-engine` and `packages/export-engine` as pure decision layers.
+  They receive normalized facts plus resolved rule evidence and do not import FastAPI, SQLAlchemy,
+  Postgres or rendering. Their presence on the slice branch is not a shipped `main` capability.
 - `packages/rules-store` resolves dated legal and convention values. Engines receive resolved
   values; they do not reach into the store.
 - `packages/adapters` normalizes bank, meter/MDL, annual and monthly DWD, Vision, email, Destatis
   and DATEV edges. Only an adapter may know a provider format.
 - `packages/db` owns SQLAlchemy models, Alembic migrations, sessions, RLS-supporting persistence
-  and seed data, including U4/U4b monthly UVI evidence and archive rows. Domain and engine packages
-  do not depend on it.
+  and seed data, including U4/U4b monthly UVI evidence and archive rows. Prepared migration `0024`
+  adds seven M7 tables on the slice branch; its latest development parity remains open. Domain and
+  engine packages do not depend on it.
 - `apps/api` composes authorization, persistence, engines, rules, adapters and rendering. U5 owns
-  the authorized UVI generation/archive and owner download boundary. Pydantic validates the
+  the authorized UVI generation/archive and owner download boundary. Prepared M7 adds the tax
+  composition boundary, but its verified artifact adapter is still RED. Pydantic validates the
   backend boundary.
 - `apps/web` and `packages/ui` own client interaction and presentation. Zod mirrors wire
   validation for user experience; it never replaces backend validation.
 - `packages/pdf` projects frozen calculation results into documents, including the separate U5
-  renter artifact. It may format and paginate; it does not recalculate legal or money rules.
+  renter artifact and the prepared M7 Anlage-V overview. It may format and paginate; it does not
+  recalculate legal or money rules.
 
 `scripts/check_engine_purity.py` protects the engine boundary. The RLS and composite-FK checks
 protect the current persistence boundary. The shipped pre-context checker protects the one bounded
@@ -178,8 +193,8 @@ Lokara keeps separate clocks because combining them produces incorrect money or 
 6. **Data-lifecycle time.** Retention, restriction and deletion are decided per data class and legal
    duty. Retaining a record never grants portal access.
 
-No exact retention duration is canonical yet. Every duration remains blocked on source-backed
-`docs/11` tax/archive rules and a separate source-backed privacy retention schedule.
+No exact retention duration is canonical yet. Approved `docs/11` and prepared M7 archive code do
+not supply the separate source-backed privacy retention schedule needed to close that boundary.
 
 ## Subsystem ownership
 
@@ -193,6 +208,8 @@ No exact retention duration is canonical yet. Every duration remains blocked on 
 | Seeded demo facts and pitch truth | `docs/06-demo-scenarios.md` |
 | Cross-cutting compliance and two-clock lifecycle | `docs/07-compliance.md` |
 | Statement audiences, formal minimums and document projection | `docs/08-statement-document.md` |
+| AfA calculation, allocation, self-use and financing handoff | `docs/10-afa.md` |
+| Tax-event readiness, Anlage-V/DATEV and export archives | `docs/11-tax-export.md` |
 | Milestone sequence and delivery status | `PLAN.md` |
 
 ## Cross-cutting invariants

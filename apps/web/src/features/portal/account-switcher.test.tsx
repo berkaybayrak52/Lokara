@@ -1,12 +1,20 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { showOwnerControls as showBuildingOwnerControls } from '../objekte/buildings-page';
 
-import { PortalShellContent } from './app-shell';
+import * as AppShellModule from './app-shell';
 import { showOwnerControls as showDashboardOwnerControls } from './dashboard';
 import { AccountChooser, autoEntryAccount } from './portal-entry';
+
+const { PortalShellContent } = AppShellModule;
+const ACCOUNT_ROOT_SOURCE = readFileSync(
+  new URL('../../app/a/[accountId]/page.tsx', import.meta.url),
+  'utf8',
+);
+const APP_SHELL_SOURCE = readFileSync(new URL('./app-shell.tsx', import.meta.url), 'utf8');
 
 type Context = { id: string; name: string; role: 'OWNER' | 'EMPLOYEE' | 'TAX_ADVISOR'; shape: string };
 
@@ -111,22 +119,40 @@ describe('M5 account contexts', () => {
     expect(html).not.toContain('/zahlungen');
   });
 
-  it('shows the tax-adviser preparation state instead of the owner portal', () => {
+  it('shows the restricted tax workspace for a tax adviser', () => {
     const html = renderToStaticMarkup(
       <PortalShellContent
         accountId={TAX_ADVISOR.id}
         account={TAX_ADVISOR}
         accounts={[TAX_ADVISOR, OWNER]}
-        pathname="/a/advisor-1"
+        pathname="/a/advisor-1/steuern"
       >
-        <p>OWNER_SCREEN_MUST_NOT_RENDER</p>
+        <p>RESTRICTED_TAX_WORKSPACE</p>
       </PortalShellContent>,
     );
 
-    expect(html).toContain('Steuerfunktionen werden vorbereitet');
+    expect(html).toContain('RESTRICTED_TAX_WORKSPACE');
+    expect(html).toContain('href="/a/advisor-1/steuern"');
     expect(html).toContain('href="/"');
-    expect(html).not.toContain('OWNER_SCREEN_MUST_NOT_RENDER');
+    expect(html).not.toContain('Steuerfunktionen werden vorbereitet');
     expect(html).not.toContain('Abrechnung erstellen');
+  });
+
+  it('redirects every tax-adviser landing and non-tax path through the shared helper', () => {
+    const redirectPath = (AppShellModule as Record<string, unknown>).taxAdvisorRedirectPath;
+    expect(redirectPath).toBeTypeOf('function');
+    if (typeof redirectPath !== 'function') throw new Error('taxAdvisorRedirectPath is missing');
+    expect(redirectPath('TAX_ADVISOR', 'advisor-1', '/a/advisor-1')).toBe(
+      '/a/advisor-1/steuern',
+    );
+    expect(redirectPath('TAX_ADVISOR', 'advisor-1', '/a/advisor-1/objekte')).toBe(
+      '/a/advisor-1/steuern',
+    );
+    expect(redirectPath('TAX_ADVISOR', 'advisor-1', '/a/advisor-1/steuern')).toBeNull();
+    expect(redirectPath('OWNER', 'owner-1', '/a/owner-1')).toBeNull();
+    expect(ACCOUNT_ROOT_SOURCE).toContain('taxAdvisorLandingPath');
+    expect(ACCOUNT_ROOT_SOURCE).toMatch(/redirect\([^)]*taxAdvisorLandingPath/);
+    expect(APP_SHELL_SOURCE).toContain('taxAdvisorRedirectPath');
   });
 
   it('limits employees to the assigned-building surface and removes owner-only actions', () => {

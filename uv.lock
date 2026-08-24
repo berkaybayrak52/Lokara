@@ -9,9 +9,11 @@ resolution-markers = [
 [manifest]
 members = [
     "lokara-adapters",
+    "lokara-afa-engine",
     "lokara-api",
     "lokara-db",
     "lokara-domain",
+    "lokara-export-engine",
     "lokara-guard-engine",
     "lokara-heating-engine",
     "lokara-matching-engine",
@@ -25,9 +27,11 @@ members = [
 dev = [
     { name = "httpx2", specifier = ">=1.0" },
     { name = "lokara-adapters", editable = "packages/adapters" },
+    { name = "lokara-afa-engine", editable = "packages/afa-engine" },
     { name = "lokara-api", editable = "apps/api" },
     { name = "lokara-db", editable = "packages/db" },
     { name = "lokara-domain", editable = "packages/domain" },
+    { name = "lokara-export-engine", editable = "packages/export-engine" },
     { name = "lokara-guard-engine", editable = "packages/guard-engine" },
     { name = "lokara-heating-engine", editable = "packages/heating-engine" },
     { name = "lokara-matching-engine", editable = "packages/matching-engine" },
@@ -360,14 +364,21 @@ dependencies = [
 requires-dist = [{ name = "lokara-domain", editable = "packages/domain" }]
 
 [[package]]
+name = "lokara-afa-engine"
+version = "0.1.0"
+source = { editable = "packages/afa-engine" }
+
+[[package]]
 name = "lokara-api"
 version = "0.1.0"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "fastapi" },
     { name = "lokara-adapters" },
+    { name = "lokara-afa-engine" },
     { name = "lokara-db" },
     { name = "lokara-domain" },
+    { name = "lokara-export-engine" },
     { name = "lokara-heating-engine" },
     { name = "lokara-matching-engine" },
     { name = "lokara-nk-engine" },
@@ -384,8 +395,10 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "lokara-adapters", editable = "packages/adapters" },
+    { name = "lokara-afa-engine", editable = "packages/afa-engine" },
     { name = "lokara-db", editable = "packages/db" },
     { name = "lokara-domain", editable = "packages/domain" },
+    { name = "lokara-export-engine", editable = "packages/export-engine" },
     { name = "lokara-heating-engine", editable = "packages/heating-engine" },
     { name = "lokara-matching-engine", editable = "packages/matching-engine" },
     { name = "lokara-nk-engine", editable = "packages/nk-engine" },
@@ -423,6 +436,11 @@ requires-dist = [
 name = "lokara-domain"
 version = "0.1.0"
 source = { editable = "packages/domain" }
+
+[[package]]
+name = "lokara-export-engine"
+version = "0.1.0"
+source = { editable = "packages/export-engine" }
 
 [[package]]
 name = "lokara-guard-engine"

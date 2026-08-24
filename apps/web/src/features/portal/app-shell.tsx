@@ -2,8 +2,8 @@
 
 import { Button } from '@lokara/ui';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import React from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import React, { useEffect } from 'react';
 
 import type { MeAccount } from '@/lib/contracts';
 
@@ -59,12 +59,31 @@ const NAV_ITEMS: NavItem[] = [
     // for an EMPLOYEE this entry could only ever dead-end in an error page.
     visibleFor: (role) => role === 'OWNER',
   },
+  {
+    href: (id) => `/a/${id}/steuern`,
+    label: 'Steuern',
+    activePrefixes: ['/steuern'],
+    visibleFor: (role) => role === 'OWNER' || role === 'TAX_ADVISOR',
+  },
 ];
 
 // Pages that exist in the plan but not yet in the app — an honest roadmap
 // beats dead links (and hiding them would misrepresent scope). M3 and M4 are
 // complete, so this is empty; the next entries arrive with M5.
 const UPCOMING: string[] = [];
+
+export function taxAdvisorLandingPath(accountId: string): string {
+  return `/a/${accountId}/steuern`;
+}
+
+export function taxAdvisorRedirectPath(
+  role: string | undefined,
+  accountId: string,
+  pathname: string,
+): string | null {
+  const landing = taxAdvisorLandingPath(accountId);
+  return role === 'TAX_ADVISOR' && !pathname.startsWith(landing) ? landing : null;
+}
 
 export function AppShell({
   accountId,
@@ -74,8 +93,21 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: me } = useMe();
   const account = me?.accounts.find((a) => a.id === accountId);
+  const redirectPath = taxAdvisorRedirectPath(account?.role, accountId, pathname);
+  useEffect(() => {
+    if (redirectPath) router.replace(redirectPath);
+  }, [redirectPath, router]);
+
+  if (redirectPath) {
+    return (
+      <main className="px-8 py-16" role="status">
+        Steuerbereich wird geöffnet …
+      </main>
+    );
+  }
 
   return (
     <PortalShellContent
@@ -108,11 +140,11 @@ export function PortalShellContent({
   const taxAdvisor = account?.role === 'TAX_ADVISOR';
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex min-h-dvh flex-col md:flex-row">
       {/* sticky + h-dvh, not the stretched default: without it the aside grows
           to the full DOCUMENT height on a long page (Zähler is ~2700px), which
           parks the account block far below the fold and scrolls the nav away. */}
-      <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-mint bg-white px-4 py-6">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-mint bg-white px-4 py-6 md:flex">
         <Link href="/" className="mb-8 flex items-center gap-2 px-2">
           <span
             aria-hidden="true"
@@ -126,10 +158,12 @@ export function PortalShellContent({
           <span className="font-display text-lg font-bold">Lokara</span>
         </Link>
 
-        {!taxAdvisor && account ? (
+        {account ? (
           <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
             {NAV_ITEMS.filter(
-              (item) => item.visibleFor === undefined || item.visibleFor(account.role),
+              (item) =>
+                (item.visibleFor === undefined || item.visibleFor(account.role)) &&
+                (!taxAdvisor || item.label === 'Steuern'),
             ).map((item) => {
               const href = item.href(accountId);
               const active =
@@ -214,6 +248,26 @@ export function PortalShellContent({
           screen the tables otherwise run to the far edge and the eye loses the
           row. Set here, once, so no page can drift from it. */}
       <div className="mx-auto min-w-0 w-full max-w-[1100px] flex-1">
+        {account ? (
+          <nav
+            aria-label="Mobile Hauptnavigation"
+            className="flex gap-2 overflow-x-auto border-b border-mint bg-white px-4 py-3 md:hidden"
+          >
+            {NAV_ITEMS.filter(
+              (item) =>
+                (item.visibleFor === undefined || item.visibleFor(account.role)) &&
+                (!taxAdvisor || item.label === 'Steuern'),
+            ).map((item) => (
+              <Link
+                key={item.href(accountId)}
+                href={item.href(accountId)}
+                className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         {isLoading ? (
           <main className="mx-auto max-w-2xl px-8 py-16">
             <div aria-hidden="true" className="h-32 animate-pulse rounded-xl bg-mint/60" />
@@ -224,16 +278,6 @@ export function PortalShellContent({
             <p className="mt-3 max-w-prose text-slate">
               Für dieses Konto besteht keine aktive Mitgliedschaft. Die Navigation zeigt nur, was
               existiert — jeder Zugriff wird serverseitig unabhängig geprüft.
-            </p>
-            <Button asChild className="mt-6">
-              <Link href="/">Zur Kontoauswahl</Link>
-            </Button>
-          </main>
-        ) : taxAdvisor ? (
-          <main className="mx-auto max-w-2xl px-8 py-16">
-            <h1 className="font-display text-2xl font-bold">Steuerfunktionen werden vorbereitet</h1>
-            <p className="mt-3 max-w-prose text-slate">
-              Dieser Bereich ist noch nicht verfügbar. Bitte wählen Sie ein anderes Konto aus.
             </p>
             <Button asChild className="mt-6">
               <Link href="/">Zur Kontoauswahl</Link>

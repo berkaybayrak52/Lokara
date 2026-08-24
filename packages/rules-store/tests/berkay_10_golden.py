@@ -670,7 +670,7 @@ PAGE_03_GOLDENS: Final[dict[str, Golden]] = {
         "selected_result": 453_798,
         "discarded_day_exact_result": 447_887,
         "legal_basis": "§ 7 Abs. 1 S. 4 EStG",
-        "verification_flag": "geprüft",
+        "verification_flag": "verify-before-production",
         "reverse_change": {
             "letting_end": "2026-08-15",
             "self_use_starts": "2026-08-16",

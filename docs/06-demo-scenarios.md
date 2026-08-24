@@ -24,7 +24,8 @@
 | **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
 | **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized; C3b's matching jobs and the C3c *Zahlungen* screen are locally merged. None of the three is part of the six-screen path. |
 | **Green outside the six-screen demo** | G1's pure W1/W2/W4 evaluators are locally merged; no seed, screen, statement figure or PDF change |
-| **Future** | Scenario 6, the five-persona identity demo, renter/tax-adviser portals, investment entitlement and mobile; the role-aware account chooser/switcher itself is already shipped |
+| **Prepared but unmerged; excluded from demo** | M7 tax workspace and adviser restriction on `slice/m7-afa-tax-export`; web is green, but the artifact/API contract is RED and runtime output remains blocked |
+| **Future** | Scenario 6 persona seeding, renter portal, investment entitlement and mobile; the role-aware account chooser/switcher itself is already shipped |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for
 production.
@@ -172,13 +173,16 @@ no statement figure, allocation or rendered byte depends on it. C3b gives the de
 works; no statement figure and no PDF byte depends on it. The statement period contract also
 remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
-Prepared G1 is also outside this path and changes no seed, statement figure or PDF byte.
+Prepared M7 is also outside this path. It changes no current seed, statement figure or ordinary PDF
+byte, and its tax workspace must not be added to the pitch while `.lokara-red` is present.
 
 ## Future demo
 
 ### Scenario 6 — Hausverwaltung and five personas
 
-**Future; not clickable today.** Hausverwaltung is an `AccountShape`, not a role or separate portal.
+**Future as a seeded five-persona demo; not clickable on `main` today.** Hausverwaltung is an
+`AccountShape`, not a role or separate portal. The M7 branch prepares a restricted tax-adviser
+workspace, but it has no demo persona seed and remains RED/unmerged.
 Roles live on `Membership`; the supported membership roles are `OWNER`, `EMPLOYEE` and
 `TAX_ADVISOR`. A renter is linked domain data, not a membership role. Investor access is unlocked by
 an entitlement, not an identity role. Detailed row shapes remain in `docs/02`.
@@ -189,10 +193,12 @@ The future demo covers five people without changing those rules:
 2. an HV employee restricted to assigned buildings;
 3. a renter with access only through their tenancy;
 4. one person who is a landlord, renter and entitlement-gated investor in different contexts;
-5. a read-only tax adviser guest on the client's account.
+5. a tax adviser guest who is read-only except for the adviser profile and tax-year mapping.
 
-M5 owns membership enforcement, employee building scope and account switching. M10 owns renter
-activation/portal and tax-adviser portal work; the investment module also remains future.
+M5 owns membership enforcement, employee building scope and account switching. Prepared M7 owns
+the restricted tax workspace and adviser profile/mapping boundary. M10 still owns renter
+activation/portal, complete persona seeding and investment entitlement; the investment module also
+remains future.
 
 When persona seeding is implemented, it must be idempotent, use stable IDs, create an `OWNER`
 membership for each account, load all personas with one switch and reuse Scenario 1 data where

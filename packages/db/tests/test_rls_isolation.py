@@ -31,6 +31,7 @@ from lokara_db import (
     AdvancePaymentPeriod,
     AdvanceReconciliation,
     AdvanceReconciliationAllocation,
+    AfaRecordVersion,
     AllocationKeyAssignment,
     BankAccount,
     BankTransaction,
@@ -67,6 +68,12 @@ from lokara_db import (
     StatementArchive,
     StatementSettlement,
     StatementStatus,
+    TaxAdviserProfileVersion,
+    TaxEvent,
+    TaxExportArchive,
+    TaxExportArtifact,
+    TaxExportReadinessAttempt,
+    TaxMappingVersion,
     Tenancy,
     TenancyParty,
     Unit,
@@ -3362,6 +3369,238 @@ class TestM6C2MoneyInvariants:
                     stored_reference=None,
                 )
             )
+
+    @staticmethod
+    def _tax_event_kwargs(seed: _Seed) -> dict[str, Any]:
+        values: dict[str, Any] = {
+            "id": new_id(),
+            "account_id": seed.account_a,
+            "building_id": seed.building_a,
+            "payment_date": None,
+            "due_date": None,
+            "category": None,
+            "amount_cents": 1,
+            "direction": "einnahme",
+            "receipt_reference": "M7 RLS probe",
+            "source": "manuell",
+            "version": 1,
+            "source_payment_allocation_id": None,
+            "source_component": "manual",
+            "supersedes_tax_event_id": None,
+            "source_snapshot": {"source": "M7 RLS probe"},
+            "recorded_at": datetime(2025, 1, 2, tzinfo=UTC),
+        }
+        return values
+
+    def test_account_b_cannot_read_any_account_a_m7_row_and_transaction_rolls_back(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        generated_at = datetime(2025, 1, 2, 3, 4, 5, tzinfo=UTC)
+        ids = {name: new_id() for name in ("afa", "profile", "mapping", "ready", "archive")}
+
+        with Session(app) as session:
+            session.begin()
+            try:
+                session.execute(
+                    text("SELECT set_config('app.account_id', :account_id, true)"),
+                    {"account_id": seed.account_a},
+                )
+                session.add_all(
+                    [
+                        AfaRecordVersion(
+                            id=ids["afa"],
+                            account_id=seed.account_a,
+                            building_id=seed.building_a,
+                            tax_year=2025,
+                            version=1,
+                            input_snapshot={},
+                            result_snapshot={},
+                            rule_snapshot={},
+                            rechtsstand="07/2026",
+                            production_blocked=True,
+                            supersedes_afa_record_version_id=None,
+                            generated_at=generated_at,
+                        ),
+                        TaxEvent(**self._tax_event_kwargs(seed)),
+                        TaxAdviserProfileVersion(
+                            id=ids["profile"],
+                            account_id=seed.account_a,
+                            version=1,
+                            profile_snapshot={},
+                            production_blocked=True,
+                            supersedes_profile_version_id=None,
+                            generated_at=generated_at,
+                        ),
+                        TaxMappingVersion(
+                            id=ids["mapping"],
+                            account_id=seed.account_a,
+                            tax_year=2025,
+                            version=1,
+                            mapping_snapshot={},
+                            source_version="test",
+                            rechtsstand="07/2026",
+                            production_blocked=True,
+                            supersedes_mapping_version_id=None,
+                            generated_at=generated_at,
+                        ),
+                    ]
+                )
+                session.flush()
+                session.add(
+                    TaxExportReadinessAttempt(
+                        id=ids["ready"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        afa_record_version_id=ids["afa"],
+                        adviser_profile_version_id=ids["profile"],
+                        mapping_version_id=ids["mapping"],
+                        tax_year=2025,
+                        export_kind="anlage_v_csv",
+                        input_snapshot={},
+                        findings_snapshot=[],
+                        production_blocked=True,
+                        generated_at=generated_at,
+                    )
+                )
+                session.flush()
+                session.add(
+                    TaxExportArchive(
+                        id=ids["archive"],
+                        account_id=seed.account_a,
+                        readiness_attempt_id=ids["ready"],
+                        building_id=seed.building_a,
+                        tax_year=2025,
+                        export_kind="anlage_v_csv",
+                        version=1,
+                        input_snapshot={},
+                        production_blocked=True,
+                        sha256=sha256(b"blocked").hexdigest(),
+                        supersedes_archive_id=None,
+                        generated_at=generated_at,
+                    )
+                )
+                session.flush()
+                session.add(
+                    TaxExportArtifact(
+                        id=new_id(),
+                        account_id=seed.account_a,
+                        archive_id=ids["archive"],
+                        artifact_kind="anlage_v_csv",
+                        content_bytes=b"blocked",
+                        sha256=sha256(b"blocked").hexdigest(),
+                        mime_type="text/csv",
+                        filename="blocked.csv",
+                        production_blocked=True,
+                        generated_at=generated_at,
+                    )
+                )
+                session.flush()
+
+                session.execute(
+                    text("SELECT set_config('app.account_id', :account_id, true)"),
+                    {"account_id": seed.account_b},
+                )
+                for model in (
+                    AfaRecordVersion,
+                    TaxEvent,
+                    TaxAdviserProfileVersion,
+                    TaxMappingVersion,
+                    TaxExportReadinessAttempt,
+                    TaxExportArchive,
+                    TaxExportArtifact,
+                ):
+                    assert session.scalars(select(model)).all() == []
+            finally:
+                session.rollback()
+
+    def test_every_m7_table_refuses_a_cross_account_write(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        generated_at = datetime(2025, 1, 2, 3, 4, 5, tzinfo=UTC)
+        builders = (
+            lambda: AfaRecordVersion(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                tax_year=2025,
+                version=1,
+                input_snapshot={},
+                result_snapshot={},
+                rule_snapshot={},
+                rechtsstand="07/2026",
+                production_blocked=True,
+                supersedes_afa_record_version_id=None,
+                generated_at=generated_at,
+            ),
+            lambda: TaxEvent(**self._tax_event_kwargs(seed)),
+            lambda: TaxAdviserProfileVersion(
+                id=new_id(),
+                account_id=seed.account_a,
+                version=1,
+                profile_snapshot={},
+                production_blocked=True,
+                supersedes_profile_version_id=None,
+                generated_at=generated_at,
+            ),
+            lambda: TaxMappingVersion(
+                id=new_id(),
+                account_id=seed.account_a,
+                tax_year=2025,
+                version=1,
+                mapping_snapshot={},
+                source_version="test",
+                rechtsstand="07/2026",
+                production_blocked=True,
+                supersedes_mapping_version_id=None,
+                generated_at=generated_at,
+            ),
+            lambda: TaxExportReadinessAttempt(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                afa_record_version_id=None,
+                adviser_profile_version_id=None,
+                mapping_version_id=new_id(),
+                tax_year=2025,
+                export_kind="anlage_v_csv",
+                input_snapshot={},
+                findings_snapshot=[],
+                production_blocked=True,
+                generated_at=generated_at,
+            ),
+            lambda: TaxExportArchive(
+                id=new_id(),
+                account_id=seed.account_a,
+                readiness_attempt_id=new_id(),
+                version=1,
+                input_snapshot={},
+                production_blocked=True,
+                sha256=sha256(b"blocked").hexdigest(),
+                supersedes_archive_id=None,
+                generated_at=generated_at,
+            ),
+            lambda: TaxExportArtifact(
+                id=new_id(),
+                account_id=seed.account_a,
+                archive_id=new_id(),
+                artifact_kind="anlage_v_csv",
+                content_bytes=b"blocked",
+                sha256=sha256(b"blocked").hexdigest(),
+                mime_type="text/csv",
+                filename="blocked.csv",
+                production_blocked=True,
+                generated_at=generated_at,
+            ),
+        )
+        for build in builders:
+            with (
+                pytest.raises(ProgrammingError, match="row-level security"),
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.add(build())
+                session.flush()
 
     def test_an_allocation_cannot_settle_more_than_its_entry_carried(
         self, engines: tuple[Engine, Engine], seed: _Seed, m6c2_bank_rows: _M6C2BankRows

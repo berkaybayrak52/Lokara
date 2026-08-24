@@ -43,9 +43,11 @@ workspace contains exactly `apps/web` and `packages/ui`.
 `packages/guard-engine` has no API route, web/runtime consumer, database record, scheduler,
 provider, delivery path or PDF projection.
 
-`apps/mobile`, AfA/export/KPI engines, Redis and workers are absent. Real Supabase, Vision, bank,
-email and MDL providers are also absent; current external edges use local infrastructure or stubs.
-These are **Future**, not empty shipped modules.
+`apps/mobile`, KPI engines, Redis and workers are absent. `packages/afa-engine` and
+`packages/export-engine` plus the tax route/workspace are **Prepared but unmerged** on
+`slice/m7-afa-tax-export`; they are absent from `main`, and the slice remains RED. Real Supabase,
+Vision, bank, email and MDL providers are also absent; current external edges use local
+infrastructure or stubs.
 
 ### Binding dependency direction
 
@@ -105,10 +107,11 @@ inside Python; Pydantic validates the backend boundary.
 - `/me`, fixed-account demo bootstrap and `/calc/nk` remain bounded exceptions. `/me` exposes all
   live account contexts for its verified subject but grants none. The web switcher uses only those
   contexts as ordinary `/a/{accountId}` links, so every destination is authorized again by the API.
-- `OWNER` retains the owner portal. `EMPLOYEE` access is restricted to assigned buildings; zero
-  assignments expose no building data. `TAX_ADVISOR` may use `/me` but current owner-portal routes
-  are denied server-side and render the web preparation state instead. The web hides building
-  creation and demo load/reset for employees; this is usability, never authorization.
+- On shipped `main`, `OWNER` retains the owner portal and `EMPLOYEE` access is restricted to assigned
+  buildings; zero assignments expose no building data. Prepared M7 redirects `TAX_ADVISOR` account
+  routes to `/a/{accountId}/steuern`, where the API permits reads plus adviser-profile/mapping writes
+  only. This branch-local route is not shipped while the M7 RED window is open. The web hides
+  building creation and demo load/reset for employees; this is usability, never authorization.
 - The web client performs one single-flight refresh for concurrent 401 responses and replays each
   failed request once. A second 401 is returned; it does not loop.
 - `ENVIRONMENT` is required. In `staging` and `production`, API startup refuses enabled dev-token
@@ -122,9 +125,19 @@ wired. Demo load/reset also require their explicit flag and operate on the fixed
 **Shipped on `main`:** `app_bootstrap_contexts(text)` and migration `0014` define one bounded
 pre-context identity read. `GET /me` supplies the live contexts for the URL-based chooser and
 switcher; no account is stored in the token or client session. M5 account switching was merged as
-`a748729`. A tax-adviser URL deliberately shows “Steuerfunktionen werden vorbereitet” rather than
-owner navigation or content. `docs/02-data-model.md` owns the detailed function, role, policy,
-privilege and call-site contract.
+`a748729`. On `main`, a tax-adviser URL still shows “Steuerfunktionen werden vorbereitet”. Prepared
+M7 replaces that state with the restricted `/steuern` workspace, but the branch is unmerged and
+RED. `docs/02-data-model.md` owns the detailed function, role, policy, privilege and call-site
+contract.
+
+## Prepared M7 tax workspace
+
+`slice/m7-afa-tax-export` adds `/a/{accountId}/steuern`, a minimized tax-building list, normalized
+AfA inputs, temporal self-use, profile/mapping forms, readiness and immutable-history evidence, and
+selection of Anlage-V PDF, Anlage-V CSV or DATEV. Owner has full M7 access; adviser has read plus
+profile/mapping writes; employee has none. The web suite passes `106` tests, but the corresponding
+server-generated artifact/API contract still has ten focused failures. This is prepared work, not a
+clickable demo claim on `main` and not production export availability.
 
 ## Shipped statement and M6-B archive boundary
 
@@ -201,19 +214,20 @@ allocation-key assignment. No Beleg file, invoice date, vendor, archive record o
 The extracted category is only an editable free-text label; no cost type or allocation key is
 inferred as law.
 
-`docs/09-betrkv-catalogue.md` now **Specifies** the BetrKV catalogue. Production classification and
-catalogue-backed default-key suggestions remain unimplemented.
+`docs/09-betrkv-catalogue.md` owns the BetrKV catalogue. Slice C technically implements
+classification, catalogue-backed defaults and the owner residual; its flagged authority remains
+production-blocking.
 
 ## Future architecture
 
 - M10 renter activation, `/renter/{tenancyId}`, renter-portal isolation and account-safe portal
-  access are **Future**. Adviser profile, account mapping and tax functions remain **Future** M7
-  work; the current adviser preparation state is not a tax route.
+  access are **Future**. Adviser profile, account mapping and tax functions are prepared in M7 but
+  remain unmerged and incomplete.
 - `apps/mobile` is **Future** at M10: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.
-- Pure AfA/export/KPI packages and W3/W5–W8 guard extensions wait for their approved specs and
-  owning milestones.
+- Pure KPI packages and W3/W5–W8 guard extensions wait for their approved specs and owning
+  milestones. Pure AfA/export packages are prepared on the M7 branch, not shipped.
 - Redis plus Celery or Arq wait for a real rate-limit, retry, sync or scheduled-delivery slice.
 - Real Supabase Auth/Storage/Postgres credentials and real Vision, bank, email and MDL providers wait
   for their integration and hosting/DPA decisions and stay behind adapters.

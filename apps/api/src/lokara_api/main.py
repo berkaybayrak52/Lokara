@@ -19,6 +19,7 @@ from .routers import (
     payments,
     portal,
     statements,
+    tax,
     uvi_runs,
 )
 from .settings import ApiSettings
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(statements.router)
     app.include_router(payments.router)
     app.include_router(uvi_runs.router)
+    app.include_router(tax.router)
     return app
 
 
