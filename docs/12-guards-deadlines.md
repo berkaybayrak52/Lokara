@@ -1,6 +1,7 @@
 # Guards and deadlines — shared trigger, escalation and resolution contract
 
-**Status:** complete D2 transcription; approved 21.08.2026
+**Status:** complete D2 transcription; bounded G1 engine technically complete and reviewed on
+`slice/g-shared-guard-foundation` (uncommitted and unmerged) 24.08.2026
 
 **Authoritative source:**
 `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
@@ -14,8 +15,10 @@
 **Fixtures:** exactly `12-F01`–`12-F24` in
 `packages/rules-store/tests/berkay_12_golden.py`
 
-**Implementation status:** specification only. No guard engine, reminder scheduler, provider,
-schema, API, UI, e-mail, push or PDF behavior is implemented by this slice.
+**Implementation status:** G1 implements `12-F01`–`12-F06` and `12-F11`–`12-F13` through the pure
+`packages/guard-engine`. No reminder scheduler, provider, schema, API, UI, e-mail, push or PDF
+behavior is implemented. UVI calculation/document work remains U; reminder and delivery work
+remains M9.
 
 This document owns Page 05's reusable date, money, trigger, warning, escalation and auto-resolution
 rules. All product and warning copy is German. Code structure and identifiers are English. Money is
@@ -32,12 +35,17 @@ The CSV controls structured values, source, legal nature, flag and Rechtsstand. 
 controls the expanded rule method, German output and worked examples. `docs/03` Appendix D records
 that the retired correspondence supplied no later Page-05-specific correction.
 
+Two W2 gaps that this document used to carry are **closed**, both at Rechtsstand 08/2026 and both
+`geprüft` against the norm text. The five-versus-six-year question: MessEV Anlage 7 Nr. 5.5.1/5.5.2
+and 7.1/7.2 give six years for cold water, warm water, heat meters and heat-exchanger hot water from
+04.11.2021, so the five-year value is superseded Rechtsstand rather than a source conflict. The
+31 December expiry convention: § 34 Abs. 2 MessEV ends a period of one year or longer with the end
+of the calendar year in which it falls due. Page 05 line 55 and line 68, and CSV rows 128 and 129,
+still carry the older readings; § 5.2 records why neither may be restored, and the register rows for
+Anlage 7 and § 34 are still to be added.
+
 The following authority gaps remain explicit and block production use of their affected paths:
 
-- W2 lists Kaltwasser 6 years, Warmwasser 5, WMZ 5, electric meters 8 and bellows gas meters 8.
-  Page 05 and the register also record an unresolved conflict with “Zähler-Spec V1”, which says
-  Warmwasser and WMZ are each 6 years. This document does not choose between 5 and 6 years.
-- W2's 31 December expiry convention has no final statutory citation.
 - W4's month-end UVI due date is a convention; year-round cadence versus heating-season-only is
   unresolved.
 - W1/W5 calendar arithmetic includes an unresolved reading of the renter objection period: same
@@ -102,10 +110,18 @@ renter's reduction right is an explicit non-goal.
 
 ## 3. Shared guard result contract
 
-Every guard takes `today` as a day-exact system date and returns the source input identity, rule
-version/as-of date, computed boundary or threshold, active state, German warning copy, escalation
-stage and auto-resolution event. A result must preserve any uncertainty, conflict or production
-block that affected it.
+Every guard takes `today` as an explicit day-exact input; it never reads the ambient clock. The
+input also carries the source subject's type and stable identity. The caller supplies a typed rule
+bundle carrying source, legal basis, `Rechtsstand`, verification status and unresolved conflicts.
+The pure engine does not import the rules store.
+
+Every result returns that source identity and a common surface: guard code, stage, active and
+resolved state, nullable German warning copy, escalation channels, nullable boundary date,
+resolution event, rule evidence and production blockers. A result must preserve any uncertainty,
+conflict or production block that affected it. Missing source material remains missing: in
+particular, Page 05 supplies no exact W1 90-day warning copy and no W4 behavior after the
+31.12.2026 retrofit deadline. The engine may expose those gaps as production blockers, but must not
+invent copy or a post-deadline rule.
 
 Date steps use calendar days/months and no rounding. `add_months(date, n)` keeps the numbered day;
 if it does not exist in the target month, use that month's last day. A deadline expires at 24:00 on
@@ -182,12 +198,30 @@ else:
   < 0  -> exceeded, non-blocking
 ```
 
-The years table is versioned rules data. From 04.11.2021, cold-water, warm-water, heat and
-heat-exchanger hot-water meters use **six years** (MessEV Anlage 7 Nr. 5.5.1/5.5.2 and 7.1/7.2);
-§ 34 Abs. 2 MessEV ends the period on 31 December of the calculated expiry year. This is
-`geprüft`, Rechtsstand 08/2026. The source's transition statement for already-installed devices is
-`UNSICHER` (provider communication, no found transition clause). Heizkostenverteiler are excluded:
-they have no Eichfrist guard.
+The years table is versioned rules data. From 04.11.2021 the Dritte Verordnung zur Änderung der
+MessEV unified the period: cold-water, warm-water, heat and heat-exchanger hot-water meters all use
+**six years** (MessEV Anlage 7 Nr. 5.5.1/5.5.2 and 7.1/7.2); § 34 Abs. 2 MessEV ends the period on
+31 December of the calculated expiry year. This is `geprüft`, Rechtsstand 08/2026. Electric meters
+and bellows gas meters stay at **eight years** under authoritative CSV row 129, which is untouched
+by the unification.
+
+The five-year Warmwasser/WMZ value is **superseded Rechtsstand, not a source conflict**: every
+source naming five years predates November 2021 or copies one that does. Page 05 line 68 and CSV
+row 129 still print it, and Page 05's `12-F05` worked example is calculated from it. Do not restore
+it. The register rows for Anlage 7 and § 34 are still to be added; until then this document carries
+the citation.
+
+One uncertainty survives and is labelled, not blocking: that the six-year period also covers devices
+whose five-year period was still running rests on consistent Messdienstleister communication, and no
+transition clause was found in the ordinance text. It attaches to warm-water, heat-meter and
+heat-exchanger hot-water results only.
+
+The correction changes what `12-F05` demonstrates. Page 05 prints Warmwasser 5 Jahre, expiry
+31.12.2025 and the Hinweis stage for `eichdatum=06.2020 · heute=08.2025`. Under six years the
+boundary is 31.12.2026 with 16 calendar months remaining, so the case falls outside the `<= 6`
+months notice window and the guard is silent. That is the point Berkay makes about the five-year
+reading: it alarms up to ten and a half months early. Heizkostenverteiler are excluded: they have
+no Eichfrist guard.
 The exact warning is: “Der {medium}-Zähler in {WE} ist ab {valid_until} nicht mehr geeicht. Werte
 aus ungeeichten Zählern können bei der Abrechnung angreifbar sein — bitte Austausch/Nacheichung
 veranlassen.”
@@ -228,7 +262,8 @@ if not remote_readable and today <= 31.12.2026:
 
 if remote_readable:
   due_on = month_end(add_months(last_uvi_sent_on ?? start_month, 1))
-  overdue = today >= due_on and no UVI in the current month
+  due = today == due_on and no UVI in the current month
+  overdue = today > due_on and no UVI in the current month
 ```
 
 W4 applies to each renter in a remotely readable building. It is inactive for UVI when equipment
@@ -422,9 +457,9 @@ Page 05 excludes all ten items listed by both the Page and Non-Goals V1:
 shipped M6-C2 ledger plus the technically complete, development-synchronized and locally merged
 C3a service can supply W3 payment events. C3b's `watch_deadlines` is locally merged and
 deliberately applies **no** guard rule from this document: it reports an overdue
-receivable as days and cents, with no W3 threshold, stage, warning copy or escalation. Those arrive
-with the guard engine, versioned, and may consume Page-05 costs/interest under the approved bank
-contract. `docs/13` owns future clause
+receivable as days and cents, with no W3 threshold, stage, warning copy or escalation. Those require
+a later guard-engine extension; G1 implements only W1, W2 and W4. The versioned W3 extension may
+consume Page-05 costs/interest under the approved bank contract. `docs/13` owns future clause
 selection, risk results and action-workflow routing, but
 Page 06 supplies no complete clause or letter bodies. M9 owns actual reminders, e-mail, push and
 checklists. All external providers stay behind adapters.
@@ -436,6 +471,8 @@ shared rows and ten non-goals are mapped. The data-only checks may prove
 coverage and arithmetic, but they do not approve legal rules, resolve authority gaps or demonstrate
 production behavior.
 
-This specification slice changed documentation and tests only. It made no production, schema,
-migration, API, engine, adapter, UI or PDF change. The D1–D3 documentation program is complete;
-Page-05 implementation remains assigned to the later guard stages in `PLAN.md`.
+The approved D2 transcription was data-only. G1 now executes exactly `12-F01`–`12-F06` and
+`12-F11`–`12-F13` through the pure `lokara_guard_engine` package and its three public evaluators.
+The reviewed slice is technically complete but remains uncommitted and unmerged. It makes no
+schema, migration, API, adapter, UI, scheduler, e-mail, push or PDF change. Later U and M9
+integration remains assigned to `PLAN.md`.

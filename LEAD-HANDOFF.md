@@ -1,4 +1,4 @@
-# LEAD-HANDOFF.md — M6 complete; G (shared guard foundation) is next
+# LEAD-HANDOFF.md — G1 technically complete on slice; U is next
 
 Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git status` and
 `git log` before acting. Git remains authoritative.
@@ -7,15 +7,29 @@ Read `CLAUDE.md`, `AGENTS.md` and `PLAN.md` first. Verify this handoff with `git
 
 - **M6 is technically complete and locally merged.** C3c's landlord *Zahlungen* screen was
   committed as `92e0dcd` and merged into `main` as `6995bc4`, which closes M6-C and with it M6.
-  **Nothing is pushed.** No branch has a remote.
+  Current `main` and `origin/main` both point to `f372f67`.
 - Every `M6-C closed when` condition is now met on `main`: all thirteen `BANKMATCH` fixtures pass
   through the service and persistence, the three job entrypoints are callable, a landlord can
   confirm or reject a Review proposal in the UI, every isolation boundary is green and the rendered
   statement is unchanged.
-- The next stage in `PLAN.md`'s execution order is **G — the shared guard foundation** against
-  approved `docs/12`, then U (UVI), then M7.
+- **G1 is technically complete and reviewed on `slice/g-shared-guard-foundation`.** It remains
+  uncommitted, unmerged and unpushed. The next stage after G1 closure is U (UVI), then M7.
 - Preserve the untracked `Antwort-an-Emir_04.md`. Never stage with `git add -A`.
 - `slice/m6-c3c-zahlungen` is merged and can be deleted whenever Emir wants; it is kept for now.
+
+## What G1 prepares
+
+`packages/guard-engine` is a pure internal package with three evaluators: W1 statement deadline,
+W2 meter calibration and W4 UVI cadence. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13` execute
+through production code. Inputs carry source identity and `today`; callers supply evidence,
+Rechtsstand, verification status and scoped conflicts. No database, API, UI, scheduler, provider,
+e-mail, push or PDF consumer was added.
+
+W2 executes the unified six-year MessEV period, `geprüft` at Rechtsstand 08/2026; the five-year
+Warmwasser/WMZ value is superseded Rechtsstand and must not be restored. What remains attached to
+warm-water, heat-meter and heat-exchanger results is the non-blocking retrofit-transition label.
+Missing W1 copy and post-retrofit W4 behavior remain explicit source gaps. W3 and W5–W8, UVI calculation/document work and all reminders and
+delivery remain open.
 
 ## What C3c shipped
 
@@ -37,23 +51,21 @@ control in the journal. Two nav cases in `features/portal/account-switcher.test.
 
 ## Database state
 
-Unchanged: development matches migration `0021` and Alembic is at `0021`. C3c required no schema
-change. Do not reset the Docker volume and do not run `scripts/verify_demo_path.sh --fresh`. The
+Unchanged: development matches migration `0021` and Alembic is at `0021`. C3c and G1 require no
+schema change. Do not reset the Docker volume and do not run `scripts/verify_demo_path.sh --fresh`. The
 validated backup remains at `/tmp/lokara-m6c3a-pre-migration-20260824.dump`.
 
 ## Evidence
 
-`scripts/gate.sh fast`, `full` and `demo` are green on the merged tree: 1,233 Python and 84 web
-tests, `mypy --strict` clean, `check_pre_context_reads.py`, `check_rls_coverage.py`,
-`check_fk_isolation.py` and `check_engine_purity.py` clean. The rendered statement is unchanged at
-149269 bytes, 22 goldens present and 8 scale-leak canaries absent. The red window was proved real:
-the fixture failed with a missing-module error before `proposal-view.ts` existed.
+For G1, focused tests pass, `scripts/gate.sh fast` is green with 561 pure-package tests, and the
+UTF-8 full gate is green with 1,252 Python and 84 web tests. Strict mypy and engine purity are clean.
+The statement review's one W2 conflict-scope finding was fixed fixture-first and re-reviewed with
+no remaining finding. The red window was proved first by the missing `lokara_guard_engine` module
+and again by the reviewer-driven missing applicability field.
 
-**The demo PDF's MD5 is not a reproducible invariant.** The PDF embeds `/CreationDate` and
-`/ModDate`, so the hash changes on every render while the byte count stays at 149269. The
-`88eb8434eda65f8d7ff82826fc837a58` recorded in earlier handoffs was only ever valid for one render
-instant, and no gate ever checked it. Use the byte count plus `assert_statement_pdf`'s content
-assertions instead, and do not "verify" that hash again.
+The raw PDF MD5 is timestamp-dependent. `scripts/pdf_fingerprint.sh` normalizes those timestamps;
+its before/after value is unchanged at `88eb8434eda65f8d7ff82826fc837a58`, 149269 bytes. The full
+gate also keeps the PDF content assertions green.
 
 ## Recorded, not fixed
 
@@ -71,7 +83,13 @@ assertions instead, and do not "verify" that hash again.
 - The screen has never been exercised against a live API: the four queries and the 409 conflict
   path are unverified at runtime.
 
-## Unresolved authority — M6 is technically closed, not legally approved
+## Unresolved authority — technical closure is not legal approval
+
+- Every Page-05-specific register row remains `verify-before-production` except W2's Eichfrist and
+  year-end rules, which round 4 closed against MessEV Anlage 7 and § 34 Abs. 2 at Rechtsstand
+  08/2026. CSV rows 128 and 129 still print the superseded readings and need new register entries.
+  W1 date interpretation and W4 year-round/heating-season cadence remain unresolved. G1 must not
+  enable production output.
 
 - Every Page-08 weight and threshold keeps `verify-before-production` at `Rechtsstand 07/2026`. The
   screen presents confidence as a decision aid and states it is not legal proof of a match. Green

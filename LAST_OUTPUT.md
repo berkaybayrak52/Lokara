@@ -1,20 +1,21 @@
-# Last output — M6-C3a locally merged
+# Last output — G1 status reconciliation complete
 
-HEAD `2b0a350` on `main` · `24.08.2026`
+HEAD `f372f67` on `slice/g-shared-guard-foundation` · `24.08.2026`
 Status: Complete
 
 ## Wanted
-Update every current-status document, then commit and locally merge M6-C3a.
+Reconcile every project-owned Markdown current-state claim before the next session.
 
 ## Done
-All current-status documents now record C3a complete, development-synchronized and locally merged.
-The docs reconciliation is clean. Slice commit `b445ae1` was merged into local `main` as `2b0a350`.
-The final UTF-8 full gate is green: 1,211 Python and 43 web tests. The clean boundary audit,
-unchanged evidence counts/68 legacy Auto confirmations and PDF fingerprint remain recorded.
+All tracked current-state Markdown now separates shipped M6, prepared but unmerged G1, specified U
+and future consumers. Both read-only reconciliation passes are clean. The 29 focused tests, fast
+gate and UTF-8 full gate are green: 1,252 Python and 84 web tests. The normalized PDF fingerprint
+remains `88eb8434eda65f8d7ff82826fc837a58`, 149269 bytes.
 
 ## Not done
-C3b jobs and the C3c *Zahlungen* screen remain open. Nothing was pushed.
-`Antwort-an-Emir_04.md` remains untracked. The validated backup is retained.
+No G1 database, API, UI, scheduler, provider, delivery or PDF consumer exists. W3/W5–W8, U and M9
+remain open. G1 and this reconciliation are uncommitted, unmerged and unpushed; `main` and
+`origin/main` remain `f372f67`. All legal and convention blockers remain visible.
 
 ## Optional next step
-Start C3b only when Emir authorizes that separate slice.
+Review the uncommitted G1 slice for separate commit and merge authorization; U follows afterward.

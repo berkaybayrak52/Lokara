@@ -87,16 +87,18 @@ carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner
 M6-C3-0 verifies their database invariants. C3a's service and final `0021` are technically complete,
 development-synchronized and locally merged; C3b's job entrypoints are technically complete and
 locally merged, and so is the C3c landlord *Zahlungen* screen, which changes no statement figure
-and no rendered byte. Renter
+and no rendered byte. Prepared G1 likewise has no statement/PDF consumer and leaves the normalized
+fingerprint and seeded figures unchanged. Renter
 delivery/portal remains M10. These archives are owner-only technical
 records, not legal-production or renter delivery output.
 
 ### Future dependencies
 
-Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to future
-`docs/11`; reusable deadline orchestration to `docs/12`; bank matching to `docs/15`; and UVI/DWD
-rules to approved `docs/16`. This file records their boundaries and does not duplicate or
-invent their contracts.
+Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to
+approved `docs/11`; shared deadline orchestration to approved `docs/12`; bank matching to
+`docs/15`; and UVI/DWD rules to approved `docs/16`. G1 prepares W1/W2/W4 evaluation only; no
+statement projection, reminder or delivery consumer exists. This file records those boundaries and
+does not duplicate or invent their contracts.
 
 ## 2. Page 01 source coverage and output contract
 
@@ -820,8 +822,9 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
   `docs/03`; different §§ 7/8 shares need a future input shape.
 - **Page 01b implementation:** derived-mass provenance, § 7 Abs. 4/readiness risks, device evidence
   and annual comparison remain exactly as `docs/03` records.
-- **D2 owners:** `docs/09` classification; `docs/11` tax mapping; `docs/12` guards; `docs/15` bank
-  matching rules and remaining workflow; `docs/16` UVI/DWD and the unresolved § 6a notice identity.
+- **D2 owners:** `docs/09` classification; `docs/11` tax mapping; `docs/12` guards, whose W1/W2/W4
+  evaluator is prepared without a statement consumer; `docs/15` bank matching rules and remaining
+  workflow; `docs/16` UVI/DWD and the unresolved § 6a notice identity.
 - **Page 01 E16/E21:** tenant disclosure and tax timing remain unguessed and visibly open.
 
 ## Interim framing

@@ -23,7 +23,8 @@
 | **Shipped** | The secure M5 bootstrap read; it changes identity lookup, not onboarding or the visible demo |
 | **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
 | **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized; C3b's matching jobs and the C3c *Zahlungen* screen are locally merged. None of the three is part of the six-screen path. |
-| **Future** | Scenario 6, the five-persona identity demo, role-aware account switching, renter/tax-adviser portals, investment entitlement and mobile |
+| **Prepared but unmerged, outside the six-screen demo** | G1's pure W1/W2/W4 evaluators; no seed, screen, statement figure or PDF change |
+| **Future** | Scenario 6, the five-persona identity demo, renter/tax-adviser portals, investment entitlement and mobile; the role-aware account chooser/switcher itself is already shipped |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for
 production.
@@ -152,9 +153,9 @@ RLS-scoped application role and cannot create the first `Person`; after the owne
 and reset operate only on the fixed `acc_demo_lokara` account. They are pitch utilities, not
 production signup, onboarding or account creation.
 
-The shipped M5 foundation adds migration `0014` and the bounded `app_bootstrap_contexts(text)`
-identity read. It does not add a `Person` write, production onboarding, a new dashboard, a portal
-or an account switcher.
+The shipped M5 foundation adds migration `0014`, the bounded `app_bootstrap_contexts(text)` identity
+read and the URL-based account chooser/switcher. It does not add a `Person` write, production
+onboarding, a new dashboard, a renter portal or the future five-persona demo.
 
 ## Current statement boundary
 
@@ -171,6 +172,7 @@ no statement figure, allocation or rendered byte depends on it. C3b gives the de
 works; no statement figure and no PDF byte depends on it. The statement period contract also
 remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
+Prepared G1 is also outside this path and changes no seed, statement figure or PDF byte.
 
 ## Future demo
 
