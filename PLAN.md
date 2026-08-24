@@ -506,7 +506,7 @@ M5 is complete and merged on `main`: roles behave correctly; every nested buildi
 verifies its URL context; multiple account contexts switch by URL and are re-authorized per request;
 the pre-context checker stays green; and no current API route writes `renter.person_id`. Renter
 activation, renter URL context and renter portal authorization are M10 work. C3b is technically
-complete on its slice branch; C3c is next.
+complete and locally merged; C3c is next.
 
 ---
 

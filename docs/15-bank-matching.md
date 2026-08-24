@@ -636,7 +636,7 @@ transcribed. Emir approved the transcription on 20.08.2026. M6-C1/M6-C2/M6-C3-0/
 verify the engine, persistence, normalized stub adapter, service and owner endpoints on local
 `main`; they do not approve production bank-matching behavior or any legal/product convention.
 C3b technically verifies the scheduler port, the three job entrypoints and the PSD2 consent
-precondition on its slice branch; that is a technical result, not approval of the 180-day
+precondition on local `main`; that is a technical result, not approval of the 180-day
 convention or of production bank matching. finAPI, the C3c landlord *Zahlungen* screen, manual
 assignment, automatic later use of renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
 until its source gap is answered. The separate `docs/16` D2 transcription is approved and merged.
