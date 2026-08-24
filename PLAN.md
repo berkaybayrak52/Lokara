@@ -50,11 +50,12 @@ before UI. Dates are communication events, not planning inputs.
 - M5 is complete and merged into `main` as `a748729`: secure bootstrap, backend
   membership/assigned-building authorization and the URL-based account chooser/switcher are
   shipped. Renter activation/portal remains M10; adviser profile, mapping and tax functions remain
-  M7. All of M6 except the M6-C3 feature slice is locally merged into `main`: M6-A (temporal advances, `d82abcc`), M6-B
-  (finalized archives, `f578f2f`), M6-C1 (the pure matching engine, `8306b68`) and M6-C2 (bank
-  persistence, the § 3.1 adapter and owner-scoped endpoints, `92e1318`), followed by M6-C3-0's
-  migration-`0020` invariant repair. **M6-C3 — the matching service, landlord Zahlungen screen and
-  three job entrypoints — is the open implementation work.**
+  M7. All of M6 except the remaining C3b/C3c feature work is locally merged into `main`: M6-A
+  (temporal advances, `d82abcc`), M6-B (finalized archives, `f578f2f`), M6-C1 (the pure matching
+  engine, `8306b68`) and M6-C2 (bank persistence, the § 3.1 adapter and owner-scoped endpoints,
+  `92e1318`), followed by M6-C3-0's migration-`0020` invariant repair. **M6-C3a is technically
+  complete, development-synchronized and locally merged; C3b's three jobs and C3c's landlord
+  Zahlungen screen are open. Nothing was pushed.**
 
 ---
 
@@ -66,7 +67,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
-| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction. M6-A/B ship actual-advance reconciliation and owner-only technical final archives; M6-C1/C2/C3-0 ship bank matching, ledger persistence and audited invariants. Workflow/UI remains M6-C3 and renter delivery/portal remains M10. |
+| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction. M6-A/B ship actual-advance reconciliation and owner-only technical final archives; M6-C1/C2/C3-0/C3a ship bank matching, ledger persistence, the matching service, five owner APIs and audited invariants on local `main`. C3b jobs/C3c UI and M10 renter delivery remain open. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. Technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or monthly DWD/UVI work. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The exact 34-ID data oracle covers purchase-cost ordering, three allocation routes, AfA/use rounding, the 15% guard and annual finance paths. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. Weg B placeholders and the F11 month/day choice block production. No implementation exists. |
@@ -74,7 +75,7 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 | Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. The exact 24-ID data oracle covers date arithmetic, strict arrears thresholds, cent rounding, UVI cadence, rent limits, VPI and vacancy. All 18 Page-specific register rows remain `verify-before-production`; the 5-year/6-year meter conflict is unresolved. No guard implementation exists. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
-| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0 ship the engine, persistence, adapter, owner endpoints and audited database invariants. The matching service, landlord *Zahlungen* screen and job entrypoints are M6-C3. |
+| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b jobs and C3c *Zahlungen* remain open. |
 | UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | Complete transcription approved and merged 21.08.2026. Annual DWD factors remain separate from monthly degree-day data; the exact monthly dataset and station-to-PLZ mapping stay `verify-before-production`. No implementation exists. |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
@@ -262,7 +263,7 @@ not replace the complete documentation or reconciliation gates.
 | B | **complete; locally merged 23.08.2026** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Finalization shipped in M6-B and the payment ledger in M6-C2. |
 | C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
 | M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7. |
-| M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1 and M6-C2 are merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, and the nine bank/receivable/ledger tables with the § 3.1 adapter and owner-scoped endpoints. **M6-C3-0 is technically complete and locally merged**: amended `0020`, the development hand-delta, focused/full/demo gates and unchanged PDF fingerprint are verified. **M6-C3 is open**: the matching service that joins the engine to the database, the landlord Zahlungen screen and the three job entrypoints. |
+| M6 | After M5 | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **M6-C3 remains open** for C3b jobs and C3c Zahlungen UI. |
 | G | After M6 | Shared guard foundation | Implement the approved `docs/12` rules needed by § 556, Eichfrist, UVI cadence and later M9 work through one reusable guard mechanism. |
 | U | After G | UVI comparison, calculation and document | Implement approved `docs/16`, including the heating-only comparison, monthly readings, labelled fallbacks and tenant document. Scheduled delivery waits for M9; portal publication waits for M10. |
 | M7 | After U | Tax export and AfA | Implement approved `docs/09`–`docs/11`. Build computation paths and archives; flagged register values continue to block real output. |
@@ -503,7 +504,7 @@ This work added no new dashboard, portal or account switcher.
 M5 is complete and merged on `main`: roles behave correctly; every nested building route
 verifies its URL context; multiple account contexts switch by URL and are re-authorized per request;
 the pre-context checker stays green; and no current API route writes `renter.person_id`. Renter
-activation, renter URL context and renter portal authorization are M10 work. M6-C3 is next.
+activation, renter URL context and renter portal authorization are M10 work. C3b and C3c are next.
 
 ---
 
@@ -553,21 +554,24 @@ fixtures are `M6B-F02`–`F04`, `F10`, `F14`, `F16`–`F19`, `M6B-IMM`, `M6B-COR
 `docs/08`.
 
 - Keep finAPI stubbed behind the bank adapter until a separate provider-integration slice.
-- Join the shipped matching engine to persistence through the M6-C3 application service.
+- C3a joins the matching engine to persistence and is technically complete,
+  development-synchronized and locally merged.
 - Add background job entrypoints for bank sync, 180-day reconsent cleanup and deadline watchers.
 - Add the landlord *Zahlungen* confirmation/rejection screen without inventing manual assignment.
 - Deliver/publish renter documents only after the separate M10 portal and legal-production work.
 
 **M6-B closed when:** confirmed advances produce frozen Saldo branches; owner-only finalization is
 immutable and reproducible; owner and isolated tenant archives are separately rendered; zero-day
-tenancies are excluded and footnoted. **M6 remains open** until the matching service, job
-entrypoints and landlord *Zahlungen* screen are implemented in M6-C.
+tenancies are excluded and footnoted. **M6 remains open** until C3b's job entrypoints and C3c's
+landlord *Zahlungen* screen are implemented. C3a is technically complete,
+development-synchronized and locally merged.
 Temporal contractual advances are **not** open work: M6-A shipped them. Delivery and the renter
 portal are M10, not M6.
 
 #### M6-C — bank matching, payment ledger and the Zahlungen screen
 
-**Status:** open. This is the remaining M6 work. **Approved-spec prerequisite:** `docs/15`, whose
+**Status:** open. C3a is technically complete, development-synchronized and locally merged into
+`main`. C3b and C3c remain open. **Approved-spec prerequisite:** `docs/15`, whose
 thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three bounded slices:
 
 - **M6-C1 — complete and merged.** Pure `packages/matching-engine`: § 4 signals and decision
@@ -737,13 +741,24 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   reversals do, but that is the test graph's shortcut, and § 5.3 makes the return a distinct
   movement resolved by E2E reference. An audit finding is evidence, not a patch.
 
-- **M6-C3** — the matching service, German landlord *Zahlungen* screen where a Review proposal is
-  confirmed, and the three job entrypoints. **Nothing today
-  joins the matching engine to the database**: `apps/api` never references `MatchProposal`,
-  `MatchConfirmation`, `PaymentLedgerEntry`, `PaymentAllocation` or `IbanHistory`, so an imported
-  transaction never becomes a proposal and no proposal can be confirmed. That bridge — a
-  `matching_service.py` beside `statement_service.py` — is the substance of the slice; the screen
-  is the thin part on top.
+- **M6-C3a — matching service and owner API. Technically complete, development-synchronized and
+  locally merged 24.08.2026.** Migration `0021` adds
+  deterministic proposal ranks, nullable legacy-compatible allocation projection snapshots,
+  confirmed/Auto PAYMENT evidence and deferred ledger/allocation reconciliation. A new
+  `matching_service.py` persists all thirteen `BANKMATCH-F01`–`F13` paths and exposes exactly five
+  owner-scoped capabilities: matching-profile upsert, immutable match execution, grouped proposal
+  list, final decision and immutable payment-ledger list. The acceptance files are
+  `apps/api/tests/test_m6c3a_matching_service.py` and
+  `packages/db/tests/test_migration_0021_m6c3a.py`; both are green with the implementation.
+  The final amended `0021` is verified from the disposable `lokara_c3a_check` database. Development
+  now matches it exactly after one validated transactional hand-delta: column types, constraints,
+  trigger timing/deferrability, hardened function definitions and hashes are identical. Evidence
+  counts and 68 legacy Auto confirmations are unchanged. C3a excludes jobs, the *Zahlungen* screen,
+  pagination, manual assignment and automatic later use of renter credit.
+- **M6-C3b — open.** Three job functions behind a scheduler port: bank sync, 180-day reconsent
+  cleanup and deadline watchers. Redis, Arq and Celery remain uninstalled.
+- **M6-C3c — open.** German landlord *Zahlungen* screen for final confirm/reject/duplicate evidence;
+  no manual assignment.
 
 **Hard constraints:**
 
@@ -752,7 +767,8 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
 - The payment ledger is append-only. Reversals append compensating rows; nothing is edited.
 - An IBAN is learned only from a confirmed match and never when null.
 - The § 5.2 Largest-Remainder tie-break convention is missing from the authoritative source. The
-  engine raises on an exact tie; it must not invent a rule. No fixture exercises that branch.
+  engine and service tests prove refusal and complete rollback on an exact tie; no tie-break is
+  invented.
 - Matching confidence is a Lokara convention and is never presented as legal support for a match.
 - Background jobs ship as service functions behind a scheduler port. Redis, Arq and Celery stay
   uninstalled until a real worker slice; `docs/01` D7 keeps that pick open.

@@ -158,11 +158,17 @@ def reverse(
     allocations = tuple(
         allocation for settlement in original_settlements for allocation in settlement.allocations
     )
-    reversed_total = -sum(allocation.assigned_cents for allocation in allocations)
+    # A full bank return includes money that remained as renter credit. Credit was
+    # never assigned to a receivable, so it participates in the equality but never
+    # becomes a fabricated compensating allocation.
+    reversed_total = -sum(
+        settlement.assigned_cents + settlement.credit_cents for settlement in original_settlements
+    )
     if reversed_total != returned.amount_cents:
         raise ValueError(
-            "a return reverses the original allocations exactly; it is never partially "
-            f"absorbed or topped up ({reversed_total} != {returned.amount_cents})"
+            "a return reverses the original settlement, including its credit, exactly; "
+            "it is never partially absorbed or topped up "
+            f"({reversed_total} != {returned.amount_cents})"
         )
 
     return ReversalResult(

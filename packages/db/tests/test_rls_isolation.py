@@ -16,7 +16,7 @@ FORCE binds it too — admin/seed flows there must set a context.
 
 import os
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -2236,7 +2236,7 @@ def m6c2_bank_rows(engines: tuple[Engine, Engine], seed: _Seed) -> _M6C2BankRows
                     signal_e2e=0,
                     signal_period=5,
                     confidence=100,
-                    decision="AUTO_MATCH",
+                    decision="NEEDS_REVIEW",
                     convention_version="docs/15 07/2026",
                     reason_de="Eindeutige IBAN, exakter Betrag, Zahlungscode und Periode.",
                 ),
@@ -2274,7 +2274,7 @@ def m6c2_bank_rows(engines: tuple[Engine, Engine], seed: _Seed) -> _M6C2BankRows
                 account_id=seed.account_a,
                 renter_id=seed.renter_a,
                 normalized_iban="DE02120300000000202051",
-                valid_from=date(2025, 7, 2),
+                valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                 valid_to=None,
                 learned_from_transaction_id=ids.transaction_id,
                 confirmed_match_id=ids.confirmation_id,
@@ -2504,7 +2504,7 @@ class TestM6C2BankBoundaries:
                 account_id=seed.account_a,
                 renter_id=seed.renter_a,
                 normalized_iban="DE00",
-                valid_from=date(2025, 7, 2),
+                valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                 valid_to=None,
                 learned_from_transaction_id=None,
                 confirmed_match_id=rows.confirmation_id,
@@ -2956,6 +2956,26 @@ class TestM6C2MoneyInvariants:
                     reverses_entry_id=m6c2_bank_rows.ledger_entry_id,
                 )
             )
+            session.flush()
+            # Migration 0021 reconciles every ledger entry at deferred commit.
+            # This first reversal is the valid baseline for the uniqueness probe,
+            # so it must compensate the original fixture allocation exactly.
+            session.add(
+                PaymentAllocation(
+                    id=new_id(),
+                    account_id=seed.account_a,
+                    ledger_entry_id=first,
+                    receivable_id=m6c2_bank_rows.receivable_id,
+                    costs_cents=0,
+                    interest_cents=0,
+                    principal_cents=-108_000,
+                    base_rent_cents=-85_000,
+                    nk_advance_cents=-15_000,
+                    heating_advance_cents=-8_000,
+                    garage_cents=0,
+                    resulting_status="open",
+                )
+            )
         with (
             pytest.raises(IntegrityError),
             Session(owner) as session,
@@ -2993,7 +3013,7 @@ class TestM6C2MoneyInvariants:
                     account_id=seed.account_a,
                     renter_id=seed.renter_a,
                     normalized_iban="DE99999999999999999999",
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     valid_to=None,
                     learned_from_transaction_id=None,
                     confirmed_match_id=None,
@@ -3027,7 +3047,10 @@ class TestM6C2MoneyInvariants:
         with account_scoped_session(app, seed.account_a) as session:
             session.execute(
                 text("UPDATE iban_history SET valid_to = :d WHERE id = :id"),
-                {"d": date(2026, 1, 1), "id": m6c2_bank_rows.iban_history_id},
+                {
+                    "d": datetime(2026, 1, 1, tzinfo=UTC),
+                    "id": m6c2_bank_rows.iban_history_id,
+                },
             )
 
     def test_a_bank_transaction_and_a_proposal_cannot_be_rewritten(

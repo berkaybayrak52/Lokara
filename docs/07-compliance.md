@@ -97,8 +97,9 @@ archived.
 - Confirmed actual advances, Saldo, settlements and the statement archive handoff are shipped in
   M6-A/M6-B. The payment ledger and bank-matching evidence shipped in M6-C2 as append-only rows
   (migrations `0017`/`0019`); M6-C3-0 migration `0020` hardens renter consistency, allocation caps,
-  learned-IBAN provenance, trigger name resolution and RLS write observability. The matching
-  service, jobs and *Zahlungen* screen remain M6-C3; renter delivery/portal remains M10. Tax/export
+  learned-IBAN provenance, trigger name resolution and RLS write observability. The C3a matching
+  service and final `0021` are technically complete, development-synchronized and locally merged.
+  C3b jobs and C3c *Zahlungen* screen remain open; renter delivery/portal remains M10. Tax/export
   archives remain M7 work and depend on approved `docs/10` and `docs/11`; delivery evidence and
   contract histories arrive with their owning later milestones.
 

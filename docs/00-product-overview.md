@@ -42,12 +42,13 @@ demo or sales copy may advertise that case as supported.
 The account model supports `SOLO` and `HAUSVERWALTUNG`, with roles on Membership rather than Account.
 The shipped demo uses one owner membership and one account. Employee role enforcement and account
 switching are shipped. The pure bank-matching engine, bank/receivable/payment-ledger persistence,
-adapter and owner-scoped import/list/handoff endpoints are also shipped. Renter activation/portal,
-tax-adviser guest access, the landlord *Zahlungen* screen and matching jobs, tax export, contracts,
-billing and native apps remain future milestones in `PLAN.md`.
+adapter and base owner endpoints are shipped on `main`; C3a's matching service and five owner APIs
+are technically complete, development-synchronized to final `0021` and locally merged into `main`.
+Renter activation/portal, tax-adviser guest access, C3b matching jobs, the C3c landlord *Zahlungen*
+screen, tax export, contracts, billing and native apps remain future milestones in `PLAN.md`.
 
 Future product breadth includes renter delivery, UVI, Anlage V/DATEV, guards/reminders, the
-matching workflow/UI and mobile clients. Those are roadmap dependencies, not shipped capabilities.
+C3b/C3c matching jobs/UI and mobile clients. Those are roadmap dependencies, not shipped capabilities.
 
 ## Competitive thesis
 

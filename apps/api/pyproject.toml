@@ -15,6 +15,7 @@ dependencies = [
   "lokara-db",
   "lokara-nk-engine",
   "lokara-heating-engine",
+  "lokara-matching-engine",
   "lokara-rules-store",
   "lokara-adapters",
   "lokara-pdf",
@@ -28,6 +29,7 @@ lokara-domain = { workspace = true }
 lokara-db = { workspace = true }
 lokara-nk-engine = { workspace = true }
 lokara-heating-engine = { workspace = true }
+lokara-matching-engine = { workspace = true }
 lokara-rules-store = { workspace = true }
 lokara-adapters = { workspace = true }
 lokara-pdf = { workspace = true }

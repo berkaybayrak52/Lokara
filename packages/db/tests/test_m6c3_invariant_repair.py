@@ -34,7 +34,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -141,9 +141,9 @@ def graph(owner: Engine) -> _Graph:
 
     Renter one pays 1.080,00 €, which is reversed (`docs/15` F06). Renter two is a
     co-party of the same tenancy with an open 600,00 € debt, and is the "other renter"
-    every C1/C2 fixture points at. `entry_spare` is a 600,00 € payment with no
-    allocation yet, so a cross-renter allocation can be attempted without the
-    per-entry cap refusing it for an unrelated reason.
+    every C1/C2 fixture points at. `entry_spare` is a valid, fully allocated 600,00 €
+    payment used only where a committed original is required; allocation probes build
+    their own parent rows inside a rolled-back transaction.
     """
     ids = _Graph(*(new_id() for _ in range(22)))
     with Session(owner) as session, session.begin():
@@ -294,14 +294,14 @@ def graph(owner: Engine) -> _Graph:
                 signal_e2e=0,
                 signal_period=5,
                 confidence=100,
-                decision="AUTO_MATCH",
+                decision="NEEDS_REVIEW",
                 convention_version="docs/15 07/2026",
                 reason_de="Eindeutige IBAN, exakter Betrag und Periode.",
             )
         )
         session.flush()
-        # `enforce_ledger_entry_evidence` (0019) requires an entry's proposal to name the
-        # entry's own transaction, so the spare payment needs its own proposal. It names
+        # The spare payment is committed fixture evidence, so 0021 requires both valid
+        # Auto/confirmed evidence and exact credit/allocation reconciliation. It names
         # renter one, which is what makes M6C3R-R01 a cross-renter allocation.
         session.add(
             MatchProposal(
@@ -316,7 +316,7 @@ def graph(owner: Engine) -> _Graph:
                 signal_e2e=0,
                 signal_period=0,
                 confidence=75,
-                decision="NEEDS_REVIEW",
+                decision="AUTO_MATCH",
                 convention_version="docs/15 07/2026",
                 reason_de="IBAN bekannt, Betrag weicht ab.",
             )
@@ -342,8 +342,8 @@ def graph(owner: Engine) -> _Graph:
                     ordering_version="§ 366/367 BGB",
                     reverses_entry_id=None,
                 ),
-                # A PAYMENT with no allocation yet. Nothing forbids that state — it is
-                # the row an allocation is written against.
+                # A fully allocated PAYMENT. Tests that need an allocation-free parent
+                # create it inside their own rolled-back transaction below.
                 PaymentLedgerEntry(
                     id=ids.entry_spare,
                     account_id=ids.account_id,
@@ -358,21 +358,37 @@ def graph(owner: Engine) -> _Graph:
             ]
         )
         session.flush()
-        session.add(
-            PaymentAllocation(
-                id=ids.allocation_id,
-                account_id=ids.account_id,
-                ledger_entry_id=ids.entry_payment,
-                receivable_id=ids.receivable_one,
-                costs_cents=0,
-                interest_cents=0,
-                principal_cents=108_000,
-                base_rent_cents=85_000,
-                nk_advance_cents=15_000,
-                heating_advance_cents=8_000,
-                garage_cents=0,
-                resulting_status="settled",
-            )
+        session.add_all(
+            [
+                PaymentAllocation(
+                    id=ids.allocation_id,
+                    account_id=ids.account_id,
+                    ledger_entry_id=ids.entry_payment,
+                    receivable_id=ids.receivable_one,
+                    costs_cents=0,
+                    interest_cents=0,
+                    principal_cents=108_000,
+                    base_rent_cents=85_000,
+                    nk_advance_cents=15_000,
+                    heating_advance_cents=8_000,
+                    garage_cents=0,
+                    resulting_status="settled",
+                ),
+                PaymentAllocation(
+                    id=new_id(),
+                    account_id=ids.account_id,
+                    ledger_entry_id=ids.entry_spare,
+                    receivable_id=ids.receivable_one,
+                    costs_cents=0,
+                    interest_cents=0,
+                    principal_cents=60_000,
+                    base_rent_cents=60_000,
+                    nk_advance_cents=0,
+                    heating_advance_cents=0,
+                    garage_cents=0,
+                    resulting_status="partial",
+                ),
+            ]
         )
         session.flush()
         # Every REVERSAL in the live database carries `match_proposal_id IS NULL`
@@ -389,6 +405,23 @@ def graph(owner: Engine) -> _Graph:
                 credit_cents=0,
                 ordering_version="§ 366/367 BGB",
                 reverses_entry_id=ids.entry_payment,
+            )
+        )
+        session.flush()
+        session.add(
+            PaymentAllocation(
+                id=new_id(),
+                account_id=ids.account_id,
+                ledger_entry_id=ids.entry_reversal,
+                receivable_id=ids.receivable_one,
+                costs_cents=0,
+                interest_cents=0,
+                principal_cents=-108_000,
+                base_rent_cents=-85_000,
+                nk_advance_cents=-15_000,
+                heating_advance_cents=-8_000,
+                garage_cents=0,
+                resulting_status="open",
             )
         )
     return ids
@@ -485,20 +518,21 @@ def _allocation(
 
 def _confirmation_for(
     session: Session, ids: _Graph, *, renter_id: str, receivable_id: str, outcome: str
-) -> str:
+) -> tuple[str, str]:
     """A fresh proposal plus its confirmation, inside the caller's doomed transaction.
 
     `uq_match_confirmation_proposal` allows one confirmation per proposal, so a second
     confirmed IBAN fact needs a second proposal — and the proposal's renter must be the
     row's renter, or `enforce_match_proposal_renter` refuses it first.
     """
-    confirmation_id = new_id()
-    proposal_id = new_id()
+    confirmation_id, proposal_id, transaction_id = new_id(), new_id(), new_id()
+    session.add(_transaction(ids, transaction_id, 1, f"E2E-{transaction_id[:8]}"))
+    session.flush()
     session.add(
         MatchProposal(
             id=proposal_id,
             account_id=ids.account_id,
-            bank_transaction_id=ids.tx_spare,
+            bank_transaction_id=transaction_id,
             receivable_id=receivable_id,
             renter_id=renter_id,
             signal_iban=0,
@@ -523,7 +557,7 @@ def _confirmation_for(
         )
     )
     session.flush()
-    return confirmation_id
+    return confirmation_id, transaction_id
 
 
 def _iban_row(
@@ -532,14 +566,15 @@ def _iban_row(
     renter_id: str,
     iban: str,
     confirmation_id: str,
-    valid_from: date,
+    valid_from: datetime,
     learned_from: str | None,
 ) -> IbanHistory:
     """`learned_from` must be the transaction the cited confirmation's proposal names.
 
     M6C3R-R16/R17 make that a rule, so every caller states it: `graph.confirmation_id`
-    confirms a proposal on `tx_payment`, and every confirmation `_confirmation_for`
-    builds sits on `tx_spare`. Passing the wrong one is the R17 fixture, not a default.
+    confirms a proposal on `tx_payment`, while `_confirmation_for` returns the fresh
+    transaction it created beside the confirmation. Passing the wrong one is the R17
+    fixture, not a default.
     """
     return IbanHistory(
         id=new_id(),
@@ -570,11 +605,18 @@ class TestAllocationBelongsToOneRenter:
     ) -> None:
         """M6C3R-R01: entry renter via `match_proposal_id → match_proposal.renter_id`."""
         with _rolled_back(owner) as session:
+            payment = _payment_entry(
+                session,
+                graph,
+                renter_id=graph.renter_one,
+                receivable_id=graph.receivable_one,
+                cents=60_000,
+            )
             error = _insert_error(
                 session,
                 _allocation(
                     graph,
-                    entry_id=graph.entry_spare,
+                    entry_id=payment,
                     receivable_id=graph.receivable_two,
                     base_rent=45_000,
                     nk_advance=10_000,
@@ -672,7 +714,7 @@ class TestLearnedIbanNeedsItsOwnConfirmation:
                     renter_id=graph.renter_two,
                     iban=_IBAN_WRONG_RENTER,
                     confirmation_id=graph.confirmation_id,
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     learned_from=graph.tx_payment,
                 ),
             )
@@ -687,7 +729,7 @@ class TestLearnedIbanNeedsItsOwnConfirmation:
         """M6C3R-R05: outcome REJECTED is not a confirmation. Same renter throughout, so
         only the outcome rule can be what refuses this."""
         with _rolled_back(owner) as session:
-            rejected = _confirmation_for(
+            rejected, rejected_tx = _confirmation_for(
                 session,
                 graph,
                 renter_id=graph.renter_two,
@@ -701,10 +743,10 @@ class TestLearnedIbanNeedsItsOwnConfirmation:
                     renter_id=graph.renter_two,
                     iban=_IBAN_UNCONFIRMED,
                     confirmation_id=rejected,
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     # R16/R17: the provenance must be the confirmed proposal's own
                     # transaction, so only the outcome rule can refuse this row.
-                    learned_from=graph.tx_spare,
+                    learned_from=rejected_tx,
                 ),
             )
         assert error is not None, (
@@ -834,11 +876,31 @@ class TestAllocationSignFollowsItsEntry:
         """M6C3R-R07: the compensating allocation is accepted, and the two allocations on
         the receivable net to zero — `docs/15` § 5.3 / F06."""
         with _rolled_back(owner) as session:
+            payment = _payment_entry(
+                session,
+                graph,
+                renter_id=graph.renter_one,
+                receivable_id=graph.receivable_one,
+                cents=108_000,
+            )
+            paid = _insert_error(
+                session,
+                _allocation(
+                    graph,
+                    entry_id=payment,
+                    receivable_id=graph.receivable_one,
+                    base_rent=85_000,
+                    nk_advance=15_000,
+                    heating_advance=8_000,
+                ),
+            )
+            assert paid is None
+            reversal = _reversal_entry(session, graph, reverses=payment, cents=108_000)
             error = _insert_error(
                 session,
                 _allocation(
                     graph,
-                    entry_id=graph.entry_reversal,
+                    entry_id=reversal,
                     receivable_id=graph.receivable_one,
                     base_rent=-85_000,
                     nk_advance=-15_000,
@@ -861,7 +923,10 @@ class TestAllocationSignFollowsItsEntry:
                         ),
                         0,
                     )
-                ).where(PaymentAllocation.receivable_id == graph.receivable_one)
+                ).where(
+                    PaymentAllocation.receivable_id == graph.receivable_one,
+                    PaymentAllocation.ledger_entry_id.in_((payment, reversal)),
+                )
             )
             assert netted == 0, (
                 f"F06: payment plus reversal must net to zero on the receivable, got {netted} cents"
@@ -875,11 +940,18 @@ class TestAllocationSignFollowsItsEntry:
         `sum >= amount_cents` for a REVERSAL. `0019` compares against `abs(amount_cents)`,
         which grants a -1.080,00 € reversal a +1.080,00 € budget."""
         with _rolled_back(owner) as session:
+            payment = _payment_entry(
+                session,
+                graph,
+                renter_id=graph.renter_one,
+                receivable_id=graph.receivable_one,
+                cents=60_000,
+            )
             negative_on_payment = _insert_error(
                 session,
                 _allocation(
                     graph,
-                    entry_id=graph.entry_spare,
+                    entry_id=payment,
                     receivable_id=graph.receivable_two,
                     base_rent=-45_000,
                     status="open",
@@ -987,7 +1059,7 @@ class TestActiveIbanUniquenessIsPerRenter:
         """M6C3R-R10: the F07 state must exist; the replacement guarantee still holds
         per renter."""
         with _rolled_back(owner) as session:
-            second = _confirmation_for(
+            second, second_tx = _confirmation_for(
                 session,
                 graph,
                 renter_id=graph.renter_two,
@@ -1001,7 +1073,7 @@ class TestActiveIbanUniquenessIsPerRenter:
                     renter_id=graph.renter_one,
                     iban=_IBAN_SHARED,
                     confirmation_id=graph.confirmation_id,
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     learned_from=graph.tx_payment,
                 ),
                 _iban_row(
@@ -1009,8 +1081,8 @@ class TestActiveIbanUniquenessIsPerRenter:
                     renter_id=graph.renter_two,
                     iban=_IBAN_SHARED,
                     confirmation_id=second,
-                    valid_from=date(2025, 7, 3),
-                    learned_from=graph.tx_spare,
+                    valid_from=datetime(2025, 7, 3, tzinfo=UTC),
+                    learned_from=second_tx,
                 ),
             )
             assert shared is None, (
@@ -1018,7 +1090,7 @@ class TestActiveIbanUniquenessIsPerRenter:
                 "renters on one IBAN, each scored ambiguous and routed to Review. "
                 f"Refused with: {shared}"
             )
-            third = _confirmation_for(
+            third, third_tx = _confirmation_for(
                 session,
                 graph,
                 renter_id=graph.renter_one,
@@ -1032,7 +1104,7 @@ class TestActiveIbanUniquenessIsPerRenter:
                     renter_id=graph.renter_one,
                     iban=_IBAN_REPLACED,
                     confirmation_id=graph.confirmation_id,
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     learned_from=graph.tx_payment,
                 ),
                 _iban_row(
@@ -1040,8 +1112,8 @@ class TestActiveIbanUniquenessIsPerRenter:
                     renter_id=graph.renter_one,
                     iban=_IBAN_REPLACED,
                     confirmation_id=third,
-                    valid_from=date(2025, 7, 3),
-                    learned_from=graph.tx_spare,
+                    valid_from=datetime(2025, 7, 3, tzinfo=UTC),
+                    learned_from=third_tx,
                 ),
             )
             assert duplicated is not None, (
@@ -1179,6 +1251,28 @@ def _payment_entry(
     return entry_id
 
 
+def _reversal_entry(session: Session, ids: _Graph, *, reverses: str, cents: int) -> str:
+    """A transaction-local reversal whose compensating allocation is added by its test."""
+    tx_id, entry_id = new_id(), new_id()
+    session.add(_transaction(ids, tx_id, -cents, f"E2E-{tx_id[:8]}"))
+    session.flush()
+    session.add(
+        PaymentLedgerEntry(
+            id=entry_id,
+            account_id=ids.account_id,
+            bank_transaction_id=tx_id,
+            match_proposal_id=None,
+            kind="REVERSAL",
+            amount_cents=-cents,
+            credit_cents=0,
+            ordering_version="§ 366/367 BGB",
+            reverses_entry_id=reverses,
+        )
+    )
+    session.flush()
+    return entry_id
+
+
 def _reversal_entry_with_own_proposal(
     session: Session,
     ids: _Graph,
@@ -1268,11 +1362,18 @@ class TestAReversalsOwnProposalDoesNotChooseTheRenter:
         with _rolled_back(owner) as session:
             # Control (R01's shape): a plain PAYMENT of renter one may not settle
             # renter two's debt. The proposal branch is consulted and it is correct.
+            renter_one_payment = _payment_entry(
+                session,
+                graph,
+                renter_id=graph.renter_one,
+                receivable_id=graph.receivable_one,
+                cents=60_000,
+            )
             plain_payment = _insert_error(
                 session,
                 _allocation(
                     graph,
-                    entry_id=graph.entry_spare,
+                    entry_id=renter_one_payment,
                     receivable_id=graph.receivable_two,
                     base_rent=45_000,
                     nk_advance=10_000,
@@ -1332,12 +1433,25 @@ class TestAReversalsOwnProposalDoesNotChooseTheRenter:
                 "a return that carries its own proposal is docs/15 § 5.3's ordinary "
                 f"shape and both sources name renter two here; refused with: {agreeing}"
             )
-            # H1. `entry_spare` is renter one's 600,00 € payment. The return names
+            # Complete renter one's local payment before testing its return. The parent
+            # and its evidence remain inside this transaction and are rolled back.
+            own_allocation = _insert_error(
+                session,
+                _allocation(
+                    graph,
+                    entry_id=renter_one_payment,
+                    receivable_id=graph.receivable_one,
+                    base_rent=60_000,
+                    status="partial",
+                ),
+            )
+            assert own_allocation is None
+            # H1. The return names
             # renter two in its own proposal and renter one through `reverses_entry_id`.
             shadowing_return = _reversal_entry_with_own_proposal(
                 session,
                 graph,
-                reverses=graph.entry_spare,
+                reverses=renter_one_payment,
                 cents=60_000,
                 proposal_renter=graph.renter_two,
                 proposal_receivable=graph.receivable_two,
@@ -1389,6 +1503,13 @@ class TestTriggerLookupsCannotBeShadowed:
         one. Pre-repair behaviour: **accepted**.
         """
         with _rolled_back_app(app_engine, graph.account_id) as session:
+            payment = _payment_entry(
+                session,
+                graph,
+                renter_id=graph.renter_one,
+                receivable_id=graph.receivable_one,
+                cents=60_000,
+            )
             session.execute(
                 text(
                     "CREATE TEMP TABLE receivable"
@@ -1410,7 +1531,7 @@ class TestTriggerLookupsCannotBeShadowed:
                 session,
                 _allocation(
                     graph,
-                    entry_id=graph.entry_spare,
+                    entry_id=payment,
                     receivable_id=graph.receivable_two,
                     base_rent=45_000,
                     nk_advance=10_000,
@@ -1436,6 +1557,17 @@ class TestTriggerLookupsCannotBeShadowed:
         money that does not exist. Pre-repair behaviour: **accepted**.
         """
         with _rolled_back_app(app_engine, graph.account_id) as session:
+            payment = _payment_entry(
+                session,
+                graph,
+                renter_id=graph.renter_one,
+                receivable_id=graph.receivable_one,
+                cents=60_000,
+            )
+            proposal = session.scalar(
+                select(PaymentLedgerEntry.match_proposal_id).where(PaymentLedgerEntry.id == payment)
+            )
+            assert proposal is not None
             session.execute(
                 text(
                     "CREATE TEMP TABLE payment_ledger_entry"
@@ -1451,16 +1583,16 @@ class TestTriggerLookupsCannotBeShadowed:
                     " VALUES (:id, :account_id, 10000000, 'PAYMENT', :proposal_id, NULL)"
                 ),
                 {
-                    "id": graph.entry_spare,
+                    "id": payment,
                     "account_id": graph.account_id,
-                    "proposal_id": graph.proposal_spare,
+                    "proposal_id": proposal,
                 },
             )
             error = _insert_error(
                 session,
                 _allocation(
                     graph,
-                    entry_id=graph.entry_spare,
+                    entry_id=payment,
                     receivable_id=graph.receivable_one,
                     base_rent=500_000,
                 ),
@@ -1496,7 +1628,7 @@ class TestALearnedIbanNamesTheTransactionItWasLearnedFrom:
         """M6C3R-R16: `learned_from_transaction_id IS NULL` with a genuine CONFIRMED
         confirmation for the right renter. Pre-repair behaviour: **accepted**."""
         with _rolled_back(owner) as session:
-            confirmed = _confirmation_for(
+            confirmed, _ = _confirmation_for(
                 session,
                 graph,
                 renter_id=graph.renter_two,
@@ -1510,7 +1642,7 @@ class TestALearnedIbanNamesTheTransactionItWasLearnedFrom:
                     renter_id=graph.renter_two,
                     iban=_IBAN_NO_PROVENANCE,
                     confirmation_id=confirmed,
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     learned_from=None,
                 ),
             )
@@ -1541,7 +1673,7 @@ class TestALearnedIbanNamesTheTransactionItWasLearnedFrom:
                     renter_id=graph.renter_one,
                     iban=_IBAN_FOREIGN_TX,
                     confirmation_id=graph.confirmation_id,
-                    valid_from=date(2025, 7, 2),
+                    valid_from=datetime(2025, 7, 2, tzinfo=UTC),
                     learned_from=graph.tx_spare,
                 ),
             )
