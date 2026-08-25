@@ -1,6 +1,7 @@
 """API configuration (pydantic-settings). DB URLs live in lokara_db.DbSettings."""
 
 from typing import TYPE_CHECKING, Any, Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +46,19 @@ class ApiSettings(BaseSettings):
     # Dev/pitch-only: enables POST /demo/load (one-click demo seed). Off by
     # default — any authenticated caller could otherwise reset the demo account.
     demo_seed_enabled: bool = False
+    # Public Nominatim is a demo-only provider. External geocoding stays off
+    # unless an operator explicitly enables it; creation still succeeds when
+    # the provider is unavailable.
+    geocoding_enabled: bool = False
+    geocoding_endpoint: str = Field(
+        default="https://nominatim.openstreetmap.org/search",
+        min_length=1,
+        validate_default=True,
+    )
+    geocoding_contact_email: str = Field(
+        default="kontakt@lokara.de", min_length=1, validate_default=True
+    )
+    geocoding_timeout_seconds: float = Field(default=3.0, gt=0, le=10)
     api_port: int = 3001
     web_origin: str = "http://localhost:3000"
 
@@ -65,8 +79,8 @@ class ApiSettings(BaseSettings):
         build the settings object takes the process down once, loudly, at boot — the
         failure mode you want for "this deployment is unsafe".
 
-        All three routes are checked independently: reporting only the first one found
-        sends an operator to close one of three open doors.
+        All unsafe routes are checked independently: reporting only the first one found
+        sends an operator to close one open door while leaving the others unnoticed.
         """
         if self.environment not in DEPLOYED_ENVIRONMENTS:
             return self
@@ -83,6 +97,16 @@ class ApiSettings(BaseSettings):
             problems.append(
                 "SUPABASE_JWT_SECRET is still the placeholder published in .env.example "
                 "— set a real deployment secret"
+            )
+        geocoding_hostname = urlsplit(self.geocoding_endpoint).hostname
+        if (
+            self.geocoding_enabled
+            and geocoding_hostname is not None
+            and geocoding_hostname.casefold().rstrip(".") == "nominatim.openstreetmap.org"
+        ):
+            problems.append(
+                "GEOCODING_ENABLED points at public nominatim.openstreetmap.org "
+                "(demo-only provider) — disable it or configure a private provider"
             )
 
         if problems:

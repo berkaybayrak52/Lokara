@@ -124,6 +124,56 @@ The endpoint adds no table, migration, write path, engine call, or public type o
 HTTP response. Its boundary audit is clean after focused coverage for zero, multiple, and archived
 assignments plus both exact-today tenancy boundaries.
 
+## Shipped UI-03 Objekte, wizards and map
+
+UI-03 repairs the drifted tenancy contract, adds five building master-data columns and moves object
+and unit creation out of the inline forms into their own account-scoped routes:
+
+- `TenancyOut` on the wire carries `advancePaymentSchedule` (a list of
+  `AdvancePaymentPeriodOut`), not the removed `advancePaymentCents`/`advancePaymentEur` scalars.
+  The web contract in `apps/web/src/lib/contracts.ts` now mirrors it through the exported
+  `AdvancePaymentPeriodOutSchema`, so the unit detail page parses the real response instead of
+  failing closed. The NK-Vorauszahlung column selects the period valid today, else the latest one,
+  and shows the em dash for an empty schedule;
+- creating a tenancy sends `initialAdvancePaymentCents` and `advanceDeclarationRef`, matching
+  `TenancyCreate`. The declaration reference is a free provenance string with the default
+  "Mietvertrag"; it is not a calculated amount and changes no money;
+- migration `0026` adds `building_type` (VARCHAR with a CHECK over the four structural values, not a
+  Postgres enum), `is_residential`, `country`, `latitude` and `longitude`. The three non-geo columns
+  are NOT NULL with server defaults so existing insert paths, including the demo seed, keep working;
+  the coordinates stay nullable. The migration reserves `0025` for the unmerged M9 branch and sets
+  `down_revision = "0024"` deliberately;
+- `POST /a/{accountId}/buildings` accepts `buildingType`, `isResidential`, `houseNumber` and
+  `country`, joins street and house number into the existing single `street` column, and keeps the
+  German five-digit `postal_code` rule unchanged. `BuildingSummary` gains `buildingType`, `latitude`
+  and `longitude`;
+- geocoding lives behind `lokara_adapters.geocoding.GeocodingGateway`. `DisabledGeocodingGateway` is
+  the default: `geocoding_enabled` is **off** unless an operator turns it on, because public
+  Nominatim is a demo-only provider with no SLA. The Nominatim adapter is server-side only, carries
+  an identifying User-Agent, holds a hard timeout, and returns `None` on any error, timeout, empty
+  result or blocked network. Geocoding never blocks or fails building creation;
+- routes `/a/{accountId}/objekte/neu` and `/a/{accountId}/objekte/{buildingId}/einheit/neu` are
+  pages inside the same account-scoped segment, so the shell and server authorization enclose them.
+  Both inline creation forms are gone; the list and unit list render full width behind an owner-only
+  action link. Hiding the link is presentation; authorization stays server-side;
+- the Liste/Karte toggle switches presentation of the same complete object list. It filters nothing
+  and holds no persisted preference. Leaflet is the single new runtime dependency, bound imperatively
+  in a client component so SSR never touches `window`. Objects without coordinates render a calm
+  German note, never an empty surface;
+- photo areas in both wizards are **intentionally inactive**: no file input, no upload request, no
+  storage call. Real object storage is a later slice.
+
+Recorded assumptions (the source spec's Build-Notes): the Nominatim User-Agent uses the placeholder
+contact address `kontakt@lokara.de` until a real one is supplied; the contract-generator entry links
+to `/a/{accountId}/vertraege/neu?unitId={unitId}`, a path still to be confirmed with Emir, and
+renders the branded 404 until that module exists; no example photo asset was delivered, so the slots
+show a token-only placeholder; the optional display-only photo slot on the detail pages was left out
+to respect the minimal-invasive rule protecting the later object dashboard.
+
+This step was implemented under the direct implementation mode recorded in `CLAUDE.md` § 10. Lint,
+strict mypy, type check and the web production build pass; no test suite was run for it, so it is
+**implemented; unverified — no test evidence**.
+
 ## Shipped API surface
 
 There is one FastAPI application. Its current route families are:

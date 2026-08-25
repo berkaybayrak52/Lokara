@@ -468,7 +468,10 @@ class TestMeterValidation:
             headers=DEMO,
             json={
                 "name": "Zweites Haus",
-                "street": "Nebenweg 3",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
+                "street": "Nebenweg",
+                "houseNumber": "3",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
             },

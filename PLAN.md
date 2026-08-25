@@ -1402,6 +1402,12 @@ declared `.lokara-red` window.
 
 #### Verification and closure
 
+**Direct implementation mode, set by Emir on 25.08.2026.** From UI-03 onward, and until Emir ends
+the mode, these steps are implemented without subagents, without new focused tests or fixtures and
+without gate runs; see `CLAUDE.md` § 10 "Current working mode". Lint, type checks and the web
+production build remain. A step built this way is recorded as **implemented; unverified — no test
+evidence**, never as focused-green, and the deferred UI-08 verification must cover it.
+
 - Run focused tests and `scripts/gate.sh fast` during each slice. Run `scripts/gate.sh full` before
   closing each numbered specification.
 - Run the non-fresh demo gate after UI-01, UI-03, UI-05A, UI-06 and UI-08. Never run

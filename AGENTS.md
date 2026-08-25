@@ -93,6 +93,13 @@ git switch main
 git switch -c slice/<name>
 ```
 
+> **Suspended while direct implementation mode is active.** `CLAUDE.md` § 10 "Current working
+> mode" turns off the agent flow, the red window and the pre-merge gates described in this section.
+> While it stands, no subagent runs, no reviewer agent runs, no fixture is written, no
+> `.lokara-red` sentinel is created and no gate run is a merge precondition. Branch discipline,
+> the file ownership in § 5 and the invariants in § 7 still apply. The rules below take effect
+> again when Emir removes that subsection.
+
 The normal flow is:
 
 1. **Spec** — for legal or calculation work, `spec-scribe` transcribes the source and creates the

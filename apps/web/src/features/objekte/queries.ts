@@ -37,9 +37,13 @@ export function useUnitDetail(accountId: string, unitId: string) {
 
 interface BuildingCreateInput {
   name: string;
+  buildingType: 'WOHN_UND_GESCHAEFTSHAUS' | 'WOHNHAUS' | 'GEWERBEIMMOBILIE' | 'EINFAMILIENHAUS';
+  isResidential: boolean;
   street: string;
+  houseNumber: string;
   postalCode: string;
   city: string;
+  country: string;
 }
 
 export function useCreateBuilding(accountId: string) {
@@ -80,7 +84,8 @@ interface TenancyCreateInput {
   validFrom: string;
   validTo: string | null;
   baseRentCents: number;
-  advancePaymentCents: number;
+  initialAdvancePaymentCents: number;
+  advanceDeclarationRef: string;
 }
 
 export function useCreateTenancy(accountId: string, unitId: string) {

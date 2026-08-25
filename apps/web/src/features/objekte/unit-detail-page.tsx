@@ -18,11 +18,13 @@ import {
   TableRow,
 } from '@lokara/ui';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { PageHeader } from '@/features/portal/page-header';
 import { ApiError } from '@/lib/api';
+import type { AdvancePaymentPeriodOut } from '@/lib/contracts';
 import { isoToGermanDate, parseEurToCents } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
 
@@ -43,6 +45,7 @@ const TenancyFormSchema = z
       .string()
       .min(1, 'Pflichtfeld')
       .refine((v) => parseEurToCents(v) !== null, 'Betrag wie 220,00 angeben'),
+    advanceDeclarationRef: z.string().trim().min(1, 'Pflichtfeld').max(500, 'Maximal 500 Zeichen'),
   })
   .refine((values) => values.validTo === '' || values.validTo > values.validFrom, {
     path: ['validTo'],
@@ -50,7 +53,30 @@ const TenancyFormSchema = z
   });
 type TenancyForm = z.infer<typeof TenancyFormSchema>;
 
-const EMPTY: TenancyForm = { renterName: '', validFrom: '', validTo: '', baseRent: '', advance: '' };
+const EMPTY: TenancyForm = {
+  renterName: '',
+  validFrom: '',
+  validTo: '',
+  baseRent: '',
+  advance: '',
+  advanceDeclarationRef: 'Mietvertrag',
+};
+
+export function selectAdvancePaymentAmount(
+  schedule: AdvancePaymentPeriodOut[],
+  todayIso: string,
+): string | null {
+  if (schedule.length === 0) return null;
+
+  const latestFirst = [...schedule].sort((left, right) =>
+    right.validFrom.localeCompare(left.validFrom),
+  );
+  const current = latestFirst.find(
+    (period) =>
+      period.validFrom <= todayIso && (period.validTo === null || todayIso < period.validTo),
+  );
+  return (current ?? latestFirst[0])?.amountEur ?? null;
+}
 
 /** Einheit / Mietverhältnis (docs/04 M3 page 3): tenancy timeline + create. */
 export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitId: string }) {
@@ -168,7 +194,10 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
                             {tenancy.baseRentEur}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {tenancy.advancePaymentEur}
+                            {selectAdvancePaymentAmount(
+                              tenancy.advancePaymentSchedule,
+                              new Date().toISOString().slice(0, 10),
+                            ) ?? <span className="text-slate">—</span>}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -197,9 +226,61 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
           ) : null}
         </section>
 
-        <CreateTenancyForm accountId={accountId} unitId={unitId} />
+        <TenancyEntry accountId={accountId} unitId={unitId} />
       </div>
     </main>
+  );
+}
+
+function TenancyEntry({ accountId, unitId }: { accountId: string; unitId: string }) {
+  const [step, setStep] = useState<'start' | 'choices' | 'manual'>('start');
+
+  if (step === 'manual') {
+    return <CreateTenancyForm accountId={accountId} unitId={unitId} />;
+  }
+
+  return (
+    <section aria-label="Mietverhältnis erstellen">
+      <Card>
+        <CardHeader>
+          <CardTitle>Mietverhältnis erstellen</CardTitle>
+          <CardDescription>
+            Wählen Sie den passenden Weg für die Vertragsdaten dieser Einheit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {step === 'start' ? (
+            <Button type="button" onClick={() => setStep('choices')}>
+              Jetzt Mietverhältnis erstellen
+            </Button>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate/40 bg-paper p-4">
+                <Link
+                  href={`/a/${accountId}/vertraege/neu?unitId=${unitId}`}
+                  className="font-display font-semibold text-green underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Mit Vertragsgenerator
+                </Link>
+                <p className="mt-2 text-sm text-slate">
+                  Vertrag erzeugen und Daten automatisch übernehmen
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate/40 bg-paper p-4">
+                <button
+                  type="button"
+                  onClick={() => setStep('manual')}
+                  className="font-display font-semibold text-green underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Vertragsdaten selbst einpflegen
+                </button>
+                <p className="mt-2 text-sm text-slate">Bestehende Angaben manuell erfassen</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -213,15 +294,16 @@ function CreateTenancyForm({ accountId, unitId }: { accountId: string; unitId: s
 
   const onSubmit = form.handleSubmit((values) => {
     const baseRentCents = parseEurToCents(values.baseRent);
-    const advancePaymentCents = parseEurToCents(values.advance);
-    if (baseRentCents === null || advancePaymentCents === null) return;
+    const initialAdvancePaymentCents = parseEurToCents(values.advance);
+    if (baseRentCents === null || initialAdvancePaymentCents === null) return;
     create.mutate(
       {
         renterName: values.renterName,
         validFrom: values.validFrom,
         validTo: values.validTo === '' ? null : values.validTo,
         baseRentCents,
-        advancePaymentCents,
+        initialAdvancePaymentCents,
+        advanceDeclarationRef: values.advanceDeclarationRef,
       },
       {
         onSuccess: () => {
@@ -282,6 +364,12 @@ function CreateTenancyForm({ accountId, unitId }: { accountId: string; unitId: s
               inputMode="decimal"
               error={form.formState.errors.advance}
               registration={form.register('advance')}
+            />
+            <FormField
+              id="tenancy-advance-declaration"
+              label="Grundlage der NK-Vorauszahlung"
+              error={form.formState.errors.advanceDeclarationRef}
+              registration={form.register('advanceDeclarationRef')}
             />
             <div>
               <Button type="submit" disabled={create.isPending}>

@@ -339,9 +339,24 @@ class StatementCo2(ApiModel):
 
 class BuildingCreate(ApiModel):
     name: str = Field(min_length=1, max_length=200)
+    building_type: Literal[
+        "WOHN_UND_GESCHAEFTSHAUS",
+        "WOHNHAUS",
+        "GEWERBEIMMOBILIE",
+        "EINFAMILIENHAUS",
+    ]
+    is_residential: bool
     street: str = Field(min_length=1, max_length=200)
+    house_number: str = Field(min_length=1, max_length=20)
     postal_code: str = Field(pattern=r"^\d{5}$")
     city: str = Field(min_length=1, max_length=100)
+    country: str = Field(default="Deutschland", min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def _composed_street_fits_database_column(self) -> "BuildingCreate":
+        if len(f"{self.street} {self.house_number}") > 200:
+            raise ValueError("street and house number together must not exceed 200 characters")
+        return self
 
 
 class BuildingSummary(ApiModel):
@@ -351,6 +366,9 @@ class BuildingSummary(ApiModel):
     postal_code: str
     city: str
     unit_count: int
+    building_type: str
+    latitude: float | None
+    longitude: float | None
 
 
 class BuildingListResponse(ApiModel):
