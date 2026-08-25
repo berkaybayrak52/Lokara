@@ -14,115 +14,123 @@ import { useState } from 'react';
 
 import { ApiError } from '@/lib/api';
 
-import { useAccountSummary, useLoadDemo, useMe, useResetDemo } from './queries';
+import {
+  DashboardSkeleton,
+  MietSollCard,
+  OccupancyCard,
+  UnavailableCard,
+} from './dashboard-widgets';
+import { useLoadDemo, useMe, usePortfolioOverview, useResetDemo } from './queries';
 
 export function showOwnerControls(role: string | undefined): boolean {
   return role === 'OWNER';
 }
 
-/** Dashboard (docs/04 M3 page 1): overview cards + one-click demo scenario. */
+/** Portfolio dashboard (UI-01): server-owned rent and occupancy truth. */
 export function Dashboard({ accountId }: { accountId: string }) {
-  const summary = useAccountSummary(accountId);
+  const overview = usePortfolioOverview(accountId);
   const loadDemo = useLoadDemo();
   const { data: me } = useMe();
   const ownerControls = showOwnerControls(
     me?.accounts.find((account) => account.id === accountId)?.role,
   );
 
-  if (summary.isPending) {
+  if (overview.isPending) {
     return (
       <PageFrame>
-        <div aria-hidden="true" className="grid gap-4 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-32 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
-            />
-          ))}
-        </div>
+        <DashboardSkeleton />
       </PageFrame>
     );
   }
 
-  if (summary.isError) {
-    const empty = summary.error instanceof ApiError && summary.error.status === 404;
+  if (overview.isError) {
+    const empty = overview.error instanceof ApiError && overview.error.status === 404;
+    if (empty) {
+      return (
+        <PageFrame>
+          <EmptyPortfolioCard
+            ownerControls={ownerControls}
+            loadPending={loadDemo.isPending}
+            loadFailed={loadDemo.isError}
+            onLoad={() => loadDemo.mutate()}
+          />
+        </PageFrame>
+      );
+    }
     return (
       <PageFrame>
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>{empty ? 'Noch keine Daten' : 'Fehler beim Laden'}</CardTitle>
+            <CardTitle>Fehler beim Laden</CardTitle>
             <CardDescription>
-              {empty
-                ? ownerControls
-                  ? 'Dieses Konto enthält noch kein Objekt. Laden Sie das Demo-Szenario: ein Gebäude, drei Einheiten, ein Auszug zur Jahresmitte — die Grundlage für die Abrechnung.'
-                  : 'Ihnen ist kein Objekt zugewiesen.'
-                : 'Die Übersicht konnte nicht geladen werden. Bitte versuchen Sie es später erneut.'}
+              Die Übersicht konnte nicht geladen werden. Bitte versuchen Sie es später erneut.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {!empty ? (
-              <StatusNote kind="danger" label="Verbindungsfehler.">
-                Laden Sie die Seite neu oder versuchen Sie es später erneut.
-              </StatusNote>
-            ) : null}
-            {ownerControls ? (
-              <div>
-                <Button onClick={() => loadDemo.mutate()} disabled={loadDemo.isPending}>
-                  {loadDemo.isPending ? 'Wird geladen…' : 'Demo-Szenario laden'}
-                </Button>
-              </div>
-            ) : null}
-            {ownerControls && loadDemo.isError ? (
-              <StatusNote kind="danger" label="Laden fehlgeschlagen.">
-                Bitte erneut versuchen.
-              </StatusNote>
-            ) : null}
+            <StatusNote kind="danger" label="Verbindungsfehler.">
+              Laden Sie die Seite neu oder versuchen Sie es später erneut.
+            </StatusNote>
           </CardContent>
         </Card>
       </PageFrame>
     );
   }
 
-  const data = summary.data;
-  const tenancyCount = data.tenancies.length;
+  const data = overview.data;
+  if (data.buildingCount === 0) {
+    return (
+      <PageFrame>
+        <EmptyPortfolioCard
+          ownerControls={ownerControls}
+          loadPending={loadDemo.isPending}
+          loadFailed={loadDemo.isError}
+          onLoad={() => loadDemo.mutate()}
+        />
+      </PageFrame>
+    );
+  }
 
   return (
     <PageFrame>
-      <div className="grid items-start gap-4 sm:grid-cols-3">
-        <Card className="border-l-4 border-green">
-          <CardHeader>
-            <CardDescription className="font-semibold text-forest">Objekt</CardDescription>
-            <CardTitle className="font-display text-xl">{data.buildingName}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-slate">{data.buildingAddress}</CardContent>
-        </Card>
-        <Card className="border-l-4 border-green">
-          <CardHeader>
-            <CardDescription className="font-semibold text-forest">Einheiten</CardDescription>
-            <CardTitle className="font-display text-3xl tabular-nums">{data.unitCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-slate">Wohneinheiten im Objekt</CardContent>
-        </Card>
-        <Card className="border-l-4 border-green">
-          <CardHeader>
-            <CardDescription className="font-semibold text-forest">
-              Mietverhältnisse
-            </CardDescription>
-            <CardTitle className="font-display text-3xl tabular-nums">{tenancyCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-slate">
-            inkl. Auszug zur Jahresmitte — Leerstand fällt dem Vermieter zu
-          </CardContent>
-        </Card>
+      <div className="grid min-w-0 grid-cols-1 items-start gap-4 overflow-hidden lg:grid-cols-3">
+        <MietSollCard
+          buildingCount={data.buildingCount}
+          mietSollCentsMonthly={data.mietSollCentsMonthly}
+        />
+        <OccupancyCard
+          accountId={accountId}
+          href={`/a/${accountId}/objekte`}
+          occupiedUnitCount={data.occupiedUnitCount}
+          vacantUnitCount={data.vacantUnitCount}
+          unitCount={data.unitCount}
+        />
+        <UnavailableCard
+          title="Mieteinnahmen"
+          description="Noch keine Zahlungsdaten verfügbar. Der monatliche Zahlungseingang folgt mit der Finanzübersicht."
+        />
       </div>
 
-      <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
-        <Card>
+      <div className="mt-6 grid min-w-0 grid-cols-1 items-start gap-4 overflow-hidden lg:grid-cols-3">
+        <UnavailableCard
+          title="Offene Posten"
+          description="Noch keine Zahlungsdaten verfügbar. Offene Mieten werden erst nach Einrichtung des Zahlungsabgleichs angezeigt."
+        />
+        <UnavailableCard
+          title="Cashflow"
+          description="Einrichtung ausstehend. Für den Verlauf fehlen noch echte Einnahmen- und Ausgabendaten."
+        />
+        <UnavailableCard
+          title="Aufgaben & Tickets"
+          description="Noch nicht verfügbar. Aufgaben und Tickets erhalten später eine eigene verlässliche Datenquelle."
+        />
+      </div>
+
+      <div className="mt-6 grid min-w-0 grid-cols-1 items-start gap-4 overflow-hidden lg:grid-cols-2">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle>Abrechnung 2025</CardTitle>
+            <CardTitle>Abrechnung erstellen</CardTitle>
             <CardDescription>
-              Betriebs- und Heizkostenabrechnung für {data.buildingName} — centgenau, mit
-              CO₂-Aufteilung und Rechtsstand.
+              Betriebs- und Heizkostenabrechnung — centgenau, mit CO₂-Aufteilung und Rechtsstand.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -134,6 +142,45 @@ export function Dashboard({ accountId }: { accountId: string }) {
         {ownerControls ? <ResetDemoCard /> : null}
       </div>
     </PageFrame>
+  );
+}
+
+function EmptyPortfolioCard({
+  ownerControls,
+  loadPending,
+  loadFailed,
+  onLoad,
+}: {
+  ownerControls: boolean;
+  loadPending: boolean;
+  loadFailed: boolean;
+  onLoad: () => void;
+}) {
+  return (
+    <Card className="max-w-xl min-w-0 overflow-hidden">
+      <CardHeader>
+        <CardTitle>Noch keine Daten</CardTitle>
+        <CardDescription>
+          {ownerControls
+            ? 'Dieses Konto enthält noch kein Objekt. Laden Sie das Demo-Szenario als Grundlage für die Abrechnung.'
+            : 'Ihnen ist noch kein Objekt zugewiesen. Wenden Sie sich an die Kontoinhaberin oder den Kontoinhaber.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {ownerControls ? (
+          <div>
+            <Button onClick={onLoad} disabled={loadPending}>
+              {loadPending ? 'Wird geladen…' : 'Demo-Szenario laden'}
+            </Button>
+          </div>
+        ) : null}
+        {ownerControls && loadFailed ? (
+          <StatusNote kind="danger" label="Laden fehlgeschlagen.">
+            Bitte erneut versuchen.
+          </StatusNote>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -208,7 +255,7 @@ function ResetDemoCard() {
 
 function PageFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="px-8 py-10">
+    <main className="min-w-0 overflow-x-hidden px-8 py-10">
       <header className="mb-8">
         <h1 className="font-display text-3xl font-bold">Übersicht</h1>
         <p className="mt-2 max-w-prose text-slate">Ihr Bestand auf einen Blick.</p>

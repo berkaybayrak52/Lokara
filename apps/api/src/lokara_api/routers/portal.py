@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
-from lokara_db import Account, AdvanceReconciliation, Person
+from lokara_db import Account, AdvanceReconciliation, Building, Person, Tenancy, Unit
 from lokara_domain import OccupancyOverlapError, Period, cents, format_eur
 from lokara_heating_engine import Page01bStatementValues
 from lokara_nk_engine import BillingWindowTooLongError, NkInputError
@@ -20,7 +20,7 @@ from lokara_pdf import (
     render_html_to_pdf,
     statement_html,
 )
-from sqlalchemy import select
+from sqlalchemy import and_, case, distinct, func, select
 
 from ..auth import RequireAuth
 from ..authorization import default_building_id, require_building, visible_building_ids
@@ -28,6 +28,7 @@ from ..deps import PathAccountSession
 from ..schemas import (
     DemoStatementResponse,
     DemoSummaryResponse,
+    PortfolioOverviewResponse,
     StatementAnnualComparison,
     StatementCo2,
     StatementDeviceEvidence,
@@ -68,6 +69,55 @@ _NO_DATA = 'Keine Daten im Konto — erst "Demo-Szenario laden" ausführen.'
 def summary(account_id: str, session: PathAccountSession) -> DemoSummaryResponse:
     return summary_response(
         session, session.get(Account, account_id), building_id=default_building_id(session)
+    )
+
+
+@router.get("/portfolio/overview")
+def portfolio_overview(account_id: str, session: PathAccountSession) -> PortfolioOverviewResponse:
+    today = date.today()
+    active_tenancy = and_(
+        Tenancy.account_id == Unit.account_id,
+        Tenancy.unit_id == Unit.id,
+        Tenancy.valid_from <= today,
+        Tenancy.valid_to.is_(None) | (Tenancy.valid_to > today),
+    )
+    query = (
+        select(
+            func.count(distinct(Building.id)).label("building_count"),
+            func.count(distinct(Unit.id)).label("unit_count"),
+            func.count(distinct(case((Tenancy.id.is_not(None), Unit.id), else_=None))).label(
+                "occupied_unit_count"
+            ),
+            func.coalesce(func.sum(Tenancy.base_rent_cents), 0).label("miet_soll_cents_monthly"),
+        )
+        .select_from(Building)
+        .outerjoin(
+            Unit,
+            and_(
+                Unit.account_id == Building.account_id,
+                Unit.building_id == Building.id,
+            ),
+        )
+        .outerjoin(Tenancy, active_tenancy)
+        .where(
+            Building.account_id == account_id,
+            Building.archived_at.is_(None),
+        )
+    )
+    visible_ids = visible_building_ids(session)
+    if visible_ids is not None:
+        query = query.where(Building.id.in_(visible_ids))
+
+    row = session.execute(query).one()
+    building_count = int(row.building_count)
+    unit_count = int(row.unit_count)
+    occupied_unit_count = int(row.occupied_unit_count)
+    return PortfolioOverviewResponse(
+        building_count=building_count,
+        unit_count=unit_count,
+        occupied_unit_count=occupied_unit_count,
+        vacant_unit_count=unit_count - occupied_unit_count,
+        miet_soll_cents_monthly=int(row.miet_soll_cents_monthly),
     )
 
 
