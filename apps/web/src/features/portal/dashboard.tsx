@@ -25,14 +25,19 @@ export function Dashboard({ accountId }: { accountId: string }) {
   const summary = useAccountSummary(accountId);
   const loadDemo = useLoadDemo();
   const { data: me } = useMe();
-  const ownerControls = showOwnerControls(me?.accounts.find((account) => account.id === accountId)?.role);
+  const ownerControls = showOwnerControls(
+    me?.accounts.find((account) => account.id === accountId)?.role,
+  );
 
   if (summary.isPending) {
     return (
       <PageFrame>
         <div aria-hidden="true" className="grid gap-4 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-32 animate-pulse rounded-xl bg-mint/60" />
+            <div
+              key={i}
+              className="h-32 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+            />
           ))}
         </div>
       </PageFrame>
@@ -51,20 +56,22 @@ export function Dashboard({ accountId }: { accountId: string }) {
                 ? ownerControls
                   ? 'Dieses Konto enthält noch kein Objekt. Laden Sie das Demo-Szenario: ein Gebäude, drei Einheiten, ein Auszug zur Jahresmitte — die Grundlage für die Abrechnung.'
                   : 'Ihnen ist kein Objekt zugewiesen.'
-                : 'Die Übersicht konnte nicht geladen werden. Läuft die API (uv run lokara-api)?'}
+                : 'Die Übersicht konnte nicht geladen werden. Bitte versuchen Sie es später erneut.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {!empty ? (
               <StatusNote kind="danger" label="Verbindungsfehler.">
-                Bitte API und Datenbank prüfen, dann erneut versuchen.
+                Laden Sie die Seite neu oder versuchen Sie es später erneut.
               </StatusNote>
             ) : null}
-            {ownerControls ? <div>
-              <Button onClick={() => loadDemo.mutate()} disabled={loadDemo.isPending}>
-                {loadDemo.isPending ? 'Wird geladen…' : 'Demo-Szenario laden'}
-              </Button>
-            </div> : null}
+            {ownerControls ? (
+              <div>
+                <Button onClick={() => loadDemo.mutate()} disabled={loadDemo.isPending}>
+                  {loadDemo.isPending ? 'Wird geladen…' : 'Demo-Szenario laden'}
+                </Button>
+              </div>
+            ) : null}
             {ownerControls && loadDemo.isError ? (
               <StatusNote kind="danger" label="Laden fehlgeschlagen.">
                 Bitte erneut versuchen.
@@ -81,24 +88,26 @@ export function Dashboard({ accountId }: { accountId: string }) {
 
   return (
     <PageFrame>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
+      <div className="grid items-start gap-4 sm:grid-cols-3">
+        <Card className="border-l-4 border-green">
           <CardHeader>
-            <CardDescription>Objekt</CardDescription>
+            <CardDescription className="font-semibold text-forest">Objekt</CardDescription>
             <CardTitle className="font-display text-xl">{data.buildingName}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate">{data.buildingAddress}</CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-green">
           <CardHeader>
-            <CardDescription>Einheiten</CardDescription>
+            <CardDescription className="font-semibold text-forest">Einheiten</CardDescription>
             <CardTitle className="font-display text-3xl tabular-nums">{data.unitCount}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate">Wohneinheiten im Objekt</CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-green">
           <CardHeader>
-            <CardDescription>Mietverhältnisse</CardDescription>
+            <CardDescription className="font-semibold text-forest">
+              Mietverhältnisse
+            </CardDescription>
             <CardTitle className="font-display text-3xl tabular-nums">{tenancyCount}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate">
@@ -107,7 +116,7 @@ export function Dashboard({ accountId }: { accountId: string }) {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Abrechnung 2025</CardTitle>
@@ -183,7 +192,7 @@ function ResetDemoCard() {
         {reset.isError ? (
           <StatusNote kind="danger" label="Zurücksetzen fehlgeschlagen.">
             {reset.error instanceof ApiError && reset.error.status === 403
-              ? 'Demo-Funktionen sind deaktiviert — API mit DEMO_SEED_ENABLED=true starten.'
+              ? 'Demo-Funktionen sind derzeit nicht verfügbar.'
               : 'Bitte erneut versuchen.'}
           </StatusNote>
         ) : null}
@@ -202,10 +211,7 @@ function PageFrame({ children }: { children: React.ReactNode }) {
     <main className="px-8 py-10">
       <header className="mb-8">
         <h1 className="font-display text-3xl font-bold">Übersicht</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Ihr Bestand auf einen Blick. Kontext kommt aus der URL — jede Anfrage wird serverseitig
-          neu autorisiert.
-        </p>
+        <p className="mt-2 max-w-prose text-slate">Ihr Bestand auf einen Blick.</p>
       </header>
       {children}
     </main>

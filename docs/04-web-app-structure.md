@@ -83,6 +83,27 @@ pages. Neither is `/`, which enters a sole
 `TAX_ADVISOR` context is selected deliberately rather than
 entered automatically.
 
+## Prepared but unmerged UI-00 global shell
+
+`slice/ui-00-layout-global-clean` prepares the UI-00 layout-only contract without changing any API,
+schema, calculation, money, or legal rule:
+
+- the supplied horizontal Lokara wordmark replaces the CSS placeholder and the supplied signet is
+  installed through Next.js `app/icon.png`;
+- authenticated content uses one centered 1440px frame with shared responsive side spacing;
+- dashboard cards keep their natural heights and the three summary cards carry the restrained
+  brand accent defined by `docs/05`;
+- root loading, error, and not-found states use German copy, brand tokens, visible actions, and the
+  supplied wordmark;
+- global metadata describes lifecycle-wide property management. Domain-specific lifecycle fields
+  remain owned by UI-03, UI-05B, UI-07, and UI-08; UI-00 adds none;
+- no global object filter exists. Portfolio pages remain portfolio-wide, and an individual object
+  is entered through the Objekte route.
+
+The shell and overview no longer expose URL-context or server-authorization implementation text.
+Functional labels such as `Abrechnung 2025` remain unchanged because they name a feature rather
+than position Lokara as an accounting-only product.
+
 ## Shipped API surface
 
 There is one FastAPI application. Its current route families are:

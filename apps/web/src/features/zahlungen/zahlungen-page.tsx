@@ -89,7 +89,7 @@ export function ZahlungenPage({ accountId }: { accountId: string }) {
             </div>
           ) : isError ? (
             <StatusNote kind="danger" label="Zahlungen konnten nicht geladen werden.">
-              Bitte API und Datenbank prüfen, dann neu laden.
+              Laden Sie die Seite neu oder versuchen Sie es später erneut.
             </StatusNote>
           ) : rows.length === 0 ? (
             <Card>
@@ -152,13 +152,12 @@ export function ZahlungenPage({ accountId }: { accountId: string }) {
           )}
         </section>
 
-        {/* One approved spelling only, byte-identical to the statement PDF's
-            DISCLAIMER and the styleguide footer. It states what Lokara IS; it
+        {/* One approved web spelling, identical to the styleguide footer. It
             must never be reworded into an attestation that the work on this
             page was carried out in conformity with the law. */}
         <p className="max-w-prose text-sm text-slate">
-          Die Verrechnung folgt §§ 366, 367 BGB. Lokara ist ein Werkzeug für die rechtskonforme
-          Betriebs- und Heizkostenabrechnung, keine Rechts- oder Steuerberatung.
+          Die Verrechnung folgt §§ 366, 367 BGB. Lokara unterstützt Vermieter bei der
+          rechtskonformen Verwaltung ihrer Objekte und ersetzt keine Rechts- oder Steuerberatung.
         </p>
       </div>
     </main>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@lokara/ui';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect } from 'react';
@@ -145,17 +146,18 @@ export function PortalShellContent({
           to the full DOCUMENT height on a long page (Zähler is ~2700px), which
           parks the account block far below the fold and scrolls the nav away. */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-mint bg-white px-4 py-6 md:flex">
-        <Link href="/" className="mb-8 flex items-center gap-2 px-2">
-          <span
-            aria-hidden="true"
-            className="grid size-8 shrink-0 grid-cols-2 gap-0.5 rounded-lg bg-ink p-1.5"
-          >
-            <span className="rounded-[2px] bg-green" />
-            <span className="rounded-[2px] bg-paper/90" />
-            <span className="rounded-[2px] bg-paper/90" />
-            <span className="rounded-[2px] bg-green" />
-          </span>
-          <span className="font-display text-lg font-bold">Lokara</span>
+        <Link
+          href="/"
+          className="mb-8 flex items-center gap-2 rounded px-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+        >
+          <Image
+            src="/lokara-logo.png"
+            alt="Lokara"
+            width={103}
+            height={28}
+            className="h-7 w-auto"
+            priority
+          />
         </Link>
 
         {account ? (
@@ -244,10 +246,8 @@ export function PortalShellContent({
         ) : null}
       </aside>
 
-      {/* One centered measure for every page instead of full-bleed: on a wide
-          screen the tables otherwise run to the far edge and the eye loses the
-          row. Set here, once, so no page can drift from it. */}
-      <div className="mx-auto min-w-0 w-full max-w-[1100px] flex-1">
+      {/* UI-00: one centered 1440px content frame with shared responsive air. */}
+      <div className="mx-auto min-w-0 w-full max-w-[1440px] flex-1 px-6 xl:px-8">
         {account ? (
           <nav
             aria-label="Mobile Hauptnavigation"
@@ -270,14 +270,17 @@ export function PortalShellContent({
         ) : null}
         {isLoading ? (
           <main className="mx-auto max-w-2xl px-8 py-16">
-            <div aria-hidden="true" className="h-32 animate-pulse rounded-xl bg-mint/60" />
+            <div
+              aria-hidden="true"
+              className="h-32 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+            />
           </main>
         ) : account === undefined ? (
           <main className="mx-auto max-w-2xl px-8 py-16">
             <h1 className="font-display text-2xl font-bold">Kein Zugriff auf dieses Konto</h1>
             <p className="mt-3 max-w-prose text-slate">
               Für dieses Konto besteht keine aktive Mitgliedschaft. Die Navigation zeigt nur, was
-              existiert — jeder Zugriff wird serverseitig unabhängig geprüft.
+              für Sie verfügbar ist.
             </p>
             <Button asChild className="mt-6">
               <Link href="/">Zur Kontoauswahl</Link>

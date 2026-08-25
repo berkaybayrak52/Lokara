@@ -76,8 +76,8 @@ export function PortalEntry() {
         <div aria-hidden="true" className="mt-8 h-40 animate-pulse rounded-xl bg-mint/60" />
       ) : me.isError ? (
         <div className="mt-8 space-y-4">
-          <StatusNote kind="danger" label="Keine Verbindung zur API.">
-            Läuft der Server? <code className="font-mono text-xs">uv run lokara-api</code>
+          <StatusNote kind="danger" label="Anmeldung nicht verfügbar.">
+            Bitte versuchen Sie es später erneut.
           </StatusNote>
           <Button variant="outline" onClick={() => me.refetch()}>
             Erneut versuchen

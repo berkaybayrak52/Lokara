@@ -37,7 +37,7 @@ export function BelegPage({ accountId }: { accountId: string }) {
         <div aria-hidden="true" className="h-64 animate-pulse rounded-xl bg-mint/60" />
       ) : buildings.isError ? (
         <StatusNote kind="danger" label="Objekte konnten nicht geladen werden.">
-          Bitte API und Datenbank prüfen, dann neu laden.
+          Laden Sie die Seite neu oder versuchen Sie es später erneut.
         </StatusNote>
       ) : buildings.data.buildings.length === 0 ? (
         <Card className="max-w-xl">
