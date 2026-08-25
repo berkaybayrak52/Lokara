@@ -226,6 +226,27 @@ UI work is done only when:
   isolation.
 - Merge only green work. Commit, merge and push only at the stage Emir authorizes.
 
+### Current working mode — direct implementation
+
+Set by Emir on 25.08.2026. It is active until he ends it and overrides the lane, agent and gate
+rules above and in `AGENTS.md` for as long as it stands. Remove this subsection to restore the
+normal cadence.
+
+- Do not spawn subagents. The main session does the work directly.
+- Do not write tests, golden fixtures or `.lokara-red` sentinels, and do not treat a
+  `scripts/gate.sh` run as a merge precondition. Lint, type checks and the web production build are
+  compile-level checks, not tests, and stay in use.
+- The rule that no agent writes both a test and the implementation that satisfies it is suspended,
+  because no test is written at all.
+
+Everything else still binds: engine purity, integer-cent money, immutable and versioned legal
+records, account isolation and RLS, the source precedence in § 4, German UI copy and every
+`verify-before-production` flag.
+
+Code written under this mode carries no test evidence. It is not green, may not be recorded as
+technically closed, and every path it touches must be re-verified before milestone closure or any
+production claim.
+
 ### Technical closure and unresolved authority
 
 - Classify every unresolved authority as `verify-before-production`, a required
