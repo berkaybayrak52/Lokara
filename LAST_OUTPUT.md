@@ -1,20 +1,26 @@
-# Last output — UI-02 ready for local merge
+# Last output — UI-03 finished under direct implementation mode
 
-HEAD `3898776` on `slice/ui-02-app-shell-desktop` · `25.08.2026`
+HEAD `15ee3b3` on `main` · `25.08.2026`
 Status: Complete
 
 ## Wanted
-Close, commit and locally merge UI-02 without pushing.
+Close the agent workflow and test writing until further notice, record that in the docs, continue
+UI-03, and put the primary working tree on the UI-03 branch.
 
 ## Done
-The desktop shell has its persistent 248/72px sidebar, account menu, role navigation and shared headers.
-Rendered interaction fixtures pass; the Escape and Reduced Motion review findings are fixed.
-Statement review, fast, production build and the clean disposable-database full gate are green.
-The full gate passed 1,717 Python tests and 137 web tests; the disposable container was removed.
+`CLAUDE.md` § 10 gained "Current working mode": no subagents, no tests/fixtures/`.lokara-red`, no
+gate run as a merge precondition; engine purity, isolation, immutability and source precedence
+still bind. `AGENTS.md` § 4 and the `PLAN.md` UI verification section point at it.
+UI-03 covers O1–O12: schedule contract repair, migration `0026`, the geocoding adapter behind a
+default-off setting, both wizard routes, the Liste/Karte toggle with Leaflet, and inactive photo
+slots. Ten `mypy --strict` errors in its pre-existing test files were fixed. Decisions recorded in
+`docs/04`. `.lokara-red` removed.
+Green: ruff, `mypy --strict` (237 files), typecheck, lint, production build. Both commits and the
+merge are local on `main`; `PLAN.md` records UI-03 as implemented and unverified.
 
 ## Not done
-The automated viewport/zoom screenshot matrix remains unavailable; Emir accepted the live shell.
-Nothing was pushed.
+No test suite, boundary audit or statement review was run for UI-03. Nothing pushed.
+The spec's `## Build-Notes` block is unfilled: it lives under `berkay-work/`.
 
 ## Optional next step
-Start UI-03 from the updated `main` branch.
+Give permission for the `berkay-work` Build-Notes edit, then start UI-04.
