@@ -33,6 +33,15 @@ export const DemoSummaryResponseSchema = z.object({
 });
 export type DemoSummaryResponse = z.infer<typeof DemoSummaryResponseSchema>;
 
+export const PortfolioOverviewResponseSchema = z.object({
+  buildingCount: z.number().int().nonnegative(),
+  unitCount: z.number().int().nonnegative(),
+  occupiedUnitCount: z.number().int().nonnegative(),
+  vacantUnitCount: z.number().int().nonnegative(),
+  mietSollCentsMonthly: z.number().int().nonnegative(),
+});
+export type PortfolioOverviewResponse = z.infer<typeof PortfolioOverviewResponseSchema>;
+
 export const MeAccountSchema = z.object({
   id: z.string(),
   name: z.string(),

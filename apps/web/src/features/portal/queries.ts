@@ -13,6 +13,7 @@ import {
   DeliveryAddressSchema,
   FinalizeStatementSchema,
   PaymentInstructionSchema,
+  PortfolioOverviewResponseSchema,
   StatementHistorySchema,
   TenancyPreviewChoiceSchema,
 } from '@/lib/contracts';
@@ -31,6 +32,15 @@ export function useAccountSummary(accountId: string) {
     queryKey: ['account', accountId, 'summary'],
     queryFn: () => api(`/a/${accountId}/summary`, DemoSummaryResponseSchema),
     retry: false, // a 404 is the designed empty state, not a flake
+  });
+}
+
+export function usePortfolioOverview(accountId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'portfolio-overview'],
+    queryFn: () =>
+      api(`/a/${accountId}/portfolio/overview`, PortfolioOverviewResponseSchema),
+    retry: false,
   });
 }
 

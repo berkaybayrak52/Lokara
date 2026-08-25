@@ -83,10 +83,9 @@ pages. Neither is `/`, which enters a sole
 `TAX_ADVISOR` context is selected deliberately rather than
 entered automatically.
 
-## Prepared but unmerged UI-00 global shell
+## Shipped UI-00 global shell
 
-`slice/ui-00-layout-global-clean` prepares the UI-00 layout-only contract without changing any API,
-schema, calculation, money, or legal rule:
+UI-00 is locally merged and changes no API, schema, calculation, money, or legal rule:
 
 - the supplied horizontal Lokara wordmark replaces the CSS placeholder and the supplied signet is
   installed through Next.js `app/icon.png`;
@@ -101,8 +100,29 @@ schema, calculation, money, or legal rule:
   is entered through the Objekte route.
 
 The shell and overview no longer expose URL-context or server-authorization implementation text.
-Functional labels such as `Abrechnung 2025` remain unchanged because they name a feature rather
-than position Lokara as an accounting-only product.
+UI-00 left functional feature labels unchanged; UI-01 now owns the dashboard card wording below.
+
+## Shipped UI-01 portfolio dashboard
+
+UI-01 replaces the single-building start page with a portfolio read model while
+keeping `/a/{accountId}/summary` unchanged for its existing consumers:
+
+- `GET /a/{accountId}/portfolio/overview` returns exactly `buildingCount`, `unitCount`,
+  `occupiedUnitCount`, `vacantUnitCount`, and `mietSollCentsMonthly`;
+- the API aggregates only non-archived buildings visible to the caller, uses half-open active-today
+  tenancy periods, and sums Kaltmiete only; an empty visible portfolio returns five zeroes;
+- the dashboard renders the real monthly Mietsoll and occupancy ratio from that server-owned read
+  model. It does not rebuild money or visibility from client-side building feeds;
+- payment receipts, open items, cashflow, and tasks/tickets have no approved current data source and
+  therefore render explicit German unavailable states. The proposed 82/18 finance values and fixed
+  5/10/20 ticket counts are intentionally inactive and are never presented as product truth;
+- loading, empty, failure, demo-load/reset, Objekte, and Abrechnung paths remain explicit. Employees
+  with no visible assignment receive guidance to contact the account owner, never an owner-only
+  creation action.
+
+The endpoint adds no table, migration, write path, engine call, or public type outside the five-field
+HTTP response. Its boundary audit is clean after focused coverage for zero, multiple, and archived
+assignments plus both exact-today tenancy boundaries.
 
 ## Shipped API surface
 
@@ -110,7 +130,7 @@ There is one FastAPI application. Its current route families are:
 
 - `/health` and the environment-gated `/auth/dev-token`;
 - subject-only `/me`, fixed-account `/demo/{load,reset}` and `/calc/nk` routes;
-- `/a/{accountId}` summary and fixed demo-statement/PDF routes;
+- `/a/{accountId}` summary, portfolio overview and fixed demo-statement/PDF routes;
 - `/a/{accountId}` building, unit, tenancy, cost/allocation-key, meter/reading, heating-cost and
   extraction routes;
 - `/a/{accountId}` bank, receivable and Page-01-handoff routes (M6-C2, owner-only).

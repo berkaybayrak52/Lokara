@@ -103,8 +103,8 @@ is **Future**.
 - **App icon:** rounded square, Petrol Ink ground with green blocks.
 - **Avatar:** Lokara Grün circle with the mark.
 
-The supplied horizontal primary lockup and PNG app icon are **Prepared but unmerged** on
-`slice/ui-00-layout-global-clean`. The shell uses the complete horizontal lockup at 28px height and
+The supplied horizontal primary lockup and PNG app icon are **Shipped**. The shell uses the
+complete horizontal lockup at 28px height and
 therefore adds no separate wordmark. Next.js owns the app icon through `apps/web/src/app/icon.png`.
 Inverse, monochrome, and avatar assets remain **Future**; do not synthesize them from the PNGs.
 
@@ -376,7 +376,7 @@ calm colour, strong type hierarchy, tight motion, and generous air as a bar, not
 | Current motion | CSS/Tailwind transitions, including reduced-motion handling in the shared button | **Shipped** |
 | Framer Motion | Selected dependency; not installed | **Future** |
 | Mobile theme | Shared React Native token/theme object and app | **Future** |
-| Primary logo and app icon | Supplied PNGs installed in the UI-00 shell and Next.js app-icon convention on `slice/ui-00-layout-global-clean` | **Prepared but unmerged** |
+| Primary logo and app icon | Supplied PNGs installed in the UI-00 shell and Next.js app-icon convention | **Shipped** |
 | Other logo and motif assets | Inverse, monochrome, avatar, and separate motif assets are not present | **Future** |
 
 Known delivery gaps are kept explicit instead of changing this contract silently:

@@ -66,10 +66,12 @@ before UI. Dates are communication events, not planning inputs.
   complete and locally merged** from `slice/m7-afa-tax-export`. M7-F is deliberately deferred until
   after M10: one boundary audit found four unresolved defects, while statement/docs review,
   regression-first repairs and closing gates remain. Every M7 authority flag still blocks
-  production output. UI-00 was approved for local merge by Emir on 25.08.2026 with its clean
+  production output. UI-00 was locally merged by Emir on 25.08.2026 with its clean
   disposable-database full gate green. Live browser verification could not run because no browser
   session was available; Emir explicitly authorized the merge and UI-01 start with that check still
-  recorded as outstanding. UI-00 through UI-08 run before the paused M9 work resumes.
+  recorded as outstanding. UI-01 was also locally merged by Emir on 25.08.2026 with all non-browser
+  checks green and its live browser verification still recorded as outstanding. UI-00 through UI-08
+  run before the paused M9 work resumes.
   M10 renter publication follows completed M9, then M11 native apps, billing and the load test.
 
 ---
@@ -285,7 +287,7 @@ not replace the complete documentation or reconciliation gates.
 | U | **Technically complete, reviewed and locally merged 24.08.2026** | UVI comparison, calculation and document | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10. |
 | M7 | **M7-0…M7-E technically complete and locally merged 25.08.2026; M7-F deferred until after M10** | Tax export and AfA | The merged foundation passed its earlier gates. The initial M7-F boundary audit found four unresolved defects; statement/docs review, repairs and closing gates remain. All flagged register values continue to block real output. |
 | M8 | **Lane A unblocked; lane B source-blocked** | Document and letter engine | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either. |
-| UI | **UI-00 approved for local merge 25.08.2026; UI-01 starts next, with UI-00 live browser verification still recorded as outstanding** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
+| UI | **UI-00 and UI-01 locally merged 25.08.2026; UI-02 next, with both earlier live browser checks still recorded as outstanding** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
 | M9 | **Paused by Emir on 25.08.2026; resume after UI-08** | Reminders, email and checklists | Preserve the existing unmerged M9 worktree exactly. When resumed, extend the existing W1/W2/W4 foundation with the remaining guard projections, reminders, delivery and UVI scheduling from approved `docs/12`. |
 | M10 | **After resumed M9 is complete** | Portals and investment | Two independent lanes, R before I: renter activation, renter context and the renter portal, then the approved `docs/14` investment cockpit. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5. |
 | M11 | After M10 | Native apps, billing and load test | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test. |
@@ -1307,8 +1309,8 @@ rules.
 
 ### Portfolio UI 00–08 programme
 
-**Status — UI-00 approved for local merge by Emir on 25.08.2026.** It was prepared from clean `main` in the new
-`slice/ui-00-layout-global-clean` worktree, never from the dirty M7-F tree, the preserved M9
+**Status — UI-00 and UI-01 locally merged by Emir on 25.08.2026; UI-02 is next.** UI-00 was prepared from
+clean `main` in the new `slice/ui-00-layout-global-clean` worktree, never from the dirty M7-F tree, the preserved M9
 worktree or the unwanted `slice/ui-00-layout-global` worktree. Static UI review, 108 web tests,
 lint, types, production build and the fast gate are green. A clean `scripts/gate.sh full` is also
 green against a disposable PostgreSQL 16 database migrated to `0024`: 1,709 pytest and 108 vitest
@@ -1319,6 +1321,15 @@ browser session is available. Emir explicitly authorized local merge and the UI-
 check still recorded as outstanding. Do not reuse or remove the unwanted worktree; its removal
 requires Emir's separate approval.
 
+UI-01 now has its five-field portfolio endpoint, real Mietsoll/occupancy dashboard, and explicit
+unavailable states instead of the source's proposed 82/18 finance and 5/10/20 ticket mocks. Focused
+fixtures, boundary audit, statement review, fast, full and non-fresh demo gates are green: 1,717
+pytest and 117 vitest tests pass, and the statement remains 149,269 bytes. The disposable database
+was removed. The demo gate restarted the shared Postgres container without targeting it for any
+migration or seed; its preserved M9 volume was verified still at `0025`. Live UI-01 viewport, zoom,
+keyboard, focus, reduced-motion and overflow verification remains blocked because no browser
+session is available. Emir explicitly authorized local merge with that check still outstanding.
+
 The supplied files are authoritative UX intent. Existing approved legal rules, pure-engine
 contracts, account isolation and immutable evidence remain authoritative wherever a proposed
 backend detail conflicts. No page may invent counts, money, legal status, deadlines, provider
@@ -1327,7 +1338,7 @@ state, uploads, portal access or other unavailable product state.
 #### Source custody and documentation
 
 - Relocate only `berkay-work/berkay-specs/` to `berkay-work/Spec-Seiten/UI/`; preserve every file's
-  contents. This relocation is **prepared but unmerged** in `slice/ui-00-layout-global-clean`; all
+  contents. This relocation was **locally merged** with UI-00; all
   source hashes match and the former source directory is no longer present in the dirty M7-F tree.
 - Preserve this filename order: `00`, `01`, `02`, `03`, `04`, `05_Abrechnung`, `05_Einheiten`,
   `06`, `07`, `08`.
@@ -1347,8 +1358,8 @@ state, uploads, portal access or other unavailable product state.
 
 | Step | Source file | Current status | Required implementation and explicit limits |
 | --- | --- | --- | --- |
-| UI-00 | `00_Layout-Global.md` | **Approved for local merge 25.08.2026; implementation, static review and clean disposable-database full gate are green; live browser verification remains outstanding by explicit Emir decision** | Install the supplied horizontal logo and `app/icon.png`; update metadata; establish the 1440px content frame, shared page spacing, natural card heights, branded KPI accents and global loading/error/not-found states. Remove development-facing copy and the global object filter. Audit lifecycle metadata, but leave domain-specific schema additions to their owning later steps. |
-| UI-01 | `01_Dashboard.md` | **Not started** | Add `GET /a/{account_id}/portfolio/overview` returning exactly `buildingCount`, `unitCount`, `occupiedUnitCount`, `vacantUnitCount` and `mietSollCentsMonthly`. Aggregate only visible, non-archived buildings and respect employee building scope. Replace the single-building dashboard with the portfolio layout. The proposed 82/18 finance mock and fake ticket counters are **intentionally inactive**; render real values or an honest unavailable/onboarding state. |
+| UI-00 | `00_Layout-Global.md` | **Locally merged 25.08.2026; implementation, static review and clean disposable-database full gate are green; live browser verification remains outstanding by explicit Emir decision** | Install the supplied horizontal logo and `app/icon.png`; update metadata; establish the 1440px content frame, shared page spacing, natural card heights, branded KPI accents and global loading/error/not-found states. Remove development-facing copy and the global object filter. Audit lifecycle metadata, but leave domain-specific schema additions to their owning later steps. |
+| UI-01 | `01_Dashboard.md` | **Locally merged 25.08.2026; implementation, reviews, fast/full and non-fresh demo are green; live browser verification remains outstanding by explicit Emir decision** | Add `GET /a/{account_id}/portfolio/overview` returning exactly `buildingCount`, `unitCount`, `occupiedUnitCount`, `vacantUnitCount` and `mietSollCentsMonthly`. Aggregate only visible, non-archived buildings and respect employee building scope. Replace the single-building dashboard with the portfolio layout. The proposed 82/18 finance mock and fake ticket counters are **intentionally inactive**; render real values or an honest unavailable/onboarding state. |
 | UI-02 | `02_App-Shell-Desktop.md` | **Not started** | Implement the 248px expanded and 72px collapsed sidebar, persistent account-scoped preference, full logo versus icon, accessible tooltips, active navigation, account menu and shared page header. Keep authorization server-enforced; hiding navigation is presentation only. Roll the shell across existing landlord routes and remove obsolete development navigation copy. Track this filename as UI-02 even though its internal heading says 09. |
 | UI-03 | `03_Objekte.md` | **Not started** | First repair the tenancy frontend contract to consume `advancePaymentSchedule` and send `initialAdvancePaymentCents` plus `advanceDeclarationRef`. Add building type, residential flag, country and nullable coordinates without silently changing engine decisions. Build object/unit routes and wizards, list/map switch and inactive photo slots. Geocoding and tiles use configurable adapters. Public Nominatim/OSM is demo-only, cached, attributed and failure-tolerant; production defaults disabled. |
 | UI-04 | `04_Objekt-Dashboard.md` | **Not started** | Add `/a/{account_id}/buildings/{building_id}/dashboard` as a server-owned read model with `asOf`, four authoritative KPIs, up to three prioritized facts, compact unit rows and explicit module availability. Do not aggregate financial truth in the browser. Generate object-summary PDFs server-side as immutable, owner-only snapshots with digest verification. Payment-dependent values are **source-blocked** until UI-07 supplies them. |

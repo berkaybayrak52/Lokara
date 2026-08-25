@@ -58,6 +58,14 @@ class DemoSummaryResponse(ApiModel):
     tenancies: list[DemoTenancySummary]
 
 
+class PortfolioOverviewResponse(ApiModel):
+    building_count: int = Field(ge=0)
+    unit_count: int = Field(ge=0)
+    occupied_unit_count: int = Field(ge=0)
+    vacant_unit_count: int = Field(ge=0)
+    miet_soll_cents_monthly: int = Field(ge=0)
+
+
 # ── NK statement calculation ──────────────────────────────────────────────────
 
 
