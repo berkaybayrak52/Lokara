@@ -26,6 +26,7 @@ import { API_URL, ApiError } from '@/lib/api';
 import type { DemoStatementResponse } from '@/lib/contracts';
 
 import { useBuildings } from '../objekte/queries';
+import { PageHeader } from './page-header';
 
 import {
   useBuildingTenancies,
@@ -86,15 +87,11 @@ export function StatementPage({ accountId }: { accountId: string }) {
   };
 
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Abrechnung erstellen</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Betriebs- und Heizkostenabrechnung für ein Objekt und einen Abrechnungszeitraum. Die
-          Anteile berechnen die geprüften Engines — jede Kostenart stimmt centgenau mit dem
-          Gesamtbetrag überein.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Abrechnungen"
+        description="Betriebs- und Heizkostenabrechnung für ein Objekt und einen Abrechnungszeitraum. Die Anteile berechnen die geprüften Engines — jede Kostenart stimmt centgenau mit dem Gesamtbetrag überein."
+      />
 
       {!requested ? (
         <Card className="max-w-xl">
@@ -153,8 +150,8 @@ export function StatementPage({ accountId }: { accountId: string }) {
         </Card>
       ) : statement.isPending ? (
         <div aria-hidden="true" className="max-w-4xl space-y-4">
-          <div className="h-48 animate-pulse rounded-xl bg-mint/60" />
-          <div className="h-48 animate-pulse rounded-xl bg-mint/60" />
+          <div className="h-48 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none" />
+          <div className="h-48 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none" />
         </div>
       ) : statement.isError ? (
         <div className="max-w-xl space-y-4">

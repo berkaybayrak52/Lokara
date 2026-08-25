@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { PageHeader } from '@/features/portal/page-header';
 import { useFormDraft } from '@/lib/form-draft';
 
 import { FormField } from './form-field';
@@ -48,19 +49,19 @@ export function BuildingsPage({ accountId }: { accountId: string }) {
   const ownerControls = showOwnerControls(me?.accounts.find((account) => account.id === accountId)?.role);
 
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Objekte</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Gebäude mit ihren Einheiten und Mietverhältnissen. Ein Klick auf ein Objekt öffnet die
-          Einheiten.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Objekte"
+        description="Gebäude mit ihren Einheiten und Mietverhältnissen. Ein Klick auf ein Objekt öffnet die Einheiten."
+      />
 
       <div className="grid max-w-5xl gap-8 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Objektliste">
           {buildings.isPending ? (
-            <div aria-hidden="true" className="h-48 animate-pulse rounded-xl bg-mint/60" />
+            <div
+              aria-hidden="true"
+              className="h-48 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+            />
           ) : buildings.isError ? (
             <StatusNote kind="danger" label="Objekte konnten nicht geladen werden.">
               Laden Sie die Seite neu oder versuchen Sie es später erneut.

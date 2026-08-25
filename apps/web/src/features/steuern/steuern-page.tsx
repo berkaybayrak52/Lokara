@@ -14,6 +14,7 @@ import {
 } from '@lokara/ui';
 import React, { useEffect, useState } from 'react';
 
+import { PageHeader } from '@/features/portal/page-header';
 import { useMe } from '@/features/portal/queries';
 import {
   taxArtifactUrl,
@@ -570,13 +571,11 @@ export function TaxWorkspace(props: TaxWorkspaceProps) {
     </div>
   );
   return (
-    <main className="px-4 py-8 sm:px-8 sm:py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold text-ink">Steuern</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          AfA-Nachweise und unveränderliche Steuerexporte für Objekt und Steuerjahr.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Steuern"
+        description="AfA-Nachweise und unveränderliche Steuerexporte für Objekt und Steuerjahr."
+      />
       <nav aria-label="Steuernavigation" className="mb-6 flex gap-2 overflow-x-auto pb-2 sm:hidden">
         {['Auswahl', 'AfA-Assistent', 'Exportbereitschaft', 'Einstellungen', 'Exporthistorie'].map(
           (section) => (
@@ -1141,13 +1140,13 @@ export function TaxWorkspacePage({ accountId }: { accountId: string }) {
   }, [mapping.data?.id]);
   if (me.isPending || buildings.isPending)
     return (
-      <main className="px-4 py-8" role="status">
+      <main className="py-10" role="status">
         Steuerbereich wird geladen …
       </main>
     );
   if (account?.role !== 'OWNER' && account?.role !== 'TAX_ADVISOR')
     return (
-      <main className="px-4 py-8">
+      <main className="py-10">
         <h1 className="font-display text-2xl font-bold">Kein Zugriff auf Steuern</h1>
       </main>
     );
