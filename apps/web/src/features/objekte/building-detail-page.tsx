@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { PageHeader } from '@/features/portal/page-header';
 import { ApiError } from '@/lib/api';
 import { parseSqmToX100 } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
@@ -52,15 +53,18 @@ export function BuildingDetailPage({
 
   if (detail.isPending) {
     return (
-      <main className="px-8 py-10">
-        <div aria-hidden="true" className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60" />
+      <main className="py-10">
+        <div
+          aria-hidden="true"
+          className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+        />
       </main>
     );
   }
   if (detail.isError) {
     const missing = detail.error instanceof ApiError && detail.error.status === 404;
     return (
-      <main className="px-8 py-10">
+      <main className="py-10">
         <StatusNote kind="danger" label={missing ? 'Objekt nicht gefunden.' : 'Fehler beim Laden.'}>
           {missing ? (
             <Link className="underline underline-offset-4" href={`/a/${accountId}/objekte`}>
@@ -76,22 +80,19 @@ export function BuildingDetailPage({
 
   const building = detail.data;
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <p className="mb-1 text-sm">
+    <main className="py-10">
+      <PageHeader
+        title={building.name}
+        description={`${building.street}, ${building.postalCode} ${building.city}`}
+        breadcrumb={
           <Link
             href={`/a/${accountId}/objekte`}
             className="text-green underline-offset-4 hover:underline"
           >
             Objekte
-          </Link>{' '}
-          <span aria-hidden="true">/</span>
-        </p>
-        <h1 className="font-display text-3xl font-bold">{building.name}</h1>
-        <p className="mt-2 text-slate">
-          {building.street}, {building.postalCode} {building.city}
-        </p>
-      </header>
+          </Link>
+        }
+      />
 
       <div className="grid max-w-5xl gap-8 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Einheiten">

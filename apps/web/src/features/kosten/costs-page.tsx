@@ -25,6 +25,7 @@ import { useForm } from 'react-hook-form';
 
 import { useBuildingDetail, useBuildings } from '@/features/objekte/queries';
 import { FormField } from '@/features/objekte/form-field';
+import { PageHeader } from '@/features/portal/page-header';
 import { ApiError } from '@/lib/api';
 import type { AllocationKey, CostEntryOut } from '@/lib/contracts';
 import { ALLOCATION_KEYS, ALLOCATION_KEY_LABELS } from '@/lib/contracts';
@@ -41,18 +42,17 @@ export function CostsPage({ accountId }: { accountId: string }) {
   const buildingId = selectedId ?? buildings.data?.buildings[0]?.id ?? null;
 
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Kosten erfassen</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Betriebskosten je Objekt und Abrechnungszeitraum. Der Umlageschlüssel wird pro Kostenart
-          gewählt und kann jederzeit geändert werden — die Abrechnung rechnet neu, erfasste Daten
-          bleiben erhalten.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Kosten"
+        description="Betriebskosten je Objekt und Abrechnungszeitraum. Der Umlageschlüssel wird pro Kostenart gewählt und kann jederzeit geändert werden — die Abrechnung rechnet neu, erfasste Daten bleiben erhalten."
+      />
 
       {buildings.isPending ? (
-        <div aria-hidden="true" className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60" />
+        <div
+          aria-hidden="true"
+          className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+        />
       ) : buildings.isError ? (
         <StatusNote kind="danger" label="Objekte konnten nicht geladen werden.">
           Laden Sie die Seite neu oder versuchen Sie es später erneut.
@@ -115,7 +115,10 @@ function CostsForBuilding({
     <div className="grid max-w-6xl gap-8 lg:grid-cols-[3fr_2fr]">
       <section aria-label="Erfasste Kosten">
         {costs.isPending ? (
-          <div aria-hidden="true" className="h-48 animate-pulse rounded-xl bg-mint/60" />
+          <div
+            aria-hidden="true"
+            className="h-48 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+          />
         ) : costs.isError ? (
           <StatusNote kind="danger" label="Kosten konnten nicht geladen werden.">
             Bitte erneut versuchen.

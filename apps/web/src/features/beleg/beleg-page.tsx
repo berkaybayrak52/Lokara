@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { useBuildingDetail, useBuildings } from '@/features/objekte/queries';
+import { PageHeader } from '@/features/portal/page-header';
 
 import { ReviewStep } from './review-step';
 import { useStoredExtraction } from './queries';
@@ -23,18 +24,17 @@ export function BelegPage({ accountId }: { accountId: string }) {
   const buildingId = selectedId ?? buildings.data?.buildings[0]?.id ?? null;
 
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Beleg-Upload</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Rechnung hochladen, erkannte Felder prüfen, als Kostenart übernehmen. Gespeichert wird
-          ausschließlich, was Sie bestätigt haben — eine Fehlerkennung erreicht die Abrechnung nie
-          ungeprüft.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Belege"
+        description="Rechnung hochladen, erkannte Felder prüfen, als Kostenart übernehmen. Gespeichert wird ausschließlich, was Sie bestätigt haben — eine Fehlerkennung erreicht die Abrechnung nie ungeprüft."
+      />
 
       {buildings.isPending ? (
-        <div aria-hidden="true" className="h-64 animate-pulse rounded-xl bg-mint/60" />
+        <div
+          aria-hidden="true"
+          className="h-64 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+        />
       ) : buildings.isError ? (
         <StatusNote kind="danger" label="Objekte konnten nicht geladen werden.">
           Laden Sie die Seite neu oder versuchen Sie es später erneut.

@@ -4,17 +4,22 @@ import { Button } from '@lokara/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import type { MeAccount } from '@/lib/contracts';
 
 import { useMe } from './queries';
 
 /**
- * The Vermieter-portal shell (docs/04): context lives in the URL
- * (/a/{accountId}/…), the left menu is DERIVED from the Person's relationships
- * and is navigation only — the API re-authorizes every request independently.
+ * The account context lives in the URL. The menu only reflects relationships
+ * returned by /me; every destination remains independently authorized by the API.
  */
+
+const SIDEBAR_PREFERENCE_KEY = 'lokara.sidebar.collapsed.v1';
+
+function sidebarPreferenceKey(accountId: string): string {
+  return `${SIDEBAR_PREFERENCE_KEY}:${accountId}`;
+}
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: 'Inhaber:in',
@@ -22,56 +27,67 @@ const ROLE_LABELS: Record<string, string> = {
   TAX_ADVISOR: 'Steuerberater:in',
 };
 
+type IconName =
+  'overview' | 'buildings' | 'payments' | 'costs' | 'receipts' | 'meters' | 'statements' | 'tax';
+
 interface NavItem {
   href: (accountId: string) => string;
   label: string;
-  /** Path prefixes (relative to /a/{id}) that count as "inside" this item. */
+  icon: IconName;
   activePrefixes: string[];
-  /**
-   * Nav-only visibility, NOT authorization. The API re-authorizes every request
-   * independently (CLAUDE.md § 3.3) and a hidden link protects nothing; this
-   * predicate only keeps the menu honest, so it never offers a route that is
-   * guaranteed to answer 403 for the caller's role.
-   */
   visibleFor?: (role: string) => boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: (id) => `/a/${id}`, label: 'Übersicht', activePrefixes: [] },
-  // Einheiten pages belong to the Objekte section (list → detail → unit).
+  { href: (id) => `/a/${id}`, label: 'Übersicht', icon: 'overview', activePrefixes: [] },
   {
     href: (id) => `/a/${id}/objekte`,
     label: 'Objekte',
+    icon: 'buildings',
     activePrefixes: ['/objekte', '/einheiten'],
-  },
-  { href: (id) => `/a/${id}/kosten`, label: 'Kosten erfassen', activePrefixes: ['/kosten'] },
-  { href: (id) => `/a/${id}/beleg`, label: 'Beleg-Upload', activePrefixes: ['/beleg'] },
-  { href: (id) => `/a/${id}/zaehler`, label: 'Zähler', activePrefixes: ['/zaehler'] },
-  {
-    href: (id) => `/a/${id}/abrechnung`,
-    label: 'Abrechnung erstellen',
-    activePrefixes: ['/abrechnung'],
   },
   {
     href: (id) => `/a/${id}/zahlungen`,
     label: 'Zahlungen',
+    icon: 'payments',
     activePrefixes: ['/zahlungen'],
-    // Every payment route is behind `require_owner` (`routers/payments.py`), so
-    // for an EMPLOYEE this entry could only ever dead-end in an error page.
     visibleFor: (role) => role === 'OWNER',
+  },
+  { href: (id) => `/a/${id}/kosten`, label: 'Kosten', icon: 'costs', activePrefixes: ['/kosten'] },
+  { href: (id) => `/a/${id}/beleg`, label: 'Belege', icon: 'receipts', activePrefixes: ['/beleg'] },
+  {
+    href: (id) => `/a/${id}/zaehler`,
+    label: 'Zähler',
+    icon: 'meters',
+    activePrefixes: ['/zaehler'],
+  },
+  {
+    href: (id) => `/a/${id}/abrechnung`,
+    label: 'Abrechnungen',
+    icon: 'statements',
+    activePrefixes: ['/abrechnung'],
   },
   {
     href: (id) => `/a/${id}/steuern`,
     label: 'Steuern',
+    icon: 'tax',
     activePrefixes: ['/steuern'],
     visibleFor: (role) => role === 'OWNER' || role === 'TAX_ADVISOR',
   },
 ];
 
-// Pages that exist in the plan but not yet in the app — an honest roadmap
-// beats dead links (and hiding them would misrepresent scope). M3 and M4 are
-// complete, so this is empty; the next entries arrive with M5.
-const UPCOMING: string[] = [];
+function isKnownRole(role: string | undefined): boolean {
+  return role === 'OWNER' || role === 'EMPLOYEE' || role === 'TAX_ADVISOR';
+}
+
+function visibleNavigation(account: MeAccount): NavItem[] {
+  if (!isKnownRole(account.role)) return [];
+  return NAV_ITEMS.filter(
+    (item) =>
+      (item.visibleFor === undefined || item.visibleFor(account.role)) &&
+      (account.role !== 'TAX_ADVISOR' || item.label === 'Steuern'),
+  );
+}
 
 export function taxAdvisorLandingPath(accountId: string): string {
   return `/a/${accountId}/steuern`;
@@ -95,16 +111,17 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: me } = useMe();
-  const account = me?.accounts.find((a) => a.id === accountId);
+  const me = useMe();
+  const account = me.data?.accounts.find((candidate) => candidate.id === accountId);
   const redirectPath = taxAdvisorRedirectPath(account?.role, accountId, pathname);
+
   useEffect(() => {
     if (redirectPath) router.replace(redirectPath);
   }, [redirectPath, router]);
 
   if (redirectPath) {
     return (
-      <main className="px-8 py-16" role="status">
+      <main className="px-6 py-16" role="status">
         Steuerbereich wird geöffnet …
       </main>
     );
@@ -114,9 +131,11 @@ export function AppShell({
     <PortalShellContent
       accountId={accountId}
       account={account}
-      accounts={me?.accounts ?? []}
+      accounts={me.data?.accounts ?? []}
       pathname={pathname}
-      isLoading={me === undefined}
+      isLoading={me.isPending}
+      isError={me.isError}
+      onRetry={() => void me.refetch()}
     >
       {children}
     </PortalShellContent>
@@ -129,6 +148,8 @@ export function PortalShellContent({
   accounts,
   pathname,
   isLoading = false,
+  isError = false,
+  onRetry,
   children,
 }: {
   accountId: string;
@@ -136,37 +157,73 @@ export function PortalShellContent({
   accounts: MeAccount[];
   pathname: string;
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   children: React.ReactNode;
 }) {
-  const taxAdvisor = account?.role === 'TAX_ADVISOR';
+  const [collapsed, setCollapsed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(sidebarPreferenceKey(accountId));
+    setCollapsed(
+      stored === null ? window.matchMedia('(max-width: 1439px)').matches : stored === 'true',
+    );
+  }, [accountId]);
+
+  const toggleSidebar = () => {
+    setCollapsed((current) => {
+      const next = !(current ?? window.matchMedia('(max-width: 1439px)').matches);
+      window.localStorage.setItem(sidebarPreferenceKey(accountId), String(next));
+      return next;
+    });
+  };
+
+  const collapsedNow = collapsed === true;
+  const sidebarWidth =
+    collapsed === null ? 'w-[248px] max-[1439px]:w-[72px]' : collapsed ? 'w-[72px]' : 'w-[248px]';
+  const labelVisibility =
+    collapsed === null ? 'max-[1439px]:sr-only' : collapsedNow ? 'sr-only' : '';
+  const fullLogoVisibility =
+    collapsed === null
+      ? 'h-7 w-auto max-w-full max-[1439px]:hidden'
+      : collapsedNow
+        ? 'hidden'
+        : 'h-7 w-auto max-w-full';
+  const signetVisibility =
+    collapsed === null ? 'hidden size-7 max-[1439px]:block' : collapsedNow ? 'size-7' : 'hidden';
 
   return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
-      {/* sticky + h-dvh, not the stretched default: without it the aside grows
-          to the full DOCUMENT height on a long page (Zähler is ~2700px), which
-          parks the account block far below the fold and scrolls the nav away. */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-mint bg-white px-4 py-6 md:flex">
-        <Link
-          href="/"
-          className="mb-8 flex items-center gap-2 rounded px-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-        >
-          <Image
-            src="/lokara-logo.png"
-            alt="Lokara"
-            width={103}
-            height={28}
-            className="h-7 w-auto"
-            priority
-          />
-        </Link>
+    <div className="flex min-h-dvh min-w-0 bg-paper text-ink">
+      <aside
+        className={`${sidebarWidth} sticky top-0 flex h-dvh shrink-0 flex-col overflow-visible border-r border-mint bg-white px-3 py-5 transition-[width] duration-[180ms] ease-out motion-reduce:transition-none`}
+      >
+        <div className="flex h-10 shrink-0 items-center">
+          <Link
+            href={`/a/${accountId}`}
+            aria-label="Zur Übersicht"
+            title="Zur Übersicht"
+            className="flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <Image
+              src="/lokara-logo.png"
+              alt="Lokara"
+              width={103}
+              height={28}
+              priority
+              className={fullLogoVisibility}
+            />
+            <Image src="/icon.png" alt="" width={28} height={28} className={signetVisibility} />
+          </Link>
+        </div>
 
-        {account ? (
-          <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col gap-1">
-            {NAV_ITEMS.filter(
-              (item) =>
-                (item.visibleFor === undefined || item.visibleFor(account.role)) &&
-                (!taxAdvisor || item.label === 'Steuern'),
-            ).map((item) => {
+        {isLoading ? (
+          <SidebarSkeleton />
+        ) : account && isKnownRole(account.role) ? (
+          <nav
+            aria-label="Hauptnavigation"
+            className="mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain"
+          >
+            {visibleNavigation(account).map((item) => {
               const href = item.href(accountId);
               const active =
                 item.activePrefixes.length === 0
@@ -178,118 +235,385 @@ export function PortalShellContent({
                 <Link
                   key={href}
                   href={href}
+                  aria-label={item.label}
                   aria-current={active ? 'page' : undefined}
+                  title={collapsedNow ? item.label : undefined}
                   className={
-                    'rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out ' +
-                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ' +
+                    'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ease-out ' +
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ' +
                     (active ? 'bg-mint font-semibold text-forest' : 'text-ink hover:bg-mint/60')
                   }
                 >
-                  {item.label}
+                  <NavIcon name={item.icon} />
+                  <span
+                    className={`${labelVisibility} truncate transition-opacity duration-[180ms] motion-reduce:transition-none`}
+                  >
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
-
-            {UPCOMING.length > 0 ? (
-              <p className="mt-6 mb-1 px-3 text-xs font-semibold tracking-wide text-slate uppercase">
-                In Arbeit
-              </p>
-            ) : null}
-            {UPCOMING.map((label) => (
-              <span
-                key={label}
-                aria-disabled="true"
-                className="cursor-not-allowed rounded-lg px-3 py-2 text-sm text-slate"
-              >
-                {label}
-                <span className="ml-2 rounded bg-mint px-1.5 py-0.5 text-[10px] font-semibold text-forest">
-                  bald
-                </span>
-              </span>
-            ))}
           </nav>
         ) : (
           <div className="flex-1" />
         )}
 
-        {account ? (
-          // shrink-0 so a long nav never squeezes it, and truncate so a long
-          // Hausverwaltung name clips cleanly instead of pushing the role line
-          // out of the box (title keeps the full name reachable).
-          <div className="mt-8 shrink-0 rounded-lg bg-paper px-3 py-2.5">
-            <p className="truncate text-sm font-semibold" title={account.name}>
-              {account.name}
-            </p>
-            <p className="truncate text-xs text-slate">
-              {ROLE_LABELS[account.role] ?? account.role}
-            </p>
-            {accounts.length > 1 ? (
-              <div className="mt-3 border-t border-mint pt-3">
-                <p className="text-xs font-semibold text-slate">Konto wechseln</p>
-                <ul className="mt-1 space-y-1" aria-label="Konto wechseln">
-                  {accounts
-                    .filter((candidate) => candidate.id !== accountId)
-                    .map((candidate) => (
-                      <li key={candidate.id}>
-                        <Link
-                          href={`/a/${candidate.id}`}
-                          className="block rounded px-1 py-1 text-xs text-green underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                        >
-                          {candidate.name}
-                        </Link>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
+        {account && isKnownRole(account.role) ? (
+          <AccountMenu
+            account={account}
+            accountId={accountId}
+            accounts={accounts}
+            collapsed={collapsedNow}
+            defaultResponsive={collapsed === null}
+          />
         ) : null}
+
+        <button
+          type="button"
+          aria-label={collapsedNow ? 'Navigation ausklappen' : 'Navigation einklappen'}
+          title={collapsedNow ? 'Navigation ausklappen' : 'Navigation einklappen'}
+          onClick={toggleSidebar}
+          className="mt-3 flex min-h-10 shrink-0 items-center justify-center rounded-lg text-slate transition-colors duration-150 hover:bg-mint hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+        >
+          <CollapseIcon collapsed={collapsedNow} />
+          <span className="sr-only">
+            {collapsedNow ? 'Navigation ausklappen' : 'Navigation einklappen'}
+          </span>
+        </button>
       </aside>
 
-      {/* UI-00: one centered 1440px content frame with shared responsive air. */}
-      <div className="mx-auto min-w-0 w-full max-w-[1440px] flex-1 px-6 xl:px-8">
-        {account ? (
-          <nav
-            aria-label="Mobile Hauptnavigation"
-            className="flex gap-2 overflow-x-auto border-b border-mint bg-white px-4 py-3 md:hidden"
-          >
-            {NAV_ITEMS.filter(
-              (item) =>
-                (item.visibleFor === undefined || item.visibleFor(account.role)) &&
-                (!taxAdvisor || item.label === 'Steuern'),
-            ).map((item) => (
-              <Link
-                key={item.href(accountId)}
-                href={item.href(accountId)}
-                className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
-        {isLoading ? (
-          <main className="mx-auto max-w-2xl px-8 py-16">
-            <div
-              aria-hidden="true"
-              className="h-32 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+      <div className="min-w-0 flex-1">
+        <div className="mx-auto min-w-0 w-full max-w-[1440px] px-6 min-[1440px]:px-8 min-[1800px]:px-10">
+          {isLoading ? (
+            <ShellLoadingState />
+          ) : isError ? (
+            <ShellStatus
+              title="Lokara konnte nicht geladen werden"
+              description="Bitte versuchen Sie es erneut."
+              action={
+                <Button onClick={onRetry} disabled={onRetry === undefined}>
+                  Erneut versuchen
+                </Button>
+              }
             />
-          </main>
-        ) : account === undefined ? (
-          <main className="mx-auto max-w-2xl px-8 py-16">
-            <h1 className="font-display text-2xl font-bold">Kein Zugriff auf dieses Konto</h1>
-            <p className="mt-3 max-w-prose text-slate">
-              Für dieses Konto besteht keine aktive Mitgliedschaft. Die Navigation zeigt nur, was
-              für Sie verfügbar ist.
-            </p>
-            <Button asChild className="mt-6">
-              <Link href="/">Zur Kontoauswahl</Link>
-            </Button>
-          </main>
-        ) : (
-          children
-        )}
+          ) : account === undefined || !isKnownRole(account.role) ? (
+            <ShellStatus
+              title="Kein Zugriff auf dieses Konto"
+              description="Für dieses Konto besteht keine verfügbare Mitgliedschaft."
+              action={
+                <Button asChild>
+                  <Link href="/">Zur Kontoauswahl</Link>
+                </Button>
+              }
+            />
+          ) : (
+            children
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function SidebarSkeleton() {
+  return (
+    <div className="mt-7 flex flex-1 flex-col gap-2" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-11 animate-pulse rounded-lg bg-mint/60 motion-reduce:animate-none"
+        />
+      ))}
+    </div>
+  );
+}
+
+function ShellLoadingState() {
+  return (
+    <main className="py-10" role="status" aria-busy="true">
+      <span className="sr-only">Lokara wird geladen …</span>
+      <div aria-hidden="true" className="space-y-8">
+        <div className="space-y-3">
+          <div className="h-9 w-56 animate-pulse rounded-lg bg-mint/60 motion-reduce:animate-none" />
+          <div className="h-5 max-w-xl animate-pulse rounded bg-mint/60 motion-reduce:animate-none" />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-40 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+            />
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function ShellStatus({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action: React.ReactNode;
+}) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => headingRef.current?.focus(), []);
+
+  return (
+    <main className="py-16">
+      <h1 ref={headingRef} tabIndex={-1} className="font-display text-3xl font-bold outline-none">
+        {title}
+      </h1>
+      <p className="mt-3 max-w-prose text-slate">{description}</p>
+      <div className="mt-6">{action}</div>
+    </main>
+  );
+}
+
+function AccountMenu({
+  account,
+  accountId,
+  accounts,
+  collapsed,
+  defaultResponsive,
+}: {
+  account: MeAccount;
+  accountId: string;
+  accounts: MeAccount[];
+  collapsed: boolean;
+  defaultResponsive: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const initials = account.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toLocaleUpperCase('de-DE'))
+    .join('');
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', closeOutside);
+    return () => document.removeEventListener('mousedown', closeOutside);
+  }, [open]);
+
+  const focusMenuItem = (position: 'first' | 'last') => {
+    window.requestAnimationFrame(() => {
+      const items = menuRef.current?.querySelectorAll<HTMLElement>(
+        '[role="menuitem"]:not([aria-disabled="true"])',
+      );
+      const target = position === 'first' ? items?.[0] : items?.[items.length - 1];
+      target?.focus();
+    });
+  };
+
+  return (
+    <div ref={rootRef} className="relative mt-8 shrink-0">
+      <div
+        ref={menuRef}
+        role="menu"
+        aria-label="Konten"
+        hidden={!open}
+        className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 min-w-64 rounded-xl border border-mint bg-white p-2 shadow-lg"
+        onKeyDown={(event) => {
+          const items = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>(
+              '[role="menuitem"]:not([aria-disabled="true"])',
+            ),
+          );
+          const current = items.indexOf(document.activeElement as HTMLElement);
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setOpen(false);
+            triggerRef.current?.focus();
+          } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            items[(current + 1 + items.length) % items.length]?.focus();
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            items[(current - 1 + items.length) % items.length]?.focus();
+          }
+        }}
+      >
+        <p className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-slate uppercase">
+          Konten
+        </p>
+        {accounts.map((candidate) =>
+          candidate.id === accountId ? (
+            <span
+              key={candidate.id}
+              role="menuitem"
+              aria-current="page"
+              aria-disabled="true"
+              className="flex rounded-lg bg-mint px-3 py-2 text-sm font-semibold text-forest"
+            >
+              {candidate.name}
+            </span>
+          ) : (
+            <Link
+              key={candidate.id}
+              role="menuitem"
+              tabIndex={open ? 0 : -1}
+              href={`/a/${candidate.id}`}
+              className="flex rounded-lg px-3 py-2 text-sm hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {candidate.name}
+            </Link>
+          ),
+        )}
+        <div className="my-2 border-t border-mint" />
+        <Link
+          href="/"
+          role="menuitem"
+          tabIndex={open ? 0 : -1}
+          className="flex rounded-lg px-3 py-2 text-sm font-semibold text-green hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Zur Kontoauswahl
+        </Link>
+      </div>
+
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={accounts.length > 1 ? 'Konto wechseln' : 'Kontomenü öffnen'}
+        title={collapsed ? account.name : undefined}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && open) {
+            event.preventDefault();
+            setOpen(false);
+            triggerRef.current?.focus();
+          } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            setOpen(true);
+            focusMenuItem(event.key === 'ArrowDown' ? 'first' : 'last');
+          }
+        }}
+        className="flex min-h-14 w-full items-center gap-3 rounded-xl bg-paper px-3 text-left transition-colors duration-150 hover:bg-mint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+      >
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-mint font-display text-xs font-bold text-forest">
+          {initials || 'K'}
+        </span>
+        <span
+          className={`${defaultResponsive ? 'max-[1439px]:sr-only' : collapsed ? 'sr-only' : ''} min-w-0 flex-1`}
+        >
+          <span className="block truncate text-sm font-semibold" title={account.name}>
+            {account.name}
+          </span>
+          <span className="block truncate text-xs text-slate">
+            {ROLE_LABELS[account.role] ?? account.role}
+          </span>
+        </span>
+        <ChevronIcon
+          className={`${defaultResponsive ? 'max-[1439px]:hidden' : collapsed ? 'hidden' : ''}`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function NavIcon({ name }: { name: IconName }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    overview: <path d="M4 13h6V4H4v9Zm10 7h6V11h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z" />,
+    buildings: (
+      <>
+        <path d="M4 21V7l8-4 8 4v14" />
+        <path d="M2 21h20M8 10h2m4 0h2m-8 4h2m4 0h2m-5 7v-4h2v4" />
+      </>
+    ),
+    payments: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 9h18M7 15h4" />
+      </>
+    ),
+    costs: (
+      <>
+        <path d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21V3Z" />
+        <path d="M10 8h4m-4 4h4" />
+      </>
+    ),
+    receipts: (
+      <>
+        <path d="M6 3h9l3 3v15H6V3Z" />
+        <path d="M15 3v4h4M9 11h6m-6 4h6" />
+      </>
+    ),
+    meters: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m12 12 4-3M8 17h8" />
+      </>
+    ),
+    statements: (
+      <>
+        <path d="M5 3h14v18H5V3Z" />
+        <path d="M8 8h8m-8 4h8m-8 4h5" />
+      </>
+    ),
+    tax: (
+      <>
+        <path d="M4 8h16M6 8V6l6-3 6 3v2M7 8v9m5-9v9m5-9v9M4 21h16v-4H4v4Z" />
+      </>
+    ),
+  };
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="size-5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths[name]}
+    </svg>
+  );
+}
+
+function CollapseIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={collapsed ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'} />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={`size-4 shrink-0 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m7 10 5 5 5-5" />
+    </svg>
   );
 }

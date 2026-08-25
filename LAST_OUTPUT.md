@@ -1,19 +1,20 @@
-# Last output — U2 Heizspiegel rules green
+# Last output — UI-02 ready for local merge
 
-HEAD `ab875d2` on `slice/u2-heizspiegel-rules` · `24.08.2026`
+HEAD `3898776` on `slice/ui-02-app-shell-desktop` · `25.08.2026`
 Status: Complete
 
 ## Wanted
-Commit and locally merge U1b, then start U2.
+Close, commit and locally merge UI-02 without pushing.
 
 ## Done
-U1b was merged locally as `ee83535` and finalized as `ab875d2`; nothing was pushed.
-U2 now versions all 18 Heizspiegel rows, deductions, guards, fallbacks, attribution and vintage
-evidence. Its statement review is closed. Focused tests pass 11; rules-store tests pass 135.
-Fast passes 598 pure-package tests; full passes 1,289 Python and 84 web tests. The sentinel is absent.
+The desktop shell has its persistent 248/72px sidebar, account menu, role navigation and shared headers.
+Rendered interaction fixtures pass; the Escape and Reduced Motion review findings are fixed.
+Statement review, fast, production build and the clean disposable-database full gate are green.
+The full gate passed 1,717 Python tests and 137 web tests; the disposable container was removed.
 
 ## Not done
-U2 is not committed or merged. U3 is not started.
+The automated viewport/zoom screenshot matrix remains unavailable; Emir accepted the live shell.
+Nothing was pushed.
 
 ## Optional next step
-Authorize the U2 commit when ready.
+Start UI-03 from the updated `main` branch.

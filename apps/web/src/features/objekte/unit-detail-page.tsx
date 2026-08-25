@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { PageHeader } from '@/features/portal/page-header';
 import { ApiError } from '@/lib/api';
 import { isoToGermanDate, parseEurToCents } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
@@ -57,15 +58,18 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
 
   if (detail.isPending) {
     return (
-      <main className="px-8 py-10">
-        <div aria-hidden="true" className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60" />
+      <main className="py-10">
+        <div
+          aria-hidden="true"
+          className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+        />
       </main>
     );
   }
   if (detail.isError) {
     const missing = detail.error instanceof ApiError && detail.error.status === 404;
     return (
-      <main className="px-8 py-10">
+      <main className="py-10">
         <StatusNote
           kind="danger"
           label={missing ? 'Einheit nicht gefunden.' : 'Fehler beim Laden.'}
@@ -80,29 +84,28 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
 
   const unit = detail.data;
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <p className="mb-1 text-sm">
-          <Link
-            href={`/a/${accountId}/objekte`}
-            className="text-green underline-offset-4 hover:underline"
-          >
-            Objekte
-          </Link>{' '}
-          <span aria-hidden="true">/</span>{' '}
-          <Link
-            href={`/a/${accountId}/objekte/${unit.buildingId}`}
-            className="text-green underline-offset-4 hover:underline"
-          >
-            {unit.buildingName}
-          </Link>{' '}
-          <span aria-hidden="true">/</span>
-        </p>
-        <h1 className="font-display text-3xl font-bold">{unit.label}</h1>
-        <p className="mt-2 text-slate">
-          {unit.areaSqm.toLocaleString('de-DE')} m² Wohnfläche · {unit.buildingName}
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title={unit.label}
+        description={`${unit.areaSqm.toLocaleString('de-DE')} m² Wohnfläche · ${unit.buildingName}`}
+        breadcrumb={
+          <>
+            <Link
+              href={`/a/${accountId}/objekte`}
+              className="text-green underline-offset-4 hover:underline"
+            >
+              Objekte
+            </Link>{' '}
+            <span aria-hidden="true">/</span>{' '}
+            <Link
+              href={`/a/${accountId}/objekte/${unit.buildingId}`}
+              className="text-green underline-offset-4 hover:underline"
+            >
+              {unit.buildingName}
+            </Link>
+          </>
+        }
+      />
 
       <div className="grid max-w-5xl gap-8 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Mietverhältnisse" className="flex flex-col gap-6">

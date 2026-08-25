@@ -73,13 +73,16 @@ export function PortalEntry() {
       <h1 className="font-display text-3xl font-bold">Vermieter-Portal</h1>
 
       {me.isPending || entryAccount ? (
-        <div aria-hidden="true" className="mt-8 h-40 animate-pulse rounded-xl bg-mint/60" />
+        <div
+          aria-hidden="true"
+          className="mt-8 h-40 animate-pulse rounded-xl bg-mint/60 motion-reduce:animate-none"
+        />
       ) : me.isError ? (
         <div className="mt-8 space-y-4">
-          <StatusNote kind="danger" label="Anmeldung nicht verfügbar.">
-            Bitte versuchen Sie es später erneut.
+          <StatusNote kind="danger" label="Lokara konnte nicht geladen werden">
+            Bitte versuchen Sie es erneut.
           </StatusNote>
-          <Button variant="outline" onClick={() => me.refetch()}>
+          <Button autoFocus variant="outline" onClick={() => me.refetch()}>
             Erneut versuchen
           </Button>
         </div>

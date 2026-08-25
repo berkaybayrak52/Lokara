@@ -20,6 +20,7 @@ import {
   OccupancyCard,
   UnavailableCard,
 } from './dashboard-widgets';
+import { PageHeader } from './page-header';
 import { useLoadDemo, useMe, usePortfolioOverview, useResetDemo } from './queries';
 
 export function showOwnerControls(role: string | undefined): boolean {
@@ -255,11 +256,8 @@ function ResetDemoCard() {
 
 function PageFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-w-0 overflow-x-hidden px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Übersicht</h1>
-        <p className="mt-2 max-w-prose text-slate">Ihr Bestand auf einen Blick.</p>
-      </header>
+    <main className="min-w-0 overflow-x-hidden py-10">
+      <PageHeader title="Übersicht" description="Ihr Bestand auf einen Blick." />
       {children}
     </main>
   );
