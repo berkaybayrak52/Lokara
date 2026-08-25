@@ -149,9 +149,12 @@ and unit creation out of the inline forms into their own account-scoped routes:
   and `longitude`;
 - geocoding lives behind `lokara_adapters.geocoding.GeocodingGateway`. `DisabledGeocodingGateway` is
   the default: `geocoding_enabled` is **off** unless an operator turns it on, because public
-  Nominatim is a demo-only provider with no SLA. The Nominatim adapter is server-side only, carries
-  an identifying User-Agent, holds a hard timeout, and returns `None` on any error, timeout, empty
-  result or blocked network. Geocoding never blocks or fails building creation;
+  Nominatim is a demo-only provider with no SLA. The adapter package owns the vendor format — query
+  parameters, User-Agent, response shape and coordinate validation — and stays socket-free, the same
+  line `dwd.py` draws; the HTTP transport, timeout, one-request-per-second policy and response cap
+  live in `apps/api/src/lokara_api/geocoding_http.py`, the only place that speaks to the provider.
+  It is server-side only and returns `None` on any error, timeout, empty result or blocked network.
+  Geocoding never blocks or fails building creation;
 - routes `/a/{accountId}/objekte/neu` and `/a/{accountId}/objekte/{buildingId}/einheit/neu` are
   pages inside the same account-scoped segment, so the shell and server authorization enclose them.
   Both inline creation forms are gone; the list and unit list render full width behind an owner-only

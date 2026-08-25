@@ -14,11 +14,7 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from lokara_adapters.geocoding import (
-    DisabledGeocodingGateway,
-    GeocodingGateway,
-    NominatimGeocodingGateway,
-)
+from lokara_adapters.geocoding import DisabledGeocodingGateway, GeocodingGateway
 from lokara_db import AdvancePaymentPeriod, Building, Renter, Tenancy, TenancyParty, Unit, new_id
 from lokara_domain import Period, cents, format_eur, periods_overlap
 from sqlalchemy import select
@@ -30,6 +26,7 @@ from ..authorization import (
     visible_building_ids,
 )
 from ..deps import PathAccountSession
+from ..geocoding_http import NominatimGeocodingGateway
 from ..schemas import (
     AdvancePaymentPeriodOut,
     BuildingCreate,

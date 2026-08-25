@@ -63,7 +63,6 @@ from .geocoding import (
     DisabledGeocodingGateway,
     GeocodingGateway,
     GeocodingResult,
-    NominatimGeocodingGateway,
 )
 from .meter import (
     MeasurementUnit,
@@ -132,7 +131,6 @@ __all__ = [
     "MonthlyDegreeDayImportError",
     "MonthlyDegreeDayRecord",
     "MonthlyStationAssignment",
-    "NominatimGeocodingGateway",
     "OutgoingEmail",
     "PlzCentroid",
     "PriceIndexGateway",

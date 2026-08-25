@@ -1,4 +1,4 @@
-"""UI-03 Nominatim adapter contract without network access."""
+"""UI-03 Nominatim transport contract without network access."""
 
 import json
 from collections.abc import Callable
@@ -7,8 +7,9 @@ from urllib.parse import parse_qs, urlsplit
 from urllib.request import Request
 
 import pytest
-from lokara_adapters import geocoding
-from lokara_adapters.geocoding import DisabledGeocodingGateway, NominatimGeocodingGateway
+from lokara_adapters.geocoding import DisabledGeocodingGateway
+from lokara_api import geocoding_http
+from lokara_api.geocoding_http import NominatimGeocodingGateway
 
 
 class _Response:
@@ -43,7 +44,7 @@ def test_nominatim_request_is_identified_bounded_and_parses_first_result(
             ]
         )
 
-    monkeypatch.setattr(geocoding, "urlopen", fake_urlopen)
+    monkeypatch.setattr(geocoding_http, "urlopen", fake_urlopen)
     gateway = NominatimGeocodingGateway(
         contact_email="geo@lokara.de",
         timeout_seconds=2.75,
@@ -79,7 +80,7 @@ def test_equivalent_normalized_casefold_addresses_share_one_cached_lookup(
         call_count += 1
         return _json_response([{"lat": "50.1", "lon": "8.6"}])
 
-    monkeypatch.setattr(geocoding, "urlopen", fake_urlopen)
+    monkeypatch.setattr(geocoding_http, "urlopen", fake_urlopen)
     gateway = NominatimGeocodingGateway()
 
     first = gateway.geocode("Musterstraße 12, 60311 Frankfurt")
@@ -109,7 +110,7 @@ def test_public_provider_rate_limit_is_shared_across_gateway_instances(
         starts.append(clock())
         return _json_response([{"lat": "50.1", "lon": "8.6"}])
 
-    monkeypatch.setattr(geocoding, "urlopen", fake_urlopen)
+    monkeypatch.setattr(geocoding_http, "urlopen", fake_urlopen)
     first = NominatimGeocodingGateway(clock=clock, sleep=sleep)
     second = NominatimGeocodingGateway(
         endpoint="https://nominatim.openstreetmap.org./search",
@@ -140,7 +141,7 @@ def test_public_provider_rate_limit_is_shared_across_gateway_instances(
 def test_empty_malformed_and_nonfinite_results_return_none(
     monkeypatch: pytest.MonkeyPatch, body: bytes
 ) -> None:
-    monkeypatch.setattr(geocoding, "urlopen", lambda *_args, **_kwargs: _Response(body))
+    monkeypatch.setattr(geocoding_http, "urlopen", lambda *_args, **_kwargs: _Response(body))
     assert NominatimGeocodingGateway().geocode("Musterstraße 12, Frankfurt") is None
 
 
@@ -157,7 +158,7 @@ def test_coordinates_outside_world_bounds_return_none(
     monkeypatch: pytest.MonkeyPatch, latitude: str, longitude: str
 ) -> None:
     monkeypatch.setattr(
-        geocoding,
+        geocoding_http,
         "urlopen",
         lambda *_args, **_kwargs: _json_response([{"lat": latitude, "lon": longitude}]),
     )
@@ -176,7 +177,7 @@ def test_network_edge_failures_and_empty_addresses_return_none(
         call_count += 1
         raise error_factory()
 
-    monkeypatch.setattr(geocoding, "urlopen", failing_urlopen)
+    monkeypatch.setattr(geocoding_http, "urlopen", failing_urlopen)
     gateway = NominatimGeocodingGateway()
 
     assert gateway.geocode("Musterstraße 12, Frankfurt") is None
