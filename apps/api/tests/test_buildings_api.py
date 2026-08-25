@@ -7,18 +7,23 @@ usual two isolation proofs (path re-authorization + RLS backstop).
 
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any, cast
 
 import jwt
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from lokara_api import create_app
+from lokara_api.routers import buildings as buildings_router
+from lokara_api.schemas import BuildingCreate, BuildingSummary
 from lokara_api.settings import ApiSettings
 from lokara_db import Account, DbSettings, Membership, Person, Role, create_db_engine
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
+from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -80,6 +85,59 @@ DEMO = _token(DEMO_PERSON_ID)
 BASE = f"/a/{DEMO_ACCOUNT_ID}"
 
 
+def _building_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "name": "Testgasse 5",
+        "buildingType": "WOHNHAUS",
+        "isResidential": True,
+        "street": "Testgasse",
+        "houseNumber": "5",
+        "postalCode": "60313",
+        "city": "Frankfurt am Main",
+    }
+    payload.update(overrides)
+    return payload
+
+
+class TestBuildingContracts:
+    @pytest.mark.parametrize("missing", ["buildingType", "isResidential", "houseNumber"])
+    def test_create_schema_requires_ui03_fields(self, missing: str) -> None:
+        payload = _building_payload()
+        del payload[missing]
+        with pytest.raises(ValidationError):
+            BuildingCreate.model_validate(payload)
+
+    def test_create_schema_keeps_german_postcode_and_country_default(self) -> None:
+        body = BuildingCreate.model_validate(_building_payload())
+        assert body.building_type == "WOHNHAUS"
+        assert body.is_residential is True
+        assert body.house_number == "5"
+        assert body.country == "Deutschland"
+        assert body.postal_code == "60313"
+
+    def test_create_schema_rejects_an_address_over_200_composed_characters(self) -> None:
+        with pytest.raises(ValidationError):
+            BuildingCreate.model_validate(_building_payload(street="A" * 180, houseNumber="1" * 20))
+
+    def test_summary_schema_exposes_type_and_nullable_coordinates(self) -> None:
+        summary = BuildingSummary.model_validate(
+            {
+                "id": "building-1",
+                "name": "Geohaus",
+                "street": "Geoallee 7",
+                "postalCode": "60313",
+                "city": "Frankfurt am Main",
+                "unitCount": 0,
+                "buildingType": "WOHNHAUS",
+                "latitude": None,
+                "longitude": None,
+            }
+        )
+        assert summary.building_type == "WOHNHAUS"
+        assert summary.latitude is None
+        assert summary.longitude is None
+
+
 class TestCreateChain:
     tenancy_id: str
     """One flowing scenario: Building → Unit → Tenancy → timeline read-back."""
@@ -91,16 +149,15 @@ class TestCreateChain:
         response = client.post(
             f"{BASE}/buildings",
             headers=DEMO,
-            json={
-                "name": "Testgasse 5",
-                "street": "Testgasse 5",
-                "postalCode": "60313",
-                "city": "Frankfurt am Main",
-            },
+            json=_building_payload(),
         )
         assert response.status_code == 201
         body = response.json()
         assert body["name"] == "Testgasse 5"
+        assert body["street"] == "Testgasse 5"
+        assert body["buildingType"] == "WOHNHAUS"
+        assert body["latitude"] is None
+        assert body["longitude"] is None
         assert body["unitCount"] == 0
         TestCreateChain.building_id = body["id"]
 
@@ -115,7 +172,32 @@ class TestCreateChain:
         response = client.post(
             f"{BASE}/buildings",
             headers=DEMO,
-            json={"name": "X", "street": "X 1", "postalCode": "123", "city": "F"},
+            json={
+                "name": "X",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
+                "street": "X",
+                "houseNumber": "1",
+                "postalCode": "123",
+                "city": "F",
+            },
+        )
+        assert response.status_code == 422
+
+    @pytest.mark.parametrize("missing", ["buildingType", "isResidential", "houseNumber"])
+    def test_new_building_fields_are_required(self, client: TestClient, missing: str) -> None:
+        payload = _building_payload(name=f"Fehlend {missing}")
+        del payload[missing]
+        response = client.post(f"{BASE}/buildings", headers=DEMO, json=payload)
+        assert response.status_code == 422
+
+    def test_composed_street_must_fit_the_existing_200_character_limit(
+        self, client: TestClient
+    ) -> None:
+        response = client.post(
+            f"{BASE}/buildings",
+            headers=DEMO,
+            json=_building_payload(name="Zu lange Adresse", street="A" * 180, houseNumber="1" * 20),
         )
         assert response.status_code == 422
 
@@ -228,7 +310,15 @@ class TestIsolation:
         response = client.post(
             f"{BASE}/buildings",
             headers=_token(ISO_PERSON_ID),
-            json={"name": "Einbruch 1", "street": "E 1", "postalCode": "60000", "city": "F"},
+            json={
+                "name": "Einbruch 1",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
+                "street": "E",
+                "houseNumber": "1",
+                "postalCode": "60000",
+                "city": "F",
+            },
         )
         assert response.status_code == 403
 
@@ -245,3 +335,72 @@ class TestIsolation:
             headers=_token(ISO_PERSON_ID),
         )
         assert response.status_code == 404
+
+
+class TestGeocodingBoundary:
+    @staticmethod
+    def _override(client: TestClient, gateway: object) -> Callable[..., Any]:
+        dependency = buildings_router.get_geocoding_gateway
+        cast(FastAPI, client.app).dependency_overrides[dependency] = lambda: gateway
+        return dependency
+
+    def test_normalized_coordinates_are_saved_and_returned_in_summary(
+        self, client: TestClient
+    ) -> None:
+        from lokara_adapters.geocoding import GeocodingResult
+
+        class Gateway:
+            address: str | None = None
+
+            def geocode(self, address: str) -> GeocodingResult:
+                self.address = address
+                return GeocodingResult(latitude=50.1109, longitude=8.6821)
+
+        gateway = Gateway()
+        dependency = self._override(client, gateway)
+        try:
+            response = client.post(
+                f"{BASE}/buildings",
+                headers=DEMO,
+                json=_building_payload(
+                    name="Geohaus 7",
+                    buildingType="WOHN_UND_GESCHAEFTSHAUS",
+                    street="Geoallee",
+                    houseNumber="7",
+                ),
+            )
+            assert response.status_code == 201, response.text
+            body = response.json()
+            assert gateway.address == "Geoallee 7, 60313 Frankfurt am Main, Deutschland"
+            assert body["buildingType"] == "WOHN_UND_GESCHAEFTSHAUS"
+            assert body["latitude"] == pytest.approx(50.1109)
+            assert body["longitude"] == pytest.approx(8.6821)
+            assert isinstance(body["latitude"], float)
+            assert isinstance(body["longitude"], float)
+
+            listing = client.get(f"{BASE}/buildings", headers=DEMO)
+            listed = next(row for row in listing.json()["buildings"] if row["id"] == body["id"])
+            assert listed["buildingType"] == "WOHN_UND_GESCHAEFTSHAUS"
+            assert listed["latitude"] == pytest.approx(50.1109)
+            assert listed["longitude"] == pytest.approx(8.6821)
+        finally:
+            cast(FastAPI, client.app).dependency_overrides.pop(dependency, None)
+
+    def test_gateway_failure_never_blocks_create(self, client: TestClient) -> None:
+        class FailingGateway:
+            def geocode(self, address: str) -> None:
+                del address
+                raise OSError("network unavailable")
+
+        dependency = self._override(client, FailingGateway())
+        try:
+            response = client.post(
+                f"{BASE}/buildings",
+                headers=DEMO,
+                json=_building_payload(name="Haus ohne Geopunkt", houseNumber="9"),
+            )
+            assert response.status_code == 201, response.text
+            assert response.json()["latitude"] is None
+            assert response.json()["longitude"] is None
+        finally:
+            cast(FastAPI, client.app).dependency_overrides.pop(dependency, None)

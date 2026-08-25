@@ -59,6 +59,12 @@ from .email import (
     SentEmail,
     StubEmailGateway,
 )
+from .geocoding import (
+    DisabledGeocodingGateway,
+    GeocodingGateway,
+    GeocodingResult,
+    NominatimGeocodingGateway,
+)
 from .meter import (
     MeasurementUnit,
     MeterConsumption,
@@ -107,11 +113,14 @@ __all__ = [
     "DatevGateway",
     "DeliveredExport",
     "DeliveryStatus",
+    "DisabledGeocodingGateway",
     "DwdAnnualImportError",
     "EmailDeliveryReceipt",
     "EmailGateway",
     "ExtractedInvoiceFields",
     "FieldConfidences",
+    "GeocodingGateway",
+    "GeocodingResult",
     "MeasurementUnit",
     "MeterConsumption",
     "MeterDevice",
@@ -123,6 +132,7 @@ __all__ = [
     "MonthlyDegreeDayImportError",
     "MonthlyDegreeDayRecord",
     "MonthlyStationAssignment",
+    "NominatimGeocodingGateway",
     "OutgoingEmail",
     "PlzCentroid",
     "PriceIndexGateway",

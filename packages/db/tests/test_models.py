@@ -5,9 +5,31 @@ carries account_id, the uniqueness rules exist, and the RLS table list in
 ACCOUNT_SCOPED_TABLES can never silently drift from the models.
 """
 
+import ast
+import re
+from pathlib import Path
+
 from lokara_db import ACCOUNT_SCOPED_TABLES, Base, DbSettings, sqlalchemy_url
-from sqlalchemy import UniqueConstraint
-from sqlalchemy.sql.schema import Table
+from sqlalchemy import Boolean, CheckConstraint, Enum, Float, String, UniqueConstraint
+from sqlalchemy.sql.schema import DefaultClause, Table
+
+_DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent
+_UI03_MIGRATION = _DB_PACKAGE_DIR / "alembic" / "versions" / "0026_ui03_building_metadata.py"
+
+
+def _server_default_text(table: Table, column: str) -> str:
+    """Read a column's DDL-level server default as text."""
+    default = table.columns[column].server_default
+    assert isinstance(default, DefaultClause)
+    return str(default.arg)
+
+
+BUILDING_TYPES = {
+    "WOHN_UND_GESCHAEFTSHAUS",
+    "WOHNHAUS",
+    "GEWERBEIMMOBILIE",
+    "EINFAMILIENHAUS",
+}
 
 EXPECTED_TABLES = {
     "person",
@@ -132,6 +154,65 @@ class TestSchemaShape:
         ):
             assert _table(table_name).columns[column].type.python_type is int
 
+    def test_building_carries_ui03_metadata_and_nullable_coordinates(self) -> None:
+        building = _table("building")
+        assert {
+            "building_type",
+            "is_residential",
+            "country",
+            "latitude",
+            "longitude",
+        } <= set(building.columns.keys())
+
+        assert isinstance(building.columns["building_type"].type, String)
+        assert not isinstance(building.columns["building_type"].type, Enum)
+        assert isinstance(building.columns["is_residential"].type, Boolean)
+        assert isinstance(building.columns["country"].type, String)
+        assert isinstance(building.columns["latitude"].type, Float)
+        assert isinstance(building.columns["longitude"].type, Float)
+
+        for name in ("building_type", "is_residential", "country"):
+            assert not building.columns[name].nullable
+            assert building.columns[name].server_default is not None
+        assert _server_default_text(building, "building_type").strip("'") == "WOHNHAUS"
+        assert _server_default_text(building, "is_residential").lower() == "true"
+        assert _server_default_text(building, "country").strip("'") == "Deutschland"
+        assert building.columns["latitude"].nullable
+        assert building.columns["longitude"].nullable
+        assert building.columns["latitude"].server_default is None
+        assert building.columns["longitude"].server_default is None
+
+    def test_building_type_uses_one_varchar_check_with_exactly_four_values(self) -> None:
+        building = _table("building")
+        checks = [
+            constraint
+            for constraint in building.constraints
+            if isinstance(constraint, CheckConstraint)
+            and "building_type" in str(constraint.sqltext)
+        ]
+        assert len(checks) == 1
+        assert set(re.findall(r"'([^']+)'", str(checks[0].sqltext))) == BUILDING_TYPES
+
+    def test_building_coordinates_have_named_nullable_world_range_checks(self) -> None:
+        building = _table("building")
+        checks = {
+            constraint.name: " ".join(str(constraint.sqltext).lower().split())
+            for constraint in building.constraints
+            if isinstance(constraint, CheckConstraint)
+        }
+        assert {
+            "ck_building_type",
+            "ck_building_latitude_range",
+            "ck_building_longitude_range",
+        } <= set(checks)
+        assert building.columns["latitude"].nullable
+        assert building.columns["longitude"].nullable
+
+        latitude = checks["ck_building_latitude_range"]
+        longitude = checks["ck_building_longitude_range"]
+        assert "latitude" in latitude and "-90" in latitude and "90" in latitude
+        assert "longitude" in longitude and "-180" in longitude and "180" in longitude
+
     def test_validity_columns_are_day_granular_dates(self) -> None:
         from datetime import date
 
@@ -210,3 +291,103 @@ class TestSettings:
         settings = DbSettings()
         assert "lokara_app" in settings.database_sqlalchemy_url
         assert "lokara_app" not in settings.direct_sqlalchemy_url
+
+
+class TestUi03BuildingMetadataMigration:
+    def _migration_tree(self) -> ast.Module:
+        assert _UI03_MIGRATION.exists(), (
+            "UI-03 migration is missing: expected 0026_ui03_building_metadata.py "
+            "because 0025 is reserved by paused M9"
+        )
+        return ast.parse(_UI03_MIGRATION.read_text())
+
+    @staticmethod
+    def _function(tree: ast.Module, name: str) -> ast.FunctionDef:
+        return next(
+            node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name
+        )
+
+    @staticmethod
+    def _op_calls(function: ast.FunctionDef, operation: str) -> list[ast.Call]:
+        return [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "op"
+            and node.func.attr == operation
+        ]
+
+    def test_revision_is_0026_directly_after_0024(self) -> None:
+        tree = self._migration_tree()
+        assignments = {
+            target.id: node.value.value
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            for target in node.targets
+            if isinstance(target, ast.Name) and target.id in {"revision", "down_revision"}
+        }
+        assert assignments == {"revision": "0026", "down_revision": "0024"}
+
+    def test_upgrade_adds_five_columns_and_the_four_value_check(self) -> None:
+        tree = self._migration_tree()
+        upgrade = self._function(tree, "upgrade")
+        add_column_calls = self._op_calls(upgrade, "add_column")
+        added = {
+            call.args[1].args[0].value
+            for call in add_column_calls
+            if len(call.args) >= 2
+            and isinstance(call.args[1], ast.Call)
+            and call.args[1].args
+            and isinstance(call.args[1].args[0], ast.Constant)
+        }
+        assert added == {
+            "building_type",
+            "is_residential",
+            "country",
+            "latitude",
+            "longitude",
+        }
+        created_checks = {
+            call.args[0].value
+            for call in self._op_calls(upgrade, "create_check_constraint")
+            if call.args and isinstance(call.args[0], ast.Constant)
+        }
+        assert created_checks == {
+            "ck_building_type",
+            "ck_building_latitude_range",
+            "ck_building_longitude_range",
+        }
+        source = _UI03_MIGRATION.read_text()
+        assert "postgresql.ENUM" not in source
+        for value in BUILDING_TYPES:
+            assert value in source
+
+    def test_downgrade_removes_check_and_all_five_columns(self) -> None:
+        tree = self._migration_tree()
+        downgrade = self._function(tree, "downgrade")
+        dropped_checks = {
+            call.args[0].value
+            for call in self._op_calls(downgrade, "drop_constraint")
+            if call.args and isinstance(call.args[0], ast.Constant)
+        }
+        assert dropped_checks == {
+            "ck_building_type",
+            "ck_building_latitude_range",
+            "ck_building_longitude_range",
+        }
+        dropped = {
+            call.args[1].value
+            for call in self._op_calls(downgrade, "drop_column")
+            if len(call.args) >= 2 and isinstance(call.args[1], ast.Constant)
+        }
+        assert dropped == {
+            "building_type",
+            "is_residential",
+            "country",
+            "latitude",
+            "longitude",
+        }

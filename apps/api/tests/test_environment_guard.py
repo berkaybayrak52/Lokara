@@ -101,6 +101,54 @@ class TestDeployedEnvironmentsRefuseDevSwitches:
         with pytest.raises(ValidationError):
             ApiSettings()
 
+    @pytest.mark.parametrize("environment", ["staging", "production"])
+    def test_public_nominatim_cannot_be_enabled_in_a_deployment(
+        self, monkeypatch: pytest.MonkeyPatch, environment: str
+    ) -> None:
+        _base_env(monkeypatch)
+        monkeypatch.setenv("ENVIRONMENT", environment)
+        monkeypatch.setenv("GEOCODING_ENABLED", "true")
+        monkeypatch.setenv("GEOCODING_ENDPOINT", "https://nominatim.openstreetmap.org/search")
+
+        with pytest.raises(ValidationError, match="GEOCODING_ENABLED"):
+            ApiSettings()
+
+    @pytest.mark.parametrize("environment", ["staging", "production"])
+    def test_an_explicit_private_geocoder_may_be_enabled_in_a_deployment(
+        self, monkeypatch: pytest.MonkeyPatch, environment: str
+    ) -> None:
+        _base_env(monkeypatch)
+        monkeypatch.setenv("ENVIRONMENT", environment)
+        monkeypatch.setenv("GEOCODING_ENABLED", "true")
+        monkeypatch.setenv("GEOCODING_ENDPOINT", "https://geocoder.internal.example/search")
+
+        settings = ApiSettings()
+
+        assert settings.geocoding_enabled is True
+        assert settings.geocoding_endpoint == "https://geocoder.internal.example/search"
+
+    def test_deployed_guard_reports_every_unsafe_switch_together(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("AUTH_DEV_TOKEN", "true")
+        monkeypatch.setenv("DEMO_SEED_ENABLED", "true")
+        monkeypatch.setenv("SUPABASE_JWT_SECRET", PUBLISHED_DEV_SECRET)
+        monkeypatch.setenv("GEOCODING_ENABLED", "true")
+        monkeypatch.setenv("GEOCODING_ENDPOINT", "https://nominatim.openstreetmap.org/search")
+
+        with pytest.raises(ValidationError) as exc_info:
+            ApiSettings()
+
+        message = str(exc_info.value)
+        for unsafe_setting in (
+            "AUTH_DEV_TOKEN",
+            "DEMO_SEED_ENABLED",
+            "SUPABASE_JWT_SECRET",
+            "GEOCODING_ENABLED",
+        ):
+            assert unsafe_setting in message
+
 
 class TestLocalKeepsWorking:
     def test_local_may_have_every_dev_switch_on(self, monkeypatch: pytest.MonkeyPatch) -> None:

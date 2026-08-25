@@ -31,6 +31,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -389,6 +390,11 @@ class Building(Base):
     street: Mapped[str]
     postal_code: Mapped[str]
     city: Mapped[str]
+    building_type: Mapped[str] = mapped_column(server_default="WOHNHAUS")
+    is_residential: Mapped[bool] = mapped_column(server_default="true")
+    country: Mapped[str] = mapped_column(server_default="Deutschland")
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
     # Page 01 § 3.5 `objekt.fiktivbelegungModus` — Stammdaten of the object, not
     # of a unit or a run, because one building bills one way (docs/02 § 5 D0).
     # Migration 0009 makes this and its waiver note immutable after creation, so
@@ -451,6 +457,19 @@ class Building(Base):
         CheckConstraint(
             "fiktivbelegung_mode <> 'KEINE' OR fiktivbelegung_waiver_note IS NOT NULL",
             name="ck_building_fiktivbelegung_waiver_logged",
+        ),
+        CheckConstraint(
+            "building_type IN ('WOHN_UND_GESCHAEFTSHAUS', 'WOHNHAUS', "
+            "'GEWERBEIMMOBILIE', 'EINFAMILIENHAUS')",
+            name="ck_building_type",
+        ),
+        CheckConstraint(
+            "latitude BETWEEN -90 AND 90",
+            name="ck_building_latitude_range",
+        ),
+        CheckConstraint(
+            "longitude BETWEEN -180 AND 180",
+            name="ck_building_longitude_range",
         ),
         Index("ix_building_account", "account_id"),
     )

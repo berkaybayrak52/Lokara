@@ -69,6 +69,9 @@ export const BuildingSummarySchema = z.object({
   postalCode: z.string(),
   city: z.string(),
   unitCount: z.number().int(),
+  buildingType: z.string(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
 });
 export type BuildingSummary = z.infer<typeof BuildingSummarySchema>;
 
@@ -94,6 +97,17 @@ export const BuildingDetailResponseSchema = z.object({
 });
 export type BuildingDetailResponse = z.infer<typeof BuildingDetailResponseSchema>;
 
+export const AdvancePaymentPeriodOutSchema = z.object({
+  id: z.string(),
+  amountCents: z.number().int(),
+  amountEur: z.string(),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+  predecessorId: z.string().nullable(),
+  declarationRef: z.string(),
+});
+export type AdvancePaymentPeriodOut = z.infer<typeof AdvancePaymentPeriodOutSchema>;
+
 export const TenancyOutSchema = z.object({
   id: z.string(),
   renterNames: z.array(z.string()),
@@ -101,8 +115,7 @@ export const TenancyOutSchema = z.object({
   validTo: z.string().nullable(),
   baseRentCents: z.number().int(),
   baseRentEur: z.string(),
-  advancePaymentCents: z.number().int(),
-  advancePaymentEur: z.string(),
+  advancePaymentSchedule: z.array(AdvancePaymentPeriodOutSchema),
   activeToday: z.boolean(),
 });
 export type TenancyOut = z.infer<typeof TenancyOutSchema>;

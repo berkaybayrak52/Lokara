@@ -10,8 +10,15 @@ version, never UPDATE.
 """
 
 from datetime import date
+from functools import lru_cache
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from lokara_adapters.geocoding import (
+    DisabledGeocodingGateway,
+    GeocodingGateway,
+    NominatimGeocodingGateway,
+)
 from lokara_db import AdvancePaymentPeriod, Building, Renter, Tenancy, TenancyParty, Unit, new_id
 from lokara_domain import Period, cents, format_eur, periods_overlap
 from sqlalchemy import select
@@ -37,8 +44,22 @@ from ..schemas import (
     UnitDetailResponse,
     UnitSummary,
 )
+from ..settings import ApiSettings
 
 router = APIRouter(prefix="/a/{account_id}")
+
+
+@lru_cache(maxsize=1)
+def get_geocoding_gateway() -> GeocodingGateway:
+    """Build the configured external-edge adapter once per API process."""
+    settings = ApiSettings()
+    if not settings.geocoding_enabled:
+        return DisabledGeocodingGateway()
+    return NominatimGeocodingGateway(
+        endpoint=settings.geocoding_endpoint,
+        contact_email=settings.geocoding_contact_email,
+        timeout_seconds=settings.geocoding_timeout_seconds,
+    )
 
 
 def _is_active_today(valid_from: date, valid_to: date | None) -> bool:
@@ -54,6 +75,9 @@ def _building_summary(building: Building) -> BuildingSummary:
         postal_code=building.postal_code,
         city=building.city,
         unit_count=len(building.units),
+        building_type=building.building_type,
+        latitude=building.latitude,
+        longitude=building.longitude,
     )
 
 
@@ -73,16 +97,37 @@ def list_buildings(account_id: str, session: PathAccountSession) -> BuildingList
 
 @router.post("/buildings", status_code=201)
 def create_building(
-    account_id: str, body: BuildingCreate, session: PathAccountSession
+    account_id: str,
+    body: BuildingCreate,
+    session: PathAccountSession,
+    geocoding: Annotated[GeocodingGateway, Depends(get_geocoding_gateway)],
 ) -> BuildingSummary:
     require_owner(session)
+    street = f"{body.street} {body.house_number}"
+    address = f"{street}, {body.postal_code} {body.city}, {body.country}"
+    latitude: float | None = None
+    longitude: float | None = None
+    try:
+        coordinates = geocoding.geocode(address)
+        if coordinates is not None:
+            latitude = coordinates.latitude
+            longitude = coordinates.longitude
+    except Exception:
+        # Geocoding is enrichment only. Provider/network failures must never
+        # prevent the account-scoped building write.
+        pass
     building = Building(
         id=new_id(),
         account_id=account_id,  # WITH CHECK refuses any other value
         name=body.name,
-        street=body.street,
+        street=street,
         postal_code=body.postal_code,
         city=body.city,
+        building_type=body.building_type,
+        is_residential=body.is_residential,
+        country=body.country,
+        latitude=latitude,
+        longitude=longitude,
     )
     session.add(building)
     session.flush()

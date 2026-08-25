@@ -1,6 +1,5 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Button,
   Card,
@@ -18,25 +17,13 @@ import {
   TableRow,
 } from '@lokara/ui';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { useState } from 'react';
 
 import { PageHeader } from '@/features/portal/page-header';
-import { useFormDraft } from '@/lib/form-draft';
 
-import { FormField } from './form-field';
-import { useBuildings, useCreateBuilding } from './queries';
+import { BuildingMap } from './building-map';
+import { useBuildings } from './queries';
 import { useMe } from '../portal/queries';
-
-const BuildingFormSchema = z.object({
-  name: z.string().min(1, 'Pflichtfeld'),
-  street: z.string().min(1, 'Pflichtfeld'),
-  postalCode: z.string().regex(/^\d{5}$/, 'PLZ: genau 5 Ziffern'),
-  city: z.string().min(1, 'Pflichtfeld'),
-});
-type BuildingForm = z.infer<typeof BuildingFormSchema>;
-
-const EMPTY: BuildingForm = { name: '', street: '', postalCode: '', city: '' };
 
 export function showOwnerControls(role: string | undefined): boolean {
   return role === 'OWNER';
@@ -46,17 +33,52 @@ export function showOwnerControls(role: string | undefined): boolean {
 export function BuildingsPage({ accountId }: { accountId: string }) {
   const buildings = useBuildings(accountId);
   const { data: me } = useMe();
-  const ownerControls = showOwnerControls(me?.accounts.find((account) => account.id === accountId)?.role);
+  const [view, setView] = useState<'list' | 'map'>('list');
+  const ownerControls = showOwnerControls(
+    me?.accounts.find((account) => account.id === accountId)?.role,
+  );
 
   return (
     <main className="py-10">
       <PageHeader
         title="Objekte"
-        description="Gebäude mit ihren Einheiten und Mietverhältnissen. Ein Klick auf ein Objekt öffnet die Einheiten."
+        description="Alle Objekte dieses Kontos. Ein Klick auf ein Objekt öffnet seine Einheiten."
+        actions={
+          ownerControls ? (
+            <Button asChild>
+              <Link href={`/a/${accountId}/objekte/neu`}>Objekt anlegen</Link>
+            </Button>
+          ) : undefined
+        }
       />
 
-      <div className="grid max-w-5xl gap-8 lg:grid-cols-[2fr_1fr]">
-        <section aria-label="Objektliste">
+      <div className="max-w-5xl">
+        <div
+          role="group"
+          aria-label="Objektansicht"
+          className="mb-6 inline-flex rounded-lg border border-slate/40 bg-card p-1"
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant={view === 'list' ? 'secondary' : 'ghost'}
+            aria-pressed={view === 'list'}
+            onClick={() => setView('list')}
+          >
+            Liste
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={view === 'map' ? 'secondary' : 'ghost'}
+            aria-pressed={view === 'map'}
+            onClick={() => setView('map')}
+          >
+            Karte
+          </Button>
+        </div>
+
+        <section aria-label={view === 'list' ? 'Objektliste' : 'Objektkarte'}>
           {buildings.isPending ? (
             <div
               aria-hidden="true"
@@ -66,13 +88,15 @@ export function BuildingsPage({ accountId }: { accountId: string }) {
             <StatusNote kind="danger" label="Objekte konnten nicht geladen werden.">
               Laden Sie die Seite neu oder versuchen Sie es später erneut.
             </StatusNote>
+          ) : view === 'map' ? (
+            <BuildingMap accountId={accountId} buildings={buildings.data.buildings} />
           ) : buildings.data.buildings.length === 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>Noch keine Objekte</CardTitle>
                 <CardDescription>
                   {ownerControls
-                    ? 'Legen Sie rechts Ihr erstes Gebäude an — Einheiten und Mietverhältnisse folgen auf der Detailseite.'
+                    ? 'Legen Sie Ihr erstes Objekt über „Objekt anlegen“ an — Einheiten und Mietverhältnisse folgen auf der Detailseite.'
                     : 'Ihnen ist kein Objekt zugewiesen.'}
                 </CardDescription>
               </CardHeader>
@@ -112,93 +136,7 @@ export function BuildingsPage({ accountId }: { accountId: string }) {
             </Card>
           )}
         </section>
-
-        {ownerControls ? <CreateBuildingForm accountId={accountId} /> : null}
       </div>
     </main>
-  );
-}
-
-function CreateBuildingForm({ accountId }: { accountId: string }) {
-  const create = useCreateBuilding(accountId);
-  const form = useForm<BuildingForm>({
-    resolver: zodResolver(BuildingFormSchema),
-    defaultValues: EMPTY,
-  });
-  const { draftRestored, clearDraft } = useFormDraft(`${accountId}.building-create`, form);
-
-  const onSubmit = form.handleSubmit((values) => {
-    create.mutate(values, {
-      onSuccess: () => {
-        clearDraft();
-        form.reset(EMPTY);
-      },
-    });
-  });
-
-  return (
-    <section aria-label="Objekt anlegen">
-      <Card>
-        <CardHeader>
-          <CardTitle>Objekt anlegen</CardTitle>
-          <CardDescription>
-            Eingaben werden automatisch als Entwurf gespeichert — nichts geht beim Abbrechen
-            verloren.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-            <FormField
-              id="building-name"
-              label="Bezeichnung"
-              hint="z. B. Musterstraße 12"
-              error={form.formState.errors.name}
-              registration={form.register('name')}
-            />
-            <FormField
-              id="building-street"
-              label="Straße und Hausnummer"
-              error={form.formState.errors.street}
-              registration={form.register('street')}
-            />
-            <div className="grid grid-cols-[120px_1fr] gap-4">
-              <FormField
-                id="building-plz"
-                label="PLZ"
-                inputMode="numeric"
-                error={form.formState.errors.postalCode}
-                registration={form.register('postalCode')}
-              />
-              <FormField
-                id="building-city"
-                label="Ort"
-                error={form.formState.errors.city}
-                registration={form.register('city')}
-              />
-            </div>
-            <div>
-              <Button type="submit" disabled={create.isPending}>
-                {create.isPending ? 'Wird angelegt…' : 'Objekt anlegen'}
-              </Button>
-            </div>
-            {draftRestored ? (
-              <StatusNote kind="warning" label="Entwurf wiederhergestellt.">
-                Ihre letzten Eingaben wurden automatisch gesichert.
-              </StatusNote>
-            ) : null}
-            {create.isError ? (
-              <StatusNote kind="danger" label="Anlegen fehlgeschlagen.">
-                Bitte Eingaben prüfen und erneut versuchen.
-              </StatusNote>
-            ) : null}
-            {create.isSuccess ? (
-              <StatusNote kind="success" label="Gespeichert.">
-                Das Objekt wurde angelegt.
-              </StatusNote>
-            ) : null}
-          </form>
-        </CardContent>
-      </Card>
-    </section>
   );
 }
