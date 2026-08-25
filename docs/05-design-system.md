@@ -103,8 +103,10 @@ is **Future**.
 - **App icon:** rounded square, Petrol Ink ground with green blocks.
 - **Avatar:** Lokara Grün circle with the mark.
 
-These usages are **Specified**. No primary, inverse, icon, monochrome, app-icon, or avatar asset is
-present in the repository; their implementation is **Future**.
+The supplied horizontal primary lockup and PNG app icon are **Prepared but unmerged** on
+`slice/ui-00-layout-global-clean`. The shell uses the complete horizontal lockup at 28px height and
+therefore adds no separate wordmark. Next.js owns the app icon through `apps/web/src/app/icon.png`.
+Inverse, monochrome, and avatar assets remain **Future**; do not synthesize them from the PNGs.
 
 ### 2.5 Semantic status colors
 
@@ -319,8 +321,15 @@ nothing busy. Tokens provide structure; these rules provide the feel. They apply
 
 - Use the **8px spacing scale**: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64. Everything snaps to it.
 - Prefer generous white space. Section padding is at least 24px; card padding is 16–24px.
+- The authenticated web shell uses one centered content frame up to 1440px wide, with 24px
+  horizontal breathing room and 32px from the `xl` breakpoint. Individual tables or prose may use
+  a narrower reading measure; never shrink the global frame to repair one screen.
 - Constrain body and content columns to about 640–760px for readability; do not stretch prose
   full-bleed.
+- Card grids align at the top and preserve natural card heights. Do not stretch a short card only
+  to match a longer neighbour.
+- Portfolio KPI cards may use one 4px Lokara-Grün left accent plus a Forest label. The value remains
+  Petrol Ink, and status meaning is never carried by this decorative accent.
 - Use calm surfaces: Paper background, an 8–12px card radius, 8px input/button radius, and one very
   soft elevation shadow. No heavy shadows or double borders.
 
@@ -367,7 +376,8 @@ calm colour, strong type hierarchy, tight motion, and generous air as a bar, not
 | Current motion | CSS/Tailwind transitions, including reduced-motion handling in the shared button | **Shipped** |
 | Framer Motion | Selected dependency; not installed | **Future** |
 | Mobile theme | Shared React Native token/theme object and app | **Future** |
-| Logo and motif assets | Usage is specified, but no repository assets exist | **Future** |
+| Primary logo and app icon | Supplied PNGs installed in the UI-00 shell and Next.js app-icon convention on `slice/ui-00-layout-global-clean` | **Prepared but unmerged** |
+| Other logo and motif assets | Inverse, monochrome, avatar, and separate motif assets are not present | **Future** |
 
 Known delivery gaps are kept explicit instead of changing this contract silently:
 

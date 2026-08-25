@@ -167,7 +167,7 @@ export function StatementPage({ accountId }: { accountId: string }) {
                 // "API request failed: 422 …" string.
                 statement.error instanceof ApiError && statement.error.detail
                 ? statement.error.detail
-                : 'Bitte API und Datenbank prüfen, dann erneut versuchen.'}
+                : 'Laden Sie die Seite neu oder versuchen Sie es später erneut.'}
           </StatusNote>
           <Button variant="outline" onClick={() => setRequested(false)}>
             Auswahl ändern

@@ -67,7 +67,7 @@ export function BuildingDetailPage({
               Zurück zur Objektliste
             </Link>
           ) : (
-            'Bitte API und Datenbank prüfen, dann neu laden.'
+            'Laden Sie die Seite neu oder versuchen Sie es später erneut.'
           )}
         </StatusNote>
       </main>

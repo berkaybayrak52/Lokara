@@ -103,9 +103,9 @@ const RENTER_ID = 'renter-8f31c0d2-DO-NOT-PRINT';
 const CONFLICT_DETAIL =
   'Für diesen Bankumsatz existiert bereits eine abweichende Entscheidung (Pruefkennung QX7-ZAHLUNG).';
 
-/** Byte-identical to `packages/pdf/src/lokara_pdf/statement.py` DISCLAIMER. */
+/** The approved lifecycle-wide web disclaimer. */
 const DISCLAIMER =
-  'Lokara ist ein Werkzeug für die rechtskonforme Betriebs- und Heizkostenabrechnung, keine Rechts- oder Steuerberatung.';
+  'Lokara unterstützt Vermieter bei der rechtskonformen Verwaltung ihrer Objekte und ersetzt keine Rechts- oder Steuerberatung.';
 
 const RECEIVABLE: ReceivableOut = {
   id: 'rec-1',
@@ -353,7 +353,7 @@ describe('Zahlungen — footer and internal references', () => {
     expect(html).toContain(DISCLAIMER);
     // "arbeitet rechtskonform" is a retired attestation: it claims the work on
     // this page was carried out in conformity with the law. The approved
-    // sentence states what Lokara IS. It must not come back.
+    // sentence claimed what Lokara IS. It must not come back.
     expect(html).not.toContain('arbeitet rechtskonform');
   });
 
