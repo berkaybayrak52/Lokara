@@ -31,7 +31,7 @@ LOKARA_REQUIRE_DB (set in CI) forbids the skip.
 import os
 import time
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -167,6 +167,7 @@ def client() -> Iterator[TestClient]:
                 person_id=ISO_PERSON_ID,
                 account_id=ISO_ACCOUNT_ID,
                 role=Role.OWNER,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         _drop_confirmations(session)

@@ -120,6 +120,7 @@ def client() -> Iterator[TestClient]:
                 person_id=_EMPLOYEE_ID,
                 account_id=DEMO_ACCOUNT_ID,
                 role=Role.EMPLOYEE,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         session.merge(
@@ -128,6 +129,7 @@ def client() -> Iterator[TestClient]:
                 person_id=_UNASSIGNED_EMPLOYEE_ID,
                 account_id=DEMO_ACCOUNT_ID,
                 role=Role.EMPLOYEE,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         session.merge(
@@ -136,6 +138,7 @@ def client() -> Iterator[TestClient]:
                 person_id=_MULTI_EMPLOYEE_ID,
                 account_id=DEMO_ACCOUNT_ID,
                 role=Role.EMPLOYEE,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         session.merge(
@@ -144,6 +147,7 @@ def client() -> Iterator[TestClient]:
                 person_id=_TAX_ADVISOR_ID,
                 account_id=DEMO_ACCOUNT_ID,
                 role=Role.TAX_ADVISOR,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         session.merge(
@@ -152,6 +156,7 @@ def client() -> Iterator[TestClient]:
                 person_id=_REVOKED_ID,
                 account_id=DEMO_ACCOUNT_ID,
                 role=Role.EMPLOYEE,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 revoked_at=datetime.now(UTC),
             )
         )
@@ -161,6 +166,7 @@ def client() -> Iterator[TestClient]:
                 person_id=_OTHER_OWNER_ID,
                 account_id=_OTHER_ACCOUNT_ID,
                 role=Role.OWNER,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         for assignment_id, membership_id, building_id in (

@@ -138,7 +138,7 @@ Slow down here.
 - Say: *"€1.200 garbage cost is allocated by area and day. Renter 1 pays €600,00. Renter 2 pays
   €178,52 for 181 days. The landlord carries €181,48 for vacancy. Renter 3 pays €240,00. The total
   reconciles exactly through largest-remainder rounding."*
-- Say: *"Heating uses degree days. Unit B splits 583,3/416,7 ‰: €776,52 to the renter and €554,74 to
+- Say: *"Heating uses degree days. Unit B splits 583,3/416,7 ‰: €776,39 to the renter and €554,87 to
   the landlord. CO₂ uses the 10-step model, and the Rechtsstand is printed."*
 - Say: *"This PDF is the landlord's building-wide calculation and QA overview. It must never be sent
   to a renter. M6-B separately creates owner-only technical archives per eligible tenancy with
@@ -157,7 +157,7 @@ Slow down here.
 | Unit C — Renter 3, 20 m², 365 days | **€240,00** |
 | Reconciliation | **exactly €1.200,00** |
 | Heating and CO₂ total | **€10.300,00** |
-| Unit B heating split | **583,3/416,7 ‰ = €776,52 / €554,74** |
+| Unit B heating split | **583,3/416,7 ‰ = €776,39 / €554,87** |
 | CO₂ | 10 steps; **Rechtsstand 01/2023** |
 
 ---
@@ -207,9 +207,11 @@ If the stack fails, show the verified artifact and numbers.
 ## 6. Do not demo
 
 - Mobile, bank sync, contracts or renter portals. They are roadmap work.
-- The M7 tax/AfA workspace or tax-adviser route. It is merged and reachable on `main`, but it has
-  no seeded adviser persona, so the screen opens empty, and every real export is refused with
-  `Export gesperrt: Die Quellen müssen zuerst geprüft werden.` while its register values remain
-  `verify-before-production`. There is nothing here a landlord can be shown working end to end.
+- The M7 tax/AfA workspace or tax-adviser route. It is integrated only on `development`, has no
+  seeded adviser persona, and every real export remains blocked while its authority values await
+  verification. M7-F is deferred and unverified.
+- M9 `/a/{accountId}/waechter`. It is integrated only on `development`, has no stable demo seed,
+  delivery defaults off, and its production, legal, provider and known presentation blockers
+  remain. M9 is paused and must not be demoed.
 - The five personas in `docs/06` as clickable UI. They are a model, not finished screens.
 - OCR as a live integration. The screen is real, but extraction is canned. Say that clearly.

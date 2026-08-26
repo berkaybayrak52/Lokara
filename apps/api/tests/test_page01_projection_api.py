@@ -24,7 +24,7 @@ import os
 import time
 from collections.abc import Iterator
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -473,6 +473,7 @@ class TestTenantProjectionIsAPrivacyBoundary:
                             person_id=employee_id,
                             account_id=DEMO_ACCOUNT_ID,
                             role=Role.EMPLOYEE,
+                            accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                         ),
                         BuildingAssignment(
                             id=assignment_id,

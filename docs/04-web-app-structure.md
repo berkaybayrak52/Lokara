@@ -27,7 +27,10 @@ lokara/
 │  ├─ heating-engine/         # pure Python heating/CO₂ calculation
 │  ├─ rules-store/            # versioned rule data resolved by callers
 │  ├─ matching-engine/        # pure Python docs/15 bank matching and settlement
-│  ├─ guard-engine/           # pure Python docs/12 W1/W2/W4 guard evaluation
+│  ├─ guard-engine/           # pure Python docs/12 W1–W8 guard evaluation
+│  ├─ afa-engine/             # pure Python AfA calculation
+│  ├─ export-engine/          # pure Python Anlage-V/DATEV projections
+│  ├─ uvi-engine/             # pure Python monthly UVI calculation
 │  ├─ adapters/               # ports plus current stubs/adapters
 │  ├─ db/                     # SQLAlchemy, Alembic and RLS
 │  ├─ pdf/                    # HTML→PDF through Playwright Chromium
@@ -40,12 +43,12 @@ lokara/
 The uv workspace contains `apps/api` and every Python package shown above except `ui`. The Bun
 workspace contains exactly `apps/web` and `packages/ui`.
 
-`packages/guard-engine` has no API route, web/runtime consumer, database record, scheduler,
-provider, delivery path or PDF projection.
+Integrated M9 work connects `packages/guard-engine` to migration `0025`, account-scoped jobs/API
+and `/a/{accountId}/waechter`. It is unverified on `development`, paused and production-blocked.
 
 `apps/mobile`, KPI engines, Redis and workers are absent. `packages/afa-engine`,
-`packages/export-engine` and the tax route/workspace are merged on `main`, though real export
-output stays blocked. Real Supabase, Vision, bank, email and MDL providers are absent; current
+`packages/export-engine` and the tax route/workspace are present; deferred M7-F repairs are
+integrated but unverified. Real Supabase, Vision, bank, email and MDL providers are absent; current
 external edges use local infrastructure or stubs.
 
 ### Binding dependency direction
@@ -72,6 +75,7 @@ Zahlungen screen. Do not renumber them when navigation changes.
 |    6 | Abrechnung erstellen   | `/a/{accountId}/abrechnung`                                        |
 |    7 | Beleg-Upload           | `/a/{accountId}/beleg`                                             |
 |    8 | Zahlungen              | `/a/{accountId}/zahlungen`                                         |
+|    9 | Wächter                | `/a/{accountId}/waechter`                                          |
 
 Page 8 is owner-only, in navigation as well as in the API; see the C3c paragraph under
 "Shipped API surface" below.
@@ -231,6 +235,9 @@ There is one FastAPI application. Its current route families are:
 - `/a/{accountId}` building, unit, tenancy, cost/allocation-key, meter/reading, heating-cost and
   extraction routes;
 - `/a/{accountId}` bank, receivable and Page-01-handoff routes (M6-C2, owner-only).
+- `/a/{accountId}` guards, guard runs, schedules, reminders, checklists and deliveries (prepared
+  M9). Owners control sends and legal confirmation; employees are assigned-building scoped for
+  guards/checklists; tax advisers have no M9 access.
 
 There is no shipped bootstrap API route. JSON uses camelCase at the client boundary and snake_case
 inside Python; Pydantic validates the backend boundary.

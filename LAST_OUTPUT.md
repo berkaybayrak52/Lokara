@@ -8,8 +8,8 @@ Preserve UI-04, deferred M7-F repairs and paused M9 work on one long-lived local
 branch while leaving `main` unchanged.
 
 ## Done
-UI-04 and the deferred M7-F repair checkpoint are being combined on `development`.
+All three checkpoint histories are now combined on `development`.
 
 ## Not done
-M9 integration, migration-head reconciliation and compile-level verification remain. Nothing was
-pushed.
+Migration-head reconciliation, current-state documentation and compile-level verification remain.
+Nothing was pushed.

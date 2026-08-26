@@ -46,18 +46,16 @@ adapter and base owner endpoints are shipped on `main`; C3a's matching service a
 are technically complete, development-synchronized to final `0021` and locally merged into `main`.
 C3b's scheduler port and three job entrypoints are technically complete and locally merged into
 `main`, and so is the C3c landlord *Zahlungen* screen, which completes M6. Renter activation/portal,
-contracts, billing and native apps remain future milestones in `PLAN.md`. M7 tax-adviser access,
-AfA and tax export are **technically complete and locally merged** (`3d69013`): the engines,
-migration `0024`, the account-scoped API and the restricted `/steuern` workspace ship on local
-`main`. Real export output stays blocked while its register values remain
-`verify-before-production`, and M7-F's three read-only reviews remain open.
+contracts, billing and native apps remain future milestones in `PLAN.md`. The `development` branch
+integrates M7-0 through M7-E plus deferred M7-F repairs, but M7-F remains unverified and every
+flagged tax authority still blocks production output.
 
-The locally merged G1 slice provides pure W1 statement-deadline, W2 meter-calibration and
-W4 UVI-cadence evaluators. It has no database, API, UI, scheduler, provider, delivery or PDF
-consumer. Future product breadth still includes renter delivery, W3 and W5–W8, M9 reminders and
-delivery and mobile clients. Anlage V/DATEV has a merged M7 foundation, but not a usable
-production export: real generation stays refused while its register values remain
-`verify-before-production`. Those are roadmap or blocked dependencies, not usable capabilities.
+G1 supplies the pure guard foundation. `development` also integrates paused M9 work for W1–W8,
+immutable evidence, account-scoped jobs/API, default-off renter email delivery and the landlord
+`/waechter` screen. This is unverified integration work, outside the stable demo and not
+production-approved: legal/source flags, absent real providers/workers, missing immutable UVI PDF
+bytes, an empty production checklist catalogue and known presentation defects still block real
+automation. M10 owns renter portal publication.
 
 ## Competitive thesis
 

@@ -19,7 +19,7 @@ and LOKARA_REQUIRE_DB (CI) forbids the skip.
 import os
 import time
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import jwt
@@ -106,7 +106,11 @@ def live(request: pytest.FixtureRequest) -> Iterator[tuple[TestClient, _Fixture]
         session.flush()
         session.merge(
             Membership(
-                id="mem_m6c2_owner", person_id=PERSON_ID, account_id=ACCOUNT_ID, role=Role.OWNER
+                id="mem_m6c2_owner",
+                person_id=PERSON_ID,
+                account_id=ACCOUNT_ID,
+                role=Role.OWNER,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         session.merge(
@@ -115,6 +119,7 @@ def live(request: pytest.FixtureRequest) -> Iterator[tuple[TestClient, _Fixture]
                 person_id=OUTSIDER_PERSON_ID,
                 account_id=OUTSIDER_ACCOUNT_ID,
                 role=Role.OWNER,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         session.merge(

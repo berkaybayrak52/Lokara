@@ -12,6 +12,7 @@ from .routers import (
     demo,
     extraction,
     finalized_statements,
+    guards_delivery,
     health,
     mdl,
     me,
@@ -43,6 +44,10 @@ def create_app() -> FastAPI:
     app.include_router(advances.router)
     app.include_router(finalized_statements.router)
     app.include_router(finalized_statements.root_router)
+    # FastAPI 0.139 keeps ``include_router`` branches lazy. M9's authorization
+    # contract audits each concrete APIRoute and its dependency graph, so keep
+    # this bounded router materialized in the application route table.
+    app.router.routes.extend(guards_delivery.router.routes)
     app.include_router(buildings.router)
     app.include_router(costs.router)
     app.include_router(meters.router)

@@ -1,7 +1,8 @@
 # Guards and deadlines — shared trigger, escalation and resolution contract
 
-**Status:** complete D2 transcription; bounded G1 engine technically complete, reviewed and
-locally merged 24.08.2026
+**Status:** complete D2 transcription; M9 implementation prepared but uncommitted and unmerged on
+`slice/m9-guards-delivery` 25.08.2026. Demo gate green and boundary review clean; final statement
+review red — see `PLAN.md` § M9-U.
 
 **Authoritative source:**
 `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
@@ -15,10 +16,17 @@ locally merged 24.08.2026
 **Fixtures:** exactly `12-F01`–`12-F24` in
 `packages/rules-store/tests/berkay_12_golden.py`
 
-**Implementation status:** G1 implements `12-F01`–`12-F06` and `12-F11`–`12-F13` through the pure
-`packages/guard-engine`. No reminder scheduler, provider, schema, API, UI, e-mail, push or PDF
-behavior is implemented. UVI calculation/document work remains U; reminder and delivery work
-remains M9.
+**Implementation status:** G1 remains the merged foundation. Prepared M9 executes all
+`12-F01`–`12-F24` through public W1–W8 evaluators and adds migration `0025`, account-scoped jobs and
+API, the `/waechter` landlord screen, immutable reminder/delivery evidence and a deterministic email
+stub. Automation defaults off. This is not production authorization.
+
+The M9-R endpoint, membership, trigger and writer-trust defects are repaired and verified against
+migrated Postgres; the fresh boundary audit is clean. The remaining closure defect is presentation,
+not transcription: `/waechter` maps known guard/status values to German, but lower-case internal
+blocker keys can still leak. Its broad internal-code heuristic can also hide useful `SHA-256`
+wording and apply a false legal fallback to technical blockers. `PLAN.md` § M9-U owns that final
+repair before commit or merge.
 
 This document owns Page 05's reusable date, money, trigger, warning, escalation and auto-resolution
 rules. All product and warning copy is German. Code structure and identifiers are English. Money is
@@ -183,7 +191,10 @@ warns sharply; it does not assess the statutory exception.
 - expired warning: “Frist abgelaufen: Für {Jahr} ist eine Nachforderung in der Regel
   ausgeschlossen. Ein Guthaben müssen Sie dem Mieter weiterhin auszahlen.”
 - escalation: in-app at 90 days; in-app + e-mail at 30; e-mail + push at 0/expired.
-- auto-resolution: `statement_delivered_on <= landlord_deadline`; event `statement_sent`.
+- resolution: `statement_delivered_on <= landlord_deadline`; event `statement_sent`. Provider
+  `DELIVERED` is transport evidence only. W1 resolves only after an owner confirms `delivered_on`
+  with an evidence reference. A late confirmation remains append-only evidence and does not restore
+  timeliness.
 
 ### 5.2 W2 — meter calibration expiry
 
@@ -273,9 +284,10 @@ uncertainty described in § 1.
 The warning is: “Für {WE} (fernablesbare Zähler) steht die monatliche Verbrauchsinformation für
 {Monat} noch aus. § 6a HeizkostenV verpflichtet zur monatlichen Information des Mieters.”
 
-Escalation is in-app when due and e-mail when overdue. Generating/sending that month's UVI resolves
-the occurrence and advances the next due month; event `uvi_sent`. `docs/16` owns UVI calculation,
-content, delivery document, DWD inputs and comparison rules; W4 owns only cadence and guard state.
+Escalation is in-app when due and e-mail when overdue. Generating/sending that month's UVI is the
+specified resolution event `uvi_sent`. It is not currently executable: M9 refuses UVI dispatch
+until immutable PDF bytes exist. `docs/16` owns UVI calculation, content, delivery document, DWD
+inputs and comparison rules; W4 owns only cadence and guard state.
 
 ### 5.5 W5 — § 558 comparative-rent increase
 
@@ -471,8 +483,14 @@ shared rows and ten non-goals are mapped. The data-only checks may prove
 coverage and arithmetic, but they do not approve legal rules, resolve authority gaps or demonstrate
 production behavior.
 
-The approved D2 transcription was data-only. G1 now executes exactly `12-F01`–`12-F06` and
-`12-F11`–`12-F13` through the pure `lokara_guard_engine` package and its three public evaluators.
-The reviewed slice is technically complete and locally merged. It makes no
-schema, migration, API, adapter, UI, scheduler, e-mail, push or PDF change. Later U and M9
-integration remains assigned to `PLAN.md`.
+The approved D2 transcription was data-only. G1 is the locally merged foundation; prepared M9 now
+executes all 24 fixtures through production evaluators and supplies immutable account-scoped
+persistence, idempotent jobs, owner/employee-safe endpoints, the landlord `/waechter` screen and a
+deterministic email adapter.
+
+Real delivery remains blocked and default-off. No real email provider, worker, scheduler, push
+client/token boundary or GENESIS integration is selected. Each renter is a separate message;
+missing address, suppression, artifact/hash mismatch or any frozen production blocker sends
+nothing. UVI lacks immutable PDF bytes, and Page 05 supplies no approved production checklist
+catalogue, so that catalogue remains empty. All `verify-before-production`, missing-copy, UVI and
+VPI limitations remain visible and blocking.

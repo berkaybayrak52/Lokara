@@ -68,6 +68,12 @@ const NAV_ITEMS: NavItem[] = [
     activePrefixes: ['/abrechnung'],
   },
   {
+    href: (id) => `/a/${id}/waechter`,
+    label: 'Wächter',
+    activePrefixes: ['/waechter'],
+    visibleFor: (role) => role === 'OWNER' || role === 'EMPLOYEE',
+  },
+  {
     href: (id) => `/a/${id}/steuern`,
     label: 'Steuern',
     icon: 'tax',

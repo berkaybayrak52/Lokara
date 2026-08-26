@@ -57,27 +57,18 @@ before UI. Dates are communication events, not planning inputs.
   complete, development-synchronized and locally merged. C3b's three job entrypoints and C3c's
   landlord Zahlungen screen (`6995bc4`) are technically complete and locally merged, which closes
   M6-C and with it M6.**
-- **G1 is technically complete and locally merged (`6c257f8`).** The pure `packages/guard-engine`
-  executes W1, W2 and W4 for `12-F01`–`12-F06` and `12-F11`–`12-F13`. It adds no database, API, UI,
-  scheduler or PDF consumer. W2 now runs the unified six-year MessEV Eichfrist; the slice had
-  reversed that merged round-4 decision, and the reversal was undone before the merge.
-  `main` is ahead of `origin/main`, which still points to `f372f67`.
-  U1–U5 are now technically complete and locally merged. M7-0 through M7-E are **technically
-  complete and locally merged** from `slice/m7-afa-tax-export`. M7-F is deliberately deferred until
-  after M10: one boundary audit found four unresolved defects, while statement/docs review,
-  regression-first repairs and closing gates remain. Every M7 authority flag still blocks
-  production output. UI-00 was locally merged by Emir on 25.08.2026 with its clean
-  disposable-database full gate green. Live browser verification could not run because no browser
-  session was available; Emir explicitly authorized the merge and UI-01 start with that check still
-  recorded as outstanding. UI-01 was also locally merged by Emir on 25.08.2026 with all non-browser
-  checks green and its live browser verification still recorded as outstanding. UI-02 was locally
-  merged by Emir on 25.08.2026 after live shell acceptance, statement review, 137 web tests and a
-  clean disposable-database full gate. Its automated screenshot matrix remains outstanding.
-  UI-03 was locally merged on 25.08.2026 under the direct implementation mode in `CLAUDE.md`
-  § 10: implemented and compile-verified, but unverified by any test run.
-  UI-04 followed on the same terms.
-  UI-05A is next; UI-00 through UI-08 run before the paused M9 work resumes.
-  M10 renter publication follows completed M9, then M11 native apps, billing and the load test.
+- **G1 is technically complete and locally merged (`6c257f8`).** U1–U5 and M7-0 through M7-E are
+  also locally merged. Local `main` remains the last consolidated checkpoint at `5230724`.
+  The long-lived local `development` branch integrates UI-04, deferred M7-F repairs and paused M9
+  work, including all W1–W8 projections, migration `0025`, account-scoped jobs/API, immutable
+  delivery evidence and `/waechter`. Integration does not close or verify these workstreams.
+  M7-F remains deferred until after M10; its repair candidate still needs closing reviews and
+  verification, and every M7 authority flag continues to block production output. M9 remains paused
+  until after UI-08, with its known landlord-facing presentation and production blockers visible.
+  UI-00 through UI-02 retain their earlier evidence. UI-03 and UI-04 were implemented under the
+  direct implementation mode in `CLAUDE.md` § 10 and carry no test evidence. UI-05A is next and
+  future direct implementation continues on `development`. Nothing from this consolidation is
+  pushed.
 
 ---
 
@@ -89,12 +80,12 @@ golden fixtures. Existing docs are not assumed correct merely because they alrea
 
 | Source | Target | Fixtures | Current coverage and dependency |
 | --- | --- | --- | --- |
-| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B is complete and locally merged for the persisted M3/M4 path, including the Round-4 Block-(c) correction. M6-A/B ship actual-advance reconciliation and owner-only technical final archives; M6-C1/C2/C3-0/C3a ship bank matching, ledger persistence, the matching service, five owner APIs and audited invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's Zahlungen screen are technically complete and locally merged. M10 renter delivery remains open. |
+| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B and M6 ship the persisted calculation, bank/ledger flow and owner-only final archives. Prepared M9 adds default-off, owner-controlled renter email delivery; M10 owns renter portal publication. |
 | Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. U1–U5 now implement monthly DWD/UVI engineering, but technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or UVI production authority. |
 | Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
 | Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The normalized pure engine, server-owned rules and the AfA API/web boundary are locally merged and green under `scripts/gate.sh full`. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. F11 selects 453,798 ct, while K09 authority, Weg B and the missing Gutachten share still block production. |
 | Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The pure export engine, rules, the strengthened `0024` model and the server-owned artifact/API adapter are locally merged and green under `scripts/gate.sh full`. Artifact bytes are generated by the server from domain inputs; a caller can never supply them. Seven register rows are `geprüft`; six and all affected runtime outputs remain blocked. |
-| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. G1 executes the nine selected W1/W2/W4 cases (`12-F01`–`F06`, `F11`–`F13`) through the pure guard engine on `main`. Sixteen of the 18 Page-specific register rows remain `verify-before-production`; rows 128 and 129 were closed by round 4 against § 34 Abs. 2 MessEV and MessEV Anlage 7 and still need matching register entries. W3 and W5–W8 plus all consumers remain open. |
+| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. Prepared M9 executes all 24 cases through production evaluators and adds immutable persistence, account-scoped jobs/API and `/waechter`. The original 18 Page-specific register rows remain flagged; the two superseding checked W2 rules still need matching register rows. Real delivery remains default-off and production-blocked. |
 | Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
 | Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
 | Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's *Zahlungen* screen are technically complete and locally merged. |
@@ -290,13 +281,13 @@ not replace the complete documentation or reconciliation gates.
 | M6 | **Technically complete; locally merged 24.08.2026** | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **C3b's scheduler port and three job entrypoints are locally merged**: no schema change, no endpoint, one consent precondition on every AIS pull. **C3c's Zahlungen screen is technically complete and locally merged**: a client-only owner screen that records one final confirm/reject/duplicate outcome, with no manual assignment and no backend change. That merge closes M6-C and completes M6; delivery and the renter portal remain M10. |
 | G | **Technically complete, reviewed and locally merged 24.08.2026** | Shared guard foundation | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration. |
 | U | **Technically complete, reviewed and locally merged 24.08.2026** | UVI comparison, calculation and document | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10. |
-| M7 | **M7-0…M7-E technically complete and locally merged 25.08.2026; M7-F deferred until after M10** | Tax export and AfA | The merged foundation passed its earlier gates. The initial M7-F boundary audit found four unresolved defects; statement/docs review, repairs and closing gates remain. All flagged register values continue to block real output. |
+| M7 | **M7-0…M7-E technically complete; M7-F repair candidate integrated on `development` but deferred and unverified** | Tax export and AfA | The pure AfA/export foundation and Anlage-V paths retain their earlier branch evidence. M7-F still needs closing reviews and verification, and all flagged register values continue to block real output. |
 | M8 | **Lane A unblocked; lane B source-blocked** | Document and letter engine | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either. |
-| UI | **UI-00 through UI-04 complete 25.08.2026; UI-05A next; UI-03 and UI-04 carry no test evidence and automated screenshot checks remain recorded as outstanding** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
-| M9 | **Paused by Emir on 25.08.2026; resume after UI-08** | Reminders, email and checklists | Preserve the existing unmerged M9 worktree exactly. When resumed, extend the existing W1/W2/W4 foundation with the remaining guard projections, reminders, delivery and UVI scheduling from approved `docs/12`. |
+| UI | **UI-00 through UI-04 integrated; UI-05A next on `development`; UI-03/UI-04 carry no test evidence** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
+| M9 | **Integrated on `development` but paused and unverified; resume after UI-08** | Reminders, email and checklists | The preserved W1–W8, immutable migration `0025`, account-scoped jobs/API, default-off delivery and `/waechter` work remains subject to known presentation, source/legal, provider, UVI-artifact and checklist-catalogue blockers. Earlier branch evidence is not consolidation evidence. |
 | M10 | **After resumed M9 is complete** | Portals and investment | Two independent lanes, R before I: renter activation, renter context and the renter portal, then the approved `docs/14` investment cockpit. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5. |
 | M11 | After M10 | Native apps, billing and load test | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test. |
-| M7-F | **After M10; required before programme/production closure** | Finish tax/AfA review and repair | Resolve the four confirmed boundary findings, complete statement/docs review, rerun all focused and closing verification, and preserve every legal/runtime production blocker. |
+| M7-F | **After M10; integrated repair candidate remains required before programme/production closure** | Finish tax/AfA review and repair | Revalidate the boundary repairs, complete statement/docs review, rerun focused and closing verification, and preserve every legal/runtime production blocker. |
 
 ### Slice A — progress and closure
 
@@ -1294,23 +1285,108 @@ compare a render against.
 
 ### M9 — Reminders, email and checklists
 
-**Status — paused by Emir on 25.08.2026; resume after UI-08.** Preserve the existing unmerged M9
-worktree exactly; this decision postpones M9 and does not cancel it.
+**Status — integrated on `development`, paused by Emir on 25.08.2026 and unverified; resume after
+UI-08.** The checkpoint preserves the M9 implementation and its earlier branch evidence, but this
+consolidation does not claim closure. Before the pause, the workstream recorded these repairs:
+
+- Migration `0025` created `guard_resolution_event` before `renter_delivery_artifact`, so its W1
+  foreign key could not resolve and the migration failed on any database that had not already
+  received an earlier draft. Creation order now follows the dependency, and the reversed drop order
+  follows from it.
+- `dispatch_renter_artifact` wrote a `RecipientSuppressionEvent` that
+  `append_recipient_suppression_from_status_m9` already derives from the status event. The
+  deduplication trigger skips the second insert by returning `NULL`, which the ORM reports as a
+  `FlushError` — so every synchronous `BOUNCED`/`COMPLAINED` receipt crashed the job. The trigger is
+  now the single owner of that derivation.
+- A bounce or complaint recorded only in the append-only provider status history did not suppress a
+  later occurrence, because the dispatch path read the suppression projection alone. It now consults
+  the history directly.
+- `derive_statement_production_blockers` read an absent or invented Page-01 authority inventory as
+  "clear". A statement envelope must reproduce one published `PAGE_01_STATEMENT_RULES` version
+  verbatim, or it carries `STATEMENT-AUTHORITY-ENVELOPE-INCOMPLETE` and cannot be delivered.
+- Both renter-delivery write endpoints previously returned HTTP 500. Real migrated-Postgres tests
+  now exercise them; request context, confirmation artifact/membership bindings and accepted-owner
+  enforcement are repaired.
+- Checklist and W1 evidence triggers now require accepted memberships and consistent annual-
+  statement artifact bindings. Consumers use the bound artifact column instead of snapshot JSON.
+- Statement delivery blockers are now derived from the published Page-01 inventory instead of
+  trusting a writer-provided blocker list.
+
+The three M9 test modules also set `SUPABASE_JWT_SECRET` in the process environment at import time,
+which broke 31 unrelated authenticated API tests in a whole-suite run. Test environment is now
+fixture-scoped.
 
 **Approved-spec prerequisite:** `docs/12` and the G1 foundation. M9 extends the existing W1/W2/W4
 engine with remaining guard projections, reminders, email and checklists without redefining those
 rules.
 
-- Add the remaining arrears and move-in/out guard projections and compose them with the existing
-  § 556, Eichfrist and UVI cadence evaluators.
-- Stubbed email provider using Lokara's domain and the landlord as the From-name, with an immutable
-  delivery-status ledger.
-- Suppress bounced and complained-about addresses.
-- Count the § 556 access deadline backwards. UVI and annual statements keep separate delivery rules.
-- Three-colour delivery indicator.
-- Data-driven checklist library that creates reminders.
+- All W1–W8 evaluators and `12-F01`–`12-F24` execute through versioned Page-05 rules.
+- Migration `0025` stores immutable evaluations, reminders/resolutions, opt-in schedule versions,
+  exact-byte artifacts and hashes, email/status/suppression evidence and checklist item events.
+- Jobs and endpoints are caller-account-scoped and idempotent. Owners may send or confirm legal
+  delivery; employees see assigned-building guards and may append checklist events; tax advisers
+  have no M9 access.
+- `/waechter` shows deadlines, delivery state and checklists with labelled status, blockers and
+  accessible controls. Provider `DELIVERED` is transport evidence only; W1 requires an owner
+  confirmation with `delivered_on` and an evidence reference.
+- Automation defaults off. No real email, worker, scheduler, push or Destatis provider is selected;
+  UVI delivery lacks frozen PDF bytes and the production checklist catalogue is empty.
 
-**Done when:** the § 556 deadline escalates correctly and delivery status is visible.
+#### M9-R — completed endpoint and boundary repair
+
+The database-backed endpoint tests, request-context repair, W1 confirmation bindings and
+writer-trust repair are complete. The follow-up boundary audit also found and drove repairs for
+unaccepted membership scope and forgeable/non-annual W1 evidence bindings. A fresh boundary review
+is clean; its focused verification passed `112` tests. The numbered requirements below are the
+completed repair record, not the current resume task.
+
+1. **Database-backed write tests completed.** The real migrated-Postgres suite now posts to
+   `POST /a/{account_id}/deliveries` and `POST /a/{account_id}/deliveries/{delivery_id}/confirm`.
+   It first proved both failures red under the declared `.lokara-red` window and now verifies the
+   repaired ORM, check-constraint and trigger paths.
+
+2. **Forged-context check restored.** Delivery validation now uses the request body instead of
+   aliasing the fetched `RenterDeliveryArtifact` as request context. The real-row path verifies the
+   fetched building, unit, tenancy, renter and tenancy party against the artifact's declared
+   foreign-key chain.
+
+3. **W1 confirmation bindings recorded.** `PortalScope` now carries `membership_id`, and
+   `confirm_delivery` writes both `renter_delivery_artifact_id` and
+   `confirmed_by_membership_id`. The application role rule and database trigger now agree on an
+   accepted, unrevoked owner confirmation, preserving the § 147 AO actor.
+
+4. **Writer-trust gap closed.** `derive_statement_production_blockers` now derives the expected
+   blockers from the published `PAGE_01_STATEMENT_RULES` inventory instead of trusting the
+   snapshot writer's blocker list.
+
+5. **Verification completed.** `scripts/gate.sh demo` is green with `1844` pytest and `130` vitest;
+   the ordinary statement fingerprint remains `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes.
+   The boundary review is clean. The separate statement review remains red as recorded below.
+
+#### M9-U — final landlord-facing UI repair. Required before commit or merge.
+
+The first UI repair added explicit German W1–W8 titles, known blocker labels, reminder-channel
+labels, suppression-reason labels and semantic blocker lists. The fresh statement review still
+found one HIGH presentation defect: actual lower-case blocker keys such as
+`missing_warning_copy:last_day`, `missing_post_retrofit_rule`, `missing_uvi_cadence_start` and
+`basis_year_mismatch` can still leak. The broad internal-code regex also hides the useful `SHA-256`
+part of an approved German integrity message, and the generic fallback can misdescribe technical
+blockers as missing legal/rule authority and duplicate identical bullets.
+
+Resume test-first: add failing web fixtures for these exact cases, replace the heuristic with
+explicit mappings/allowlisting and safe differentiated fallbacks, deduplicate the rendered list,
+then rerun the focused web tests, `scripts/gate.sh demo`, the fingerprint check and a fresh
+`statement-reviewer` pass. The slice cannot close while that review is red.
+
+These audit findings stay open and unfixed, and are recorded as `verify-before-production` rather
+than repaired inside M9-R: client-supplied `today`/`now` on `POST /guard-runs` stamps immutable
+evidence; discovery-token expansion can create unbounded undeletable rows; `StubEmailGateway`
+claims `provider_idempotency_enforced = True` from per-process memory and accumulates renter PDFs
+across accounts; and `evaluators.py` hardcodes five legal values and uses exact `days == 30` /
+`days == 90` equality, which permanently loses a W1 warning whenever a run is missed.
+
+**Done when:** the technical gates and non-fresh demo are green, the ordinary statement fingerprint
+is unchanged, required reviews are clean and the prepared slice is presented without merging it.
 
 ### Portfolio UI 00–08 programme
 

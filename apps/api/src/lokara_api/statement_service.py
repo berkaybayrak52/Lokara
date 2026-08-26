@@ -14,10 +14,11 @@ heating inputs are incomplete the statement says so; the NK part still
 computes, because one missing meter must not block the Betriebskosten.
 """
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from enum import StrEnum
+from typing import Final
 
 from lokara_adapters import (
     MeasurementUnit,
@@ -80,9 +81,11 @@ from lokara_rules_store import (
     DEFAULT_CONSUMPTION_SHARE,
     DEGREE_DAY_TABLE,
     HEATING_SPLIT_BOUNDS,
+    PAGE_01_STATEMENT_RULES,
     WARM_WATER_FORMULA,
     ResolvedRule,
     get_rule,
+    resolve_page01_statement_rules,
     resolve_rule,
 )
 from sqlalchemy import select
@@ -103,6 +106,11 @@ BILLING_START = date(2025, 1, 1)
 BILLING_END = date(2026, 1, 1)  # exclusive
 BILLING_PERIOD = Period(valid_from=BILLING_START, valid_to=BILLING_END)
 RULES_AS_OF = date(2025, 12, 31)
+# The Page-01 authority inventory is a separately versioned legal surface.  Its
+# first approved register version is dated 07/2026, so it cannot be resolved by
+# the 2025 consumption period.  Keep the selected legal as-of date explicit and
+# deterministic at the server boundary.
+STATEMENT_RULES_AS_OF = date(2026, 8, 25)
 
 
 def period_label(window: Period) -> str:
@@ -173,9 +181,41 @@ class StatementBundle:
     # serializes this alongside the result at finalization; preview otherwise
     # keeps it in memory only.
     normalized_inputs: dict[str, object]
+    # Exact server-selected Page-01 register rows.  Finalization freezes these
+    # unchanged; clients never supply or downgrade their verification status.
+    statement_rule_evidence: tuple[dict[str, str], ...]
     # Confirmed Page-02 amounts that stay with the owner.  They are not NK
     # engine costs, but the M6-B vacancy annex must preserve them by cost type.
     non_allocable_costs: tuple[tuple[str, int], ...]
+
+
+#: A statement envelope carries two halves of one authority record: the frozen
+#: `production_blockers` list and the complete versioned Page-01 authority inventory.
+#: Half an envelope is not evidence that a statement is clear -- it is evidence that
+#: the record was never frozen -- so both the finalizer and the M9 delivery path
+#: raise this blocker rather than reading an absent or invented inventory as safe.
+STATEMENT_AUTHORITY_ENVELOPE_INCOMPLETE: Final = "STATEMENT-AUTHORITY-ENVELOPE-INCOMPLETE"
+
+
+def statement_authority_envelope_is_complete(
+    production_blockers: object, statement_rule_evidence: object
+) -> bool:
+    """Both halves present, and the evidence reproduces one published inventory.
+
+    The comparison is against `PAGE_01_STATEMENT_RULES` itself, never against a
+    shape or a row count: an invented inventory of the right length is exactly the
+    input this check exists to refuse. No as-of date is inferred from the snapshot
+    either -- a frozen envelope must reproduce one published version verbatim.
+    """
+
+    if not isinstance(production_blockers, list):
+        return False
+    if not isinstance(statement_rule_evidence, list) or not statement_rule_evidence:
+        return False
+    return any(
+        statement_rule_evidence == [asdict(row) for row in version.value.evidence]
+        for version in PAGE_01_STATEMENT_RULES.versions
+    )
 
 
 def _party_labels(units: list[Unit], window: Period) -> dict[PartyKey, str]:
@@ -501,6 +541,7 @@ def compute_statement(
     *,
     building_id: str | None = None,
     window: Period | None = None,
+    statement_rules_as_of: date = STATEMENT_RULES_AS_OF,
 ) -> StatementBundle:
     """One building, one inclusive period, one calculation (docs/02 § 5 step 1).
 
@@ -512,6 +553,9 @@ def compute_statement(
     (`CLAUDE.md` § 3.3); RLS is the backstop, not the authorization.
     """
     window = window or BILLING_PERIOD
+    statement_rule_evidence = tuple(
+        asdict(row) for row in resolve_page01_statement_rules(statement_rules_as_of).evidence
+    )
     if building_id is None:
         # Oldest building = the seeded demo object; an explicit id is the
         # ordinary path, and this branch is only what "the demo" means.
@@ -692,6 +736,7 @@ def compute_statement(
         rechtsstaende=stamps,
         rechtsstand_entries=entries,
         normalized_inputs={"nk": nk_input, "page01b": page01b_input},
+        statement_rule_evidence=statement_rule_evidence,
         non_allocable_costs=non_allocable_costs,
     )
 

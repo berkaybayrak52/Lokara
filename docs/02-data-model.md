@@ -75,8 +75,8 @@ account-scoped tables carries the same `account_id`; section 3 records the enfor
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
-| Pure guard evaluation | W1 statement deadline, W2 meter calibration and W4 UVI cadence; no persisted guard/reminder records | **Shipped** as a pure engine; no schema or API |
-| AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Locally merged**; M7-F's read-only reviews remain open |
+| Guards, reminders, delivery and checklists | W1–W8 evaluations plus immutable reminders/resolutions, versioned schedules, exact-byte artifacts, email/status/suppression evidence and checklist events | **Integrated but unverified** on `development` in M9 migration `0025`; M9 remains paused and production-blocked |
+| AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Integrated on `development`** with deferred M7-F repairs; closure reviews and runtime authority remain blocked |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
 These principles decide ambiguous additions:
@@ -925,13 +925,21 @@ written is not a migration that works.
 
 ### M7 record set
 
-Migration `0024_m7_afa_tax_export.py` is on `main`. It creates
+Migration `0024_m7_afa_tax_export.py` creates
 `afa_record_version`, `tax_event`, `tax_adviser_profile_version`, `tax_mapping_version`,
 `tax_export_readiness_attempt`, `tax_export_archive` and `tax_export_artifact`. Every table carries
 `account_id`, forced RLS and a `WITH CHECK` policy; cross-account edges are composite, financial
-evidence is append-only, and archive bytes are immutable. The source was proved from an empty
-disposable database, and the development database was reconciled to it on 25.08.2026; its seven M7
-tables now match the models column for column.
+evidence is append-only, and archive bytes are immutable. Deferred M7-F repairs are integrated on
+`development`, but their closure reviews and verification remain open.
+
+### Integrated M9 record set
+
+Migration `0025_m9_guard_delivery.py` creates ten account-scoped, forced-RLS records: immutable
+guard evaluations, reminders and resolutions, versioned default-off schedules, frozen renter
+artifacts with SHA-256, email attempts and status events, bounce/complaint suppression events,
+checklist instances and append-only item events. Composite foreign keys bind every building,
+tenancy, renter, artifact and actor context. Provider delivery status is not legal receipt. This
+record set is integrated but unverified on `development`; M9 remains paused and production-blocked.
 
 The statement's Saldo is BGH formal minimum #4. It must use **geleistete** advances from accepted
 payment allocations, not `advance_payment_cents × months`. The temporal Soll schedule is still
@@ -957,9 +965,9 @@ with M7-F's read-only reviews still open.
 | Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
 | Three matching jobs | **Locally merged**; no schema change, read through an account-scoped session only | M6-C3b |
 | Landlord *Zahlungen* screen | **Locally merged**; confirm/reject/duplicate only, no manual assignment, no schema change | M6-C3c |
-| W1/W2/W4 pure guard evaluator | **Shipped** as a pure engine; no database, API, UI, scheduler, delivery or PDF consumer | G1 |
-| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; production data/legal flags remain blocking, and no scheduled/email delivery or renter publication is included | U1–U5 / `docs/16` |
-| Renter delivery/portal work | **Future** | M10 |
+| W1–W8 guards, reminders, email delivery and checklists | **Prepared but uncommitted/unmerged** with migration `0025`, account-scoped jobs/API and `/waechter`; delivery defaults off and real execution remains blocked | M9 / `docs/12` |
+| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; prepared M9 scheduling refuses delivery because immutable UVI PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
+| Renter portal publication | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Pure engine, rules, schema, web and the server-generated artifact/API adapter are locally merged and green; runtime output stays blocked while its register values remain `verify-before-production` | M7 / `docs/11-tax-export.md` |
@@ -967,10 +975,9 @@ with M7-F's read-only reviews still open.
 | `Verteilungsrest (K9)` authoritative register wording | Unresolved source issue; repository copy remains untouched | Next authoritative register export |
 
 Other later temporal or immutable records arrive only with their owning milestones: separate
-normalized `Loan`/work-detail tables beyond the prepared AfA snapshot, shared guard/reminder records,
-`LettingEffort`, tickets, subprocessors,
-activation codes, IBAN history, delivery logs, clause/contract versions and prospect objects.
-The merged pure guard engine does not approve or create those guard/reminder records.
+normalized `Loan`/work-detail tables beyond the AfA snapshot, `LettingEffort`, tickets,
+subprocessors, activation codes, clause/contract versions and prospect objects. Prepared M9 creates
+guard/reminder and delivery records but does not authorize production delivery.
 `docs/13` defines only their future logical references, composition evidence and risk routing; it
 does not approve a schema or provide clause text. `docs/14` likewise defines only the future
 Prüfobjekt snapshot, provenance, partial-result, annuity, sensitivity and Bank-PDF boundaries; it

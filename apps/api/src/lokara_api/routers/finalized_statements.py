@@ -42,6 +42,7 @@ from ..schemas import (
 )
 from ..statement_service import (
     ALLOCATION_KEY_LABELS,
+    STATEMENT_AUTHORITY_ENVELOPE_INCOMPLETE,
     WEIGHT_DISPLAY_DIVISORS,
     EmptyTenancyError,
     StatementAudience,
@@ -50,6 +51,7 @@ from ..statement_service import (
     StatementProjection,
     compute_statement,
     project_statement,
+    statement_authority_envelope_is_complete,
 )
 
 router = APIRouter(prefix="/a/{account_id}/buildings/{building_id}")
@@ -210,6 +212,74 @@ def _projection_snapshot(projection: StatementProjection) -> dict[str, object]:
     }
 
 
+def _frozen_production_blockers(*surfaces: object) -> list[str]:
+    """Collect unresolved production/legal flags already frozen in M6-B data."""
+
+    blockers: list[str] = []
+    flagged_statuses = {
+        "verify-before-production",
+        "unsicher",
+        "uncertain",
+        "blocked",
+        "missing",
+    }
+
+    def visit(value: object, path: str) -> None:
+        if isinstance(value, dict):
+            explicit = value.get("production_blockers")
+            if isinstance(explicit, (list, tuple)):
+                blockers.extend(str(item) for item in explicit if str(item).strip())
+            verification = value.get("verification_status")
+            legal_status = value.get("legal_status")
+            status = value.get("status")
+            selected_status = (
+                verification
+                if isinstance(verification, str)
+                else legal_status
+                if isinstance(legal_status, str)
+                else status
+                if isinstance(status, str) and status.strip().lower() in flagged_statuses
+                else None
+            )
+            if isinstance(selected_status, str) and selected_status.strip().lower() not in {
+                "geprüft",
+                "verified",
+                "approved",
+                "closed",
+            }:
+                marker = (
+                    value.get("name")
+                    or value.get("code")
+                    or value.get("source")
+                    or value.get("legal_basis")
+                    or path
+                )
+                blockers.append(f"{marker}: {selected_status}")
+            conflicts = value.get("unresolved_conflicts")
+            if isinstance(conflicts, (list, tuple)):
+                for conflict in conflicts:
+                    if isinstance(conflict, dict) and conflict.get("production_blocking") is True:
+                        blockers.append(
+                            str(conflict.get("code") or "UNRESOLVED-PRODUCTION-CONFLICT")
+                        )
+            if value.get("production_blocked") is True and not explicit:
+                blockers.append(f"PRODUCTION-BLOCKED:{path}")
+            for key, item in value.items():
+                if key not in {"production_blockers", "unresolved_conflicts"}:
+                    visit(item, f"{path}.{key}")
+        elif isinstance(value, (list, tuple)):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+        elif isinstance(value, str) and any(
+            marker in value.lower() for marker in ("verify-before-production", "unsicher")
+        ):
+            blockers.append(value)
+
+    for index, surface in enumerate(surfaces):
+        visit(surface, f"surface[{index}]")
+    return list(dict.fromkeys(blockers))
+
+
 def _finalized_snapshot(
     *,
     bundle: StatementBundle,
@@ -227,7 +297,20 @@ def _finalized_snapshot(
     zero_day_tenancy_ids: Iterable[str] = (),
 ) -> dict[str, object]:
     """Complete M6-B calculation evidence, independent from mutable live rows."""
-    return {
+    normalized_inputs = _snapshot_value(bundle.normalized_inputs)
+    calculation_results = {
+        "nk": _snapshot_value(bundle.nk_result),
+        "heating": _snapshot_value(bundle.heating_result),
+        "page01b": _snapshot_value(bundle.page01b_result),
+        "heating_input_total": _snapshot_value(bundle.heating_input_total),
+        "heating_missing_reason": bundle.heating_missing_reason,
+    }
+    findings = list(bundle.nk_findings)
+    provenance = _snapshot_value(
+        bundle.page01b_result.provenance if bundle.page01b_result is not None else ()
+    )
+    statement_rule_evidence = [dict(row) for row in getattr(bundle, "statement_rule_evidence", ())]
+    snapshot: dict[str, object] = {
         "snapshot_version": "M6-B/2",
         "engine_versions": {
             "nk_engine": NK_ENGINE_VERSION,
@@ -238,18 +321,11 @@ def _finalized_snapshot(
             "rechtsstaende": list(bundle.rechtsstaende),
             "entries": list(bundle.rechtsstand_entries),
         },
-        "normalized_inputs": _snapshot_value(bundle.normalized_inputs),
-        "calculation_results": {
-            "nk": _snapshot_value(bundle.nk_result),
-            "heating": _snapshot_value(bundle.heating_result),
-            "page01b": _snapshot_value(bundle.page01b_result),
-            "heating_input_total": _snapshot_value(bundle.heating_input_total),
-            "heating_missing_reason": bundle.heating_missing_reason,
-        },
-        "findings": list(bundle.nk_findings),
-        "provenance": _snapshot_value(
-            bundle.page01b_result.provenance if bundle.page01b_result is not None else ()
-        ),
+        "normalized_inputs": normalized_inputs,
+        "calculation_results": calculation_results,
+        "findings": findings,
+        "provenance": provenance,
+        "statement_rule_evidence": statement_rule_evidence,
         "owner_output": _projection_snapshot(owner_projection),
         "vacancy_output": _projection_snapshot(vacancy_projection),
         "tenant_outputs": [
@@ -301,6 +377,21 @@ def _finalized_snapshot(
             late_positive_exception_reason=exception_reason,
         ),
     }
+    production_blockers = _frozen_production_blockers(
+        normalized_inputs,
+        calculation_results,
+        findings,
+        provenance,
+        statement_rule_evidence,
+    )
+    # Freezing the blocker list without the inventory it was derived from produces an
+    # envelope whose empty list cannot be distinguished from a clean statement. The
+    # finalizer records that fact here, so the M9 delivery path reads it as data
+    # rather than re-deriving it from a snapshot it did not build.
+    if not statement_authority_envelope_is_complete(production_blockers, statement_rule_evidence):
+        production_blockers.insert(0, STATEMENT_AUTHORITY_ENVELOPE_INCOMPLETE)
+    snapshot["production_blockers"] = production_blockers
+    return snapshot
 
 
 def _archive_out(row: StatementArchive) -> FinalizedDocumentOut:

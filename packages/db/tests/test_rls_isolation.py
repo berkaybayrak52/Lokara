@@ -37,10 +37,18 @@ from lokara_db import (
     BankTransaction,
     Building,
     BuildingAssignment,
+    ChecklistInstance,
+    ChecklistItemEvent,
     ConfirmedCostClassification,
     CostEntry,
     DbSettings,
     DeliveryAddress,
+    DeliveryScheduleVersion,
+    EmailAttempt,
+    EmailDeliveryStatusEvent,
+    GuardEvaluation,
+    GuardReminder,
+    GuardResolutionEvent,
     HeatingCostEntry,
     IbanHistory,
     Landlord,
@@ -59,7 +67,9 @@ from lokara_db import (
     Person,
     PersonCount,
     Receivable,
+    RecipientSuppressionEvent,
     Renter,
+    RenterDeliveryArtifact,
     RenterMatchingProfile,
     Role,
     SelfUseKind,
@@ -77,6 +87,7 @@ from lokara_db import (
     Tenancy,
     TenancyParty,
     Unit,
+    UviRun,
     account_scoped_session,
     create_db_engine,
     new_id,
@@ -193,6 +204,7 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 person_id=ids.person_a,
                 account_id=ids.account_a,
                 role=Role.OWNER,
+                accepted_at=datetime(2026, 8, 25, 9, 0, tzinfo=UTC),
             )
         )
         session.add(
@@ -458,6 +470,1259 @@ class TestCrossAccountIsolation:
                 )
             )
             session.flush()
+
+
+class TestM9CrossAccountIsolation:
+    """Every migration-0025 evidence table proves refused reads and writes."""
+
+    def test_every_m9_table_hides_account_a_rows_from_b_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, _ = engines
+        now = datetime(2026, 8, 25, 9, 0, tzinfo=UTC)
+        content = b"m9 immutable renter artifact"
+        ids = {
+            name: new_id()
+            for name in (
+                "evaluation",
+                "reminder",
+                "resolution",
+                "schedule",
+                "statement_archive",
+                "artifact",
+                "attempt",
+                "status",
+                "suppression",
+                "checklist",
+                "item",
+            )
+        }
+
+        class _RollbackProbe(Exception):
+            pass
+
+        with (
+            pytest.raises(_RollbackProbe),
+            owner.connect() as connection,
+            connection.begin(),
+            Session(bind=connection) as session,
+        ):
+            # SQLAlchemy has no ORM relationship between the M6 archive and the
+            # M9 frozen artifact. Flush the immutable source first so the
+            # composite source FK never depends on unit-of-work guesswork.
+            session.add(
+                StatementArchive(
+                    id=ids["statement_archive"],
+                    account_id=seed.account_a,
+                    statement_id=seed.statement_a,
+                    audience="TENANT",
+                    tenancy_id=seed.tenancy_a,
+                    content_bytes=content,
+                    sha256=sha256(content).hexdigest(),
+                    mime_type="application/pdf",
+                    filename="m9-finalized-statement.pdf",
+                )
+            )
+            session.flush()
+            session.add_all(
+                [
+                    GuardEvaluation(
+                        id=ids["evaluation"],
+                        account_id=seed.account_a,
+                        guard_code="W1",
+                        subject_type="tenancy",
+                        subject_id=seed.tenancy_a,
+                        building_id=seed.building_a,
+                        unit_id=seed.unit_a,
+                        tenancy_id=seed.tenancy_a,
+                        renter_id=seed.renter_a,
+                        occurrence_key=f"m9:{ids['evaluation']}",
+                        input_snapshot={"today": "2026-08-25"},
+                        result_snapshot={"active": True},
+                        rule_snapshot={"rechtsstand": "07/2026"},
+                        evaluated_at=now,
+                    ),
+                    DeliveryScheduleVersion(
+                        id=ids["schedule"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        delivery_kind="ANNUAL_STATEMENT",
+                        version=1,
+                        enabled=False,
+                        supersedes_schedule_version_id=None,
+                        valid_from=date(2026, 8, 25),
+                        schedule_snapshot={"enabled": False},
+                    ),
+                    RenterDeliveryArtifact(
+                        id=ids["artifact"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        unit_id=seed.unit_a,
+                        tenancy_id=seed.tenancy_a,
+                        renter_id=seed.renter_a,
+                        artifact_kind="ANNUAL_STATEMENT",
+                        statement_archive_id=ids["statement_archive"],
+                        uvi_run_id=None,
+                        occurrence_key=f"m9:{ids['artifact']}",
+                        content_bytes=content,
+                        sha256=sha256(content).hexdigest(),
+                        mime_type="application/pdf",
+                        filename="m9.pdf",
+                        production_blockers_snapshot=[
+                            "verify-before-production",
+                            "missing-approved-delivery-copy",
+                        ],
+                        generated_at=now,
+                    ),
+                    ChecklistInstance(
+                        id=ids["checklist"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        template_id="TEST-ONLY",
+                        template_version=1,
+                        template_snapshot={"items": [{"id": "item-1"}]},
+                        occurrence_key=f"m9:{ids['checklist']}",
+                    ),
+                ]
+            )
+            session.flush()
+            session.add_all(
+                [
+                    GuardReminder(
+                        id=ids["reminder"],
+                        account_id=seed.account_a,
+                        guard_evaluation_id=ids["evaluation"],
+                        occurrence_key=f"m9:{ids['evaluation']}",
+                        channel="IN_APP",
+                        due_at=now,
+                        idempotency_key=f"m9:{ids['reminder']}",
+                        payload_snapshot={"warning_de": "Test"},
+                    ),
+                    GuardResolutionEvent(
+                        id=ids["resolution"],
+                        account_id=seed.account_a,
+                        guard_evaluation_id=ids["evaluation"],
+                        event_type="test_resolution",
+                        occurred_at=now,
+                        evidence_reference="rollback-only",
+                        idempotency_key=f"m9:{ids['resolution']}",
+                        event_snapshot={},
+                    ),
+                    EmailAttempt(
+                        id=ids["attempt"],
+                        account_id=seed.account_a,
+                        renter_delivery_artifact_id=ids["artifact"],
+                        renter_id=seed.renter_a,
+                        normalized_recipient="m9@example.test",
+                        sender_address="zustellung@lokara.de",
+                        from_name="Vermieter",
+                        idempotency_key=f"m9:{ids['attempt']}",
+                        provider_message_id="rollback-only",
+                        message_snapshot={},
+                        attempted_at=now,
+                    ),
+                    ChecklistItemEvent(
+                        id=ids["item"],
+                        account_id=seed.account_a,
+                        checklist_instance_id=ids["checklist"],
+                        item_id="item-1",
+                        event_type="COMPLETED",
+                        occurred_at=now,
+                        actor_membership_id=seed.membership_a,
+                        idempotency_key=f"m9:{ids['item']}",
+                        event_snapshot={},
+                    ),
+                ]
+            )
+            session.flush()
+            session.add_all(
+                [
+                    EmailDeliveryStatusEvent(
+                        id=ids["status"],
+                        account_id=seed.account_a,
+                        email_attempt_id=ids["attempt"],
+                        status="BOUNCED",
+                        occurred_at=now,
+                        provider_reference="rollback-only",
+                        event_snapshot={},
+                    ),
+                ]
+            )
+            # No explicit `RecipientSuppressionEvent` here: the BOUNCED status event
+            # above already derives exactly one, and inserting the same tuple again is
+            # skipped by the deduplication trigger -- which the ORM reports as a
+            # `FlushError`, not as the idempotent no-op it is.
+            session.flush()
+            session.execute(text("SET LOCAL ROLE lokara_app"))
+            tables = (
+                "guard_evaluation",
+                "guard_reminder",
+                "guard_resolution_event",
+                "delivery_schedule_version",
+                "renter_delivery_artifact",
+                "email_attempt",
+                "email_delivery_status_event",
+                "recipient_suppression_event",
+                "checklist_instance",
+                "checklist_item_event",
+            )
+            for account_id, expected in ((seed.account_a, 1), (seed.account_b, 0)):
+                session.execute(
+                    text("SELECT set_config('app.account_id', :account, true)"),
+                    {"account": account_id},
+                )
+                for table_name in tables:
+                    count = session.scalar(
+                        text(f'SELECT count(*) FROM "{table_name}" WHERE account_id = :a'),
+                        {"a": seed.account_a},
+                    )
+                    assert count == expected, (account_id, table_name, count)
+            raise _RollbackProbe
+
+    def test_every_m9_table_rejects_cross_account_insert_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        inserts = {
+            "guard_evaluation": (
+                "INSERT INTO guard_evaluation (id, account_id, guard_code, subject_type,"
+                " subject_id, building_id, unit_id, tenancy_id, renter_id, occurrence_key,"
+                " input_snapshot, result_snapshot, rule_snapshot, evaluated_at) VALUES"
+                " (:id, :account, 'W1', 'tenancy', :tenancy, :building, :unit, :tenancy,"
+                " :renter, :occurrence, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, :now)"
+            ),
+            "guard_reminder": (
+                "INSERT INTO guard_reminder (id, account_id, guard_evaluation_id,"
+                " occurrence_key, channel, due_at, idempotency_key, payload_snapshot) VALUES"
+                " (:id, :account, :parent, :occurrence, 'IN_APP', :now, :idempotency,"
+                " '{}'::jsonb)"
+            ),
+            "guard_resolution_event": (
+                "INSERT INTO guard_resolution_event (id, account_id, guard_evaluation_id,"
+                " event_type, occurred_at, evidence_reference, idempotency_key,"
+                " event_snapshot) VALUES (:id, :account, :parent, 'test', :now,"
+                " 'rollback-only', :idempotency, '{}'::jsonb)"
+            ),
+            "delivery_schedule_version": (
+                "INSERT INTO delivery_schedule_version (id, account_id, building_id,"
+                " delivery_kind, version, enabled, supersedes_schedule_version_id, valid_from,"
+                " schedule_snapshot) VALUES (:id, :account, :building, 'ANNUAL_STATEMENT', 1,"
+                " false, NULL, DATE '2026-08-25', '{}'::jsonb)"
+            ),
+            "renter_delivery_artifact": (
+                "INSERT INTO renter_delivery_artifact (id, account_id, building_id, unit_id,"
+                " tenancy_id, renter_id, artifact_kind, statement_archive_id, uvi_run_id,"
+                " occurrence_key, content_bytes, sha256, mime_type, filename,"
+                " production_blockers_snapshot, generated_at) VALUES (:id, :account, :building,"
+                " :unit, :tenancy, :renter, 'ANNUAL_STATEMENT', :source, NULL, :occurrence,"
+                " :content, :hash, 'application/pdf', 'm9.pdf',"
+                " '[\"verify-before-production\"]'::jsonb, :now)"
+            ),
+            "email_attempt": (
+                "INSERT INTO email_attempt (id, account_id, renter_delivery_artifact_id,"
+                " renter_id, normalized_recipient, sender_address, from_name, idempotency_key,"
+                " provider_message_id, message_snapshot, attempted_at) VALUES (:id, :account,"
+                " :parent, :renter, 'm9@example.test', 'zustellung@lokara.de', 'Vermieter',"
+                " :idempotency, NULL, '{}'::jsonb, :now)"
+            ),
+            "email_delivery_status_event": (
+                "INSERT INTO email_delivery_status_event (id, account_id, email_attempt_id,"
+                " status, occurred_at, provider_reference, event_snapshot) VALUES"
+                " (:id, :account, :parent, 'QUEUED', :now, NULL, '{}'::jsonb)"
+            ),
+            "recipient_suppression_event": (
+                "INSERT INTO recipient_suppression_event (id, account_id,"
+                " normalized_recipient, reason, occurred_at, email_attempt_id,"
+                " provider_reference) VALUES (:id, :account, 'm9@example.test', 'BOUNCED',"
+                " :now, :parent, NULL)"
+            ),
+            "checklist_instance": (
+                "INSERT INTO checklist_instance (id, account_id, building_id, template_id,"
+                " template_version, template_snapshot, occurrence_key) VALUES"
+                " (:id, :account, :building, 'TEST-ONLY', 1, '{}'::jsonb, :occurrence)"
+            ),
+            "checklist_item_event": (
+                "INSERT INTO checklist_item_event (id, account_id, checklist_instance_id,"
+                " item_id, event_type, occurred_at, actor_membership_id, idempotency_key,"
+                " event_snapshot) VALUES (:id, :account, :parent, 'item-1', 'COMPLETED', :now,"
+                " :membership, :idempotency, '{}'::jsonb)"
+            ),
+        }
+        refusals: dict[str, str] = {}
+        for table_name, statement in inserts.items():
+            with (
+                pytest.raises(ProgrammingError) as refused,
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.execute(
+                    text(statement),
+                    {
+                        "id": new_id(),
+                        "account": seed.account_a,
+                        "building": seed.building_a,
+                        "unit": seed.unit_a,
+                        "tenancy": seed.tenancy_a,
+                        "renter": seed.renter_a,
+                        "membership": seed.membership_a,
+                        "parent": new_id(),
+                        "source": new_id(),
+                        "occurrence": f"m9:{new_id()}",
+                        "idempotency": f"m9:{new_id()}",
+                        "content": b"m9",
+                        "hash": sha256(b"m9").hexdigest(),
+                        "now": datetime(2026, 8, 25, 9, 0, tzinfo=UTC),
+                    },
+                )
+            refusals[table_name] = str(refused.value)
+        assert all("row-level security" in message.lower() for message in refusals.values()), (
+            refusals
+        )
+
+    def test_m9_rows_are_append_only_and_resolution_key_is_unique_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, _ = engines
+        now = datetime(2026, 8, 25, 9, 0, tzinfo=UTC)
+        content = b"m9 append-only probe"
+        ids = {
+            name: new_id()
+            for name in (
+                "evaluation",
+                "reminder",
+                "resolution",
+                "schedule",
+                "statement_archive",
+                "artifact",
+                "attempt",
+                "status",
+                "suppression",
+                "checklist",
+                "item",
+            )
+        }
+
+        class _RollbackProbe(Exception):
+            pass
+
+        with (
+            pytest.raises(_RollbackProbe),
+            owner.connect() as connection,
+            connection.begin(),
+            Session(bind=connection) as session,
+        ):
+            session.add(
+                StatementArchive(
+                    id=ids["statement_archive"],
+                    account_id=seed.account_a,
+                    statement_id=seed.statement_a,
+                    audience="TENANT",
+                    tenancy_id=seed.tenancy_a,
+                    content_bytes=content,
+                    sha256=sha256(content).hexdigest(),
+                    mime_type="application/pdf",
+                    filename="m9-append-only-source.pdf",
+                )
+            )
+            session.flush()
+            session.add_all(
+                [
+                    GuardEvaluation(
+                        id=ids["evaluation"],
+                        account_id=seed.account_a,
+                        guard_code="W1",
+                        subject_type="tenancy",
+                        subject_id=seed.tenancy_a,
+                        building_id=seed.building_a,
+                        unit_id=seed.unit_a,
+                        tenancy_id=seed.tenancy_a,
+                        renter_id=seed.renter_a,
+                        occurrence_key=f"m9:{ids['evaluation']}",
+                        input_snapshot={"today": "2026-08-25"},
+                        result_snapshot={"active": True},
+                        rule_snapshot={"rechtsstand": "07/2026"},
+                        evaluated_at=now,
+                    ),
+                    DeliveryScheduleVersion(
+                        id=ids["schedule"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        delivery_kind="ANNUAL_STATEMENT",
+                        version=1,
+                        enabled=False,
+                        supersedes_schedule_version_id=None,
+                        valid_from=date(2026, 8, 25),
+                        schedule_snapshot={"enabled": False},
+                    ),
+                    RenterDeliveryArtifact(
+                        id=ids["artifact"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        unit_id=seed.unit_a,
+                        tenancy_id=seed.tenancy_a,
+                        renter_id=seed.renter_a,
+                        artifact_kind="ANNUAL_STATEMENT",
+                        statement_archive_id=ids["statement_archive"],
+                        uvi_run_id=None,
+                        occurrence_key=f"m9:{ids['artifact']}",
+                        content_bytes=content,
+                        sha256=sha256(content).hexdigest(),
+                        mime_type="application/pdf",
+                        filename="m9.pdf",
+                        production_blockers_snapshot=["verify-before-production"],
+                        generated_at=now,
+                    ),
+                    ChecklistInstance(
+                        id=ids["checklist"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        template_id="TEST-ONLY",
+                        template_version=1,
+                        template_snapshot={"items": [{"id": "item-1"}]},
+                        occurrence_key=f"m9:{ids['checklist']}",
+                    ),
+                ]
+            )
+            session.flush()
+            resolution_key = f"m9:{ids['resolution']}"
+            session.add_all(
+                [
+                    GuardReminder(
+                        id=ids["reminder"],
+                        account_id=seed.account_a,
+                        guard_evaluation_id=ids["evaluation"],
+                        occurrence_key=f"m9:{ids['evaluation']}",
+                        channel="IN_APP",
+                        due_at=now,
+                        idempotency_key=f"m9:{ids['reminder']}",
+                        payload_snapshot={"warning_de": "Test"},
+                    ),
+                    GuardResolutionEvent(
+                        id=ids["resolution"],
+                        account_id=seed.account_a,
+                        guard_evaluation_id=ids["evaluation"],
+                        event_type="test_resolution",
+                        occurred_at=now,
+                        evidence_reference="rollback-only",
+                        idempotency_key=resolution_key,
+                        event_snapshot={},
+                    ),
+                    EmailAttempt(
+                        id=ids["attempt"],
+                        account_id=seed.account_a,
+                        renter_delivery_artifact_id=ids["artifact"],
+                        renter_id=seed.renter_a,
+                        normalized_recipient="m9-append@example.test",
+                        sender_address="zustellung@lokara.de",
+                        from_name="Vermieter",
+                        idempotency_key=f"m9:{ids['attempt']}",
+                        provider_message_id="rollback-only",
+                        message_snapshot={},
+                        attempted_at=now,
+                    ),
+                    ChecklistItemEvent(
+                        id=ids["item"],
+                        account_id=seed.account_a,
+                        checklist_instance_id=ids["checklist"],
+                        item_id="item-1",
+                        event_type="COMPLETED",
+                        occurred_at=now,
+                        actor_membership_id=seed.membership_a,
+                        idempotency_key=f"m9:{ids['item']}",
+                        event_snapshot={},
+                    ),
+                ]
+            )
+            session.flush()
+            session.add_all(
+                [
+                    EmailDeliveryStatusEvent(
+                        id=ids["status"],
+                        account_id=seed.account_a,
+                        email_attempt_id=ids["attempt"],
+                        status="QUEUED",
+                        occurred_at=now,
+                        provider_reference="rollback-only",
+                        event_snapshot={},
+                    ),
+                    RecipientSuppressionEvent(
+                        id=ids["suppression"],
+                        account_id=seed.account_a,
+                        normalized_recipient="m9-append@example.test",
+                        reason="BOUNCED",
+                        occurred_at=now,
+                        email_attempt_id=ids["attempt"],
+                        provider_reference="rollback-only",
+                    ),
+                ]
+            )
+            session.flush()
+
+            with pytest.raises(IntegrityError), session.begin_nested():
+                session.add(
+                    GuardResolutionEvent(
+                        id=new_id(),
+                        account_id=seed.account_a,
+                        guard_evaluation_id=ids["evaluation"],
+                        event_type="duplicate_resolution",
+                        occurred_at=now,
+                        evidence_reference="duplicate",
+                        idempotency_key=resolution_key,
+                        event_snapshot={},
+                    )
+                )
+                session.flush()
+
+            table_ids = {
+                "guard_evaluation": ids["evaluation"],
+                "guard_reminder": ids["reminder"],
+                "guard_resolution_event": ids["resolution"],
+                "delivery_schedule_version": ids["schedule"],
+                "renter_delivery_artifact": ids["artifact"],
+                "email_attempt": ids["attempt"],
+                "email_delivery_status_event": ids["status"],
+                "recipient_suppression_event": ids["suppression"],
+                "checklist_instance": ids["checklist"],
+                "checklist_item_event": ids["item"],
+            }
+            for table_name, row_id in table_ids.items():
+                for statement in (
+                    f"UPDATE {table_name} SET id = id WHERE id = :id",
+                    f"DELETE FROM {table_name} WHERE id = :id",
+                ):
+                    with pytest.raises(IntegrityError, match="append-only"), session.begin_nested():
+                        session.execute(text(statement), {"id": row_id})
+
+            raise _RollbackProbe
+
+    def test_m9_same_account_context_forgery_is_refused_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """RLS cannot catch forged links between two graphs inside account A."""
+        owner, _ = engines
+        now = datetime(2026, 8, 25, 9, 0, tzinfo=UTC)
+        ids = {
+            name: new_id()
+            for name in (
+                "building_2",
+                "unit_2",
+                "renter_2",
+                "tenancy_2",
+                "party_2",
+                "statement_2",
+                "archive_a",
+                "archive_2",
+                "artifact_a",
+                "artifact_2",
+                "attempt_a",
+                "attempt_2",
+                "schedule_a",
+                "checklist_a",
+                "checklist_2",
+                "person_2",
+                "membership_2",
+                "assignment_2",
+            )
+        }
+        content = b"m9 same-account context probe"
+
+        class _RollbackProbe(Exception):
+            pass
+
+        with (
+            pytest.raises(_RollbackProbe),
+            owner.connect() as connection,
+            connection.begin(),
+            Session(bind=connection) as session,
+        ):
+            session.add_all(
+                [
+                    Building(
+                        id=ids["building_2"],
+                        account_id=seed.account_a,
+                        name="Haus A2",
+                        street="Nebenweg 2",
+                        postal_code="10115",
+                        city="Berlin",
+                    ),
+                    Renter(
+                        id=ids["renter_2"],
+                        account_id=seed.account_a,
+                        legal_name="Mieter A2",
+                    ),
+                    Person(
+                        id=ids["person_2"],
+                        email=f"employee-{ids['person_2']}@example.test",
+                    ),
+                    Membership(
+                        id=ids["membership_2"],
+                        person_id=ids["person_2"],
+                        account_id=seed.account_a,
+                        role=Role.EMPLOYEE,
+                        accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
+                    ),
+                ]
+            )
+            session.flush()
+            session.add_all(
+                [
+                    Unit(
+                        id=ids["unit_2"],
+                        account_id=seed.account_a,
+                        building_id=ids["building_2"],
+                        label="WE 2",
+                        area_sqm_x100=5_000,
+                    ),
+                    Statement(
+                        id=ids["statement_2"],
+                        account_id=seed.account_a,
+                        building_id=ids["building_2"],
+                        period_start=date(2025, 1, 1),
+                        period_end=date(2025, 12, 31),
+                        version=1,
+                        status=StatementStatus.DRAFT,
+                        total_cents=1,
+                    ),
+                    BuildingAssignment(
+                        id=ids["assignment_2"],
+                        account_id=seed.account_a,
+                        membership_id=ids["membership_2"],
+                        building_id=ids["building_2"],
+                    ),
+                ]
+            )
+            session.flush()
+            session.add(
+                Tenancy(
+                    id=ids["tenancy_2"],
+                    account_id=seed.account_a,
+                    unit_id=ids["unit_2"],
+                    valid_from=date(2025, 1, 1),
+                    valid_to=None,
+                    base_rent_cents=70_000,
+                )
+            )
+            session.flush()
+            session.add(
+                TenancyParty(
+                    id=ids["party_2"],
+                    account_id=seed.account_a,
+                    tenancy_id=ids["tenancy_2"],
+                    renter_id=ids["renter_2"],
+                )
+            )
+            session.flush()
+            for archive_id, statement_id, tenancy_id, filename in (
+                (ids["archive_a"], seed.statement_a, seed.tenancy_a, "a.pdf"),
+                (ids["archive_2"], ids["statement_2"], ids["tenancy_2"], "a2.pdf"),
+            ):
+                session.add(
+                    StatementArchive(
+                        id=archive_id,
+                        account_id=seed.account_a,
+                        statement_id=statement_id,
+                        audience="TENANT",
+                        tenancy_id=tenancy_id,
+                        content_bytes=content,
+                        sha256=sha256(content).hexdigest(),
+                        mime_type="application/pdf",
+                        filename=filename,
+                    )
+                )
+            session.flush()
+            session.add_all(
+                [
+                    DeliveryScheduleVersion(
+                        id=ids["schedule_a"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        delivery_kind="ANNUAL_STATEMENT",
+                        version=1,
+                        enabled=False,
+                        supersedes_schedule_version_id=None,
+                        valid_from=date(2026, 8, 25),
+                        schedule_snapshot={},
+                    ),
+                    ChecklistInstance(
+                        id=ids["checklist_a"],
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        template_id="TEST-ONLY",
+                        template_version=1,
+                        template_snapshot={"items": [{"id": "item-1"}]},
+                        occurrence_key=f"m9:{ids['checklist_a']}",
+                    ),
+                    ChecklistInstance(
+                        id=ids["checklist_2"],
+                        account_id=seed.account_a,
+                        building_id=ids["building_2"],
+                        template_id="TEST-ONLY",
+                        template_version=1,
+                        template_snapshot={"items": [{"id": "item-1"}]},
+                        occurrence_key=f"m9:{ids['checklist_2']}",
+                    ),
+                ]
+            )
+            for artifact_id, building_id, unit_id, tenancy_id, renter_id, archive_id in (
+                (
+                    ids["artifact_a"],
+                    seed.building_a,
+                    seed.unit_a,
+                    seed.tenancy_a,
+                    seed.renter_a,
+                    ids["archive_a"],
+                ),
+                (
+                    ids["artifact_2"],
+                    ids["building_2"],
+                    ids["unit_2"],
+                    ids["tenancy_2"],
+                    ids["renter_2"],
+                    ids["archive_2"],
+                ),
+            ):
+                session.add(
+                    RenterDeliveryArtifact(
+                        id=artifact_id,
+                        account_id=seed.account_a,
+                        building_id=building_id,
+                        unit_id=unit_id,
+                        tenancy_id=tenancy_id,
+                        renter_id=renter_id,
+                        artifact_kind="ANNUAL_STATEMENT",
+                        statement_archive_id=archive_id,
+                        uvi_run_id=None,
+                        occurrence_key=f"m9:{artifact_id}",
+                        content_bytes=content,
+                        sha256=sha256(content).hexdigest(),
+                        mime_type="application/pdf",
+                        filename=f"{artifact_id}.pdf",
+                        production_blockers_snapshot=[],
+                        generated_at=now,
+                    )
+                )
+            session.flush()
+            for attempt_id, artifact_id, renter_id, recipient in (
+                (ids["attempt_a"], ids["artifact_a"], seed.renter_a, "a@example.test"),
+                (ids["attempt_2"], ids["artifact_2"], ids["renter_2"], "a2@example.test"),
+            ):
+                session.add(
+                    EmailAttempt(
+                        id=attempt_id,
+                        account_id=seed.account_a,
+                        renter_delivery_artifact_id=artifact_id,
+                        renter_id=renter_id,
+                        normalized_recipient=recipient,
+                        sender_address="zustellung@lokara.de",
+                        from_name="Vermieter",
+                        idempotency_key=f"m9:{attempt_id}",
+                        provider_message_id=None,
+                        message_snapshot={},
+                        attempted_at=now,
+                    )
+                )
+            session.flush()
+
+            probes = {
+                "guard_building_unit": (
+                    "INSERT INTO guard_evaluation (id, account_id, guard_code, subject_type,"
+                    " subject_id, building_id, unit_id, tenancy_id, renter_id, occurrence_key,"
+                    " input_snapshot, result_snapshot, rule_snapshot, evaluated_at) VALUES"
+                    " (:id, :account, 'W1', 'tenancy', :tenancy, :building, :unit, :tenancy,"
+                    " :renter, :occurrence, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, :now)",
+                    {
+                        "building": seed.building_a,
+                        "unit": ids["unit_2"],
+                        "tenancy": ids["tenancy_2"],
+                        "renter": ids["renter_2"],
+                    },
+                ),
+                "guard_tenancy_renter": (
+                    "INSERT INTO guard_evaluation (id, account_id, guard_code, subject_type,"
+                    " subject_id, building_id, unit_id, tenancy_id, renter_id, occurrence_key,"
+                    " input_snapshot, result_snapshot, rule_snapshot, evaluated_at) VALUES"
+                    " (:id, :account, 'W1', 'tenancy', :tenancy, :building, :unit, :tenancy,"
+                    " :renter, :occurrence, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, :now)",
+                    {
+                        "building": seed.building_a,
+                        "unit": seed.unit_a,
+                        "tenancy": seed.tenancy_a,
+                        "renter": ids["renter_2"],
+                    },
+                ),
+                "schedule_supersedes_building": (
+                    "INSERT INTO delivery_schedule_version (id, account_id, building_id,"
+                    " delivery_kind, version, enabled, supersedes_schedule_version_id,"
+                    " valid_from, schedule_snapshot) VALUES (:id, :account, :building,"
+                    " 'ANNUAL_STATEMENT', 2, false, :parent, DATE '2026-08-26', '{}'::jsonb)",
+                    {"building": ids["building_2"], "parent": ids["schedule_a"]},
+                ),
+                "schedule_supersedes_kind": (
+                    "INSERT INTO delivery_schedule_version (id, account_id, building_id,"
+                    " delivery_kind, version, enabled, supersedes_schedule_version_id,"
+                    " valid_from, schedule_snapshot) VALUES (:id, :account, :building, 'UVI',"
+                    " 2, false, :parent, DATE '2026-08-26', '{}'::jsonb)",
+                    {"building": seed.building_a, "parent": ids["schedule_a"]},
+                ),
+                "artifact_unit_building": (
+                    "INSERT INTO renter_delivery_artifact (id, account_id, building_id, unit_id,"
+                    " tenancy_id, renter_id, artifact_kind, occurrence_key, statement_archive_id,"
+                    " uvi_run_id, content_bytes, sha256, mime_type, filename,"
+                    " production_blockers_snapshot, generated_at) VALUES (:id, :account,"
+                    " :building, :unit, :tenancy, :renter, 'ANNUAL_STATEMENT', :occurrence,"
+                    " :archive, NULL, :content, :hash, 'application/pdf', 'forged.pdf',"
+                    " '[]'::jsonb, :now)",
+                    {
+                        "building": seed.building_a,
+                        "unit": ids["unit_2"],
+                        "tenancy": ids["tenancy_2"],
+                        "renter": ids["renter_2"],
+                        "archive": ids["archive_2"],
+                    },
+                ),
+                "artifact_tenancy_renter": (
+                    "INSERT INTO renter_delivery_artifact (id, account_id, building_id, unit_id,"
+                    " tenancy_id, renter_id, artifact_kind, occurrence_key, statement_archive_id,"
+                    " uvi_run_id, content_bytes, sha256, mime_type, filename,"
+                    " production_blockers_snapshot, generated_at) VALUES (:id, :account,"
+                    " :building, :unit, :tenancy, :renter, 'ANNUAL_STATEMENT', :occurrence,"
+                    " :archive, NULL, :content, :hash, 'application/pdf', 'forged.pdf',"
+                    " '[]'::jsonb, :now)",
+                    {
+                        "building": seed.building_a,
+                        "unit": seed.unit_a,
+                        "tenancy": seed.tenancy_a,
+                        "renter": ids["renter_2"],
+                        "archive": ids["archive_a"],
+                    },
+                ),
+                "artifact_statement_source": (
+                    "INSERT INTO renter_delivery_artifact (id, account_id, building_id, unit_id,"
+                    " tenancy_id, renter_id, artifact_kind, occurrence_key, statement_archive_id,"
+                    " uvi_run_id, content_bytes, sha256, mime_type, filename,"
+                    " production_blockers_snapshot, generated_at) VALUES (:id, :account,"
+                    " :building, :unit, :tenancy, :renter, 'ANNUAL_STATEMENT', :occurrence,"
+                    " :archive, NULL, :content, :hash, 'application/pdf', 'forged.pdf',"
+                    " '[]'::jsonb, :now)",
+                    {
+                        "building": seed.building_a,
+                        "unit": seed.unit_a,
+                        "tenancy": seed.tenancy_a,
+                        "renter": seed.renter_a,
+                        "archive": ids["archive_2"],
+                    },
+                ),
+                "email_artifact_renter": (
+                    "INSERT INTO email_attempt (id, account_id, renter_delivery_artifact_id,"
+                    " renter_id, normalized_recipient, sender_address, from_name,"
+                    " idempotency_key, provider_message_id, message_snapshot, attempted_at)"
+                    " VALUES (:id, :account, :artifact, :renter, 'forged@example.test',"
+                    " 'zustellung@lokara.de', 'Vermieter', :occurrence, NULL, '{}'::jsonb, :now)",
+                    {"artifact": ids["artifact_a"], "renter": ids["renter_2"]},
+                ),
+                "suppression_attempt_recipient": (
+                    "INSERT INTO recipient_suppression_event (id, account_id,"
+                    " normalized_recipient, reason, occurred_at, email_attempt_id,"
+                    " provider_reference) VALUES (:id, :account, 'a2@example.test', 'BOUNCED',"
+                    " :now, :attempt, NULL)",
+                    {"attempt": ids["attempt_a"]},
+                ),
+                "status_attempt_snapshot": (
+                    "INSERT INTO email_delivery_status_event (id, account_id, email_attempt_id,"
+                    " status, occurred_at, provider_reference, event_snapshot) VALUES"
+                    " (:id, :account, :attempt, 'DELIVERED', :now, NULL,"
+                    " jsonb_build_object('email_attempt_id', CAST(:claimed_attempt AS text)))",
+                    {
+                        "attempt": ids["attempt_2"],
+                        "claimed_attempt": ids["attempt_a"],
+                    },
+                ),
+                "checklist_instance_actor_assignment": (
+                    "INSERT INTO checklist_item_event (id, account_id, checklist_instance_id,"
+                    " item_id, event_type, occurred_at, actor_membership_id, idempotency_key,"
+                    " event_snapshot) VALUES (:id, :account, :checklist, 'item-1', 'COMPLETED',"
+                    " :now, :membership, :occurrence, '{}'::jsonb)",
+                    {
+                        "checklist": ids["checklist_a"],
+                        "membership": ids["membership_2"],
+                    },
+                ),
+            }
+            accepted: list[str] = []
+            for name, (statement, specific) in probes.items():
+                savepoint = session.begin_nested()
+                try:
+                    session.execute(
+                        text(statement),
+                        {
+                            "id": new_id(),
+                            "account": seed.account_a,
+                            "occurrence": f"m9:{new_id()}",
+                            "content": content,
+                            "hash": sha256(content).hexdigest(),
+                            "now": now,
+                            **specific,
+                        },
+                    )
+                    session.flush()
+                except IntegrityError:
+                    savepoint.rollback()
+                else:
+                    accepted.append(name)
+                    savepoint.rollback()
+
+            assert accepted == [], f"same-account forged M9 relationships accepted: {accepted}"
+            raise _RollbackProbe
+
+    def test_checklist_actor_refuses_unaccepted_owner_and_employee_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, _ = engines
+
+        class _RollbackProbe(Exception):
+            pass
+
+        with (
+            pytest.raises(_RollbackProbe),
+            owner.connect() as connection,
+            connection.begin(),
+            Session(bind=connection) as session,
+        ):
+            now = datetime(2026, 8, 25, 9, 0, tzinfo=UTC)
+            checklist_id = new_id()
+            session.add(
+                ChecklistInstance(
+                    id=checklist_id,
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    template_id="M9-PENDING-ACTOR-PROBE",
+                    template_version=1,
+                    template_snapshot={"items": [{"id": "item-1"}]},
+                    occurrence_key=f"m9:pending-actor:{checklist_id}",
+                )
+            )
+            actors: list[tuple[str, str]] = []
+            for label, role in (("pending-owner", Role.OWNER), ("pending-employee", Role.EMPLOYEE)):
+                person_id = new_id()
+                membership_id = new_id()
+                session.add(
+                    Person(
+                        id=person_id,
+                        email=f"{label}-{person_id}@example.test",
+                    )
+                )
+                session.add(
+                    Membership(
+                        id=membership_id,
+                        person_id=person_id,
+                        account_id=seed.account_a,
+                        role=role,
+                        accepted_at=None,
+                        revoked_at=None,
+                    )
+                )
+                if role is Role.EMPLOYEE:
+                    session.add(
+                        BuildingAssignment(
+                            id=new_id(),
+                            account_id=seed.account_a,
+                            membership_id=membership_id,
+                            building_id=seed.building_a,
+                        )
+                    )
+                actors.append((label, membership_id))
+            session.flush()
+
+            accepted: list[str] = []
+            for label, membership_id in actors:
+                savepoint = session.begin_nested()
+                try:
+                    session.add(
+                        ChecklistItemEvent(
+                            id=new_id(),
+                            account_id=seed.account_a,
+                            checklist_instance_id=checklist_id,
+                            item_id="item-1",
+                            event_type="COMPLETED",
+                            occurred_at=now,
+                            actor_membership_id=membership_id,
+                            idempotency_key=f"m9:{label}:{new_id()}",
+                            event_snapshot={},
+                        )
+                    )
+                    session.flush()
+                except IntegrityError:
+                    savepoint.rollback()
+                else:
+                    accepted.append(label)
+                    savepoint.rollback()
+
+            assert accepted == [], f"unaccepted checklist actors persisted: {accepted}"
+            raise _RollbackProbe
+
+    def test_w1_confirmation_refuses_forged_artifact_and_non_owner_actor_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """W1 legal receipt is evidence about one artifact confirmed by one active owner."""
+        owner, _ = engines
+        event_table = GuardResolutionEvent.__table__
+        required = {"renter_delivery_artifact_id", "confirmed_by_membership_id"}
+
+        class _RollbackProbe(Exception):
+            pass
+
+        with (
+            pytest.raises(_RollbackProbe),
+            owner.connect() as connection,
+            connection.begin(),
+            Session(bind=connection) as session,
+        ):
+            assert required <= set(event_table.columns.keys()), (
+                "W1 resolution persistence lacks artifact and confirming-membership bindings"
+            )
+            now = datetime(2026, 8, 25, 9, 0, tzinfo=UTC)
+            content = b"w1 confirmation binding probe"
+            ids = {
+                name: new_id()
+                for name in (
+                    "archive",
+                    "artifact",
+                    "artifact_forged",
+                    "evaluation",
+                    "uvi_run",
+                    "uvi_artifact",
+                    "accepted_person",
+                    "accepted_membership",
+                    "employee_person",
+                    "employee_membership",
+                    "tax_person",
+                    "tax_membership",
+                    "revoked_person",
+                    "revoked_membership",
+                )
+            }
+            session.add(
+                StatementArchive(
+                    id=ids["archive"],
+                    account_id=seed.account_a,
+                    statement_id=seed.statement_a,
+                    audience="TENANT",
+                    tenancy_id=seed.tenancy_a,
+                    content_bytes=content,
+                    sha256=sha256(content).hexdigest(),
+                    mime_type="application/pdf",
+                    filename="w1.pdf",
+                )
+            )
+            for person_key, membership_key, role, revoked_at in (
+                ("accepted_person", "accepted_membership", Role.OWNER, None),
+                ("employee_person", "employee_membership", Role.EMPLOYEE, None),
+                ("tax_person", "tax_membership", Role.TAX_ADVISOR, None),
+                ("revoked_person", "revoked_membership", Role.OWNER, now),
+            ):
+                session.add(
+                    Person(
+                        id=ids[person_key],
+                        email=f"{person_key}-{ids[person_key]}@example.test",
+                    )
+                )
+                session.add(
+                    Membership(
+                        id=ids[membership_key],
+                        person_id=ids[person_key],
+                        account_id=seed.account_a,
+                        role=role,
+                        accepted_at=now,
+                        revoked_at=revoked_at,
+                    )
+                )
+            session.flush()
+            session.add(
+                GuardEvaluation(
+                    id=ids["evaluation"],
+                    account_id=seed.account_a,
+                    guard_code="W1",
+                    subject_type="tenancy",
+                    subject_id=seed.tenancy_a,
+                    building_id=seed.building_a,
+                    unit_id=seed.unit_a,
+                    tenancy_id=seed.tenancy_a,
+                    renter_id=seed.renter_a,
+                    occurrence_key="w1:statement:2025",
+                    input_snapshot={},
+                    result_snapshot={"boundary_date": "2026-12-31"},
+                    rule_snapshot={},
+                    evaluated_at=now,
+                )
+            )
+            uvi_inputs = {"source": "rollback-only"}
+            uvi_results = {"status": "generated"}
+            uvi_source_id = f"m9-w1-kind:{ids['uvi_run']}"
+            uvi_hash = connection.scalar(
+                text(
+                    "SELECT encode(digest(convert_to(jsonb_build_object("
+                    " 'tenancy_id', CAST(:tenancy AS text), 'unit_id', CAST(:unit AS text),"
+                    " 'month', CAST(:month AS date), 'inputs', CAST(:inputs AS jsonb),"
+                    " 'results', CAST(:results AS jsonb),"
+                    " 'heizspiegel_vintage', CAST(NULL AS text),"
+                    " 'source_type', CAST(:source_type AS text),"
+                    " 'source_id', CAST(:source_id AS text),"
+                    " 'station_assignment_id', CAST(NULL AS text),"
+                    " 'station_id', CAST(NULL AS text),"
+                    " 'station_distance_km', CAST(NULL AS numeric(9,3))"
+                    ")::text, 'UTF8'), 'sha256'), 'hex')"
+                ),
+                {
+                    "tenancy": seed.tenancy_a,
+                    "unit": seed.unit_a,
+                    "month": date(2026, 7, 1),
+                    "inputs": '{"source":"rollback-only"}',
+                    "results": '{"status":"generated"}',
+                    "source_type": "TEST",
+                    "source_id": uvi_source_id,
+                },
+            )
+            assert isinstance(uvi_hash, str)
+            session.add(
+                UviRun(
+                    id=ids["uvi_run"],
+                    account_id=seed.account_a,
+                    tenancy_id=seed.tenancy_a,
+                    unit_id=seed.unit_a,
+                    month=date(2026, 7, 1),
+                    inputs=uvi_inputs,
+                    results=uvi_results,
+                    heizspiegel_vintage=None,
+                    source_type="TEST",
+                    source_id=uvi_source_id,
+                    station_assignment_id=None,
+                    station_id=None,
+                    station_distance_km=None,
+                    sha256=uvi_hash,
+                )
+            )
+            session.flush()
+            for artifact_id, occurrence in (
+                (ids["artifact"], "w1:statement:2025"),
+                (ids["artifact_forged"], "w1:statement:2024"),
+            ):
+                session.add(
+                    RenterDeliveryArtifact(
+                        id=artifact_id,
+                        account_id=seed.account_a,
+                        building_id=seed.building_a,
+                        unit_id=seed.unit_a,
+                        tenancy_id=seed.tenancy_a,
+                        renter_id=seed.renter_a,
+                        artifact_kind="ANNUAL_STATEMENT",
+                        occurrence_key=occurrence,
+                        statement_archive_id=ids["archive"],
+                        uvi_run_id=None,
+                        content_bytes=content,
+                        sha256=sha256(content).hexdigest(),
+                        mime_type="application/pdf",
+                        filename=f"{artifact_id}.pdf",
+                        production_blockers_snapshot=[],
+                        generated_at=now,
+                    )
+                )
+            session.add(
+                RenterDeliveryArtifact(
+                    id=ids["uvi_artifact"],
+                    account_id=seed.account_a,
+                    building_id=seed.building_a,
+                    unit_id=seed.unit_a,
+                    tenancy_id=seed.tenancy_a,
+                    renter_id=seed.renter_a,
+                    artifact_kind="UVI",
+                    occurrence_key="w1:statement:2025",
+                    statement_archive_id=None,
+                    uvi_run_id=ids["uvi_run"],
+                    content_bytes=content,
+                    sha256=sha256(content).hexdigest(),
+                    mime_type="application/pdf",
+                    filename="uvi-w1-forgery.pdf",
+                    production_blockers_snapshot=[],
+                    generated_at=now,
+                )
+            )
+            session.flush()
+
+            cases = (
+                ("forged-artifact", ids["artifact_forged"], seed.membership_a),
+                ("employee", ids["artifact"], ids["employee_membership"]),
+                ("tax-adviser", ids["artifact"], ids["tax_membership"]),
+                ("revoked-owner", ids["artifact"], ids["revoked_membership"]),
+            )
+            for label, artifact_id, membership_id in cases:
+                with pytest.raises(IntegrityError), session.begin_nested():
+                    session.execute(
+                        text(
+                            "INSERT INTO guard_resolution_event "
+                            "(id, account_id, guard_evaluation_id,"
+                            " renter_delivery_artifact_id, confirmed_by_membership_id,"
+                            " event_type, occurred_at, evidence_reference, idempotency_key,"
+                            " event_snapshot) VALUES (:id, :account, :evaluation, :artifact,"
+                            " :membership, 'statement_sent', :now, :evidence, :key,"
+                            # Separate binds for the JSONB copies: reusing :artifact and
+                            # :membership both as a column value and inside CAST(... AS
+                            # text) leaves Postgres unable to deduce one type for the
+                            # parameter, and the insert fails on that instead of on the
+                            # W1 binding it is probing.
+                            " jsonb_build_object('artifact_id', CAST(:artifact_text AS text),"
+                            " 'confirmed_by_membership_id', CAST(:membership_text AS text)))"
+                        ),
+                        {
+                            "id": new_id(),
+                            "account": seed.account_a,
+                            "evaluation": ids["evaluation"],
+                            "artifact": artifact_id,
+                            "artifact_text": artifact_id,
+                            "membership": membership_id,
+                            "membership_text": membership_id,
+                            "now": now,
+                            "evidence": label,
+                            "key": f"w1:{label}:{new_id()}",
+                        },
+                    )
+
+            accepted: list[str] = []
+            for label, artifact_id, snapshot_artifact_id in (
+                ("uvi-artifact", ids["uvi_artifact"], ids["uvi_artifact"]),
+                ("mismatched-snapshot", ids["artifact"], ids["artifact_forged"]),
+            ):
+                savepoint = session.begin_nested()
+                try:
+                    session.execute(
+                        text(
+                            "INSERT INTO guard_resolution_event "
+                            "(id, account_id, guard_evaluation_id,"
+                            " renter_delivery_artifact_id, confirmed_by_membership_id,"
+                            " event_type, occurred_at, evidence_reference, idempotency_key,"
+                            " event_snapshot) VALUES (:id, :account, :evaluation, :artifact,"
+                            " :membership, 'statement_sent', :now, :evidence, :key,"
+                            " jsonb_build_object('artifact_id', CAST(:snapshot_artifact AS text),"
+                            " 'delivered_on', '2026-08-20'))"
+                        ),
+                        {
+                            "id": new_id(),
+                            "account": seed.account_a,
+                            "evaluation": ids["evaluation"],
+                            "artifact": artifact_id,
+                            "membership": ids["accepted_membership"],
+                            "snapshot_artifact": snapshot_artifact_id,
+                            "now": now,
+                            "evidence": label,
+                            "key": f"w1:{label}:{new_id()}",
+                        },
+                    )
+                    session.flush()
+                except IntegrityError:
+                    savepoint.rollback()
+                else:
+                    accepted.append(label)
+                    savepoint.rollback()
+            assert accepted == [], f"forged immutable W1 evidence accepted: {accepted}"
+            raise _RollbackProbe
 
 
 class TestU4AndU4bCrossAccountReads:
@@ -1660,6 +2925,7 @@ def membership_b(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[str]:
                 person_id=seed.person_a,  # one Person, two account contexts
                 account_id=seed.account_b,
                 role=Role.EMPLOYEE,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
     yield seed.membership_b
@@ -2027,6 +3293,7 @@ def person_in_b(engines: tuple[Engine, Engine], seed: _Seed) -> Iterator[str]:
                 person_id=person_id,
                 account_id=seed.account_b,
                 role=Role.EMPLOYEE,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
     yield person_id
@@ -3222,6 +4489,7 @@ class TestIdentityAndAgreementCrossAccountWrites:
                     person_id=seed.person_a,
                     account_id=seed.account_a,
                     role=Role.EMPLOYEE,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 )
             )
             session.flush()
