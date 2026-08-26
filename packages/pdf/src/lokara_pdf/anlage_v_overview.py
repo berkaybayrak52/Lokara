@@ -7,6 +7,12 @@ from datetime import datetime
 from decimal import Decimal
 from html import escape
 
+# The statement disclaimer names the Betriebs- und Heizkostenabrechnung, which this
+# document is not — an Anlage-V overview under § 21 EStG contains no Abrechnung at all.
+# This is CLAUDE.md § 6's approved wording, and it is the same sentence the /steuern
+# workspace shows, so the two surfaces no longer disagree.
+TAX_DISCLAIMER = "Lokara ist ein Werkzeug: rechtskonform, keine Rechts- oder Steuerberatung."
+
 
 @dataclass(frozen=True, slots=True)
 class AnlageVSourceRef:
@@ -78,6 +84,26 @@ def anlage_v_overview_html(data: AnlageVOverviewData) -> str:
         for line in data.lines
     )
     blockers = "".join(f"<li>{escape(value)}</li>" for value in data.blockers_de)
+    # docs/11 § 3.6: "every overview states the form year and source status"; § 8: no
+    # unverified line, account or EXTF parameter is presented as production-ready. The
+    # bundle id was checked at the top of this function and then never rendered, so the
+    # one document this pipeline can actually produce carried no source status at all.
+    if data.verified_test_bundle_id:
+        status_text = (
+            f"Erzeugt aus reinen Testwerten (Bündel {data.verified_test_bundle_id}). "
+            "Anlage-V-Zeilennummern, SKR-Konten und EXTF-Parameter sind nicht verifiziert. "
+            "Dieses Dokument ist ein technischer Nachweis und darf nicht beim Finanzamt "
+            "eingereicht werden."
+        )
+    else:
+        status_text = (
+            "Erzeugt aus den gespeicherten Quellen dieses Kontos. Die unten aufgeführten "
+            "Werte sind nicht verifiziert."
+        )
+    source_status = (
+        f'<section class="source-status"><h2>Quellenstatus</h2><p>{escape(status_text)}</p>'
+        f"<p>Formularjahr {data.tax_year}</p></section>"
+    )
     blocked = (
         f'<section class="blocked"><h2>Export gesperrt</h2><ul>{blockers}</ul></section>'
         if data.production_blocked
@@ -123,6 +149,9 @@ def anlage_v_overview_html(data: AnlageVOverviewData) -> str:
     th {{ font-weight: 600; }}
     td:nth-child(2) {{ text-align: right; white-space: nowrap; }}
     .blocked {{ border: 2px solid #a4262c; background: #fbeae9; padding: 4mm; margin-top: 7mm; }}
+    .source-status {{
+      border: 1px solid #5c6a6b; background: #f2f4f3; padding: 4mm; margin-top: 7mm;
+    }}
     footer {{
       border-top: 1px solid #5c6a6b; margin-top: 8mm; padding-top: 4mm;
       font-size: 9pt; color: #5c6a6b;
@@ -139,6 +168,7 @@ def anlage_v_overview_html(data: AnlageVOverviewData) -> str:
     </div>
     <table><thead><tr><th>Position</th><th>Betrag</th><th>Quellen</th></tr></thead><tbody>{rows}</tbody></table>
     {reconciliation}
+    {source_status}
     {blocked}
   </main>
   <footer><p>Rechtsstand {escape(data.rechtsstand)}</p><p>{escape(data.disclaimer)}</p></footer>

@@ -21,7 +21,7 @@ pre-production obligations. Detail remains with its specialist contract:
   minimums, output contents and current render gaps.
 - `docs/10-afa.md` contains the approved AfA transcription; approved
   [`docs/11-tax-export.md`](11-tax-export.md) owns tax/export/archive rules and `docs/12` owns
-  approved reusable deadline and guard rules. M7 implementation is prepared but unmerged and does
+  approved reusable deadline and guard rules. M7 implementation is locally merged and does
   not turn those contracts into production approval. Their details are not duplicated here.
 - `docs/14-investment-kpis.md` owns the future planning KPI and deterministic Bank-PDF boundaries.
   Its flat-tax scenario is not a tax export, promised refund or substitute for `docs/11`.
@@ -68,14 +68,14 @@ Every status below describes repository delivery, not legal certainty:
 - Logs, exports and provider requests must contain only the personal data required for their stated
   purpose. Production logging and export implementations still have to prove this per data flow.
 
-### Prepared M7 boundary
+### M7 boundary
 
-- `slice/m7-afa-tax-export` prepares owner/adviser authorization, seven forced-RLS M7 tables,
-  identity-free normalized tax events, immutable readiness/archive evidence and a restricted tax
-  workspace. The engine/database layers are focused-green, but the server-generated artifact/API
-  boundary remains RED and the latest development schema parity is open.
+- Merged M7 ships owner/adviser authorization, seven forced-RLS M7 tables, identity-free normalized
+  tax events, immutable readiness/archive evidence and a restricted tax workspace. The server
+  generates every artifact from domain inputs and freezes the exact bytes.
 - Runtime mappings, Anlage-V lines, SKR accounts, EXTF parameters and Soll/Haben orientation remain
-  blocked. Prepared code is neither a shipped control nor permission to send real tax output.
+  blocked. A merged control is not permission to send real tax output, and M7-F's read-only reviews
+  have not yet run.
 
 ## Evidence, append-only capabilities and immutable finalization
 
@@ -113,11 +113,11 @@ archived.
   PSD2 consent precondition to every AIS pull, write nothing outside the sync path and delete no
   append-only evidence. The C3c *Zahlungen* screen is technically complete and locally merged; it
   records one final, immutable confirm/reject/duplicate outcome and offers no way to edit or delete
-  an append-only ledger entry. Renter delivery/portal remains M10. Tax/export archives are prepared
-  in M7 but not merged or closed; delivery evidence and contract histories arrive with their owning
-  later milestones.
+  an append-only ledger entry. Renter delivery/portal remains M10. Tax/export archives are locally merged
+  in M7 and append-only, with M7-F's read-only reviews still open; delivery evidence and contract
+  histories arrive with their owning later milestones.
 
-### Specified contract and prepared tax-export implementation
+### Specified contract and merged tax-export implementation
 
 - One accepted payment-ledger snapshot feeds two deterministic outputs: the Anlage-V overview and
   DATEV EXTF. A receivable or statement Saldo is not a tax cash event.
@@ -132,9 +132,9 @@ archived.
   tax structuring or claim DATEV certification.
 - Anlage-V lines, SKR accounts, EXTF parameters and S/H orientation, and the BFH citation remain
   `verify-before-production`; a specified calculation path cannot clear those sentinels.
-- Prepared M7 implements the pure calculation/readiness layer and schema, but its app artifact
-  adapter still has ten focused failures. Earlier boundary and statement reviews predate the final
-  normalized M7-A/M7-B changes and must be rerun.
+- Merged M7 implements the pure calculation/readiness layer, the schema and the server-owned
+  artifact adapter. Earlier boundary and statement reviews predate the final normalized M7-A/M7-B
+  changes and must still be rerun; until then M7 is technically closed but not review-closed.
 
 ## Two clocks: access and data lifecycle
 

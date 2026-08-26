@@ -174,6 +174,47 @@ LAYERS: tuple[Layer, ...] = (
             }
         ),
     ),
+    # M7's two engines (docs/10, docs/11). Both were added by the M7 slice and neither was
+    # registered here, so CLAUDE.md rule 3.1 went unenforced on them for the whole
+    # milestone — the M7-F docs reconciliation found the gap. Both are in fact stdlib-only;
+    # this is what keeps them that way. AfA resolves no rule itself: every rate, guard and
+    # limit arrives in an AfaRuleBundle, so rules-store is forbidden here too.
+    Layer(
+        "packages/afa-engine/src",
+        forbidden_internal=frozenset(
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+                "lokara_matching_engine",
+                "lokara_guard_engine",
+                "lokara_uvi_engine",
+                "export_engine",
+            }
+        ),
+    ),
+    Layer(
+        "packages/export-engine/src",
+        forbidden_internal=frozenset(
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+                "lokara_matching_engine",
+                "lokara_guard_engine",
+                "lokara_uvi_engine",
+                "afa_engine",
+            }
+        ),
+    ),
     # The matching engine (docs/15) is the same crown-jewel shape: domain only. Bank
     # matching is deterministic arithmetic over integer cents, so it never reaches the
     # provider edge — the adapter normalizes floats to cents before this layer sees them.

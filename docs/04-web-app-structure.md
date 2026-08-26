@@ -43,11 +43,10 @@ workspace contains exactly `apps/web` and `packages/ui`.
 `packages/guard-engine` has no API route, web/runtime consumer, database record, scheduler,
 provider, delivery path or PDF projection.
 
-`apps/mobile`, KPI engines, Redis and workers are absent. `packages/afa-engine` and
-`packages/export-engine` plus the tax route/workspace are **Prepared but unmerged** on
-`slice/m7-afa-tax-export`; they are absent from `main`, and the slice remains RED. Real Supabase,
-Vision, bank, email and MDL providers are also absent; current external edges use local
-infrastructure or stubs.
+`apps/mobile`, KPI engines, Redis and workers are absent. `packages/afa-engine`,
+`packages/export-engine` and the tax route/workspace are merged on `main`, though real export
+output stays blocked. Real Supabase, Vision, bank, email and MDL providers are absent; current
+external edges use local infrastructure or stubs.
 
 ### Binding dependency direction
 
@@ -247,10 +246,11 @@ inside Python; Pydantic validates the backend boundary.
   live account contexts for its verified subject but grants none. The web switcher uses only those
   contexts as ordinary `/a/{accountId}` links, so every destination is authorized again by the API.
 - On shipped `main`, `OWNER` retains the owner portal and `EMPLOYEE` access is restricted to assigned
-  buildings; zero assignments expose no building data. Prepared M7 redirects `TAX_ADVISOR` account
+  buildings; zero assignments expose no building data. Shipped M7 redirects `TAX_ADVISOR` account
   routes to `/a/{accountId}/steuern`, where the API permits reads plus adviser-profile/mapping writes
-  only. This branch-local route is not shipped while the M7 RED window is open. The web hides
-  building creation and demo load/reset for employees; this is usability, never authorization.
+  only. The redirect is a convenience; `tax_account_session_for_path` re-verifies membership and
+  `authorize_tax_action` re-checks the role on every request. The web hides building creation and
+  demo load/reset for employees; this is usability, never authorization.
 - The web client performs one single-flight refresh for concurrent 401 responses and replays each
   failed request once. A second 401 is returned; it does not loop.
 - `ENVIRONMENT` is required. In `staging` and `production`, API startup refuses enabled dev-token
@@ -269,14 +269,15 @@ M7 replaces that state with the restricted `/steuern` workspace, but the branch 
 RED. `docs/02-data-model.md` owns the detailed function, role, policy, privilege and call-site
 contract.
 
-## Prepared M7 tax workspace
+## M7 tax workspace
 
-`slice/m7-afa-tax-export` adds `/a/{accountId}/steuern`, a minimized tax-building list, normalized
-AfA inputs, temporal self-use, profile/mapping forms, readiness and immutable-history evidence, and
-selection of Anlage-V PDF, Anlage-V CSV or DATEV. Owner has full M7 access; adviser has read plus
-profile/mapping writes; employee has none. The web suite passes `106` tests, but the corresponding
-server-generated artifact/API contract still has ten focused failures. This is prepared work, not a
-clickable demo claim on `main` and not production export availability.
+Merged M7 adds `/a/{accountId}/steuern`, a minimized tax-building list, normalized AfA inputs,
+temporal self-use, profile/mapping forms, readiness and immutable-history evidence, and selection of
+Anlage-V PDF, Anlage-V CSV or DATEV. Owner has full M7 access; adviser has read plus profile/mapping
+writes; employee has none. The web suite passes `106` tests and the server generates every artifact
+itself. The route is shipped, but it is not production export availability: real generation is
+refused with `Export gesperrt: Die Quellen müssen zuerst geprüft werden.` while its register values
+remain `verify-before-production`, and the workspace has no seeded adviser persona.
 
 ## Shipped statement and M6-B archive boundary
 

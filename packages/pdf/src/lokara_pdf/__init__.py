@@ -6,6 +6,7 @@ disclaimer on every legal output (CLAUDE.md).
 """
 
 from .anlage_v_overview import (
+    TAX_DISCLAIMER,
     AnlageVOverviewData,
     AnlageVOverviewLine,
     AnlageVSourceRef,
@@ -36,6 +37,7 @@ __version__ = "0.1.0"
 __all__ = [
     "DISCLAIMER",
     "OWNER_LABEL",
+    "TAX_DISCLAIMER",
     "AnlageVOverviewData",
     "AnlageVOverviewLine",
     "AnlageVSourceRef",

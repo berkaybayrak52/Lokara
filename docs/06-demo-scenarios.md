@@ -24,7 +24,7 @@
 | **Shipped** | M6-A/M6-B owner-only technical archive controls: actual advances, Saldo, immutable finalization and one isolated archive per eligible tenancy; no renter delivery/portal |
 | **Green outside the six-screen demo** | M6-C1/M6-C2/C3-0/C3a are shipped on local `main`; C3a service and five owner APIs are technically complete and development-synchronized; C3b's matching jobs and the C3c *Zahlungen* screen are locally merged. None of the three is part of the six-screen path. |
 | **Green outside the six-screen demo** | G1's pure W1/W2/W4 evaluators are locally merged; no seed, screen, statement figure or PDF change |
-| **Prepared but unmerged; excluded from demo** | M7 tax workspace and adviser restriction on `slice/m7-afa-tax-export`; web is green, but the artifact/API contract is RED and runtime output remains blocked |
+| **Merged; excluded from demo** | M7 tax workspace and adviser restriction are on local `main`, but there is no seeded adviser persona and runtime export output remains blocked |
 | **Future** | Scenario 6 persona seeding, renter portal, investment entitlement and mobile; the role-aware account chooser/switcher itself is already shipped |
 
 Green demo figures prove the current seeded path. They do not close Page 01 or Page 01b for
@@ -173,8 +173,9 @@ no statement figure, allocation or rendered byte depends on it. C3b gives the de
 works; no statement figure and no PDF byte depends on it. The statement period contract also
 remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
-Prepared M7 is also outside this path. It changes no current seed, statement figure or ordinary PDF
-byte, and its tax workspace must not be added to the pitch while `.lokara-red` is present.
+M7 is also outside this path. It changes no current seed, statement figure or ordinary PDF byte —
+the fingerprint is unchanged at `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes — and its tax
+workspace must not be added to the pitch while it has no seeded persona and its output is blocked.
 
 ## Future demo
 
@@ -195,7 +196,7 @@ The future demo covers five people without changing those rules:
 4. one person who is a landlord, renter and entitlement-gated investor in different contexts;
 5. a tax adviser guest who is read-only except for the adviser profile and tax-year mapping.
 
-M5 owns membership enforcement, employee building scope and account switching. Prepared M7 owns
+M5 owns membership enforcement, employee building scope and account switching. M7 owns
 the restricted tax workspace and adviser profile/mapping boundary. M10 still owns renter
 activation/portal, complete persona seeding and investment entitlement; the investment module also
 remains future.

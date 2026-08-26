@@ -6,17 +6,17 @@
 `berkay-work/Spec-Seiten/03 · AfA (Abschreibung) 3a95fd4207318179b865c8a1c9e4b487.md`
 **Fixtures:** exactly `10-F01`–`10-F34` in
 `packages/rules-store/tests/berkay_10_golden.py`
-**Implementation status — prepared but unmerged, 25.08.2026:** `slice/m7-afa-tax-export` contains a
+**Implementation status — technically complete and locally merged 25.08.2026 (`3d69013`):** the
 normalized pure `packages/afa-engine`, server-resolved AfA rules, immutable `AfaRecordVersion` in
-migration `0024`, owner API endpoints and the `/steuern` AfA workspace. The engine/rules run passed
-`192` focused tests; the last isolated M7-A API run passed `51`. The later M7-B app change is paused
-in a declared RED window, so none of this is merged or technically closed.
+migration `0024`, owner API endpoints and the `/steuern` AfA workspace are on local `main` and green
+under `scripts/gate.sh full`. Nothing is pushed. M7-F's three read-only reviews are the one
+outstanding closure item.
 
 The normalized engine covers acquisition/new-build, contract and BMF allocation, annual and
 month-granular series, temporal self-use, predecessor continuation, later costs with independent
 `leistungBis`, the 15% guard, loan/Disagio/interest, report and movable-asset paths. F29's incomplete
 BMF input and the missing Gutachten share stay evidence-limited and production-blocked. K09 remains
-`verify-before-production` despite the selected technical `453,798 ct` result. Prepared code is not
+`verify-before-production` despite the selected technical `453,798 ct` result. Merged code is not
 production rules approval.
 
 This document turns a purchase, construction or unentgeltlicher Erwerb into the annual object AfA,
@@ -366,8 +366,8 @@ savings claim, while partner selection remains open.
 - Establish the controlling EStR version for R 7.4 and R 4.2.
 - Verify § 7b thresholds before any notice contains numbers.
 - Verify the three uncertain BFH citations before displaying or exporting them.
-- Prepared M7 requires `leistungBis` independently of Page 02 `abfluss` in normalized AfA facts and
-  freezes those facts in the versioned input snapshot. No separate normalized work table is merged.
+- Merged M7 requires `leistungBis` independently of Page 02 `abfluss` in normalized AfA facts and
+  freezes those facts in the versioned input snapshot. No separate normalized work table exists.
 - A future partner process may consume the personalized shorter-life-report result; no partner is
   selected here.
 - The Page's old request to add `afaKlasseVorschlag` is settled at the contract level by the three

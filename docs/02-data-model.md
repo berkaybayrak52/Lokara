@@ -76,7 +76,7 @@ account-scoped tables carries the same `account_id`; section 3 records the enfor
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
 | Pure guard evaluation | W1 statement deadline, W2 meter calibration and W4 UVI cadence; no persisted guard/reminder records | **Shipped** as a pure engine; no schema or API |
-| AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in prepared migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Prepared but unmerged** on `slice/m7-afa-tax-export`; latest development parity and M7 closure remain open |
+| AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Locally merged**; M7-F's read-only reviews remain open |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
 These principles decide ambiguous additions:
@@ -117,7 +117,7 @@ deletion so historical authorization and attribution remain explainable.
 | --- | --- |
 | `OWNER` | Full account scope: billing, roles, bank data and every building. |
 | `EMPLOYEE` | Only assigned buildings. Zero `BuildingAssignment` rows means no building access. |
-| `TAX_ADVISOR` | Prepared M7 role: read-only tax/AfA/export access plus writes only to adviser-profile and year-mapping versions. It has no tax-event, AfA-record, readiness or generation write. This branch-local behavior is not shipped on `main`. |
+| `TAX_ADVISOR` | M7 role: read-only tax/AfA/export access plus writes only to adviser-profile and year-mapping versions. It has no tax-event, AfA-record, readiness or generation write. Shipped on `main`, enforced by `authorize_tax_action` on every request. |
 | `RENTER` | Not a `Role`; it is an account-scoped person/tenancy domain relationship. |
 | `Landlord` | Legal lessor data printed on a statement, never an authorization role. |
 
@@ -916,22 +916,22 @@ written is not a migration that works.
 | --- | --- |
 | `AdvancePaymentPeriod` | Shipped M6-A: account, tenancy, amount, effective dates and version/declaration evidence. |
 | `Receivable` | Shipped M6-B as `StatementSettlement`: account, finalized statement/version, tenancy, amount and immutable origin; it is not a cash event. |
-| Payment event/ledger entry | M6-C2 ships `PaymentLedgerEntry` + `PaymentAllocation`. Prepared M7 materializes accepted components idempotently into immutable `TaxEvent` rows with account/building, identity-free optional unit, nullable payment/due date and category, cents, direction, receipt reference, source enum, version, component/allocation provenance and append-only correction lineage. Missing date is red; missing category is yellow. |
+| Payment event/ledger entry | M6-C2 ships `PaymentLedgerEntry` + `PaymentAllocation`. M7 materializes accepted components idempotently into immutable `TaxEvent` rows with account/building, identity-free optional unit, nullable payment/due date and category, cents, direction, receipt reference, source enum, version, component/allocation provenance and append-only correction lineage. Missing date is red; missing category is yellow. |
 | Matching evidence | Shipped M6-C2 as `BankTransaction`, `MatchProposal`, `MatchConfirmation` and `IbanHistory`: normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
 | `TaxMappingVersion` | Prepared `0024`: immutable tax-year mapping snapshot with version, source, `Rechtsstand`, production block and same-year successor. All runtime lines/accounts remain blocked placeholders. |
 | `TaxAdviserProfileVersion` | Prepared `0024`: immutable adviser/client number, chart, account length and fiscal-year start snapshot; only owner/adviser profile writes are permitted by the prepared API. |
 | `TaxExportReadinessAttempt` | Prepared `0024`: immutable object/year/kind input references, ordered findings, acknowledgements/override evidence, blockers and generated/blocked result. |
-| `TaxExportArchive` + `TaxExportArtifact` | Prepared `0024`: stable account/building/year/kind stream, readiness reference, version/successor, exact bytes, `Rechtsstand` evidence, timestamp and hashes. The engine/database contract is focused-green; the app artifact adapter is still RED. Runtime DATEV remains blocked pending official-format and real-import verification. |
+| `TaxExportArchive` + `TaxExportArtifact` | `0024`: stable account/building/year/kind stream, readiness reference, version/successor, exact bytes, `Rechtsstand` evidence, timestamp and hashes. The server generates the bytes and freezes them; a caller can never supply them. Runtime DATEV remains blocked pending official-format and real-import verification. |
 
-### Prepared M7 record set
+### M7 record set
 
-Migration `0024_m7_afa_tax_export.py` is present only on `slice/m7-afa-tax-export`. It creates
+Migration `0024_m7_afa_tax_export.py` is on `main`. It creates
 `afa_record_version`, `tax_event`, `tax_adviser_profile_version`, `tax_mapping_version`,
 `tax_export_readiness_attempt`, `tax_export_archive` and `tax_export_artifact`. Every table carries
 `account_id`, forced RLS and a `WITH CHECK` policy; cross-account edges are composite, financial
-evidence is append-only, and archive bytes are immutable. The latest source was proved from an empty
-disposable database, but the development database still reflects an earlier `0024` shape and needs
-an exact additive parity reconciliation before closure.
+evidence is append-only, and archive bytes are immutable. The source was proved from an empty
+disposable database, and the development database was reconciled to it on 25.08.2026; its seven M7
+tables now match the models column for column.
 
 The statement's Saldo is BGH formal minimum #4. It must use **geleistete** advances from accepted
 payment allocations, not `advance_payment_cents × months`. The temporal Soll schedule is still
@@ -941,8 +941,8 @@ This separation fixes the former ambiguous phrase “statements feed the ledger�
 an obligation; an actual payment creates the cash-basis ledger event. M6 owns bank matching,
 versioned IBAN-to-renter mappings and the temporal Soll schedule needed to compare what was owed
 with what moved. M7 consumes the accepted ledger snapshot and owns the separate tax-export archive.
-Approved `docs/11` remains the contract; prepared migration/API code exists on the M7 branch but is
-not merged or technically closed.
+Approved `docs/11` remains the contract; its migration and API code are locally merged and green,
+with M7-F's read-only reviews still open.
 
 ## 7. Known gaps and milestone ownership
 
@@ -961,8 +961,8 @@ not merged or technically closed.
 | U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; production data/legal flags remain blocking, and no scheduled/email delivery or renter publication is included | U1–U5 / `docs/16` |
 | Renter delivery/portal work | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
-| Mid-year self-use/rental change for AfA apportionment | Prepared normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production`; nothing is merged | `docs/10-afa.md` / M7 |
-| Page 04 Anlage-V/DATEV export contract | Prepared pure engine/rules/schema/web work on the M7 branch; server-generated artifact/API adapter remains RED with ten focused failures, and runtime output stays blocked | M7 / `docs/11-tax-export.md` |
+| Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
+| Page 04 Anlage-V/DATEV export contract | Pure engine, rules, schema, web and the server-generated artifact/API adapter are locally merged and green; runtime output stays blocked while its register values remain `verify-before-production` | M7 / `docs/11-tax-export.md` |
 | Page 06 clause selection, risk and workflow-routing contract | Complete transcription approved and merged 21.08.2026; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |
 | `Verteilungsrest (K9)` authoritative register wording | Unresolved source issue; repository copy remains untouched | Next authoritative register export |
 

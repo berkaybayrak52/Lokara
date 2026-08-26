@@ -31,7 +31,7 @@ from lokara_db import (
     new_id,
 )
 from lokara_pdf import (
-    DISCLAIMER,
+    TAX_DISCLAIMER,
     AnlageVOverviewData,
     AnlageVOverviewLine,
     AnlageVSourceRef,
@@ -1305,11 +1305,11 @@ def generate_export(
     body: GenerateExportRequest,
     session: TaxAccountSession,
 ) -> Response:
-    # Kept after construction for the direct RED contract: every failed attempt
-    # is durable before the endpoint reports that generation is blocked.
-    role = getattr(session, "info", {}).get("tax_role")
-    if isinstance(role, Role):
-        authorize_tax_action(role, "generate")
+    # Authorization precedes construction, so the "every failed attempt is durable"
+    # contract is unaffected. This was the one authorization site in the file whose
+    # failure mode was "allow": a missing `tax_role` skipped the check and still wrote
+    # an append-only readiness attempt that nothing can remove.
+    _authorize(session, "generate")
     readiness = (
         _build_validated_readiness_attempt(account_id, body, session)
         if isinstance(body, BaseModel)
@@ -1324,6 +1324,31 @@ def generate_export(
 
 
 _VERIFIED_TEST_BUNDLE_ID = "m7-server-generated-v1"
+
+# `source_snapshot` is caller-written JSON: `create_event` stores `source_context` and
+# `correct_event` stores `source` verbatim, and neither is key-restricted. Splatting it
+# over the projection let a stored blob override `amount_cents`, `direction`, `category`
+# or `payment_date` — so the archived bytes and their hash would no longer re-derive from
+# the append-only columns, which is the whole GoBD claim. Only these engine signals may
+# be read from it, and the columns are written last so nothing can shadow them.
+# `booking_text` is deliberately absent: docs/11 § 8 requires it to default to the unit,
+# never to caller-supplied text that could carry a renter name.
+_LEDGER_SIGNAL_KEYS = frozenset(
+    {
+        "cold_rent_due_cents",
+        "nk_advance_due_cents",
+        "party_matched",
+        "recurring",
+        "expected_amount_cents",
+        "vat_case",
+    }
+)
+
+
+def _ledger_signals(snapshot: object) -> dict[str, object]:
+    if not isinstance(snapshot, dict):
+        return {}
+    return {key: value for key, value in snapshot.items() if key in _LEDGER_SIGNAL_KEYS}
 
 
 def resolve_verified_export_rule_bundle(
@@ -1485,6 +1510,7 @@ def generate_verified_test_export(
     }
     ledger_events = [
         {
+            **_ledger_signals(row.source_snapshot),
             "event_id": row.id,
             "account_id": row.account_id,
             "building_id": row.building_id,
@@ -1497,7 +1523,6 @@ def generate_verified_test_export(
             "receipt_reference": row.receipt_reference,
             "source": row.source,
             "version": row.version,
-            **row.source_snapshot,
         }
         for row in events
         if row.id not in superseded
@@ -1609,7 +1634,7 @@ def generate_verified_test_export(
             blockers_de=(),
             rechtsstand=f"AfA {afa.rechtsstand} · Export {mapping.rechtsstand}",
             production_blocked=False,
-            disclaimer=DISCLAIMER,
+            disclaimer=TAX_DISCLAIMER,
             verified_test_bundle_id=_VERIFIED_TEST_BUNDLE_ID,
         )
         artifact = VerifiedTestArtifact(

@@ -47,15 +47,17 @@ are technically complete, development-synchronized to final `0021` and locally m
 C3b's scheduler port and three job entrypoints are technically complete and locally merged into
 `main`, and so is the C3c landlord *Zahlungen* screen, which completes M6. Renter activation/portal,
 contracts, billing and native apps remain future milestones in `PLAN.md`. M7 tax-adviser access,
-AfA and tax export are **prepared but unmerged** on `slice/m7-afa-tax-export`: the M7-A and M7-B
-engine/database layers are focused-green, but the artifact/API boundary remains in a declared RED
-window and is neither shipped nor production-approved.
+AfA and tax export are **technically complete and locally merged** (`3d69013`): the engines,
+migration `0024`, the account-scoped API and the restricted `/steuern` workspace ship on local
+`main`. Real export output stays blocked while its register values remain
+`verify-before-production`, and M7-F's three read-only reviews remain open.
 
 The locally merged G1 slice provides pure W1 statement-deadline, W2 meter-calibration and
 W4 UVI-cadence evaluators. It has no database, API, UI, scheduler, provider, delivery or PDF
 consumer. Future product breadth still includes renter delivery, W3 and W5–W8, M9 reminders and
-delivery and mobile clients. Anlage V/DATEV has a prepared branch-local M7 foundation, not a shipped
-or usable production export. Those are roadmap or prepared dependencies, not shipped capabilities.
+delivery and mobile clients. Anlage V/DATEV has a merged M7 foundation, but not a usable
+production export: real generation stays refused while its register values remain
+`verify-before-production`. Those are roadmap or blocked dependencies, not usable capabilities.
 
 ## Competitive thesis
 
