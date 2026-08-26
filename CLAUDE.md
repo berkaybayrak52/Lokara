@@ -238,6 +238,9 @@ normal cadence.
   compile-level checks, not tests, and stay in use.
 - The rule that no agent writes both a test and the implementation that satisfies it is suspended,
   because no test is written at all.
+- Continue implementation directly on the long-lived local `development` branch. Local `main`
+  remains the last consolidated checkpoint at `5230724`; promotion to `main` and pushing each need
+  separate authorization.
 
 Everything else still binds: engine purity, integer-cent money, immutable and versioned legal
 records, account isolation and RLS, the source precedence in § 4, German UI copy and every

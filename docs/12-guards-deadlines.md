@@ -1,8 +1,8 @@
 # Guards and deadlines — shared trigger, escalation and resolution contract
 
-**Status:** complete D2 transcription; M9 implementation prepared but uncommitted and unmerged on
-`slice/m9-guards-delivery` 25.08.2026. Demo gate green and boundary review clean; final statement
-review red — see `PLAN.md` § M9-U.
+**Status:** complete D2 transcription; paused M9 implementation integrated on `development` and
+unverified by this consolidation. Earlier branch evidence recorded a green demo gate and clean
+boundary review, but the final statement review remained red — see `PLAN.md` § M9-U.
 
 **Authoritative source:**
 `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
@@ -16,17 +16,18 @@ review red — see `PLAN.md` § M9-U.
 **Fixtures:** exactly `12-F01`–`12-F24` in
 `packages/rules-store/tests/berkay_12_golden.py`
 
-**Implementation status:** G1 remains the merged foundation. Prepared M9 executes all
-`12-F01`–`12-F24` through public W1–W8 evaluators and adds migration `0025`, account-scoped jobs and
-API, the `/waechter` landlord screen, immutable reminder/delivery evidence and a deterministic email
-stub. Automation defaults off. This is not production authorization.
+**Implementation status:** G1 remains the merged foundation. Paused M9 work on `development`
+implements all `12-F01`–`12-F24` through public W1–W8 evaluators and adds migration `0025`,
+account-scoped jobs and API, the `/waechter` landlord screen, immutable reminder/delivery evidence
+and a deterministic email stub. It is integrated but unverified; automation defaults off. This is
+not production authorization.
 
 The M9-R endpoint, membership, trigger and writer-trust defects are repaired and verified against
 migrated Postgres; the fresh boundary audit is clean. The remaining closure defect is presentation,
 not transcription: `/waechter` maps known guard/status values to German, but lower-case internal
 blocker keys can still leak. Its broad internal-code heuristic can also hide useful `SHA-256`
 wording and apply a false legal fallback to technical blockers. `PLAN.md` § M9-U owns that final
-repair before commit or merge.
+repair before M9 closure.
 
 This document owns Page 05's reusable date, money, trigger, warning, escalation and auto-resolution
 rules. All product and warning copy is German. Code structure and identifiers are English. Money is
@@ -483,10 +484,10 @@ shared rows and ten non-goals are mapped. The data-only checks may prove
 coverage and arithmetic, but they do not approve legal rules, resolve authority gaps or demonstrate
 production behavior.
 
-The approved D2 transcription was data-only. G1 is the locally merged foundation; prepared M9 now
-executes all 24 fixtures through production evaluators and supplies immutable account-scoped
-persistence, idempotent jobs, owner/employee-safe endpoints, the landlord `/waechter` screen and a
-deterministic email adapter.
+The approved D2 transcription was data-only. G1 is the locally merged foundation; paused M9 work
+integrated on `development` implements all 24 fixtures through production evaluators and supplies
+immutable account-scoped persistence, idempotent jobs, owner/employee-safe endpoints, the landlord
+`/waechter` screen and a deterministic email adapter. The consolidation did not run those fixtures.
 
 Real delivery remains blocked and default-off. No real email provider, worker, scheduler, push
 client/token boundary or GENESIS integration is selected. Each renter is a separate message;

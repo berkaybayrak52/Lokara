@@ -87,7 +87,7 @@ carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner
 M6-C3-0 verifies their database invariants. C3a's service and final `0021` are technically complete,
 development-synchronized and locally merged; C3b's job entrypoints are technically complete and
 locally merged, and so is the C3c landlord *Zahlungen* screen, which changes no statement figure
-and no rendered byte. Prepared M9 consumes frozen Page-01 rule evidence for default-off,
+and no rendered byte. Paused M9 work integrated on `development` consumes frozen Page-01 rule evidence for default-off,
 owner-controlled renter email delivery and leaves statement rendering unchanged. Renter portal
 publication remains M10. These archives are owner-only technical
 records, not legal-production or renter delivery output.
@@ -96,8 +96,8 @@ records, not legal-production or renter delivery output.
 
 Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to
 approved `docs/11`; shared deadline orchestration to approved `docs/12`; bank matching to
-`docs/15`; and UVI/DWD rules to approved `docs/16`. Prepared M9 consumes the frozen statement
-authority snapshot for blocked delivery projection; it does not change the statement. This file records those boundaries and
+`docs/15`; and UVI/DWD rules to approved `docs/16`. Paused M9 work on `development` consumes the frozen statement
+authority snapshot for blocked delivery projection; the integration is unverified and does not change the statement. This file records those boundaries and
 does not duplicate or invent their contracts.
 
 ## 2. Page 01 source coverage and output contract
@@ -815,7 +815,8 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
 
 - **Remaining M6:** none. C3a is technically complete, development-synchronized and locally
   merged, and C3b's three job entrypoints and C3c's landlord *Zahlungen* screen are technically
-  complete and locally merged. Prepared M9 owns default-off renter email delivery; portal publication is M10.
+  complete and locally merged. Paused, unverified M9 work on `development` owns default-off renter
+  email delivery; portal publication is M10.
 - **Live demo PDF:** operator/numerator derivation and actual-advance Saldo remain absent; M6-B's separate archive has them.
 - **Meters:** start/end readings and their consistency path are not carried to the statement.
 - **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in

@@ -1,74 +1,40 @@
-# Lead handoff — M9 boundary clean; final UI review red
+# Lead handoff — active work consolidated on `development`
 
-**Resume only when Emir asks. Read `CLAUDE.md`, then `PLAN.md` § M9, then
-`docs/12-guards-deadlines.md`. Nothing may be committed, merged or pushed without Emir's explicit
-authorization.**
+## Current branch
 
-## Where the work is parked
+The primary worktree is on the long-lived local `development` branch. Local `main` remains the
+last consolidated checkpoint at `5230724`; nothing from this consolidation is pushed.
 
-| | |
-| --- | --- |
-| Worktree | `/private/tmp/lokara-m9-worktree` |
-| Branch | `slice/m9-guards-delivery` |
-| HEAD/base | `3d69013` |
-| State | uncommitted and unmerged; `.lokara-red` absent |
+`development` contains the checkpoint histories for:
 
-Work only in this worktree. Preserve every existing M9 change and the untracked dependency folders.
-Do not switch, clean, remove the worktree, commit, merge or push without Emir's instruction.
+- UI-04 from `slice/ui-04-objekt-dashboard`;
+- deferred M7-F repairs from `slice/m7-f-deferred-repairs`;
+- paused M9 guards/delivery from `slice/m9-guards-delivery`.
 
-## Current result
+Migration `0027` is an empty merge revision over heads `0025` and `0026`. No migration was applied
+to a database during consolidation.
 
-M9 implements W1–W8, migration `0025`, account-scoped jobs/API, immutable reminder/delivery/checklist
-evidence, default-off email delivery and `/a/{accountId}/waechter`.
+All authorized compile-level checks pass: Ruff check and format, strict mypy over 249 source files,
+web lint, typecheck and the production build. Alembic reports `0027` as its single head.
 
-The original M9-R endpoint and database-boundary defects are repaired:
+## Status boundaries
 
-- both renter-delivery write paths now run against migrated Postgres tests;
-- delivery confirmation records the bound artifact and accepted owner membership;
-- checklist and W1 evidence triggers enforce accepted memberships and consistent annual-statement
-  artifact bindings;
-- consumers use the bound artifact column, not forgeable snapshot JSON;
-- statement delivery blockers are derived from the published Page-01 inventory rather than trusted
-  from the writer.
+UI-04, the M7-F repair candidate and M9 are integrated, not technically closed. Consolidation uses
+compile-level checks only and supplies no test, database, gate, audit, statement review, PDF
+fingerprint or browser evidence.
 
-A fresh `boundary-auditor` review is clean. Its focused verification passed `112` tests.
-`scripts/gate.sh demo` is green: `1844` pytest, `130` vitest, `mypy --strict` over `243` source files,
-65 forced-RLS tenant tables and 130 account-scoped foreign keys. The ordinary statement fingerprint
-is unchanged at `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes.
+M9 remains paused until after UI-08. Its known landlord-facing blocker-label defects and its
+source/legal, provider, UVI-artifact and checklist-catalogue blockers remain open. Delivery stays
+default-off.
 
-**M9 is still not complete.** The fresh `statement-reviewer` run is red with one HIGH
-landlord-facing presentation defect:
+M7-F remains deferred until after M10. Its repair candidate still needs closing boundary,
+statement and documentation review plus verification. Every applicable tax authority flag remains
+production-blocking.
 
-- actual lower-case internal blocker keys still leak on `/waechter`, including
-  `missing_warning_copy:last_day`, `missing_post_retrofit_rule`, `missing_uvi_cadence_start` and
-  `basis_year_mismatch`;
-- the generic internal-code regex also hides the useful `SHA-256` part of an approved German
-  integrity message;
-- the generic fallback can falsely describe technical blockers as a missing legal/rule basis and
-  can duplicate identical bullets.
+## Next implementation
 
-The explicit German W1–W8 titles, known blocker labels, reminder-channel labels,
-suppression-reason labels and corrected Unit-B heating figures are already in place. Do not undo
-them.
+Continue direct implementation with UI-05A on `development`, under `CLAUDE.md` § 10. Do not start
+M9 or M7-F closure work unless Emir changes the recorded order.
 
-## Exact resume point
-
-1. Have `spec-scribe` add failing web tests for the real lower-case blocker keys, preservation of
-   the approved German `SHA-256` message, accurate technical fallback wording and deduplication.
-   Declare the red window in `.lokara-red`.
-2. Have `app-implementer` replace the broad regex heuristic with explicit mappings/allowlisting and
-   safe differentiated fallbacks. Unknown internal keys must not leak; useful German text must not
-   be hidden.
-3. Remove `.lokara-red`, run the focused web tests and `scripts/gate.sh demo`, confirm the fingerprint
-   is unchanged, then obtain a fresh `statement-reviewer` result.
-4. Reconcile current M9 documentation only after that review is clean. Present the slice without
-   committing or merging it.
-
-## Production blockers that remain out of scope
-
-Green gates do not authorize production use. Client-supplied clocks, discovery-token expansion,
-`StubEmailGateway` semantics/storage, hard-coded or exact-equality legal timing, source/legal flags,
-missing immutable UVI PDF bytes, absent real email/worker/scheduler/push/Destatis providers and the
-empty production checklist catalogue remain blocking. Delivery schedules remain default-off.
-
-M7-F and M8 remain parked and are not part of this work.
+Existing branches and worktrees remain preserved. Commit, promotion to `main`, cleanup and push
+remain separate decisions.

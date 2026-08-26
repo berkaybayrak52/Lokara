@@ -918,9 +918,9 @@ written is not a migration that works.
 | `Receivable` | Shipped M6-B as `StatementSettlement`: account, finalized statement/version, tenancy, amount and immutable origin; it is not a cash event. |
 | Payment event/ledger entry | M6-C2 ships `PaymentLedgerEntry` + `PaymentAllocation`. M7 materializes accepted components idempotently into immutable `TaxEvent` rows with account/building, identity-free optional unit, nullable payment/due date and category, cents, direction, receipt reference, source enum, version, component/allocation provenance and append-only correction lineage. Missing date is red; missing category is yellow. |
 | Matching evidence | Shipped M6-C2 as `BankTransaction`, `MatchProposal`, `MatchConfirmation` and `IbanHistory`: normalized transaction, accepted allocation/proposal, versioned IBAN-to-renter link, duplicate/reversal history and reviewer decision where required. |
-| `TaxMappingVersion` | Prepared `0024`: immutable tax-year mapping snapshot with version, source, `Rechtsstand`, production block and same-year successor. All runtime lines/accounts remain blocked placeholders. |
-| `TaxAdviserProfileVersion` | Prepared `0024`: immutable adviser/client number, chart, account length and fiscal-year start snapshot; only owner/adviser profile writes are permitted by the prepared API. |
-| `TaxExportReadinessAttempt` | Prepared `0024`: immutable object/year/kind input references, ordered findings, acknowledgements/override evidence, blockers and generated/blocked result. |
+| `TaxMappingVersion` | Migration `0024`: immutable tax-year mapping snapshot with version, source, `Rechtsstand`, production block and same-year successor. All runtime lines/accounts remain blocked placeholders. |
+| `TaxAdviserProfileVersion` | Migration `0024`: immutable adviser/client number, chart, account length and fiscal-year start snapshot; only owner/adviser profile writes are permitted by the API. |
+| `TaxExportReadinessAttempt` | Migration `0024`: immutable object/year/kind input references, ordered findings, acknowledgements/override evidence, blockers and generated/blocked result. |
 | `TaxExportArchive` + `TaxExportArtifact` | `0024`: stable account/building/year/kind stream, readiness reference, version/successor, exact bytes, `Rechtsstand` evidence, timestamp and hashes. The server generates the bytes and freezes them; a caller can never supply them. Runtime DATEV remains blocked pending official-format and real-import verification. |
 
 ### M7 record set
@@ -965,8 +965,8 @@ with M7-F's read-only reviews still open.
 | Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
 | Three matching jobs | **Locally merged**; no schema change, read through an account-scoped session only | M6-C3b |
 | Landlord *Zahlungen* screen | **Locally merged**; confirm/reject/duplicate only, no manual assignment, no schema change | M6-C3c |
-| W1–W8 guards, reminders, email delivery and checklists | **Prepared but uncommitted/unmerged** with migration `0025`, account-scoped jobs/API and `/waechter`; delivery defaults off and real execution remains blocked | M9 / `docs/12` |
-| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; prepared M9 scheduling refuses delivery because immutable UVI PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
+| W1–W8 guards, reminders, email delivery and checklists | **Integrated but unverified on `development`** with migration `0025`, account-scoped jobs/API and `/waechter`; M9 is paused, delivery defaults off and real execution remains blocked | M9 / `docs/12` |
+| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; paused M9 scheduling on `development` refuses delivery because immutable UVI PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
 | Renter portal publication | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
@@ -976,8 +976,8 @@ with M7-F's read-only reviews still open.
 
 Other later temporal or immutable records arrive only with their owning milestones: separate
 normalized `Loan`/work-detail tables beyond the AfA snapshot, `LettingEffort`, tickets,
-subprocessors, activation codes, clause/contract versions and prospect objects. Prepared M9 creates
-guard/reminder and delivery records but does not authorize production delivery.
+subprocessors, activation codes, clause/contract versions and prospect objects. Paused M9 work on
+`development` creates guard/reminder and delivery records but does not authorize production delivery.
 `docs/13` defines only their future logical references, composition evidence and risk routing; it
 does not approve a schema or provide clause text. `docs/14` likewise defines only the future
 Prüfobjekt snapshot, provenance, partial-result, annuity, sensitivity and Bank-PDF boundaries; it

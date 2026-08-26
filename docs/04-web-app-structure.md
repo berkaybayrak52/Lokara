@@ -144,8 +144,8 @@ and unit creation out of the inline forms into their own account-scoped routes:
 - migration `0026` adds `building_type` (VARCHAR with a CHECK over the four structural values, not a
   Postgres enum), `is_residential`, `country`, `latitude` and `longitude`. The three non-geo columns
   are NOT NULL with server defaults so existing insert paths, including the demo seed, keep working;
-  the coordinates stay nullable. The migration reserves `0025` for the unmerged M9 branch and sets
-  `down_revision = "0024"` deliberately;
+  the coordinates stay nullable. UI-03 migration `0026` and M9 migration `0025` are parallel
+  children of `0024`; empty merge revision `0027` joins them on `development`;
 - `POST /a/{accountId}/buildings` accepts `buildingType`, `isResidential`, `houseNumber` and
   `country`, joins street and house number into the existing single `street` column, and keeps the
   German five-digit `postal_code` rule unchanged. `BuildingSummary` gains `buildingType`, `latitude`
@@ -271,10 +271,9 @@ wired. Demo load/reset also require their explicit flag and operate on the fixed
 **Shipped on `main`:** `app_bootstrap_contexts(text)` and migration `0014` define one bounded
 pre-context identity read. `GET /me` supplies the live contexts for the URL-based chooser and
 switcher; no account is stored in the token or client session. M5 account switching was merged as
-`a748729`. On `main`, a tax-adviser URL still shows “Steuerfunktionen werden vorbereitet”. Prepared
-M7 replaces that state with the restricted `/steuern` workspace, but the branch is unmerged and
-RED. `docs/02-data-model.md` owns the detailed function, role, policy, privilege and call-site
-contract.
+`a748729`. The restricted `/steuern` workspace is present. Deferred M7-F repairs are integrated on
+`development`, but remain unverified and production-blocked. `docs/02-data-model.md` owns the
+detailed function, role, policy, privilege and call-site contract.
 
 ## M7 tax workspace
 
@@ -368,13 +367,14 @@ production-blocking.
 ## Future architecture
 
 - M10 renter activation, `/renter/{tenancyId}`, renter-portal isolation and account-safe portal
-  access are **Future**. Adviser profile, account mapping and tax functions are prepared in M7 but
-  remain unmerged and incomplete.
-- `apps/mobile` is **Future** at M10: Expo/React Native, the same API verification through Bearer JWT,
+  access are **Future**. Adviser profile, account mapping and tax functions exist, while deferred
+  M7-F repairs on `development` remain unverified and production-blocked.
+- `apps/mobile` is **Future** at M11: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.
-- Pure KPI packages and W3/W5–W8 guard extensions wait for their approved specs and owning
-  milestones. Pure AfA/export packages are prepared on the M7 branch, not shipped.
+- Pure KPI packages wait for their approved implementation milestone. W3/W5–W8 guard work is
+  integrated on `development` through paused M9 but remains unverified. Pure AfA/export packages
+  are present; M7-F closure remains deferred.
 - Redis plus Celery or Arq wait for a real rate-limit, retry, sync or scheduled-delivery slice.
 - Real Supabase Auth/Storage/Postgres credentials and real Vision, bank, email and MDL providers wait
   for their integration and hosting/DPA decisions and stay behind adapters.

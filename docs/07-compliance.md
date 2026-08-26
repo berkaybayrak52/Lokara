@@ -194,15 +194,16 @@ The rendered-output compatibility checks for these claims live in
 - M6-B ships owner-only, audience-isolated technical archives with actual advances, Saldo and
   finalization evidence. They are not renter delivery, portal publication or legal-production output.
 - U5 generates and immutably archives a separate German UVI renter document that an authorized
-  owner can download. Prepared M9 adds default-off scheduling/email but refuses UVI sends until
-  immutable PDF bytes exist; portal publication remains M10.
+  owner can download. Paused, unverified M9 work on `development` adds default-off scheduling/email
+  but refuses UVI sends until immutable PDF bytes exist; portal publication remains M10.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the four formal minimums and
   records exactly what the current PDF does and does not render.
 - A period longer than 12 months is a specified hard block before calculation or rendering; a
   shorter period remains day-exact. After the § 556 deadline, the landlord's late `Nachforderung`
   is suppressed while a renter `Guthaben` remains payable. Approved `docs/12` owns the shared guard
-  contract. Prepared M9 supplies W1–W8 persistence, reminders and owner-controlled delivery, while
-  provider `DELIVERED` remains distinct from owner-confirmed legal receipt.
+  contract. Paused M9 work integrated on `development` supplies W1–W8 persistence, reminders and
+  owner-controlled delivery, while provider `DELIVERED` remains distinct from owner-confirmed legal
+  receipt. The consolidated path is unverified.
 
 ## Accessibility evidence and limits
 

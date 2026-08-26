@@ -28,7 +28,15 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 type IconName =
-  'overview' | 'buildings' | 'payments' | 'costs' | 'receipts' | 'meters' | 'statements' | 'tax';
+  | 'overview'
+  | 'buildings'
+  | 'payments'
+  | 'costs'
+  | 'receipts'
+  | 'meters'
+  | 'statements'
+  | 'guards'
+  | 'tax';
 
 interface NavItem {
   href: (accountId: string) => string;
@@ -70,6 +78,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: (id) => `/a/${id}/waechter`,
     label: 'Wächter',
+    icon: 'guards',
     activePrefixes: ['/waechter'],
     visibleFor: (role) => role === 'OWNER' || role === 'EMPLOYEE',
   },
@@ -566,6 +575,12 @@ function NavIcon({ name }: { name: IconName }) {
       <>
         <path d="M5 3h14v18H5V3Z" />
         <path d="M8 8h8m-8 4h8m-8 4h5" />
+      </>
+    ),
+    guards: (
+      <>
+        <path d="M12 3 5 6v5c0 4.6 2.8 8.1 7 10 4.2-1.9 7-5.4 7-10V6l-7-3Z" />
+        <path d="M12 8v5m0 3h.01" />
       </>
     ),
     tax: (

@@ -98,7 +98,9 @@ git switch -c slice/<name>
 > While it stands, no subagent runs, no reviewer agent runs, no fixture is written, no
 > `.lokara-red` sentinel is created and no gate run is a merge precondition. Branch discipline,
 > the file ownership in § 5 and the invariants in § 7 still apply. The rules below take effect
-> again when Emir removes that subsection.
+> again when Emir removes that subsection. During this mode, direct implementation continues on
+> the long-lived local `development` branch; `main` stays at the last consolidated checkpoint until
+> Emir separately authorizes promotion.
 
 The normal flow is:
 

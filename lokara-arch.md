@@ -15,11 +15,11 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 | Status | Meaning |
 | --- | --- |
 | **Shipped** | Present on `main` and covered by current repository gates. |
-| **Prepared but unmerged** | Implemented or transcribed on a named branch, but absent from `main`. |
+| **Integrated on `development`, unverified** | Present on the long-lived development branch without current closure evidence; absent from `main`. |
 | **Specified** | The approved or merged contract for later implementation; not proof of production behavior. |
 | **Future** | Selected direction or owned work whose implementation is not present. |
 
-### Shipped
+### Shipped foundations
 
 - A Python modular monolith under `apps/api` exposes the HTTP/JSON boundary.
 - `apps/web` is the responsive Next.js client; `packages/ui` is its shared TypeScript UI layer.
@@ -41,22 +41,21 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - Deferred M7-F repairs and UI-04 are also integrated here without test, audit, review, database or
   browser evidence from the consolidation.
 
-### Shipped
+### Other shipped capabilities
 
 - M7 adds normalized pure `packages/afa-engine` and `packages/export-engine`, versioned AfA/export
   rules, migration `0024`, seven immutable account-scoped M7 records, the restricted tax
   API/workspace and a German Anlage-V projection. The server generates every artifact from domain
   inputs and freezes the exact bytes; archive versions and supersession run per logical export
-  stream (account, building, tax year, export kind). Merged locally as `3d69013` and green under
-  `scripts/gate.sh full`. Nothing is pushed, M7-F's read-only reviews are open, and real export
-  output stays blocked while its register values remain `verify-before-production`.
+  stream (account, building, tax year, export kind). The M7-0…M7-E foundation is present on `main`
+  with its earlier slice evidence. M7-F repairs are integrated only on `development`, their closing
+  reviews remain open, and real export output stays blocked while its register values remain
+  `verify-before-production`.
 
 - G1 adds the pure `packages/guard-engine` with caller-supplied W1 statement-deadline, W2
   meter-calibration and W4 UVI-cadence rules. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13`
-  execute through production code. No API, persistence, UI, scheduler or PDF consumer exists yet.
-
-- M7-0 through M7-E add the AfA/export engines, migration `0024`, restricted tax API/workspace and
-  Anlage-V artifacts on local `main`. M7-F reviews are parked and runtime authority stays blocked.
+  execute through production code. On `main` it has no API, persistence, UI, scheduler or PDF
+  consumer; paused M9 adds those consumers only on `development`.
 
 - U1 adds the pure `packages/uvi-engine`; U1b adds its explicit provenance channel and U5 carries
   the resolved evidence into the immutable run/archive, closing the former provenance gap.
@@ -64,7 +63,7 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   adapters. U4/U4b persist monthly readings and their raw links, station/month weather evidence,
   effective-dated building configuration, building-month evidence and immutable run/delivery rows.
   U5 composes those boundaries into owner-authorized generation, an immutable archive and a
-  separate German renter document downloadable by the owner. Prepared M9 scheduling refuses UVI
+  separate German renter document downloadable by the owner. Paused M9 scheduling on `development` refuses UVI
   delivery until immutable PDF bytes exist; renter portal publication remains M10.
 
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
@@ -101,7 +100,8 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   technically implemented through U5 as described above. Production clearance remains blocked by
   the unchosen PLZ geodataset, three missing UVI register rows, the exact monthly § 6a content list,
   unresolved legal/convention checks and the other `verify-before-production` items recorded
-  there. M9 delivery is prepared but default-off/blocked; M10 renter publication remains future.
+  there. M9 delivery is integrated on `development` but paused, unverified and default-off/blocked;
+  M10 renter publication remains future.
   `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
 
 ## Runtime topology
@@ -149,9 +149,9 @@ backend.
 - `packages/adapters` normalizes bank, meter/MDL, annual and monthly DWD, Vision, email, Destatis
   and DATEV edges. Only an adapter may know a provider format.
 - `packages/db` owns SQLAlchemy models, Alembic migrations, sessions, RLS-supporting persistence
-  and seed data, including U4/U4b monthly UVI evidence and archive rows. Prepared migration `0024`
-  adds seven M7 tables on the slice branch; its latest development parity remains open. Domain and
-  engine packages do not depend on it.
+  and seed data, including U4/U4b monthly UVI evidence and archive rows. Migration `0024` adds the
+  seven M7 tables; parallel heads `0025` and `0026` are joined by empty merge revision `0027` on
+  `development`. Domain and engine packages do not depend on it.
 - `apps/api` composes authorization, persistence, engines, rules, adapters and rendering. U5 owns
   the authorized UVI generation/archive and owner download boundary. M7 adds the tax composition
   boundary, where the server generates and freezes every artifact itself. Pydantic validates the
