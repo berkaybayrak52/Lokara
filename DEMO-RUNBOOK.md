@@ -207,8 +207,9 @@ If the stack fails, show the verified artifact and numbers.
 ## 6. Do not demo
 
 - Mobile, bank sync, contracts or renter portals. They are roadmap work.
-- The branch-local M7 tax/AfA workspace or tax-adviser route. It is prepared but unmerged, its
-  server-generated artifact/API contract is RED, it has no seeded adviser persona, and runtime
-  output remains blocked.
+- The M7 tax/AfA workspace or tax-adviser route. It is merged and reachable on `main`, but it has
+  no seeded adviser persona, so the screen opens empty, and every real export is refused with
+  `Export gesperrt: Die Quellen müssen zuerst geprüft werden.` while its register values remain
+  `verify-before-production`. There is nothing here a landlord can be shown working end to end.
 - The five personas in `docs/06` as clickable UI. They are a model, not finished screens.
 - OCR as a live integration. The screen is real, but extraction is canned. Say that clearly.

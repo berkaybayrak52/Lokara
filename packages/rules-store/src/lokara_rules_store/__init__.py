@@ -7,8 +7,10 @@ weights, warm-water formula) is data with a law date — resolved via
 
 from .afa import (
     AFA_CONVENTIONS,
+    AFA_DISAGIO_CONVENTION,
     AFA_RATES,
     AfaConventionProfile,
+    AfaDisagioConvention,
     AfaRates,
     ResolvedAfaRuleBundle,
     resolve_afa_rule_bundle,
@@ -49,6 +51,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AFA_CONVENTIONS",
+    "AFA_DISAGIO_CONVENTION",
     "AFA_RATES",
     "ANLAGE_V_LAYOUTS",
     "CO2_FALLBACK_EMISSION_FACTORS",
@@ -60,6 +63,7 @@ __all__ = [
     "VERIFIED_TEST_EXTF_PROFILES",
     "WARM_WATER_FORMULA",
     "AfaConventionProfile",
+    "AfaDisagioConvention",
     "AfaRates",
     "AnlageVLayout",
     "CataloguePosition",

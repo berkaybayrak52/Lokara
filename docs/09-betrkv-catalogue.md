@@ -106,8 +106,8 @@ verificationFlag: geprüft | verify-before-production
 `afaKlasseVorschlag` and `anlageVKategorie` are dependency seams, not values owned here. Approved
 `docs/10-afa.md` defines the former's exact proposals. Approved `docs/11-tax-export.md`
 defines the year-versioned mapping structure and the exact Page-04 reference categories. It does
-not populate `anlageVKategorie` for every Page-02 row. Prepared M7 adds versioned mapping records
-and UI, but the complete runtime catalogue mapping remains blocked and unmerged.
+not populate `anlageVKategorie` for every Page-02 row. Merged M7 adds versioned mapping records
+and UI, but the complete runtime catalogue mapping remains blocked.
 
 ### 3.1 Allocable catalogue rows
 

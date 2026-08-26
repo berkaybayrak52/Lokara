@@ -32,16 +32,15 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 - `docs/09-betrkv-catalogue.md` and its data-only oracle are technically implemented through Slice C.
   Its flagged authority still blocks production use.
 
-### Prepared but unmerged
-
-- `slice/m7-afa-tax-export` adds normalized pure `packages/afa-engine` and
-  `packages/export-engine`, versioned AfA/export rules, migration `0024`, seven immutable
-  account-scoped M7 records, the restricted tax API/workspace and a German Anlage-V projection.
-  M7-A and the M7-B engine/database layers are focused-green; the M7-B server-generated artifact
-  adapter is paused with ten focused API failures. `.lokara-red` is present, the latest development
-  schema parity is not reconciled, and no M7 code is committed, merged, pushed or production-ready.
-
 ### Shipped
+
+- M7 adds normalized pure `packages/afa-engine` and `packages/export-engine`, versioned AfA/export
+  rules, migration `0024`, seven immutable account-scoped M7 records, the restricted tax
+  API/workspace and a German Anlage-V projection. The server generates every artifact from domain
+  inputs and freezes the exact bytes; archive versions and supersession run per logical export
+  stream (account, building, tax year, export kind). Merged locally as `3d69013` and green under
+  `scripts/gate.sh full`. Nothing is pushed, M7-F's read-only reviews are open, and real export
+  output stays blocked while its register values remain `verify-before-production`.
 
 - G1 adds the pure `packages/guard-engine` with caller-supplied W1 statement-deadline, W2
   meter-calibration and W4 UVI-cadence rules. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13`
@@ -130,9 +129,9 @@ backend.
   order, § 366/§ 367 settlement, the Largest-Remainder principal split and reversal. It imports the
   standard library only — not even the domain package — and refuses `float` at its one import
   boundary. It stores nothing; `packages/db` holds what it read and what it decided.
-- Prepared M7 adds `packages/afa-engine` and `packages/export-engine` as pure decision layers.
+- M7 adds `packages/afa-engine` and `packages/export-engine` as pure decision layers.
   They receive normalized facts plus resolved rule evidence and do not import FastAPI, SQLAlchemy,
-  Postgres or rendering. Their presence on the slice branch is not a shipped `main` capability.
+  Postgres or rendering. `scripts/check_engine_purity.py` covers both.
 - `packages/rules-store` resolves dated legal and convention values. Engines receive resolved
   values; they do not reach into the store.
 - `packages/adapters` normalizes bank, meter/MDL, annual and monthly DWD, Vision, email, Destatis
@@ -142,13 +141,13 @@ backend.
   adds seven M7 tables on the slice branch; its latest development parity remains open. Domain and
   engine packages do not depend on it.
 - `apps/api` composes authorization, persistence, engines, rules, adapters and rendering. U5 owns
-  the authorized UVI generation/archive and owner download boundary. Prepared M7 adds the tax
-  composition boundary, but its verified artifact adapter is still RED. Pydantic validates the
+  the authorized UVI generation/archive and owner download boundary. M7 adds the tax composition
+  boundary, where the server generates and freezes every artifact itself. Pydantic validates the
   backend boundary.
 - `apps/web` and `packages/ui` own client interaction and presentation. Zod mirrors wire
   validation for user experience; it never replaces backend validation.
 - `packages/pdf` projects frozen calculation results into documents, including the separate U5
-  renter artifact and the prepared M7 Anlage-V overview. It may format and paginate; it does not
+  renter artifact and the M7 Anlage-V overview. It may format and paginate; it does not
   recalculate legal or money rules.
 
 `scripts/check_engine_purity.py` protects the engine boundary. The RLS and composite-FK checks
@@ -193,7 +192,7 @@ Lokara keeps separate clocks because combining them produces incorrect money or 
 6. **Data-lifecycle time.** Retention, restriction and deletion are decided per data class and legal
    duty. Retaining a record never grants portal access.
 
-No exact retention duration is canonical yet. Approved `docs/11` and prepared M7 archive code do
+No exact retention duration is canonical yet. Approved `docs/11` and merged M7 archive code do
 not supply the separate source-backed privacy retention schedule needed to close that boundary.
 
 ## Subsystem ownership

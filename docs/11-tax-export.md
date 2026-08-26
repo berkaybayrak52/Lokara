@@ -10,12 +10,13 @@
 **Fixtures:** exactly `11-F01`–`11-F16` in
 `packages/rules-store/tests/berkay_11_golden.py`
 
-**Implementation status — prepared but unmerged, 25.08.2026:** `slice/m7-afa-tax-export` contains
-the pure `packages/export-engine`, versioned runtime-blocked rule data, migration `0024`, tax API,
-restricted `/steuern` workspace and German Anlage-V projection. The engine/database run passed
-`193` focused tests and the web suite passes `106`; the server-generated PDF/CSV/EXTF artifact/API
-adapter is paused with ten focused failures. The latest development schema parity and all closure
-gates/reviews remain open.
+**Implementation status — technically complete and locally merged 25.08.2026 (`3d69013`):** the
+pure `packages/export-engine`, versioned runtime-blocked rule data, migration `0024`, tax API,
+restricted `/steuern` workspace and German Anlage-V projection are on local `main` and green under
+`scripts/gate.sh full`. The server generates every PDF/CSV/EXTF artifact from domain inputs and
+freezes the exact bytes; a caller can never supply them. Archive versions and supersession run per
+logical export stream — account, building, tax year and export kind. Nothing is pushed, and M7-F's
+three read-only reviews are the one outstanding closure item.
 
 No real output is approved. Anlage-V lines, SKR accounts, EXTF parameters, Soll/Haben orientation,
 the BFH citation, Disagio and maintenance mapping remain blocked. The verified-test-only server
@@ -112,7 +113,7 @@ the prepared AfA workflow. Page 04 never reconstructs the Page-03 basis, rate or
 The reference aggregation maps `afaAbziehbarCent` and `zinsAbziehbarCent`. The source names
 `disagioAbziehbarCent` and `erhaltungsaufwandCent` as handoff fields but supplies no separate
 Anlage-V rows for them; `instandhaltung` also exists as a ledger category. The mapping gap remains
-blocked: prepared M7 excludes both values until the lines and maintenance deduplication are settled.
+blocked: merged M7 excludes both values until the lines and maintenance deduplication are settled.
 
 ### 3.3 Tax-adviser profile
 
@@ -350,7 +351,7 @@ comes from the original Page, the register and the approved rules and fixtures h
 | --- | --- | --- | --- |
 | Metadata, purpose, dependencies and two-output architecture | §§ 1, 3 | source-surface test | complete |
 | Norms, case-law gap and K01–K11 | §§ 2, 4, 8–9 | register/blocker tuples | complete; flags retained |
-| Inputs and immutable-output contracts | § 3 | contract-surface constants plus prepared M7 tests | specification complete; prepared schema/app remains unmerged and RED |
+| Inputs and immutable-output contracts | § 3 | contract-surface constants plus M7 tests | specification complete; schema and app merged and green |
 | R1–R9 | § 5 | F01–F16 arithmetic/format checks | complete |
 | E01–E15, including E05a–c | § 6 | exact edge map + readiness/archive checks | complete |
 | Worked examples F01–F16 | § 7 | exact 16-ID oracle | complete |

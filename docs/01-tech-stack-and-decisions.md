@@ -15,18 +15,15 @@ planned or mentioned in the architecture.
 | Workspace | Exact current members |
 | --- | --- |
 | Bun/Turborepo | `apps/web`, `packages/ui` |
-| uv on `main` | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/matching-engine`, `packages/guard-engine`, `packages/adapters`, `packages/db`, `packages/pdf` |
-| uv prepared on `slice/m7-afa-tax-export` | all `main` members plus `packages/afa-engine` and `packages/export-engine` |
+| uv on `main` | `apps/api`, `packages/domain`, `packages/nk-engine`, `packages/heating-engine`, `packages/rules-store`, `packages/matching-engine`, `packages/guard-engine`, `packages/adapters`, `packages/db`, `packages/pdf`, `packages/afa-engine`, `packages/export-engine` |
 
 Every member in the `main` row is present on `main`; `packages/guard-engine` joined it with the
-locally merged G1 slice. The prepared row describes only the current M7 branch.
+locally merged G1 slice, and `packages/afa-engine` and `packages/export-engine` joined it with M7.
 
-Prepared and future members are separate:
+Future members are separate:
 
 - `apps/mobile` is selected for M10 but does not exist and is not a Bun member.
-- `packages/afa-engine` and `packages/export-engine` are prepared uv members on
-  `slice/m7-afa-tax-export`; they are absent from `main`, and the surrounding M7 slice remains RED.
-  No separate ledger or worker package is a current member.
+- No separate ledger or worker package is a current member.
 - Redis/Celery/Arq, payment SDKs and real provider SDKs are not installed workspace capabilities.
 
 `package.json` and `pyproject.toml` are authoritative for the live member lists.

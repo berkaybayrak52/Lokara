@@ -138,10 +138,10 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
    technically complete, development-synchronized and locally merged. C3b's scheduler port and
    three job entrypoints and the C3c *Zahlungen* screen are technically complete and
    locally merged, which completes M6. G1's pure W1/W2/W4 guard foundation is technically complete
-   and locally merged (`6c257f8`); U1–U5 are also locally merged. M7 is prepared but unmerged on
-   `slice/m7-afa-tax-export` and paused in a declared RED window; `LEAD-HANDOFF.md` owns the exact
-   ten-failure resume boundary. `main` is ahead of `origin/main`, which still points to `f372f67`;
-   nothing is pushed.
+   and locally merged (`6c257f8`); U1–U5 are also locally merged. M7-0 through M7-E are technically
+   complete and locally merged (`3d69013`); M7-F's three read-only reviews are the one outstanding
+   closure item, and `LEAD-HANDOFF.md` owns that boundary. `main` is ahead of `origin/main`, which
+   still points to `f372f67`; nothing is pushed.
    Work follows PLAN's **execution order** — ranked by *what closes the legally-required surface
    first* — rather than the milestone numbering. **It carries no deadline on purpose:** dates in
    `lokara-arch.md` are communication events (when something gets shown), never planning inputs,
@@ -164,10 +164,10 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
      allocation-key precedence, non-allocable routing, 14 edge cases and exact 32-fixture trace.
    - `10-afa.md` — Page 03's purchase-cost, purchase-price-allocation, AfA, self-use, 15%-guard and
      annual financing contract, with all 34 source-backed fixtures transcribed; the normalized M7-A
-     engine/rules path is prepared but unmerged and retains its production blockers.
+     engine/rules path is locally merged and retains its production blockers.
    - `11-tax-export.md` — Page 04's approved payment-ledger, Anlage-V overview, DATEV EXTF,
      readiness and immutable export-archive contract, with all 16 source-backed fixtures transcribed;
-     M7-B engine/database work is prepared but unmerged, its app artifact adapter remains RED, and
+     M7-B's engine, database and server-owned artifact adapter are locally merged, and
      all line, account and format placeholders remain blocked.
    - `12-guards-deadlines.md` — Page 05's shared guard contract for deadlines, arrears, UVI,
      rent adjustments and vacancy, with all 24 source-backed fixtures transcribed; G1 executes the

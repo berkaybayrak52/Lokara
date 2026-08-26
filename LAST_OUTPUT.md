@@ -1,19 +1,24 @@
-# Last output — U2 Heizspiegel rules green
+# Last output — M7 completed and merged
 
-HEAD `ab875d2` on `slice/u2-heizspiegel-rules` · `24.08.2026`
+HEAD `3d69013` on `main` · `25.08.2026`
 Status: Complete
 
 ## Wanted
-Commit and locally merge U1b, then start U2.
+Commit the current work and merge it into `main`.
 
 ## Done
-U1b was merged locally as `ee83535` and finalized as `ab875d2`; nothing was pushed.
-U2 now versions all 18 Heizspiegel rows, deductions, guards, fallbacks, attribution and vintage
-evidence. Its statement review is closed. Focused tests pass 11; rules-store tests pass 135.
-Fast passes 598 pure-package tests; full passes 1,289 Python and 84 web tests. The sentinel is absent.
+Finished M7-B first, because the slice was red. Closed the verified-export adapter: the server now
+generates artifact bytes from domain inputs behind an internal exact-byte archive boundary, archive
+streams key on account/building/year/kind, the readiness projection is identity-free and corrections
+read their stream from the superseded row. Reconciled the development database to the final `0024`.
+Two fixtures written against the draft schema were repaired by `spec-scribe`, not by the implementer.
+Fast, full (`1709` pytest, `106` vitest) and the non-fresh demo path are green; the statement
+fingerprint is unchanged at `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes. Merged as `3d69013`.
 
 ## Not done
-U2 is not committed or merged. U3 is not started.
+M7-F's three read-only reviews (`boundary-auditor`, `statement-reviewer`, `docs-reconciler`).
+Nothing was pushed. `Antwort-an-Emir_04.md`, `berkay-specs.md` and `berkay-work/UI-specs/` stay
+untracked by Emir's decision.
 
 ## Optional next step
-Authorize the U2 commit when ready.
+Run the three M7-F reviews against the merged slice before treating M7 as closed.
