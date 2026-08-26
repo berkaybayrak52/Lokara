@@ -399,6 +399,118 @@ class BuildingDetailResponse(ApiModel):
     units: list[UnitSummary]
 
 
+# ── UI-04 Objekt-Dashboard read model ────────────────────────────────────────
+#
+# One server-owned projection. Every money, area, state and priority value is
+# decided here; the browser renders what it is given and derives nothing.
+
+
+class BuildingDashboardOccupancy(ApiModel):
+    rented: int
+    vacant: int
+    self_use: int
+    total: int
+
+
+class BuildingDashboardKpis(ApiModel):
+    cold_rent_cents_monthly: int
+    cold_rent_eur_monthly: str
+    total_area_sqm_x100: int
+    total_area_sqm: float
+    rented_area_sqm_x100: int
+    rented_area_sqm: float
+    # None, never 0,00 €: no rented area means the ratio has no meaning.
+    avg_cold_rent_cents_per_sqm: int | None
+    avg_cold_rent_eur_per_sqm: str | None
+    occupancy: BuildingDashboardOccupancy
+
+
+class BuildingDashboardFact(ApiModel):
+    """One prioritized fact. The server owns severity and order."""
+
+    id: str
+    category: Literal["OPEN_RECEIVABLE", "MOVE_OUT", "MOVE_IN"]
+    severity: Literal["info", "attention"]
+    text: str
+    unit_id: str | None
+    unit_label: str | None
+    action_label: str | None
+    action_href: str | None
+    event_date: date | None
+
+
+class BuildingDashboardBalance(ApiModel):
+    status: Literal["SETTLED", "OPEN", "NONE"]
+    open_cents: int
+    open_eur: str
+    label: str
+
+
+class BuildingDashboardNextEvent(ApiModel):
+    kind: Literal["MOVE_IN", "MOVE_OUT"]
+    event_date: date
+    label: str
+
+
+class BuildingDashboardUnit(ApiModel):
+    id: str
+    label: str
+    area_sqm_x100: int
+    area_sqm: float
+    state: Literal["RENTED", "VACANT", "SELF_USE", "GRATUITOUS"]
+    state_label: str
+    party_names: list[str]
+    # docs/02 forbids overlapping tenancies. Surfacing the conflict beats hiding
+    # it behind an arbitrarily chosen party (04_Objekt-Dashboard.md OD9).
+    has_tenancy_overlap: bool
+    cold_rent_cents: int | None
+    cold_rent_eur: str | None
+    balance: BuildingDashboardBalance | None
+    next_event: BuildingDashboardNextEvent | None
+
+
+class BuildingDashboardModuleFact(ApiModel):
+    label: str
+    value: str
+
+
+class BuildingDashboardModule(ApiModel):
+    key: Literal["payments", "costs_and_statement", "meters"]
+    title: str
+    available: bool
+    # Set when `available` is false. An honest sentence, never a synthetic zero.
+    unavailable_reason: str | None
+    facts: list[BuildingDashboardModuleFact]
+    action_label: str | None
+    action_href: str | None
+
+
+class BuildingDashboardPermissions(ApiModel):
+    can_edit: bool
+    can_create_unit: bool
+    can_export_pdf: bool
+
+
+class BuildingDashboardResponse(ApiModel):
+    as_of: date
+    id: str
+    name: str
+    street: str
+    postal_code: str
+    city: str
+    country: str
+    building_type: str
+    building_type_label: str
+    is_residential: bool
+    unit_count: int
+    kpis: BuildingDashboardKpis
+    facts: list[BuildingDashboardFact]
+    facts_total: int
+    units: list[BuildingDashboardUnit]
+    modules: list[BuildingDashboardModule]
+    permissions: BuildingDashboardPermissions
+
+
 class TenancyCreate(ApiModel):
     renter_name: str = Field(min_length=1, max_length=200)
     valid_from: date

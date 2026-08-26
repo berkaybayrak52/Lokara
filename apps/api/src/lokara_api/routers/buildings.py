@@ -9,27 +9,36 @@ Temporal rows are create-only here: a Tenancy is immutable once written
 version, never UPDATE.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import lru_cache
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from lokara_adapters.geocoding import DisabledGeocodingGateway, GeocodingGateway
 from lokara_db import AdvancePaymentPeriod, Building, Renter, Tenancy, TenancyParty, Unit, new_id
 from lokara_domain import Period, cents, format_eur, periods_overlap
+from lokara_pdf import (
+    building_overview_filename,
+    building_overview_html,
+    render_html_to_pdf,
+)
 from sqlalchemy import select
 
 from ..authorization import (
+    portal_role,
     require_building,
     require_owner,
     require_resource_building,
     visible_building_ids,
 )
+from ..building_dashboard import build_dashboard, building_overview_data
 from ..deps import PathAccountSession
 from ..geocoding_http import NominatimGeocodingGateway
 from ..schemas import (
     AdvancePaymentPeriodOut,
     BuildingCreate,
+    BuildingDashboardResponse,
     BuildingDetailResponse,
     BuildingListResponse,
     BuildingSummary,
@@ -158,6 +167,54 @@ def building_detail(
         postal_code=building.postal_code,
         city=building.city,
         units=units,
+    )
+
+
+@router.get("/buildings/{building_id}/dashboard")
+def building_dashboard(
+    account_id: str, building_id: str, session: PathAccountSession
+) -> BuildingDashboardResponse:
+    """One server-owned read model for the Objektakte (04_Objekt-Dashboard.md OD1).
+
+    Separate from `GET /buildings/{building_id}` on purpose: the lean consumers of
+    the detail contract should not be made to load every financial and module
+    projection to render a unit list.
+    """
+    building = _get_building(session, building_id)
+    return build_dashboard(
+        session,
+        account_id=account_id,
+        building=building,
+        role=portal_role(session),
+        as_of=date.today(),
+    )
+
+
+@router.get("/buildings/{building_id}/overview.pdf")
+def building_overview_pdf(
+    account_id: str, building_id: str, session: PathAccountSession
+) -> Response:
+    """Server-rendered object overview from the same snapshot the page shows.
+
+    Owner-only, and refused server-side rather than hidden in the UI (OD14).
+    The renderer receives finished strings; it recomputes nothing (OD13).
+    """
+    require_owner(session)
+    building = _get_building(session, building_id)
+    dashboard = build_dashboard(
+        session,
+        account_id=account_id,
+        building=building,
+        role=portal_role(session),
+        as_of=date.today(),
+    )
+    document = building_overview_data(dashboard, generated_at=datetime.now(UTC))
+    pdf = render_html_to_pdf(building_overview_html(document))
+    filename = building_overview_filename(dashboard.name, dashboard.as_of)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{quote(filename)}"'},
     )
 
 

@@ -28,6 +28,15 @@ def _scope(session: PathAccountSession) -> PortalScope:
     return scope
 
 
+def portal_role(session: PathAccountSession) -> Role:
+    """The caller's membership role, for read models that report allowed actions.
+
+    Reporting a permission is not granting one: every write still passes its own
+    server-side check (04_Objekt-Dashboard.md OD14).
+    """
+    return _scope(session).role
+
+
 def require_building(session: PathAccountSession, building_id: str) -> Building:
     """Return a visible active building, otherwise use the anti-enumeration 404."""
     scope = _scope(session)

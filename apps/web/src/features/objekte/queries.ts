@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import {
+  BuildingDashboardResponseSchema,
   BuildingDetailResponseSchema,
   BuildingListResponseSchema,
   BuildingSummarySchema,
@@ -23,6 +24,15 @@ export function useBuildingDetail(accountId: string, buildingId: string) {
   return useQuery({
     queryKey: ['account', accountId, 'buildings', buildingId],
     queryFn: () => api(`/a/${accountId}/buildings/${buildingId}`, BuildingDetailResponseSchema),
+    retry: false,
+  });
+}
+
+export function useBuildingDashboard(accountId: string, buildingId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'buildings', buildingId, 'dashboard'],
+    queryFn: () =>
+      api(`/a/${accountId}/buildings/${buildingId}/dashboard`, BuildingDashboardResponseSchema),
     retry: false,
   });
 }
@@ -74,8 +84,14 @@ export function useCreateUnit(accountId: string, buildingId: string) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['account', accountId, 'buildings'] }),
+    onSuccess: () => {
+      // The buildings prefix also covers the object dashboard key; the portfolio
+      // overview is a separate read model and has to be told (OD17).
+      void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'buildings'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['account', accountId, 'portfolio-overview'],
+      });
+    },
   });
 }
 
@@ -100,6 +116,9 @@ export function useCreateTenancy(accountId: string, unitId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'units', unitId] });
       void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'buildings'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['account', accountId, 'portfolio-overview'],
+      });
     },
   });
 }

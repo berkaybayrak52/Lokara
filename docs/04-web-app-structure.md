@@ -177,6 +177,51 @@ This step was implemented under the direct implementation mode recorded in `CLAU
 strict mypy, type check and the web production build pass; no test suite was run for it, so it is
 **implemented; unverified — no test evidence**.
 
+## Shipped UI-04 Objektakte
+
+UI-04 turns the object detail page into an Objektakte fed by one server-owned
+projection (`apps/api/src/lokara_api/building_dashboard.py`):
+
+- `GET /a/{account_id}/buildings/{building_id}/dashboard` returns one `asOf`, the building master
+  data, four KPIs, at most three prioritized facts, compact unit rows, three module summaries and
+  the caller's allowed actions. It is a separate endpoint rather than an extension of
+  `GET /buildings/{building_id}` so the lean consumers of the detail contract do not load every
+  financial projection to render a unit list;
+- the four KPIs are **Kaltmiete / Monat** (sum of the cold rents of tenancies active at `asOf`,
+  advances excluded), **Gesamtfläche**, **Ø Kaltmiete / m²** and **Vermietungsstand**. The square-metre
+  figure is weighted — total current cold rent divided by the area actually let for money, never the
+  mean of per-unit prices — and is `null` with "Noch keine vermietete Fläche" when no area is let,
+  never `0,00 €`;
+- each unit carries exactly one state at `asOf`: `RENTED`, `VACANT`, `SELF_USE` or `GRATUITOUS`. A
+  missing tenancy is no longer read as vacancy; `SelfUsePeriod` supplies the two self-use states and
+  a running lease outranks them. Overlapping tenancies are surfaced on the row and suppress that
+  unit's rent instead of being hidden behind an arbitrarily chosen party;
+- balances come only from the authoritative `receivable` rows — `Keine Forderung`, `Ausgeglichen`
+  or `N € offen`. Nothing here sums bank transactions into a payment, and **no receivable is
+  generated**: the recurring rent claim and due-date rules live in `07_Zahlungen.md` and are not
+  built, so an absent claim stays absent (OD10 `MUSS-INPUT`);
+- facts are limited to what a module already owns: an open receivable per unit, and a move in or out
+  inside a 90-day window. Severity and order are decided server-side. Statement readiness, payments
+  under review and guard-derived meter hints have no persisted projection yet and produce no fact,
+  rather than a guessed one;
+- `GET /a/{account_id}/buildings/{building_id}/overview.pdf` renders the object overview from the
+  same projection. It is owner-only and refused server-side, the renderer in
+  `packages/pdf/src/lokara_pdf/building_overview.py` only formats supplied strings, and the document
+  states in its footer that it is neither a Betriebskostenabrechnung nor a legal notice. The filename
+  carries the object name and `asOf`; party names never enter it.
+
+**Intentionally absent, and why.** "Objekt bearbeiten" has no control: the API exposes no building
+update route and UI-03 shipped only creation wizards, so the button would link to a 404. Per-unit
+usage type (OD5's split of Wohnen and Gewerbe) has no authoritative field — deriving it from a label
+like "Büro" is exactly the guess the spec forbids — so the single weighted figure stands. "Vorgänge"
+is omitted entirely rather than shown as an empty counter, and contacts, documents and object
+activity stay absent until real persistence exists. The three demo objects of OD18 depend on the
+portfolio seed, which is not implemented; the seed still carries one building.
+
+This step was implemented under the direct implementation mode in `CLAUDE.md` § 10: ruff, strict
+mypy, typecheck, lint and the production build pass, and no test suite ran, so it is
+**implemented; unverified — no test evidence**.
+
 ## Shipped API surface
 
 There is one FastAPI application. Its current route families are:

@@ -97,6 +97,105 @@ export const BuildingDetailResponseSchema = z.object({
 });
 export type BuildingDetailResponse = z.infer<typeof BuildingDetailResponseSchema>;
 
+// UI-04 Objekt-Dashboard. Mirrors the server projection field for field: the
+// page renders these values and derives no money, state or priority of its own.
+export const BuildingDashboardOccupancySchema = z.object({
+  rented: z.number().int(),
+  vacant: z.number().int(),
+  selfUse: z.number().int(),
+  total: z.number().int(),
+});
+
+export const BuildingDashboardKpisSchema = z.object({
+  coldRentCentsMonthly: z.number().int(),
+  coldRentEurMonthly: z.string(),
+  totalAreaSqmX100: z.number().int(),
+  totalAreaSqm: z.number(),
+  rentedAreaSqmX100: z.number().int(),
+  rentedAreaSqm: z.number(),
+  avgColdRentCentsPerSqm: z.number().int().nullable(),
+  avgColdRentEurPerSqm: z.string().nullable(),
+  occupancy: BuildingDashboardOccupancySchema,
+});
+
+export const BuildingDashboardFactSchema = z.object({
+  id: z.string(),
+  category: z.enum(['OPEN_RECEIVABLE', 'MOVE_OUT', 'MOVE_IN']),
+  severity: z.enum(['info', 'attention']),
+  text: z.string(),
+  unitId: z.string().nullable(),
+  unitLabel: z.string().nullable(),
+  actionLabel: z.string().nullable(),
+  actionHref: z.string().nullable(),
+  eventDate: z.string().nullable(),
+});
+export type BuildingDashboardFact = z.infer<typeof BuildingDashboardFactSchema>;
+
+export const BuildingDashboardBalanceSchema = z.object({
+  status: z.enum(['SETTLED', 'OPEN', 'NONE']),
+  openCents: z.number().int(),
+  openEur: z.string(),
+  label: z.string(),
+});
+
+export const BuildingDashboardNextEventSchema = z.object({
+  kind: z.enum(['MOVE_IN', 'MOVE_OUT']),
+  eventDate: z.string(),
+  label: z.string(),
+});
+
+export const BuildingDashboardUnitSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  areaSqmX100: z.number().int(),
+  areaSqm: z.number(),
+  state: z.enum(['RENTED', 'VACANT', 'SELF_USE', 'GRATUITOUS']),
+  stateLabel: z.string(),
+  partyNames: z.array(z.string()),
+  hasTenancyOverlap: z.boolean(),
+  coldRentCents: z.number().int().nullable(),
+  coldRentEur: z.string().nullable(),
+  balance: BuildingDashboardBalanceSchema.nullable(),
+  nextEvent: BuildingDashboardNextEventSchema.nullable(),
+});
+export type BuildingDashboardUnit = z.infer<typeof BuildingDashboardUnitSchema>;
+
+export const BuildingDashboardModuleSchema = z.object({
+  key: z.enum(['payments', 'costs_and_statement', 'meters']),
+  title: z.string(),
+  available: z.boolean(),
+  unavailableReason: z.string().nullable(),
+  facts: z.array(z.object({ label: z.string(), value: z.string() })),
+  actionLabel: z.string().nullable(),
+  actionHref: z.string().nullable(),
+});
+export type BuildingDashboardModule = z.infer<typeof BuildingDashboardModuleSchema>;
+
+export const BuildingDashboardResponseSchema = z.object({
+  asOf: z.string(),
+  id: z.string(),
+  name: z.string(),
+  street: z.string(),
+  postalCode: z.string(),
+  city: z.string(),
+  country: z.string(),
+  buildingType: z.string(),
+  buildingTypeLabel: z.string(),
+  isResidential: z.boolean(),
+  unitCount: z.number().int(),
+  kpis: BuildingDashboardKpisSchema,
+  facts: z.array(BuildingDashboardFactSchema),
+  factsTotal: z.number().int(),
+  units: z.array(BuildingDashboardUnitSchema),
+  modules: z.array(BuildingDashboardModuleSchema),
+  permissions: z.object({
+    canEdit: z.boolean(),
+    canCreateUnit: z.boolean(),
+    canExportPdf: z.boolean(),
+  }),
+});
+export type BuildingDashboardResponse = z.infer<typeof BuildingDashboardResponseSchema>;
+
 export const AdvancePaymentPeriodOutSchema = z.object({
   id: z.string(),
   amountCents: z.number().int(),
