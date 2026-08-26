@@ -18,10 +18,12 @@ import {
   TableRow,
 } from '@lokara/ui';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { ApiError } from '@/lib/api';
+import type { TenancyOut } from '@/lib/contracts';
 import { isoToGermanDate, parseEurToCents } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
 
@@ -42,6 +44,8 @@ const TenancyFormSchema = z
       .string()
       .min(1, 'Pflichtfeld')
       .refine((v) => parseEurToCents(v) !== null, 'Betrag wie 220,00 angeben'),
+    // Freie Herkunftsangabe (kein rechenrelevanter Betrag); leer → Default beim Senden.
+    declarationRef: z.string(),
   })
   .refine((values) => values.validTo === '' || values.validTo > values.validFrom, {
     path: ['validTo'],
@@ -49,7 +53,29 @@ const TenancyFormSchema = z
   });
 type TenancyForm = z.infer<typeof TenancyFormSchema>;
 
-const EMPTY: TenancyForm = { renterName: '', validFrom: '', validTo: '', baseRent: '', advance: '' };
+const EMPTY: TenancyForm = {
+  renterName: '',
+  validFrom: '',
+  validTo: '',
+  baseRent: '',
+  advance: '',
+  declarationRef: 'Mietvertrag',
+};
+
+/**
+ * NK-Vorauszahlung zur Anzeige: die heute gültige Periode (validFrom ≤ heute und
+ * validTo leer oder nach heute), sonst die zeitlich letzte; leere Liste → „—".
+ */
+function advanceEurToday(schedule: TenancyOut['advancePaymentSchedule']): string {
+  if (schedule.length === 0) return '—';
+  const today = new Date().toISOString().slice(0, 10);
+  const current = schedule.find(
+    (period) => period.validFrom <= today && (period.validTo === null || period.validTo > today),
+  );
+  const chosen =
+    current ?? [...schedule].sort((a, b) => (a.validFrom < b.validFrom ? 1 : -1))[0];
+  return chosen?.amountEur ?? '—';
+}
 
 /** Einheit / Mietverhältnis (docs/04 M3 page 3): tenancy timeline + create. */
 export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitId: string }) {
@@ -57,15 +83,15 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
 
   if (detail.isPending) {
     return (
-      <main className="px-8 py-10">
-        <div aria-hidden="true" className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60" />
+      <main className="py-10">
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-xl bg-mint/60" />
       </main>
     );
   }
   if (detail.isError) {
     const missing = detail.error instanceof ApiError && detail.error.status === 404;
     return (
-      <main className="px-8 py-10">
+      <main className="py-10">
         <StatusNote
           kind="danger"
           label={missing ? 'Einheit nicht gefunden.' : 'Fehler beim Laden.'}
@@ -80,7 +106,7 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
 
   const unit = detail.data;
   return (
-    <main className="px-8 py-10">
+    <main className="py-10">
       <header className="mb-8">
         <p className="mb-1 text-sm">
           <Link
@@ -104,7 +130,7 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
         </p>
       </header>
 
-      <div className="grid max-w-5xl gap-8 lg:grid-cols-[2fr_1fr]">
+      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Mietverhältnisse" className="flex flex-col gap-6">
           {unit.tenancies.length === 0 ? (
             <Card>
@@ -165,7 +191,7 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
                             {tenancy.baseRentEur}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {tenancy.advancePaymentEur}
+                            {advanceEurToday(tenancy.advancePaymentSchedule)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -194,9 +220,61 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
           ) : null}
         </section>
 
-        <CreateTenancyForm accountId={accountId} unitId={unitId} />
+        <TenancyEntry accountId={accountId} unitId={unitId} />
       </div>
     </main>
+  );
+}
+
+/**
+ * Einstieg „Jetzt Mietverhältnis erstellen" (O11): erst die Wahl zwischen
+ * Vertragsgenerator (externe Route, entsteht parallel) und manuellem Einpflegen;
+ * „selbst einpflegen" blendet das bestehende Formular auf derselben Seite auf.
+ */
+function TenancyEntry({ accountId, unitId }: { accountId: string; unitId: string }) {
+  const [mode, setMode] = useState<'idle' | 'choosing' | 'manual'>('idle');
+
+  if (mode === 'manual') {
+    return <CreateTenancyForm accountId={accountId} unitId={unitId} />;
+  }
+
+  return (
+    <section aria-label="Mietverhältnis erstellen">
+      <Card>
+        <CardHeader>
+          <CardTitle>Mietverhältnis</CardTitle>
+          <CardDescription>
+            Mit dem Vertragsgenerator erzeugen und Daten automatisch übernehmen, oder bestehende
+            Angaben selbst einpflegen.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {mode === 'idle' ? (
+            <Button onClick={() => setMode('choosing')}>Jetzt Mietverhältnis erstellen</Button>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Link
+                href={`/a/${accountId}/vertraege/neu?unitId=${unitId}`}
+                className="flex flex-col rounded-xl border border-mint p-4 transition-colors hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <span className="font-semibold text-ink">Mit Vertragsgenerator</span>
+                <span className="mt-1 text-sm text-slate">
+                  Vertrag erzeugen und Daten automatisch übernehmen.
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMode('manual')}
+                className="flex flex-col rounded-xl border border-mint p-4 text-left transition-colors hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <span className="font-semibold text-ink">Vertragsdaten selbst einpflegen</span>
+                <span className="mt-1 text-sm text-slate">Bestehende Angaben manuell erfassen.</span>
+              </button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -210,15 +288,16 @@ function CreateTenancyForm({ accountId, unitId }: { accountId: string; unitId: s
 
   const onSubmit = form.handleSubmit((values) => {
     const baseRentCents = parseEurToCents(values.baseRent);
-    const advancePaymentCents = parseEurToCents(values.advance);
-    if (baseRentCents === null || advancePaymentCents === null) return;
+    const initialAdvancePaymentCents = parseEurToCents(values.advance);
+    if (baseRentCents === null || initialAdvancePaymentCents === null) return;
     create.mutate(
       {
         renterName: values.renterName,
         validFrom: values.validFrom,
         validTo: values.validTo === '' ? null : values.validTo,
         baseRentCents,
-        advancePaymentCents,
+        initialAdvancePaymentCents,
+        advanceDeclarationRef: values.declarationRef.trim() || 'Mietvertrag',
       },
       {
         onSuccess: () => {
@@ -279,6 +358,13 @@ function CreateTenancyForm({ accountId, unitId }: { accountId: string; unitId: s
               inputMode="decimal"
               error={form.formState.errors.advance}
               registration={form.register('advance')}
+            />
+            <FormField
+              id="tenancy-declaration"
+              label="Grundlage der NK-Vorauszahlung"
+              hint="z. B. Mietvertrag"
+              error={form.formState.errors.declarationRef}
+              registration={form.register('declarationRef')}
             />
             <div>
               <Button type="submit" disabled={create.isPending}>

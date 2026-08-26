@@ -8,6 +8,7 @@ import {
   CardTitle,
   StatusNote,
 } from '@lokara/ui';
+import { PageHeader } from '@/features/portal/page-header';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -33,18 +34,14 @@ export function MetersPage({ accountId }: { accountId: string }) {
   const buildingId = selectedId ?? buildings.data?.buildings[0]?.id ?? null;
 
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Zähler</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Zähler je Objekt und Einheit mit Eichfrist, dazu die Ablesungen für den
-          Abrechnungszeitraum. Ablesungen werden nur ergänzt, nie überschrieben — eine Korrektur ist
-          ein neuer Eintrag, der den alten ablöst.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Zähler"
+        description="Zähler je Objekt und Einheit mit Eichfrist, dazu die Ablesungen für den Abrechnungszeitraum. Ablesungen werden nur ergänzt, nie überschrieben — eine Korrektur ist ein neuer Eintrag, der den alten ablöst."
+      />
 
       {buildings.isPending ? (
-        <div aria-hidden="true" className="h-64 max-w-5xl animate-pulse rounded-xl bg-mint/60" />
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-xl bg-mint/60" />
       ) : buildings.isError ? (
         <StatusNote kind="danger" label="Objekte konnten nicht geladen werden.">
           Laden Sie die Seite neu oder versuchen Sie es später erneut.
@@ -103,7 +100,7 @@ function MetersForBuilding({ accountId, buildingId }: { accountId: string; build
   );
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="space-y-8">
       <HeatingCostSection accountId={accountId} buildingId={buildingId} />
 
       {/* The Eichfrist guard: computed from the meters on every load, so it can

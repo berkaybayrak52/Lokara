@@ -2,6 +2,8 @@
 
 import { Card, CardDescription, CardHeader, CardTitle, StatusNote } from '@lokara/ui';
 
+import { PageHeader } from '@/features/portal/page-header';
+
 import { LedgerList } from './ledger-list';
 import { buildRows } from './proposal-view';
 import { ReviewList } from './review-list';
@@ -42,17 +44,13 @@ export function ZahlungenPage({ accountId }: { accountId: string }) {
       : [];
 
   return (
-    <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Zahlungen</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Bankumsätze und die dazu vorgeschlagenen Forderungen. Eindeutige Treffer werden
-          automatisch gebucht; alles andere legen wir Ihnen zur Prüfung vor. Eine getroffene
-          Entscheidung bleibt bestehen und wird nicht überschrieben.
-        </p>
-      </header>
+    <main className="py-10">
+      <PageHeader
+        title="Zahlungen"
+        description="Bankumsätze und die dazu vorgeschlagenen Forderungen. Eindeutige Treffer werden automatisch gebucht; alles andere legen wir Ihnen zur Prüfung vor. Eine getroffene Entscheidung bleibt bestehen und wird nicht überschrieben."
+      />
 
-      <div className="max-w-5xl space-y-8">
+      <div className="space-y-8">
         <section aria-labelledby="zuordnung-titel" className="space-y-4">
           <div>
             <h2 id="zuordnung-titel" className="font-display text-2xl font-bold">

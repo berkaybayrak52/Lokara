@@ -15,8 +15,7 @@ function tenancy(validFrom: string, validTo: string | null, name: string): Tenan
     validTo,
     baseRentCents: 0,
     baseRentEur: '',
-    advancePaymentCents: 0,
-    advancePaymentEur: '',
+    advancePaymentSchedule: [],
     activeToday: false,
   };
 }

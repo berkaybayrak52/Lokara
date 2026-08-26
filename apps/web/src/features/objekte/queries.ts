@@ -38,8 +38,12 @@ export function useUnitDetail(accountId: string, unitId: string) {
 interface BuildingCreateInput {
   name: string;
   street: string;
+  houseNumber: string;
   postalCode: string;
   city: string;
+  country: string;
+  buildingType: string;
+  isResidential: boolean;
 }
 
 export function useCreateBuilding(accountId: string) {
@@ -80,7 +84,9 @@ interface TenancyCreateInput {
   validFrom: string;
   validTo: string | null;
   baseRentCents: number;
-  advancePaymentCents: number;
+  // API TenancyCreate (schemas.py): initial advance + its non-empty declaration ref.
+  initialAdvancePaymentCents: number;
+  advanceDeclarationRef: string;
 }
 
 export function useCreateTenancy(accountId: string, unitId: string) {

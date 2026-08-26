@@ -13,12 +13,18 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { ApiError } from '@/lib/api';
+import { centsToEurDisplay } from '@/lib/format';
 
+import { PageHeader } from './page-header';
+
+import { DEMO_TASK_COUNTS, deriveDemoFinance } from './dashboard-demo';
 import {
+  CashflowWidget,
   DashboardSkeleton,
-  MietSollCard,
   OccupancyCard,
-  UnavailableCard,
+  PlainKpiCard,
+  RingKpiCard,
+  TasksBar,
 } from './dashboard-widgets';
 import { useLoadDemo, useMe, usePortfolioOverview, useResetDemo } from './queries';
 
@@ -26,7 +32,8 @@ export function showOwnerControls(role: string | undefined): boolean {
   return role === 'OWNER';
 }
 
-/** Portfolio dashboard (UI-01): server-owned rent and occupancy truth. */
+/** Portfolio dashboard (UI-01 / Spec 01): server-owned rent + occupancy truth,
+ *  with clearly-labelled demo finance derived from the real Mietsoll. */
 export function Dashboard({ accountId }: { accountId: string }) {
   const overview = usePortfolioOverview(accountId);
   const loadDemo = useLoadDemo();
@@ -90,12 +97,20 @@ export function Dashboard({ accountId }: { accountId: string }) {
     );
   }
 
+  // Demo-Finanz (klar gekennzeichnet) aus dem echten monatlichen Mietsoll.
+  const finance = deriveDemoFinance(data.mietSollCentsMonthly);
+
   return (
     <PageFrame>
-      <div className="grid min-w-0 grid-cols-1 items-start gap-4 overflow-hidden lg:grid-cols-3">
-        <MietSollCard
-          buildingCount={data.buildingCount}
-          mietSollCentsMonthly={data.mietSollCentsMonthly}
+      {/* Kennzahl-Reihe [D4]: Mieteinnahmen (Ring), Vermietungsstand (Ring),
+          Offene Posten (kein Ring). */}
+      <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 overflow-hidden lg:grid-cols-3">
+        <RingKpiCard
+          label="Mieteinnahmen · lfd. Monat"
+          valueText={centsToEurDisplay(finance.receivedCents)}
+          numerator={finance.receivedCents}
+          denominator={data.mietSollCentsMonthly}
+          sublabel="Zur Finanzübersicht"
         />
         <OccupancyCard
           accountId={accountId}
@@ -104,27 +119,28 @@ export function Dashboard({ accountId }: { accountId: string }) {
           vacantUnitCount={data.vacantUnitCount}
           unitCount={data.unitCount}
         />
-        <UnavailableCard
-          title="Mieteinnahmen"
-          description="Noch keine Zahlungsdaten verfügbar. Der monatliche Zahlungseingang folgt mit der Finanzübersicht."
+        <PlainKpiCard
+          label="Offene Posten"
+          valueText={centsToEurDisplay(finance.openCents)}
+          sublabel={`${finance.openRenters} Mieter offen`}
         />
       </div>
 
-      <div className="mt-6 grid min-w-0 grid-cols-1 items-start gap-4 overflow-hidden lg:grid-cols-3">
-        <UnavailableCard
-          title="Offene Posten"
-          description="Noch keine Zahlungsdaten verfügbar. Offene Mieten werden erst nach Einrichtung des Zahlungsabgleichs angezeigt."
-        />
-        <UnavailableCard
-          title="Cashflow"
-          description="Einrichtung ausstehend. Für den Verlauf fehlen noch echte Einnahmen- und Ausgabendaten."
-        />
-        <UnavailableCard
-          title="Aufgaben & Tickets"
-          description="Noch nicht verfügbar. Aufgaben und Tickets erhalten später eine eigene verlässliche Datenquelle."
+      {/* Cashflow [D5] über die volle Breite. */}
+      <div className="mt-6 min-w-0 overflow-hidden">
+        <CashflowWidget months={finance.cashflow} />
+      </div>
+
+      {/* Aufgaben & Tickets [D6]. */}
+      <div className="mt-6 min-w-0 overflow-hidden">
+        <TasksBar
+          overdue={DEMO_TASK_COUNTS.overdue}
+          today={DEMO_TASK_COUNTS.today}
+          week={DEMO_TASK_COUNTS.week}
         />
       </div>
 
+      {/* Untere Reihe [D7]: Abrechnung + (nur Owner) Demo-Reset. */}
       <div className="mt-6 grid min-w-0 grid-cols-1 items-start gap-4 overflow-hidden lg:grid-cols-2">
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
@@ -255,11 +271,8 @@ function ResetDemoCard() {
 
 function PageFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-w-0 overflow-x-hidden px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Übersicht</h1>
-        <p className="mt-2 max-w-prose text-slate">Ihr Bestand auf einen Blick.</p>
-      </header>
+    <main className="min-w-0 overflow-x-hidden py-10">
+      <PageHeader title="Übersicht" description="Ihr Bestand auf einen Blick." />
       {children}
     </main>
   );

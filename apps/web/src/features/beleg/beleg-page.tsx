@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardDescription, CardHeader, CardTitle, StatusNote } from '@lokara/ui';
+import { PageHeader } from '@/features/portal/page-header';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -24,14 +25,10 @@ export function BelegPage({ accountId }: { accountId: string }) {
 
   return (
     <main className="px-8 py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold">Beleg-Upload</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          Rechnung hochladen, erkannte Felder prüfen, als Kostenart übernehmen. Gespeichert wird
-          ausschließlich, was Sie bestätigt haben — eine Fehlerkennung erreicht die Abrechnung nie
-          ungeprüft.
-        </p>
-      </header>
+      <PageHeader
+        title="Beleg-Upload"
+        description="Rechnung hochladen, erkannte Felder prüfen, als Kostenart übernehmen. Gespeichert wird ausschließlich, was Sie bestätigt haben — eine Fehlerkennung erreicht die Abrechnung nie ungeprüft."
+      />
 
       {buildings.isPending ? (
         <div aria-hidden="true" className="h-64 animate-pulse rounded-xl bg-mint/60" />

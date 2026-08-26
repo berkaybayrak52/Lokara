@@ -62,6 +62,22 @@ export const DemoLoadResponseSchema = z.object({
   accountId: z.string(),
 });
 
+export const BUILDING_TYPES = [
+  'WOHN_UND_GESCHAEFTSHAUS',
+  'WOHNHAUS',
+  'GEWERBEIMMOBILIE',
+  'EINFAMILIENHAUS',
+] as const;
+export type BuildingType = (typeof BUILDING_TYPES)[number];
+
+/** German plain-text labels for the building type (never show the raw enum). */
+export const BUILDING_TYPE_LABELS: Record<string, string> = {
+  WOHN_UND_GESCHAEFTSHAUS: 'Wohn- und Geschäftshaus',
+  WOHNHAUS: 'Wohnhaus',
+  GEWERBEIMMOBILIE: 'Gewerbeimmobilie',
+  EINFAMILIENHAUS: 'Einfamilienhaus',
+};
+
 export const BuildingSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -69,6 +85,9 @@ export const BuildingSummarySchema = z.object({
   postalCode: z.string(),
   city: z.string(),
   unitCount: z.number().int(),
+  buildingType: z.string(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
 });
 export type BuildingSummary = z.infer<typeof BuildingSummarySchema>;
 
@@ -94,6 +113,18 @@ export const BuildingDetailResponseSchema = z.object({
 });
 export type BuildingDetailResponse = z.infer<typeof BuildingDetailResponseSchema>;
 
+/** One advance-payment period (API AdvancePaymentPeriodOut, camelCase on the wire). */
+export const AdvancePaymentPeriodOutSchema = z.object({
+  id: z.string(),
+  amountCents: z.number().int(),
+  amountEur: z.string(),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+  predecessorId: z.string().nullable(),
+  declarationRef: z.string(),
+});
+export type AdvancePaymentPeriodOut = z.infer<typeof AdvancePaymentPeriodOutSchema>;
+
 export const TenancyOutSchema = z.object({
   id: z.string(),
   renterNames: z.array(z.string()),
@@ -101,8 +132,8 @@ export const TenancyOutSchema = z.object({
   validTo: z.string().nullable(),
   baseRentCents: z.number().int(),
   baseRentEur: z.string(),
-  advancePaymentCents: z.number().int(),
-  advancePaymentEur: z.string(),
+  // Temporal advances (migration 0015): a schedule, not a single scalar.
+  advancePaymentSchedule: z.array(AdvancePaymentPeriodOutSchema),
   activeToday: z.boolean(),
 });
 export type TenancyOut = z.infer<typeof TenancyOutSchema>;

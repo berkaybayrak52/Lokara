@@ -96,6 +96,9 @@ class TestCreateChain:
                 "street": "Testgasse 5",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
+                "houseNumber": "1",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
             },
         )
         assert response.status_code == 201
@@ -115,7 +118,15 @@ class TestCreateChain:
         response = client.post(
             f"{BASE}/buildings",
             headers=DEMO,
-            json={"name": "X", "street": "X 1", "postalCode": "123", "city": "F"},
+            json={
+                "name": "X",
+                "street": "X 1",
+                "houseNumber": "1",
+                "postalCode": "123",
+                "city": "F",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
+            },
         )
         assert response.status_code == 422
 
@@ -228,7 +239,15 @@ class TestIsolation:
         response = client.post(
             f"{BASE}/buildings",
             headers=_token(ISO_PERSON_ID),
-            json={"name": "Einbruch 1", "street": "E 1", "postalCode": "60000", "city": "F"},
+            json={
+                "name": "Einbruch 1",
+                "street": "E 1",
+                "houseNumber": "1",
+                "postalCode": "60000",
+                "city": "F",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
+            },
         )
         assert response.status_code == 403
 

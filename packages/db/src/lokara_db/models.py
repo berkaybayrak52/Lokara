@@ -389,6 +389,15 @@ class Building(Base):
     street: Mapped[str]
     postal_code: Mapped[str]
     city: Mapped[str]
+    # O4 (Spec 02-objekte): building Stammdaten. server_default so ORM inserts
+    # that omit them (e.g. the demo seed) still succeed and match migration 0025.
+    # building_type is VARCHAR + DB CHECK (see 0025), not a native enum.
+    building_type: Mapped[str] = mapped_column(server_default="WOHNHAUS")
+    is_residential: Mapped[bool] = mapped_column(server_default=text("true"))
+    country: Mapped[str] = mapped_column(server_default="Deutschland")
+    # Geocoding is best-effort; coordinates stay nullable.
+    latitude: Mapped[float | None]
+    longitude: Mapped[float | None]
     # Page 01 § 3.5 `objekt.fiktivbelegungModus` — Stammdaten of the object, not
     # of a unit or a run, because one building bills one way (docs/02 § 5 D0).
     # Migration 0009 makes this and its waiver note immutable after creation, so

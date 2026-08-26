@@ -337,11 +337,25 @@ class StatementCo2(ApiModel):
 # ── Objekte / Einheiten / Mietverhältnisse (M3 CRUD) ─────────────────────────
 
 
+BuildingType = Literal[
+    "WOHN_UND_GESCHAEFTSHAUS",
+    "WOHNHAUS",
+    "GEWERBEIMMOBILIE",
+    "EINFAMILIENHAUS",
+]
+
+
 class BuildingCreate(ApiModel):
     name: str = Field(min_length=1, max_length=200)
     street: str = Field(min_length=1, max_length=200)
+    # Wizard-A (O6) collects the house number separately; the API appends it to
+    # `street`. The postal_code stays DE-specific (^\d{5}$) on purpose.
+    house_number: str = Field(min_length=1, max_length=20)
     postal_code: str = Field(pattern=r"^\d{5}$")
     city: str = Field(min_length=1, max_length=100)
+    country: str = Field(default="Deutschland", min_length=1, max_length=100)
+    building_type: BuildingType
+    is_residential: bool
 
 
 class BuildingSummary(ApiModel):
@@ -351,6 +365,9 @@ class BuildingSummary(ApiModel):
     postal_code: str
     city: str
     unit_count: int
+    building_type: str
+    latitude: float | None
+    longitude: float | None
 
 
 class BuildingListResponse(ApiModel):

@@ -37,6 +37,7 @@ from ..schemas import (
     UnitDetailResponse,
     UnitSummary,
 )
+from .geocoding import geocode_address
 
 router = APIRouter(prefix="/a/{account_id}")
 
@@ -54,6 +55,9 @@ def _building_summary(building: Building) -> BuildingSummary:
         postal_code=building.postal_code,
         city=building.city,
         unit_count=len(building.units),
+        building_type=building.building_type,
+        latitude=building.latitude,
+        longitude=building.longitude,
     )
 
 
@@ -76,13 +80,22 @@ def create_building(
     account_id: str, body: BuildingCreate, session: PathAccountSession
 ) -> BuildingSummary:
     require_owner(session)
+    # Wizard-A sends street + house_number separately; store as one `street`
+    # (bounded to the column length). Geocoding is best-effort and never blocks.
+    street = f"{body.street} {body.house_number}".strip()[:200]
+    latitude, longitude = geocode_address(street, body.postal_code, body.city, body.country)
     building = Building(
         id=new_id(),
         account_id=account_id,  # WITH CHECK refuses any other value
         name=body.name,
-        street=body.street,
+        street=street,
         postal_code=body.postal_code,
         city=body.city,
+        country=body.country,
+        building_type=body.building_type,
+        is_residential=body.is_residential,
+        latitude=latitude,
+        longitude=longitude,
     )
     session.add(building)
     session.flush()

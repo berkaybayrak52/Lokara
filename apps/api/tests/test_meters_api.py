@@ -471,6 +471,9 @@ class TestMeterValidation:
                 "street": "Nebenweg 3",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
+                "houseNumber": "1",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
             },
         ).json()
         response = client.post(

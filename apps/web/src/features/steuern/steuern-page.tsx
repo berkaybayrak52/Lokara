@@ -12,6 +12,7 @@ import {
   Select,
   StatusNote,
 } from '@lokara/ui';
+import { PageHeader } from '@/features/portal/page-header';
 import React, { useEffect, useState } from 'react';
 
 import { useMe } from '@/features/portal/queries';
@@ -571,12 +572,10 @@ export function TaxWorkspace(props: TaxWorkspaceProps) {
   );
   return (
     <main className="px-4 py-8 sm:px-8 sm:py-10">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold text-ink">Steuern</h1>
-        <p className="mt-2 max-w-prose text-slate">
-          AfA-Nachweise und unveränderliche Steuerexporte für Objekt und Steuerjahr.
-        </p>
-      </header>
+      <PageHeader
+        title="Steuern"
+        description="AfA-Nachweise und unveränderliche Steuerexporte für Objekt und Steuerjahr."
+      />
       <nav aria-label="Steuernavigation" className="mb-6 flex gap-2 overflow-x-auto pb-2 sm:hidden">
         {['Auswahl', 'AfA-Assistent', 'Exportbereitschaft', 'Einstellungen', 'Exporthistorie'].map(
           (section) => (

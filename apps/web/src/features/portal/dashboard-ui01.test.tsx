@@ -92,17 +92,27 @@ describe('UI-01 dashboard composition', () => {
     expect(DASHBOARD_SOURCE).toContain('href={`/a/${accountId}/objekte`}');
   });
 
-  it('shows unavailable finance and task states without invented demo values', () => {
+  // Spec 01_Dashboard.md (Option B): das Dashboard zeigt bewusst als Demo
+  // gekennzeichnete Finanz- und Ticket-Werte, aus dem echten Mietsoll abgeleitet.
+  // (Löst die frühere "keine erfundenen Werte"-Prüfung ab; lokale Demo-Fassung.)
+  it('wires clearly-labelled demo finance and task counters from the real Mietsoll', () => {
     const ui01Source = `${DASHBOARD_SOURCE}\n${WIDGETS_SOURCE}\n${DEMO_FINANCE_SOURCE}`;
     expect(ui01Source).toContain('Mieteinnahmen');
     expect(ui01Source).toContain('Offene Posten');
-    expect(ui01Source).toContain('Cashflow');
+    expect(ui01Source).toContain('CashflowWidget');
     expect(ui01Source).toContain('Aufgaben & Tickets');
-    expect(ui01Source).toMatch(/Noch nicht verfügbar|Noch keine Zahlungsdaten|Einrichtung ausstehend/);
-    expect(ui01Source).not.toContain('dashboard-demo');
-    expect(ui01Source).not.toMatch(/mietSollCentsMonthly\s*\*\s*(?:0[.,])?82/);
-    expect(ui01Source).not.toMatch(/(?:82|18)\s*%/);
-    expect(ui01Source).not.toMatch(/5 überfällig|10 heute fällig|20 diese Woche fällig/);
+
+    // Demo-Finanz wird aus dem echten Mietsoll abgeleitet und lebt nur in dashboard-demo.ts.
+    expect(DASHBOARD_SOURCE).toContain('deriveDemoFinance');
+    expect(DASHBOARD_SOURCE).toContain('DEMO_TASK_COUNTS');
+    expect(DEMO_FINANCE_SOURCE).not.toBe('');
+    expect(DEMO_FINANCE_SOURCE).toContain('deriveDemoFinance');
+    expect(DEMO_FINANCE_SOURCE).toMatch(/overdue:\s*5/);
+    expect(DEMO_FINANCE_SOURCE).toMatch(/today:\s*10/);
+    expect(DEMO_FINANCE_SOURCE).toMatch(/week:\s*20/);
+
+    // Ehrliche Kennzeichnung: die Werte sind sichtbar als Demonstration markiert.
+    expect(WIDGETS_SOURCE).toContain('Demonstrationswerte');
   });
 
   it('keeps German loading, empty, failure, statement and owner-only demo flows', () => {

@@ -139,6 +139,9 @@ class TestDemoReset:
                 "street": "Testgasse 5",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
+                "houseNumber": "1",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
             },
         )
         assert created.status_code == 201
@@ -173,6 +176,9 @@ class TestDemoReset:
                 "street": "Resetweg 9",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
+                "houseNumber": "1",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
             },
         )
         assert building.status_code == 201
@@ -266,6 +272,9 @@ class TestDemoReset:
                 "street": "Fremdweg 1",
                 "postalCode": "10115",
                 "city": "Berlin",
+                "houseNumber": "1",
+                "buildingType": "WOHNHAUS",
+                "isResidential": True,
             },
         )
         assert created.status_code == 201

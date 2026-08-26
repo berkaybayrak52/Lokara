@@ -1,5 +1,7 @@
 import type { z } from 'zod';
 
+import { isDemoPreview, previewResponse } from './demo-preview';
+
 /**
  * The shared API interceptor (docs/04 "Auth in one api.ts interceptor").
  *
@@ -71,6 +73,16 @@ export async function api<Schema extends z.ZodType>(
   schema: Schema,
   init?: RequestInit,
 ): Promise<z.infer<Schema>> {
+  // Frontend-only Portfolio-Vorschau: fängt Lese-Antworten ab und liefert
+  // synthetische Demo-Daten. Berührt weder Backend noch Datenbank. Standardmäßig
+  // aus; aktiv nur bei NEXT_PUBLIC_DEMO_PREVIEW=true oder `?preview=1`.
+  if (isDemoPreview()) {
+    const preview = previewResponse(path, init);
+    if (preview !== undefined) {
+      return schema.parse(preview) as z.infer<Schema>;
+    }
+  }
+
   let response = await rawFetch(path, init);
 
   if (response.status === 401) {
