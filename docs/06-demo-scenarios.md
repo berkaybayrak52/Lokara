@@ -173,16 +173,18 @@ no statement figure, allocation or rendered byte depends on it. C3b gives the de
 works; no statement figure and no PDF byte depends on it. The statement period contract also
 remains in `docs/08`: a shorter
 Rumpfperiode is valid, while a period over 12 months hard-blocks before calculation or rendering.
-Prepared M7 is also outside this path. It changes no current seed, statement figure or ordinary PDF
-byte, and its tax workspace must not be added to the pitch while `.lokara-red` is present.
+Locally merged M7 remains outside this path because there is no seeded adviser persona and runtime
+authority is blocked. Prepared M9 `/waechter` is also outside the stable demo: the demo gate and
+fingerprint are green, but there is no stable seed and its final landlord-facing statement review
+is still red. It changes no current seed or ordinary statement claim.
 
 ## Future demo
 
 ### Scenario 6 — Hausverwaltung and five personas
 
 **Future as a seeded five-persona demo; not clickable on `main` today.** Hausverwaltung is an
-`AccountShape`, not a role or separate portal. The M7 branch prepares a restricted tax-adviser
-workspace, but it has no demo persona seed and remains RED/unmerged.
+`AccountShape`, not a role or separate portal. M7 ships a restricted tax-adviser workspace, but it
+has no demo persona seed and remains production-blocked.
 Roles live on `Membership`; the supported membership roles are `OWNER`, `EMPLOYEE` and
 `TAX_ADVISOR`. A renter is linked domain data, not a membership role. Investor access is unlocked by
 an entitlement, not an identity role. Detailed row shapes remain in `docs/02`.

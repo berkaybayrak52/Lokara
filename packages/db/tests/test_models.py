@@ -71,6 +71,17 @@ EXPECTED_TABLES = {
     "tax_export_readiness_attempt",
     "tax_export_archive",
     "tax_export_artifact",
+    # M9 guards, delivery evidence and checklists (docs/12; migration 0025).
+    "guard_evaluation",
+    "guard_reminder",
+    "guard_resolution_event",
+    "delivery_schedule_version",
+    "renter_delivery_artifact",
+    "email_attempt",
+    "email_delivery_status_event",
+    "recipient_suppression_event",
+    "checklist_instance",
+    "checklist_item_event",
 }
 
 

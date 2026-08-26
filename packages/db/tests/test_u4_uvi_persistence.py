@@ -260,10 +260,10 @@ def upgraded_owner() -> Iterator[Engine]:
 
 
 def test_u4_live_database_reached_current_head_after_0022(upgraded_owner: Engine) -> None:
-    """U4 runs on a schema at least as new as 0022; the repository head is 0024."""
+    """U4 runs on a schema at least as new as 0022; the repository head is 0025."""
     with upgraded_owner.connect() as connection:
         revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-    assert revision == "0024"
+    assert revision == "0025"
     assert int(revision) >= 22
 
 

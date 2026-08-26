@@ -34,12 +34,10 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
 
 ### Prepared but unmerged
 
-- `slice/m7-afa-tax-export` adds normalized pure `packages/afa-engine` and
-  `packages/export-engine`, versioned AfA/export rules, migration `0024`, seven immutable
-  account-scoped M7 records, the restricted tax API/workspace and a German Anlage-V projection.
-  M7-A and the M7-B engine/database layers are focused-green; the M7-B server-generated artifact
-  adapter is paused with ten focused API failures. `.lokara-red` is present, the latest development
-  schema parity is not reconciled, and no M7 code is committed, merged, pushed or production-ready.
+- `slice/m9-guards-delivery` adds all W1–W8 projections, migration `0025`, account-scoped jobs/API,
+  immutable delivery/checklist evidence, deterministic email and `/waechter`. It is uncommitted and
+  unmerged; automation defaults off and source/legal, provider, UVI-artifact and checklist-catalogue
+  blockers prevent production use.
 
 ### Shipped
 
@@ -47,14 +45,17 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   meter-calibration and W4 UVI-cadence rules. Exactly `12-F01`–`12-F06` and `12-F11`–`12-F13`
   execute through production code. No API, persistence, UI, scheduler or PDF consumer exists yet.
 
+- M7-0 through M7-E add the AfA/export engines, migration `0024`, restricted tax API/workspace and
+  Anlage-V artifacts on local `main`. M7-F reviews are parked and runtime authority stays blocked.
+
 - U1 adds the pure `packages/uvi-engine`; U1b adds its explicit provenance channel and U5 carries
   the resolved evidence into the immutable run/archive, closing the former provenance gap.
   U2 supplies versioned Heizspiegel inputs. U3 supplies annual and monthly DWD normalization
   adapters. U4/U4b persist monthly readings and their raw links, station/month weather evidence,
   effective-dated building configuration, building-month evidence and immutable run/delivery rows.
   U5 composes those boundaries into owner-authorized generation, an immutable archive and a
-  separate German renter document downloadable by the owner. It does not schedule or email
-  delivery (M9) or publish to the renter portal (M10).
+  separate German renter document downloadable by the owner. Prepared M9 scheduling refuses UVI
+  delivery until immutable PDF bytes exist; renter portal publication remains M10.
 
 - The bounded least-privilege pre-context identity read is shipped on `main` through migration `0014`.
 - Page 08 bank matching is implemented. `packages/matching-engine` runs all thirteen
@@ -90,7 +91,7 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   technically implemented through U5 as described above. Production clearance remains blocked by
   the unchosen PLZ geodataset, three missing UVI register rows, the exact monthly § 6a content list,
   unresolved legal/convention checks and the other `verify-before-production` items recorded
-  there. M9 delivery and M10 renter publication remain future work.
+  there. M9 delivery is prepared but default-off/blocked; M10 renter publication remains future.
   `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
 
 ## Runtime topology

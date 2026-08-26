@@ -388,18 +388,21 @@ def live() -> Iterator[tuple[TestClient, Graph, Engine]]:
                     person_id=graph.owner_id,
                     account_id=graph.account_id,
                     role=Role.OWNER,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 ),
                 Membership(
                     id=new_id(),
                     person_id=graph.employee_id,
                     account_id=graph.account_id,
                     role=Role.EMPLOYEE,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 ),
                 Membership(
                     id=new_id(),
                     person_id=graph.foreign_owner_id,
                     account_id=graph.foreign_account_id,
                     role=Role.OWNER,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 ),
                 BankAccount(
                     id=graph.bank_account_id,

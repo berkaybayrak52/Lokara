@@ -545,6 +545,7 @@ class Tenancy(Base):
     __table_args__ = (
         _scoped_fk("tenancy", "unit_id", "unit"),
         _scoped_pair("tenancy"),
+        UniqueConstraint("id", "account_id", "unit_id", name="uq_tenancy_delivery_context"),
         Index("ix_tenancy_account", "account_id"),
         Index("ix_tenancy_unit", "unit_id"),
     )
@@ -742,6 +743,12 @@ class TenancyParty(Base):
         _scoped_fk("tenancy_party", "tenancy_id", "tenancy"),
         _scoped_fk("tenancy_party", "renter_id", "renter"),
         UniqueConstraint("tenancy_id", "renter_id"),
+        UniqueConstraint(
+            "tenancy_id",
+            "renter_id",
+            "account_id",
+            name="uq_tenancy_party_delivery_context",
+        ),
         Index("ix_tenancy_party_account", "account_id"),
     )
 
@@ -1050,6 +1057,12 @@ class StatementArchive(Base):
         _scoped_fk("statement_document_archive", "statement_id", "statement"),
         _scoped_fk("statement_document_archive", "tenancy_id", "tenancy"),
         _scoped_pair("statement_document_archive"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "tenancy_id",
+            name="uq_statement_archive_delivery_context",
+        ),
         UniqueConstraint(
             "statement_id", "audience", "tenancy_id", name="uq_statement_archive_audience"
         ),
@@ -1943,6 +1956,13 @@ class UviRun(Base):
         _scoped_fk("uvi_run", "unit_id", "unit"),
         _scoped_fk("uvi_run", "station_assignment_id", "uvi_station_assignment"),
         _scoped_pair("uvi_run"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "tenancy_id",
+            "unit_id",
+            name="uq_uvi_run_delivery_context",
+        ),
         CheckConstraint("EXTRACT(DAY FROM month) = 1", name="ck_uvi_run_month_start"),
         CheckConstraint("station_distance_km >= 0", name="ck_uvi_run_station_distance_km"),
         CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", name="ck_uvi_run_sha256"),
@@ -2874,6 +2894,581 @@ class TaxExportArtifact(Base):
     )
 
 
+# ── M9: immutable guard, reminder, delivery and checklist evidence. ──
+
+
+class GuardEvaluation(Base):
+    """One immutable evaluation occurrence with every resolved input and rule."""
+
+    __tablename__ = "guard_evaluation"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    guard_code: Mapped[str]
+    subject_type: Mapped[str]
+    subject_id: Mapped[str]
+    building_id: Mapped[str]
+    unit_id: Mapped[str | None]
+    tenancy_id: Mapped[str | None]
+    renter_id: Mapped[str | None]
+    occurrence_key: Mapped[str]
+    input_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    result_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    rule_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("guard_evaluation", "building_id", "building"),
+        ForeignKeyConstraint(
+            ["unit_id", "account_id", "building_id"],
+            ["unit.id", "unit.account_id", "unit.building_id"],
+            name="guard_evaluation_unit_context_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_fk("guard_evaluation", "tenancy_id", "tenancy"),
+        _scoped_fk("guard_evaluation", "renter_id", "renter"),
+        ForeignKeyConstraint(
+            ["tenancy_id", "account_id", "unit_id"],
+            ["tenancy.id", "tenancy.account_id", "tenancy.unit_id"],
+            name="guard_evaluation_tenancy_context_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["tenancy_id", "renter_id", "account_id"],
+            ["tenancy_party.tenancy_id", "tenancy_party.renter_id", "tenancy_party.account_id"],
+            name="guard_evaluation_tenancy_party_context_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("guard_evaluation"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "occurrence_key",
+            name="uq_guard_evaluation_reminder_context",
+        ),
+        UniqueConstraint(
+            "account_id", "guard_code", "occurrence_key", name="uq_guard_evaluation_occurrence"
+        ),
+        CheckConstraint(
+            "btrim(guard_code, E' \\t\\n\\r') <> '' AND "
+            "btrim(subject_type, E' \\t\\n\\r') <> '' AND "
+            "btrim(subject_id, E' \\t\\n\\r') <> '' AND "
+            "btrim(occurrence_key, E' \\t\\n\\r') <> ''",
+            name="ck_guard_evaluation_identity_nonblank",
+        ),
+        CheckConstraint(
+            "((unit_id IS NULL AND tenancy_id IS NULL AND renter_id IS NULL) OR "
+            "(unit_id IS NOT NULL AND tenancy_id IS NOT NULL AND renter_id IS NOT NULL))",
+            name="ck_guard_evaluation_renter_context_complete",
+        ),
+        Index("ix_guard_evaluation_account", "account_id"),
+        Index("ix_guard_evaluation_building", "account_id", "building_id", "evaluated_at"),
+    )
+
+
+class GuardReminder(Base):
+    """An idempotent immutable reminder occurrence."""
+
+    __tablename__ = "guard_reminder"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    guard_evaluation_id: Mapped[str]
+    occurrence_key: Mapped[str]
+    channel: Mapped[str]
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    idempotency_key: Mapped[str]
+    payload_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("guard_reminder", "guard_evaluation_id", "guard_evaluation"),
+        ForeignKeyConstraint(
+            ["guard_evaluation_id", "account_id", "occurrence_key"],
+            [
+                "guard_evaluation.id",
+                "guard_evaluation.account_id",
+                "guard_evaluation.occurrence_key",
+            ],
+            name="guard_reminder_evaluation_occurrence_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("guard_reminder"),
+        UniqueConstraint("account_id", "idempotency_key", name="uq_guard_reminder_idempotency"),
+        CheckConstraint("channel IN ('EMAIL', 'IN_APP', 'PUSH')", name="ck_guard_reminder_channel"),
+        CheckConstraint(
+            "btrim(occurrence_key, E' \\t\\n\\r') <> '' AND "
+            "btrim(idempotency_key, E' \\t\\n\\r') <> ''",
+            name="ck_guard_reminder_identity_nonblank",
+        ),
+        Index("ix_guard_reminder_account", "account_id"),
+        Index("ix_guard_reminder_due", "account_id", "due_at"),
+    )
+
+
+class GuardResolutionEvent(Base):
+    """Append-only resolution evidence; provider delivery alone is not resolution."""
+
+    __tablename__ = "guard_resolution_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    guard_evaluation_id: Mapped[str]
+    renter_delivery_artifact_id: Mapped[str | None]
+    confirmed_by_membership_id: Mapped[str | None]
+    event_type: Mapped[str]
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    evidence_reference: Mapped[str]
+    idempotency_key: Mapped[str]
+    event_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("guard_resolution_event", "guard_evaluation_id", "guard_evaluation"),
+        _scoped_fk(
+            "guard_resolution_event",
+            "renter_delivery_artifact_id",
+            "renter_delivery_artifact",
+        ),
+        _scoped_fk(
+            "guard_resolution_event",
+            "confirmed_by_membership_id",
+            "membership",
+        ),
+        _scoped_pair("guard_resolution_event"),
+        UniqueConstraint(
+            "account_id",
+            "idempotency_key",
+            name="uq_guard_resolution_event_idempotency",
+        ),
+        CheckConstraint(
+            "btrim(event_type, E' \\t\\n\\r') <> '' AND "
+            "btrim(evidence_reference, E' \\t\\n\\r') <> '' AND "
+            "btrim(idempotency_key, E' \\t\\n\\r') <> ''",
+            name="ck_guard_resolution_event_evidence_nonblank",
+        ),
+        CheckConstraint(
+            "event_type NOT IN ('statement_sent', 'statement_sent_correction', "
+            "'statement_delivery_evidence_late', "
+            "'statement_delivery_evidence_late_correction') OR "
+            "(renter_delivery_artifact_id IS NOT NULL AND "
+            "confirmed_by_membership_id IS NOT NULL)",
+            name="ck_guard_resolution_event_w1_confirmation_bindings",
+        ),
+        Index("ix_guard_resolution_event_account", "account_id"),
+        Index(
+            "ix_guard_resolution_event_evaluation",
+            "account_id",
+            "guard_evaluation_id",
+            "occurred_at",
+        ),
+    )
+
+
+class DeliveryScheduleVersion(Base):
+    """Versioned opt-in schedule. The database default is deliberately disabled."""
+
+    __tablename__ = "delivery_schedule_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    delivery_kind: Mapped[str]
+    version: Mapped[int]
+    enabled: Mapped[bool] = mapped_column(server_default=text("false"))
+    supersedes_schedule_version_id: Mapped[str | None]
+    valid_from: Mapped[date]
+    schedule_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("delivery_schedule_version", "building_id", "building"),
+        _scoped_fk(
+            "delivery_schedule_version",
+            "supersedes_schedule_version_id",
+            "delivery_schedule_version",
+        ),
+        _scoped_pair("delivery_schedule_version"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "building_id",
+            "delivery_kind",
+            name="uq_delivery_schedule_correction_context",
+        ),
+        ForeignKeyConstraint(
+            [
+                "supersedes_schedule_version_id",
+                "account_id",
+                "building_id",
+                "delivery_kind",
+            ],
+            [
+                "delivery_schedule_version.id",
+                "delivery_schedule_version.account_id",
+                "delivery_schedule_version.building_id",
+                "delivery_schedule_version.delivery_kind",
+            ],
+            name="delivery_schedule_supersedes_context_fkey",
+            match="SIMPLE",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "building_id",
+            "delivery_kind",
+            "version",
+            name="uq_delivery_schedule_version",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "supersedes_schedule_version_id",
+            name="uq_delivery_schedule_direct_successor",
+        ),
+        CheckConstraint("version > 0", name="ck_delivery_schedule_version_positive"),
+        CheckConstraint(
+            "delivery_kind IN ('ANNUAL_STATEMENT', 'UVI')",
+            name="ck_delivery_schedule_kind",
+        ),
+        CheckConstraint(
+            "id <> supersedes_schedule_version_id", name="ck_delivery_schedule_not_self"
+        ),
+        Index("ix_delivery_schedule_version_account", "account_id"),
+        Index("ix_delivery_schedule_building", "account_id", "building_id", "valid_from"),
+    )
+
+
+class RenterDeliveryArtifact(Base):
+    """Frozen bytes for one renter and one scheduled occurrence."""
+
+    __tablename__ = "renter_delivery_artifact"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    unit_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    renter_id: Mapped[str]
+    artifact_kind: Mapped[str]
+    occurrence_key: Mapped[str]
+    statement_archive_id: Mapped[str | None]
+    uvi_run_id: Mapped[str | None]
+    content_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    sha256: Mapped[str]
+    mime_type: Mapped[str]
+    filename: Mapped[str]
+    production_blockers_snapshot: Mapped[list[object]] = mapped_column(JSONB)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    @property
+    def production_blocked(self) -> bool:
+        """Derive send eligibility from the immutable blocker snapshot."""
+
+        return bool(self.production_blockers_snapshot)
+
+    __table_args__ = (
+        _scoped_fk("renter_delivery_artifact", "building_id", "building"),
+        ForeignKeyConstraint(
+            ["unit_id", "account_id", "building_id"],
+            ["unit.id", "unit.account_id", "unit.building_id"],
+            name="renter_delivery_artifact_unit_context_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_fk("renter_delivery_artifact", "tenancy_id", "tenancy"),
+        _scoped_fk("renter_delivery_artifact", "renter_id", "renter"),
+        ForeignKeyConstraint(
+            ["tenancy_id", "account_id", "unit_id"],
+            ["tenancy.id", "tenancy.account_id", "tenancy.unit_id"],
+            name="renter_delivery_artifact_tenancy_context_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["tenancy_id", "renter_id", "account_id"],
+            ["tenancy_party.tenancy_id", "tenancy_party.renter_id", "tenancy_party.account_id"],
+            name="renter_delivery_artifact_tenancy_party_context_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_fk(
+            "renter_delivery_artifact",
+            "statement_archive_id",
+            "statement_document_archive",
+        ),
+        _scoped_fk("renter_delivery_artifact", "uvi_run_id", "uvi_run"),
+        ForeignKeyConstraint(
+            ["statement_archive_id", "account_id", "tenancy_id"],
+            [
+                "statement_document_archive.id",
+                "statement_document_archive.account_id",
+                "statement_document_archive.tenancy_id",
+            ],
+            name="renter_delivery_artifact_statement_context_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["uvi_run_id", "account_id", "tenancy_id", "unit_id"],
+            ["uvi_run.id", "uvi_run.account_id", "uvi_run.tenancy_id", "uvi_run.unit_id"],
+            name="renter_delivery_artifact_uvi_context_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("renter_delivery_artifact"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "renter_id",
+            name="uq_renter_delivery_artifact_email_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "renter_id",
+            "artifact_kind",
+            "occurrence_key",
+            name="uq_renter_delivery_artifact_occurrence",
+        ),
+        CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", name="ck_renter_delivery_artifact_sha256"),
+        CheckConstraint(
+            "octet_length(content_bytes) > 0", name="ck_renter_delivery_artifact_nonempty"
+        ),
+        CheckConstraint(
+            "((artifact_kind = 'ANNUAL_STATEMENT' AND statement_archive_id IS NOT NULL "
+            "AND uvi_run_id IS NULL) OR "
+            "(artifact_kind = 'UVI' AND statement_archive_id IS NULL "
+            "AND uvi_run_id IS NOT NULL))",
+            name="ck_renter_delivery_artifact_source_kind",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(production_blockers_snapshot) = 'array'",
+            name="ck_renter_delivery_artifact_blockers_array",
+        ),
+        CheckConstraint(
+            "btrim(artifact_kind, E' \\t\\n\\r') <> '' AND "
+            "btrim(occurrence_key, E' \\t\\n\\r') <> '' AND "
+            "btrim(mime_type, E' \\t\\n\\r') <> '' AND "
+            "btrim(filename, E' \\t\\n\\r') <> ''",
+            name="ck_renter_delivery_artifact_metadata_nonblank",
+        ),
+        Index("ix_renter_delivery_artifact_account", "account_id"),
+        Index("ix_renter_delivery_artifact_renter", "account_id", "renter_id"),
+    )
+
+
+class EmailAttempt(Base):
+    """One provider enqueue attempt, for exactly one renter and frozen artifact."""
+
+    __tablename__ = "email_attempt"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    renter_delivery_artifact_id: Mapped[str]
+    renter_id: Mapped[str]
+    normalized_recipient: Mapped[str]
+    sender_address: Mapped[str]
+    from_name: Mapped[str]
+    idempotency_key: Mapped[str]
+    provider_message_id: Mapped[str | None]
+    message_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("email_attempt", "renter_delivery_artifact_id", "renter_delivery_artifact"),
+        _scoped_fk("email_attempt", "renter_id", "renter"),
+        ForeignKeyConstraint(
+            ["renter_delivery_artifact_id", "account_id", "renter_id"],
+            [
+                "renter_delivery_artifact.id",
+                "renter_delivery_artifact.account_id",
+                "renter_delivery_artifact.renter_id",
+            ],
+            name="email_attempt_artifact_renter_context_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("email_attempt"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "normalized_recipient",
+            name="uq_email_attempt_suppression_context",
+        ),
+        UniqueConstraint("account_id", "idempotency_key", name="uq_email_attempt_idempotency"),
+        CheckConstraint(
+            "normalized_recipient = lower(btrim(normalized_recipient)) AND "
+            "normalized_recipient LIKE '%@%'",
+            name="ck_email_attempt_normalized_recipient",
+        ),
+        CheckConstraint(
+            "sender_address = lower(btrim(sender_address)) AND sender_address LIKE '%@lokara.de'",
+            name="ck_email_attempt_lokara_sender",
+        ),
+        CheckConstraint(
+            "btrim(from_name, E' \\t\\n\\r') <> '' AND btrim(idempotency_key, E' \\t\\n\\r') <> ''",
+            name="ck_email_attempt_identity_nonblank",
+        ),
+        Index("ix_email_attempt_account", "account_id"),
+        Index("ix_email_attempt_recipient", "account_id", "normalized_recipient"),
+    )
+
+
+class EmailDeliveryStatusEvent(Base):
+    """Append-only provider status history; DELIVERED is not legal receipt."""
+
+    __tablename__ = "email_delivery_status_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    email_attempt_id: Mapped[str]
+    status: Mapped[str]
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    provider_reference: Mapped[str | None]
+    event_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("email_delivery_status_event", "email_attempt_id", "email_attempt"),
+        _scoped_pair("email_delivery_status_event"),
+        CheckConstraint(
+            "status IN ('QUEUED', 'DELIVERED', 'BOUNCED', 'COMPLAINED', 'FAILED')",
+            name="ck_email_delivery_status_event_status",
+        ),
+        CheckConstraint(
+            "NOT (event_snapshot ? 'email_attempt_id') OR "
+            "COALESCE(event_snapshot ->> 'email_attempt_id' = email_attempt_id, FALSE)",
+            name="ck_email_delivery_status_event_attempt_snapshot",
+        ),
+        Index("ix_email_delivery_status_event_account", "account_id"),
+        Index(
+            "ix_email_delivery_status_event_attempt",
+            "account_id",
+            "email_attempt_id",
+            "occurred_at",
+        ),
+    )
+
+
+class RecipientSuppressionEvent(Base):
+    """A bounce or complaint permanently suppressing a normalized address."""
+
+    __tablename__ = "recipient_suppression_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    normalized_recipient: Mapped[str]
+    reason: Mapped[str]
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    email_attempt_id: Mapped[str]
+    provider_reference: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("recipient_suppression_event", "email_attempt_id", "email_attempt"),
+        ForeignKeyConstraint(
+            ["email_attempt_id", "account_id", "normalized_recipient"],
+            ["email_attempt.id", "email_attempt.account_id", "email_attempt.normalized_recipient"],
+            name="recipient_suppression_attempt_recipient_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("recipient_suppression_event"),
+        UniqueConstraint(
+            "account_id",
+            "normalized_recipient",
+            "reason",
+            "email_attempt_id",
+            name="uq_recipient_suppression_event",
+        ),
+        CheckConstraint(
+            "reason IN ('BOUNCED', 'COMPLAINED')",
+            name="ck_recipient_suppression_event_reason",
+        ),
+        CheckConstraint(
+            "normalized_recipient = lower(btrim(normalized_recipient)) AND "
+            "normalized_recipient LIKE '%@%'",
+            name="ck_recipient_suppression_normalized_recipient",
+        ),
+        Index("ix_recipient_suppression_event_account", "account_id"),
+        Index(
+            "ix_recipient_suppression_recipient",
+            "account_id",
+            "normalized_recipient",
+            "occurred_at",
+        ),
+    )
+
+
+class ChecklistInstance(Base):
+    """One data-driven checklist frozen from a versioned template."""
+
+    __tablename__ = "checklist_instance"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    template_id: Mapped[str]
+    template_version: Mapped[int]
+    template_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    occurrence_key: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("checklist_instance", "building_id", "building"),
+        _scoped_pair("checklist_instance"),
+        UniqueConstraint(
+            "account_id",
+            "building_id",
+            "template_id",
+            "template_version",
+            "occurrence_key",
+            name="uq_checklist_instance_occurrence",
+        ),
+        CheckConstraint("template_version > 0", name="ck_checklist_template_version_positive"),
+        CheckConstraint(
+            "btrim(template_id, E' \\t\\n\\r') <> '' AND "
+            "btrim(occurrence_key, E' \\t\\n\\r') <> ''",
+            name="ck_checklist_instance_identity_nonblank",
+        ),
+        Index("ix_checklist_instance_account", "account_id"),
+        Index("ix_checklist_instance_building", "account_id", "building_id"),
+    )
+
+
+class ChecklistItemEvent(Base):
+    """Append-only completion history for an item in a frozen checklist."""
+
+    __tablename__ = "checklist_item_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    checklist_instance_id: Mapped[str]
+    item_id: Mapped[str]
+    event_type: Mapped[str]
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    actor_membership_id: Mapped[str]
+    idempotency_key: Mapped[str]
+    event_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("checklist_item_event", "checklist_instance_id", "checklist_instance"),
+        _scoped_fk("checklist_item_event", "actor_membership_id", "membership"),
+        _scoped_pair("checklist_item_event"),
+        UniqueConstraint(
+            "account_id", "idempotency_key", name="uq_checklist_item_event_idempotency"
+        ),
+        CheckConstraint(
+            "btrim(item_id, E' \\t\\n\\r') <> '' AND "
+            "btrim(event_type, E' \\t\\n\\r') <> '' AND "
+            "btrim(idempotency_key, E' \\t\\n\\r') <> ''",
+            name="ck_checklist_item_event_identity_nonblank",
+        ),
+        Index("ix_checklist_item_event_account", "account_id"),
+        Index(
+            "ix_checklist_item_event_instance",
+            "account_id",
+            "checklist_instance_id",
+            "occurred_at",
+        ),
+    )
+
+
 # Tables scoped by their own account_id column — the Alembic migration enables
 # FORCEd RLS on each of these plus `account`, which is scoped by its own id.
 # `building_assignment` joined this tuple with migration 0004: its scope used to be
@@ -2936,4 +3531,14 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "tax_export_readiness_attempt",
     "tax_export_archive",
     "tax_export_artifact",
+    "guard_evaluation",
+    "guard_reminder",
+    "guard_resolution_event",
+    "delivery_schedule_version",
+    "renter_delivery_artifact",
+    "email_attempt",
+    "email_delivery_status_event",
+    "recipient_suppression_event",
+    "checklist_instance",
+    "checklist_item_event",
 )

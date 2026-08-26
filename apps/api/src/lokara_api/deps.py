@@ -89,6 +89,7 @@ def account_session_for_path(
             select(Membership).where(
                 Membership.person_id == auth.person_id,
                 Membership.account_id == account_id,
+                Membership.accepted_at.is_not(None),
                 Membership.revoked_at.is_(None),
             )
         )
@@ -114,6 +115,7 @@ def account_session_for_path(
         session.info["portal_scope"] = PortalScope(
             role=membership.role,
             building_ids=assignment_ids if membership.role is Role.EMPLOYEE else frozenset(),
+            membership_id=membership.id,
         )
         yield session
 

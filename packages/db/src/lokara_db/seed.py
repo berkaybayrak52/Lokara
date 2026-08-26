@@ -209,6 +209,7 @@ def seed_demo(session: Session) -> None:
             person_id=DEMO_PERSON_ID,
             account_id=DEMO_ACCOUNT_ID,
             role=Role.OWNER,
+            accepted_at=_RECORDED_AT,
         )
     )
     session.merge(

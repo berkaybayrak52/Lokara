@@ -19,6 +19,7 @@ from .deps import PathAccountSession
 class PortalScope:
     role: Role
     building_ids: frozenset[str]
+    membership_id: str
 
 
 def _scope(session: PathAccountSession) -> PortalScope:

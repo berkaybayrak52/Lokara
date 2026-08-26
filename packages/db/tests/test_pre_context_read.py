@@ -94,24 +94,28 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                     person_id=ids.switcher,
                     account_id=ids.account_one,
                     role=Role.OWNER,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 ),
                 Membership(
                     id=ids.memberships[1],
                     person_id=ids.switcher,
                     account_id=ids.account_two,
                     role=Role.EMPLOYEE,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 ),
                 Membership(
                     id=ids.memberships[2],
                     person_id=ids.colleague,
                     account_id=ids.other_account,
                     role=Role.TAX_ADVISOR,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 ),
                 Membership(
                     id=ids.memberships[3],
                     person_id=ids.revoked,
                     account_id=ids.other_account,
                     role=Role.EMPLOYEE,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                     revoked_at=datetime(2026, 1, 31, 12, 0, tzinfo=UTC),
                 ),
             ]

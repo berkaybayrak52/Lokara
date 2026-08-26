@@ -9,6 +9,7 @@ init-app-role.sql + alembic upgrade head + the demo seed itself.
 import os
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import jwt
@@ -58,6 +59,7 @@ def client() -> Iterator[TestClient]:
                 person_id=ISO_PERSON_ID,
                 account_id=ISO_ACCOUNT_ID,
                 role=Role.OWNER,
+                accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
             )
         )
         # "Zero domain data" has to be true on every run, not just the first:

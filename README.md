@@ -138,10 +138,15 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
    technically complete, development-synchronized and locally merged. C3b's scheduler port and
    three job entrypoints and the C3c *Zahlungen* screen are technically complete and
    locally merged, which completes M6. G1's pure W1/W2/W4 guard foundation is technically complete
-   and locally merged (`6c257f8`); U1–U5 are also locally merged. M7 is prepared but unmerged on
-   `slice/m7-afa-tax-export` and paused in a declared RED window; `LEAD-HANDOFF.md` owns the exact
-   ten-failure resume boundary. `main` is ahead of `origin/main`, which still points to `f372f67`;
-   nothing is pushed.
+   and locally merged (`6c257f8`); U1–U5 and M7-0 through M7-E are also locally merged. M7-F and M8
+   are parked. M9 is prepared but uncommitted/unmerged on `slice/m9-guards-delivery` with W1–W8,
+   migration `0025`, account-scoped jobs/API and `/waechter`. Its demo gate is green and the fresh
+   boundary review is clean after the renter-delivery and evidence-binding repairs. The final
+   statement review remains red because lower-case internal blocker keys can still leak and the
+   current fallback can hide or misdescribe useful German detail; M9-U in `PLAN.md` must close
+   before any commit or merge. `main` is at `3d69013` and matches
+   `origin/main`: everything through M7-E is pushed. Only M9 is unpushed, because it is
+   uncommitted on its own branch.
    Work follows PLAN's **execution order** — ranked by *what closes the legally-required surface
    first* — rather than the milestone numbering. **It carries no deadline on purpose:** dates in
    `lokara-arch.md` are communication events (when something gets shown), never planning inputs,
@@ -163,15 +168,13 @@ session. It does not coordinate work or override Git, `PLAN.md` or the living sp
    - `09-betrkv-catalogue.md` — Page 02's versioned operating-cost catalogue, allocability gate,
      allocation-key precedence, non-allocable routing, 14 edge cases and exact 32-fixture trace.
    - `10-afa.md` — Page 03's purchase-cost, purchase-price-allocation, AfA, self-use, 15%-guard and
-     annual financing contract, with all 34 source-backed fixtures transcribed; the normalized M7-A
-     engine/rules path is prepared but unmerged and retains its production blockers.
+     annual financing contract, with all 34 source-backed fixtures transcribed; M7 is locally merged
+     and retains its production blockers.
    - `11-tax-export.md` — Page 04's approved payment-ledger, Anlage-V overview, DATEV EXTF,
      readiness and immutable export-archive contract, with all 16 source-backed fixtures transcribed;
-     M7-B engine/database work is prepared but unmerged, its app artifact adapter remains RED, and
-     all line, account and format placeholders remain blocked.
+     M7 is locally merged, while all line, account and format placeholders remain blocked.
    - `12-guards-deadlines.md` — Page 05's shared guard contract for deadlines, arrears, UVI,
-     rent adjustments and vacancy, with all 24 source-backed fixtures transcribed; G1 executes the
-     nine selected W1/W2/W4 cases on `main`.
+     rent adjustments and vacancy, with all 24 source-backed fixtures executed by prepared M9.
    - `13-contract-clauses.md` — Page 06's clause-selection, compatibility, warning and workflow-
      routing contract, with all 19 source-backed fixtures transcribed; complete clause and action-
      letter bodies remain missing and block implementation.

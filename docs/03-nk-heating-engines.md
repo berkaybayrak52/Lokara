@@ -382,7 +382,8 @@ annual DWD factors, validates the approved range and returns either adjusted val
 raw-labelled fallback or a no-prior notice. G1 provides only the pure W4 cadence evaluator.
 U1–U5 now implement monthly DWD normalization, monthly reading/evidence persistence, UVI
 calculation and a separate German renter document that an authorized owner can generate and
-download. Scheduling and email delivery remain M9 work; renter portal publication remains M10.
+download. Prepared M9 adds default-off scheduling/email, but UVI dispatch remains blocked because no
+immutable PDF bytes exist and all UVI authority blockers still apply. Portal publication remains M10.
 
 Compact arithmetic, with every quotient kept as exact `Decimal`:
 
@@ -531,8 +532,8 @@ documents reference their numbers.
     15 percent right; one CSV entry says the 3 percent rights cumulate. Show each separately.
 15. **K12/DWD dependency.** Approved `docs/16` resolves the annual importer boundary to
     `0.40–1.80` and the latest-state note to the May-ending file. H8 now consumes normalized annual
-    factors. U3 implements the distinct monthly DWD normalization adapters, while scheduling
-    remains M9 work and the § 6a notice identity remains pre-legal.
+    factors. U3 implements the distinct monthly DWD normalization adapters; prepared M9 scheduling
+    remains blocked for UVI, and the § 6a notice identity remains pre-legal.
 16. **K13/D2 dependency.** Approved `docs/16` specifies the corrected heat-only
     comparison, guards and source. Annual statement comparison and UVI are related consumers, not
     one calculation; annual DWD factors are not monthly degree-day inputs.
@@ -555,15 +556,15 @@ documents reference their numbers.
 | H5 persistence and integration | **Shipped**: exact device factor, segment metadata, adapter and `HeatingInput` handoff | K11 remains `verify-before-production` |
 | H7 net/control/risk behavior | **Shipped in the pure orchestrator**: net/gross branches, control sum, F29 block and F30 risks | Confirmed OCR/API input remains Slice B |
 | Shared readiness/provenance/risk channel | **Shipped** for F02, F12, F17, F20, F21, F23–F26c, F30/F31 | Final wording/cumulation choices remain provisional |
-| H8 annual comparison | **Shipped for normalized annual factors and raw/no-prior fallbacks** | U1–U5 implement the distinct monthly UVI adapters, evidence, calculation/archive and owner-downloadable renter document; scheduling/email remain M9 and portal publication M10 |
+| H8 annual comparison | **Shipped for normalized annual factors and raw/no-prior fallbacks** | U1–U5 implement the monthly UVI path; prepared M9 scheduling/email remains default-off and blocked for missing immutable UVI PDF bytes; portal publication is M10 |
 
 Slice A supplies one H0–H7 pipeline, the shared readiness channel, normalized-factor H8, all 34
 fixture obligations executable end to end and statement projection. This is technical closure, not
 production approval: every `verify-before-production` register flag, both open Page 01b choices,
 confirmed MDL ingestion and the UVI production-clearance blockers in `docs/16` remain explicit.
 U1–U5 technically implement the monthly DWD/UVI calculation, persistence, archive and separate
-owner-downloadable renter document; the prepared W4 cadence evaluator and U5 generation do not
-provide M9 scheduling/email delivery or M10 renter publication.
+owner-downloadable renter document. Prepared M9 provides the scheduling/email boundary but refuses
+UVI dispatch until immutable PDF bytes and production authority exist; M10 owns renter publication.
 
 ## 9. Wiring R1/R5/K9 and Ho/Hu into the engine — current split-site map
 

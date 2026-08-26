@@ -60,6 +60,12 @@ const NAV_ITEMS: NavItem[] = [
     visibleFor: (role) => role === 'OWNER',
   },
   {
+    href: (id) => `/a/${id}/waechter`,
+    label: 'Wächter',
+    activePrefixes: ['/waechter'],
+    visibleFor: (role) => role === 'OWNER' || role === 'EMPLOYEE',
+  },
+  {
     href: (id) => `/a/${id}/steuern`,
     label: 'Steuern',
     activePrefixes: ['/steuern'],

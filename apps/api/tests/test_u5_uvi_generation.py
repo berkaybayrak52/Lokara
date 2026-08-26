@@ -662,6 +662,7 @@ def _live_u5_graph(
                 session.info["portal_scope"] = PortalScope(
                     role=Role.OWNER,
                     building_ids=frozenset(),
+                    membership_id=ids["membership"],
                 )
                 yield session
 

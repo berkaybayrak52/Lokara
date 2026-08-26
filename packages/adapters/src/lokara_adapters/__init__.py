@@ -53,6 +53,7 @@ from .dwd import (
 )
 from .email import (
     DeliveryStatus,
+    EmailAttachment,
     EmailDeliveryReceipt,
     EmailGateway,
     OutgoingEmail,
@@ -108,6 +109,7 @@ __all__ = [
     "DeliveredExport",
     "DeliveryStatus",
     "DwdAnnualImportError",
+    "EmailAttachment",
     "EmailDeliveryReceipt",
     "EmailGateway",
     "ExtractedInvoiceFields",

@@ -194,15 +194,15 @@ The rendered-output compatibility checks for these claims live in
 - M6-B ships owner-only, audience-isolated technical archives with actual advances, Saldo and
   finalization evidence. They are not renter delivery, portal publication or legal-production output.
 - U5 generates and immutably archives a separate German UVI renter document that an authorized
-  owner can download. It does not publish to a renter portal or schedule/send email delivery;
-  those boundaries remain M10 and M9 respectively.
+  owner can download. Prepared M9 adds default-off scheduling/email but refuses UVI sends until
+  immutable PDF bytes exist; portal publication remains M10.
 - [`docs/08-statement-document.md`](08-statement-document.md) owns the four formal minimums and
   records exactly what the current PDF does and does not render.
 - A period longer than 12 months is a specified hard block before calculation or rendering; a
   shorter period remains day-exact. After the § 556 deadline, the landlord's late `Nachforderung`
   is suppressed while a renter `Guthaben` remains payable. Approved `docs/12` owns the shared guard
-  contract. G1 provides pure W1/W2/W4 evaluation only; persistence, reminders, delivery and the
-  remaining guard families stay future work.
+  contract. Prepared M9 supplies W1–W8 persistence, reminders and owner-controlled delivery, while
+  provider `DELIVERED` remains distinct from owner-confirmed legal receipt.
 
 ## Accessibility evidence and limits
 
@@ -227,7 +227,8 @@ The following remain open requirements, not completed controls:
 - breach detection, assessment, notification and evidence handling;
 - authenticated secure data export and delivery;
 - the class-specific privacy retention, restriction and deletion schedule;
-- completion, schema parity and fresh review/gate evidence for the prepared `docs/11` M7 path;
+- completion of the parked M7-F fresh review evidence;
+- production authorization, real providers/workers and an approved checklist catalogue for M9;
 - real-provider configuration, hosting, AVV/DPA and sub-processor verification.
 
 The final `docs/07` tax/archive reconciliation is approved. Production compliance remains blocked

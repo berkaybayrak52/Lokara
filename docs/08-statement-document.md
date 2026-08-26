@@ -87,17 +87,17 @@ carrier. M6-C1/M6-C2 ship bank-matching logic, ledger/cash persistence and owner
 M6-C3-0 verifies their database invariants. C3a's service and final `0021` are technically complete,
 development-synchronized and locally merged; C3b's job entrypoints are technically complete and
 locally merged, and so is the C3c landlord *Zahlungen* screen, which changes no statement figure
-and no rendered byte. Merged G1 likewise has no statement/PDF consumer and leaves the normalized
-fingerprint and seeded figures unchanged. Renter
-delivery/portal remains M10. These archives are owner-only technical
+and no rendered byte. Prepared M9 consumes frozen Page-01 rule evidence for default-off,
+owner-controlled renter email delivery and leaves statement rendering unchanged. Renter portal
+publication remains M10. These archives are owner-only technical
 records, not legal-production or renter delivery output.
 
 ### Future dependencies
 
 Detailed BetrKV production classification belongs to `docs/09`; tax and Anlage-V mappings to
 approved `docs/11`; shared deadline orchestration to approved `docs/12`; bank matching to
-`docs/15`; and UVI/DWD rules to approved `docs/16`. G1 provides W1/W2/W4 evaluation only; no
-statement projection, reminder or delivery consumer exists. This file records those boundaries and
+`docs/15`; and UVI/DWD rules to approved `docs/16`. Prepared M9 consumes the frozen statement
+authority snapshot for blocked delivery projection; it does not change the statement. This file records those boundaries and
 does not duplicate or invent their contracts.
 
 ## 2. Page 01 source coverage and output contract
@@ -815,15 +815,15 @@ in `docs/03`. A hard-stop run produces no statement; risk amounts are never auto
 
 - **Remaining M6:** none. C3a is technically complete, development-synchronized and locally
   merged, and C3b's three job entrypoints and C3c's landlord *Zahlungen* screen are technically
-  complete and locally merged. Renter delivery/portal is M10.
+  complete and locally merged. Prepared M9 owns default-off renter email delivery; portal publication is M10.
 - **Live demo PDF:** operator/numerator derivation and actual-advance Saldo remain absent; M6-B's separate archive has them.
 - **Meters:** start/end readings and their consistency path are not carried to the statement.
 - **Heating:** § 9 leap-year fallback divisor and the source-backed convention questions remain in
   `docs/03`; different §§ 7/8 shares need a future input shape.
 - **Page 01b implementation:** derived-mass provenance, § 7 Abs. 4/readiness risks, device evidence
   and annual comparison remain exactly as `docs/03` records.
-- **D2 owners:** `docs/09` classification; `docs/11` tax mapping; `docs/12` guards, whose W1/W2/W4
-  evaluator is prepared without a statement consumer; `docs/15` bank matching rules and remaining
+- **D2 owners:** `docs/09` classification; `docs/11` tax mapping; `docs/12` W1–W8 guards and M9's
+  blocked delivery consumer; `docs/15` bank matching rules and remaining
   workflow; `docs/16` UVI/DWD and the unresolved § 6a notice identity.
 - **Page 01 E16/E21:** tenant disclosure and tax timing remain unguessed and visibly open.
 
@@ -898,6 +898,21 @@ The 26 Page 01 rows are **11 `geprüft`** and **15 `verify-before-production`**.
 | --- | --- |
 | `geprüft` | CO₂-Stufenmodell Wohngebäude · CO₂-Pflichtangaben in der Abrechnung · § 35a-Ausweis für den Mieter · Kürzungsrecht — nicht verbrauchsabhängig abgerechnet · Abrechnungsfrist Betriebskosten · § 6a Abs. 3 — Pflichtinformationen zur Abrechnung · Leerstand bleibt im Gesamtverteiler · CO₂-Kürzungsrecht · Belegeinsicht und Beweislast der Erfassung · Einwendungsfrist des Mieters · Belegeinsicht — elektronische Bereitstellung zulässig (Wohnraum) |
 | `verify-before-production` | Fiktivbelegung bei Leerstand · Gradtagszahltabelle VDI (K3) · Kürzungsrecht — fehlende fernablesbare Ausstattung · Rundungsweg (Seite 01 / docs/03 § 6) · Geräteliste auf der Mieterausfertigung (K10) · Zahlungsfrist bei Nachzahlung · Verteilungsrest (K9) · Grundkostenanteil (K1) · Kürzungsrecht — fehlende oder unvollständige § 6a-Information (UVI + Abrechnungs-Infoblock) · Verbrauchsvergleich — Umfang und Bereinigung · Grundkosten-Verteilung nach m²-Tagen (K2) · § 35a-Block auf der Betriebskostenabrechnung · Wording Leerstandsaufstellung · Kürzungsrecht — CO₂-Anteil nicht ausgewiesen · CO₂-Mieteranteil — Pro-rata-Ableitung (D7 Schritt 6) |
+
+### Versioned statement-authority handoff
+
+The inventory above is also the exact server-owned source contract for a finalized Page-01
+statement. `packages/rules-store` keeps one versioned row per register identity with its source,
+legal basis, `Rechtsnatur`, `Rechtsstand` and unmodified verification status. Resolution is by an
+explicit as-of date. The statement service selects the rows applicable to the actual statement
+path and freezes them as rule evidence; finalization copies that evidence into the immutable
+snapshot; M9 derives renter-delivery blockers from that frozen evidence.
+
+No layer may infer authority from a caller-supplied or otherwise fabricated `normalized_inputs`
+field. In particular, absence of a status-shaped key does not mean production-safe, and a generic
+`production_blocked` boolean does not replace the 15 named `verify-before-production` rows above.
+Every applicable row keeps its exact register flag until that versioned source row is changed from
+approved authority.
 
 K9's rounding direction remains a flagged convention. Approved `docs/03` § 9.2 separately fixes
 the owner-residual destination as a model rule. Neither status erases the other.
