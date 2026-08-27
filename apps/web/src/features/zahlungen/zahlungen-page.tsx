@@ -50,7 +50,7 @@ export function ZahlungenPage({ accountId }: { accountId: string }) {
         description="Bankumsätze und die dazu vorgeschlagenen Forderungen. Eindeutige Treffer werden automatisch gebucht; alles andere legen wir Ihnen zur Prüfung vor. Eine getroffene Entscheidung bleibt bestehen und wird nicht überschrieben."
       />
 
-      <div className="max-w-5xl space-y-8">
+      <div className="space-y-8">
         <section aria-labelledby="zuordnung-titel" className="space-y-4">
           <div>
             <h2 id="zuordnung-titel" className="font-display text-2xl font-bold">

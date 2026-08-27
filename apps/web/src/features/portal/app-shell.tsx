@@ -9,6 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { MeAccount } from '@/lib/contracts';
 
 import { useMe } from './queries';
+import { ReminderSidebar } from './reminder-sidebar';
 
 /**
  * The account context lives in the URL. The menu only reflects relationships
@@ -326,6 +327,7 @@ export function PortalShellContent({
           )}
         </div>
       </div>
+      {account && account.role !== 'TAX_ADVISOR' ? <ReminderSidebar /> : null}
     </div>
   );
 }
