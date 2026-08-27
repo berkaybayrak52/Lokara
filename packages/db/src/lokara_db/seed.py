@@ -20,22 +20,28 @@ from lokara_domain import (
     ReadingReason,
     ReadingSource,
 )
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .models import (
     Account,
+    AdvanceAllocation,
+    AdvancePayment,
     AdvancePaymentPeriod,
+    AdvanceReconciliation,
+    AdvanceReconciliationAllocation,
     AllocationKeyAssignment,
     BankAccount,
     Building,
     ConfirmedCostClassification,
     CostEntry,
+    DeliveryAddress,
     HeatingCostEntry,
     Membership,
     Meter,
     MeterReading,
     OperatingCostAgreement,
+    PaymentInstruction,
     Person,
     Renter,
     Role,
@@ -294,6 +300,127 @@ def seed_demo(session: Session) -> None:
                 valid_from=date(2025, 1, 1),
                 valid_to=date(2026, 1, 1),
                 revises_id=None,
+            )
+        )
+
+    # Complete, append-only evidence for the UI-05A demo statement. These rows
+    # are mock data only; they do not change contractual schedules or engine
+    # calculations. Conditional inserts keep the seed idempotent on databases
+    # where a rehearsal already created newer evidence.
+    delivery_addresses = {
+        "ten_demo_a1": ("Anna Beispiel", "Musterstraße 12", "60311", "Frankfurt am Main"),
+        "ten_demo_b1": ("Bernd Muster", "Parkweg 8", "60316", "Frankfurt am Main"),
+        "ten_demo_c1": ("Clara Vorlage", "Musterstraße 12", "60311", "Frankfurt am Main"),
+    }
+    for tenancy_id, (addressee, street, postal_code, city) in delivery_addresses.items():
+        address_id = f"address_demo_{tenancy_id}"
+        existing_address = session.get(DeliveryAddress, address_id)
+        previous_address_version = session.scalar(
+            select(DeliveryAddress.version)
+            .where(DeliveryAddress.tenancy_id == tenancy_id)
+            .order_by(DeliveryAddress.version.desc())
+            .limit(1)
+        )
+        if existing_address is None:
+            session.add(
+                DeliveryAddress(
+                    id=address_id,
+                    account_id=DEMO_ACCOUNT_ID,
+                    tenancy_id=tenancy_id,
+                    addressee=addressee,
+                    street=street,
+                    postal_code=postal_code,
+                    city=city,
+                    country="Deutschland",
+                    version=(previous_address_version + 1 if previous_address_version else 1),
+                    valid_from=date(2025, 1, 1),
+                )
+            )
+
+    existing_instruction = session.scalar(
+        select(PaymentInstruction.id)
+        .where(PaymentInstruction.account_id == DEMO_ACCOUNT_ID)
+        .limit(1)
+    )
+    if existing_instruction is None:
+        session.add(
+            PaymentInstruction(
+                id="payment_instruction_demo_1",
+                account_id=DEMO_ACCOUNT_ID,
+                version=1,
+                instruction_text=(
+                    "Zahlung: Bitte überweisen Sie eine Nachzahlung innerhalb von 30 Tagen "
+                    "auf das bekannte Mietkonto.\n"
+                    "Guthaben: Ein Guthaben wird innerhalb von 14 Tagen auf das bekannte "
+                    "Mietkonto ausgezahlt."
+                ),
+                valid_from=date(2025, 1, 1),
+            )
+        )
+
+    annual_advances = {
+        "ten_demo_a1": 264_000,
+        "ten_demo_b1": 90_000,
+        "ten_demo_c1": 132_000,
+    }
+    for tenancy_id, total_cents in annual_advances.items():
+        existing_reconciliation = session.scalar(
+            select(AdvanceReconciliation.id)
+            .where(
+                AdvanceReconciliation.tenancy_id == tenancy_id,
+                AdvanceReconciliation.period_start == date(2025, 1, 1),
+                AdvanceReconciliation.period_end == date(2025, 12, 31),
+            )
+            .limit(1)
+        )
+        if existing_reconciliation is not None:
+            continue
+        payment_id = f"advance_payment_demo_{tenancy_id}_2025"
+        allocation_id = f"advance_allocation_demo_{tenancy_id}_2025"
+        reconciliation_id = f"advance_reconciliation_demo_{tenancy_id}_2025"
+        session.add(
+            AdvancePayment(
+                id=payment_id,
+                account_id=DEMO_ACCOUNT_ID,
+                tenancy_id=tenancy_id,
+                amount_cents=total_cents,
+                payment_date=date(2025, 12, 31),
+                evidence_ref="Demo-Kontoauszug 2025",
+                reversal_of_id=None,
+            )
+        )
+        session.flush()
+        session.add(
+            AdvanceAllocation(
+                id=allocation_id,
+                account_id=DEMO_ACCOUNT_ID,
+                payment_id=payment_id,
+                tenancy_id=tenancy_id,
+                period_start=date(2025, 1, 1),
+                period_end=date(2025, 12, 31),
+                amount_cents=total_cents,
+            )
+        )
+        session.flush()
+        session.add(
+            AdvanceReconciliation(
+                id=reconciliation_id,
+                account_id=DEMO_ACCOUNT_ID,
+                tenancy_id=tenancy_id,
+                period_start=date(2025, 1, 1),
+                period_end=date(2025, 12, 31),
+                version=1,
+                total_cents=total_cents,
+                supersedes_id=None,
+            )
+        )
+        session.flush()
+        session.add(
+            AdvanceReconciliationAllocation(
+                id=f"advance_reconciliation_allocation_demo_{tenancy_id}_2025",
+                account_id=DEMO_ACCOUNT_ID,
+                reconciliation_id=reconciliation_id,
+                allocation_id=allocation_id,
             )
         )
 

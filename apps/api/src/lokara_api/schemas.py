@@ -939,6 +939,8 @@ class PaymentInstructionCreate(ApiModel):
 class FinalizeStatementCreate(ApiModel):
     period_start: date
     period_end: date
+    draft_id: str | None = None
+    draft_version: int | None = Field(default=None, ge=1)
     supersedes_statement_id: str | None = None
     late_positive_exception_reason: str | None = Field(default=None, max_length=1000)
 
@@ -946,6 +948,8 @@ class FinalizeStatementCreate(ApiModel):
     def period_is_ordered(self) -> "FinalizeStatementCreate":
         if self.period_end < self.period_start:
             raise ValueError("Das Ende liegt vor dem Beginn des Abrechnungszeitraums.")
+        if (self.draft_id is None) != (self.draft_version is None):
+            raise ValueError("Entwurf und Entwurfsversion müssen gemeinsam angegeben werden.")
         return self
 
 
@@ -953,6 +957,7 @@ class FinalizedDocumentOut(ApiModel):
     id: str
     audience: Literal["OWNER", "TENANT"]
     tenancy_id: str | None
+    document_type: Literal["OWNER_OVERVIEW", "COVER_LETTER", "TENANT_STATEMENT"]
     filename: str
     sha256: str
 
@@ -971,6 +976,134 @@ class StatementHistoryOut(ApiModel):
 
 class FinalizeStatementOut(StatementHistoryOut):
     settlements: list[dict[str, object]]
+
+
+# ── UI-05A resumable statement workflow ─────────────────────────────────────
+
+
+class StatementDraftCreate(ApiModel):
+    building_id: str
+    period_start: date
+    period_end: date
+    title: str | None = Field(default=None, max_length=240)
+    correction_of_statement_id: str | None = None
+    correction_reason: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def period_is_ordered(self) -> "StatementDraftCreate":
+        if self.period_end < self.period_start:
+            raise ValueError("Das Ende liegt vor dem Beginn des Abrechnungszeitraums.")
+        return self
+
+
+class StatementDraftUpdate(ApiModel):
+    version: int = Field(ge=1)
+    title: str | None = Field(default=None, max_length=240)
+    current_step: int | None = Field(default=None, ge=1, le=6)
+    selected_unit_ids: list[str] | None = None
+    overrides: dict[str, object] | None = None
+    correction_reason: str | None = Field(default=None, max_length=1000)
+
+
+class StatementDraftOut(ApiModel):
+    id: str
+    building_id: str
+    building_name: str
+    title: str
+    period_start: date
+    period_end: date
+    status: Literal["DRAFT", "REVIEW_REQUIRED", "READY", "FINALIZED", "CANCELLED"]
+    current_step: int
+    version: int
+    selected_unit_ids: list[str]
+    overrides: dict[str, object]
+    final_statement_id: str | None
+    correction_of_statement_id: str | None
+    correction_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class StatementRecordOut(ApiModel):
+    id: str
+    kind: Literal["DRAFT", "FINAL"]
+    building_id: str
+    building_name: str
+    title: str
+    unit_count: int
+    period_start: date
+    period_end: date
+    status: str
+    result_summary: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class StatementPeriodSuggestionOut(ApiModel):
+    period_start: date
+    period_end: date
+    label: str
+    reason: str
+
+
+class StatementReadinessFindingOut(ApiModel):
+    code: str
+    area: str
+    severity: Literal["INFO", "WARNING", "BLOCKER"]
+    entity_type: str | None = None
+    entity_id: str | None = None
+    message: str
+    correction_route: str | None = None
+    allowed_actions: list[str] = Field(default_factory=list)
+    provenance: str | None = None
+
+
+class StatementDraftUnitOut(ApiModel):
+    unit_id: str
+    tenancy_id: str | None
+    label: str
+    usage: str
+    party: str
+    period_label: str
+    person_count: str
+    area_sqm: str
+    contractual_advance_cents: int | None
+    actual_advances_cents: int | None
+    saldo_cents: int | None
+    included: bool
+    status: Literal["READY", "WARNING", "BLOCKER"]
+
+
+class StatementDraftCostOut(ApiModel):
+    cost_id: str
+    label: str
+    period_label: str
+    amount_cents: int
+    allocable_cents: int
+    allocation_key: str
+    status: Literal["READY", "WARNING", "BLOCKER"]
+
+
+class StatementDraftDocumentOut(ApiModel):
+    key: str
+    tenancy_id: str | None
+    recipient: str
+    document_type: str
+    readiness: Literal["READY", "BLOCKED"]
+
+
+class StatementDraftReadinessOut(ApiModel):
+    draft: StatementDraftOut
+    overall_status: Literal["DRAFT", "REVIEW_REQUIRED", "READY", "FINALIZED"]
+    findings: list[StatementReadinessFindingOut]
+    units: list[StatementDraftUnitOut]
+    costs: list[StatementDraftCostOut]
+    documents: list[StatementDraftDocumentOut]
+    nk_total_cents: int | None
+    heating_total_cents: int | None
+    allocable_total_cents: int | None
+    owner_total_cents: int | None
+    heating_path: str | None
 
 
 class MdlPositionIn(ApiModel):

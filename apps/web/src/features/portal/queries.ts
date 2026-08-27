@@ -38,8 +38,7 @@ export function useAccountSummary(accountId: string) {
 export function usePortfolioOverview(accountId: string) {
   return useQuery({
     queryKey: ['account', accountId, 'portfolio-overview'],
-    queryFn: () =>
-      api(`/a/${accountId}/portfolio/overview`, PortfolioOverviewResponseSchema),
+    queryFn: () => api(`/a/${accountId}/portfolio/overview`, PortfolioOverviewResponseSchema),
     retry: false,
   });
 }
@@ -112,7 +111,8 @@ export function useStatement(
 export function useBuildingTenancies(accountId: string, buildingId: string, enabled: boolean) {
   return useQuery({
     queryKey: ['account', accountId, 'building', buildingId, 'tenancies'],
-    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/tenancies`, TenancyPreviewChoiceSchema.array()),
+    queryFn: () =>
+      api(`/a/${accountId}/buildings/${buildingId}/tenancies`, TenancyPreviewChoiceSchema.array()),
     enabled: enabled && buildingId !== '',
   });
 }
@@ -130,7 +130,11 @@ export function useTenantPreview(
   });
   return useQuery({
     queryKey: ['account', accountId, 'tenant-preview', selection],
-    queryFn: () => api(`/a/${accountId}/buildings/${selection.buildingId}/statement?${query}`, StatementProjectionResponseSchema),
+    queryFn: () =>
+      api(
+        `/a/${accountId}/buildings/${selection.buildingId}/statement?${query}`,
+        StatementProjectionResponseSchema,
+      ),
     enabled: enabled && selection.buildingId !== '' && selection.tenancyId !== '',
   });
 }
@@ -138,50 +142,99 @@ export function useTenantPreview(
 export function useCreateAdvancePayment(accountId: string, buildingId: string, tenancyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { amountCents: number; paymentDate: string; evidenceRef: string; periodStart: string; periodEnd: string }) =>
-      api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/advance-payments`, z.object({ allocationId: z.string() }), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
+    mutationFn: (input: {
+      amountCents: number;
+      paymentDate: string;
+      evidenceRef: string;
+      periodStart: string;
+      periodEnd: string;
+    }) =>
+      api(
+        `/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/advance-payments`,
+        z.object({ allocationId: z.string() }),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
   });
 }
 
-export function useConfirmAdvanceReconciliation(accountId: string, buildingId: string, tenancyId: string) {
+export function useConfirmAdvanceReconciliation(
+  accountId: string,
+  buildingId: string,
+  tenancyId: string,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { periodStart: string; periodEnd: string; allocationIds: string[] }) => {
-      const query = new URLSearchParams({ period_start: input.periodStart, period_end: input.periodEnd });
-      return api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/reconciliations?${query}`, z.object({ id: z.string() }), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allocationIds: input.allocationIds }),
+      const query = new URLSearchParams({
+        period_start: input.periodStart,
+        period_end: input.periodEnd,
       });
+      return api(
+        `/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/reconciliations?${query}`,
+        z.object({ id: z.string() }),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ allocationIds: input.allocationIds }),
+        },
+      );
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['account', accountId, 'tenant-preview'] }),
   });
 }
 
 export function useDeliveryAddresses(accountId: string, buildingId: string, tenancyId: string) {
   return useQuery({
     queryKey: ['account', accountId, 'delivery-addresses', tenancyId],
-    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/delivery-addresses`, DeliveryAddressSchema.array()),
-    enabled: buildingId !== '' && tenancyId !== '', retry: false,
+    queryFn: () =>
+      api(
+        `/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/delivery-addresses`,
+        DeliveryAddressSchema.array(),
+      ),
+    enabled: buildingId !== '' && tenancyId !== '',
+    retry: false,
   });
 }
 
 export function useCreateDeliveryAddress(accountId: string, buildingId: string, tenancyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { addressee: string; street: string; postalCode: string; city: string; country: string; validFrom: string }) =>
-      api(`/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/delivery-addresses`, z.object({ id: z.string() }), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    mutationFn: (input: {
+      addressee: string;
+      street: string;
+      postalCode: string;
+      city: string;
+      country: string;
+      validFrom: string;
+    }) =>
+      api(
+        `/a/${accountId}/buildings/${buildingId}/tenancies/${tenancyId}/delivery-addresses`,
+        z.object({ id: z.string() }),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['account', accountId, 'delivery-addresses', tenancyId],
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'delivery-addresses', tenancyId] }),
   });
 }
 
 export function usePaymentInstructions(accountId: string) {
   return useQuery({
     queryKey: ['account', accountId, 'payment-credit-instructions'],
-    queryFn: () => api(`/a/${accountId}/payment-credit-instructions`, PaymentInstructionSchema.array()),
+    queryFn: () =>
+      api(`/a/${accountId}/payment-credit-instructions`, PaymentInstructionSchema.array()),
     retry: false,
   });
 }
@@ -191,27 +244,49 @@ export function useCreatePaymentInstruction(accountId: string) {
   return useMutation({
     mutationFn: (input: { paymentText: string; creditText: string; validFrom: string }) =>
       api(`/a/${accountId}/payment-credit-instructions`, z.object({ id: z.string() }), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'payment-credit-instructions'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['account', accountId, 'payment-credit-instructions'],
+      }),
   });
 }
 
 export function useStatementHistory(accountId: string, buildingId: string) {
   return useQuery({
     queryKey: ['account', accountId, 'statement-history', buildingId],
-    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/statements/history`, StatementHistorySchema.array()),
-    enabled: buildingId !== '', retry: false,
+    queryFn: () =>
+      api(
+        `/a/${accountId}/buildings/${buildingId}/statements/history`,
+        StatementHistorySchema.array(),
+      ),
+    enabled: buildingId !== '',
+    retry: false,
   });
 }
 
 export function useFinalizeStatement(accountId: string, buildingId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { periodStart: string; periodEnd: string; supersedesStatementId?: string; latePositiveExceptionReason?: string }) =>
+    mutationFn: (input: {
+      periodStart: string;
+      periodEnd: string;
+      draftId?: string;
+      draftVersion?: number;
+      supersedesStatementId?: string;
+      latePositiveExceptionReason?: string;
+    }) =>
       api(`/a/${accountId}/buildings/${buildingId}/statements/finalize`, FinalizeStatementSchema, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['account', accountId, 'statement-history', buildingId] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['account', accountId, 'statement-history', buildingId],
+      }),
   });
 }

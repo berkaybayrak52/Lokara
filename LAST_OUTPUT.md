@@ -1,19 +1,16 @@
-# Last output — active work consolidated on `development`
+# Last output — Portfolio- und UI-05A-Checkpoints
 
-HEAD on `development` · `26.08.2026`
-Status: Complete
+HEAD `b9ba8d1` on `development` · `27.08.2026`
+Status: Partial
 
 ## Wanted
-Preserve UI-04, deferred M7-F repairs and paused M9 work on one long-lived local development
-branch while leaving `main` unchanged.
+Preserve the remaining portfolio work and stabilized UI-05A as separate local checkpoints.
 
 ## Done
-UI-04, deferred M7-F repairs and paused M9 each have a named checkpoint and are merged into
-`development` in the requested order. Empty migration `0027` joins `0025` and `0026`; Alembic
-reports one head. Ruff check/format, mypy, web lint, typecheck and the production build pass.
-`main` remains at `5230724`; existing branches and worktrees remain preserved.
+The portfolio/demo support and UI-05A are separated. UI-05A includes migration `0028`, resumable drafts, readiness, previews, immutable archives and corrections. Finalization requires the current draft version, and M9 accepts only tenant statements as annual-statement sources. Ruff, strict mypy, web lint, typecheck and production build pass. Web/API run on ports 3000/3001.
 
 ## Not done
-No tests, gates, database migrations, audits, reviews, PDF fingerprints or browser checks ran.
-UI-04, M9 and M7-F remain integrated but unverified; M9 stays paused, M7-F stays deferred and all
-known legal, production, presentation and boundary blockers remain visible. Nothing was pushed.
+No tests, gates, reviewer agents or interactive browser accessibility matrix ran under direct mode. Chrome browser control remains unavailable until its ChatGPT extension is installed or enabled. Nothing was pushed or promoted to `main`.
+
+## Optional next step
+Start UI-05B, the unit dashboard.

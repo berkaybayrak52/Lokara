@@ -9,6 +9,9 @@ The authoritative Page 01 source is
 `berkay-work/Spec-Seiten/01 · Die Abrechnung 3a95fd420731816c9048ed7a517c3e9e.md`, read with the
 26 matching rows in `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv` and the approved
 method corrections here and in `docs/03`. Structured values and flags follow the CSV.
+The UI-05A interaction and layout source is
+`berkay-work/Spec-Seiten/UI/05_Abrechnung-erstellen.md`; it changes presentation and workflow, not
+the calculation rules owned by `docs/03`.
 
 ## Reading guide, ownership and status
 
@@ -783,10 +786,21 @@ The renderer receives one preselected final snapshot, not live account rows. It 
 the owner archive and each tenant archive. It must never build an all-renters PDF and redact/crop it
 afterwards.
 
+**UI-05A on `development` — implemented, unverified.** The tenant output is now two independently
+archived documents: a restrained cover letter and the tenant statement. Draft previews add an
+`ENTWURF - NICHT VERSENDET` banner and create no archive. Final PDFs use monochrome A4 layout,
+repeat table headers, avoid row splits and print `Seite X von Y`. When applicable frozen authority
+evidence remains `verify-before-production`, every affected preview and final archive also prints
+`TECHNISCHE DEMO - RECHTSWERTE NICHT PRODUKTIONSFREIGEGEBEN`; finalization does not turn that flag
+into legal approval. The renderer receives only frozen, audience-selected values and performs no
+money calculation. M9 delivery and M10 renter publication remain inactive. This development work
+has compile-level, local end-to-end and visual PDF evidence, but no test, gate or reviewer evidence.
+
 | Archive | Required contents | Forbidden contents |
 | --- | --- | --- |
 | Owner overview | complete owner overview; landlord-only vacancy schedule; every covered party/reconciliation line; zero-day tenancy footnote; applicable notices/disclaimer/`Rechtsstand` | tenant delivery address or another tenant's isolated letter as a substitute for the owner view |
-| Tenant document | exactly one eligible tenancy's addressee and creation date; object/period; that tenancy's cost lines and `Anteil`; printed operator and numerator derivation; meter evidence and provenance; confirmed actual advances; Saldo branch; payment/credit instruction; applicable notices; disclaimer; `Rechtsstand` | owner residual, vacancy schedule, building-wide findings, another tenancy's identity, address, advances, share, Saldo or document metadata |
+| Tenant cover letter | exactly one eligible tenancy's addressee; object/period; Saldo branch; applicable frozen payment/credit wording; enclosure and disclaimer | cost tables, owner residual, vacancy schedule, another tenancy's identity or financial data |
+| Tenant statement | exactly one eligible tenancy's addressee and creation date; object/period; that tenancy's cost lines and `Anteil`; printed operator and numerator derivation; meter evidence and provenance; confirmed actual advances; Saldo branch; payment/credit instruction; applicable notices; disclaimer; `Rechtsstand` | owner residual, vacancy schedule, building-wide findings, another tenancy's identity, address, advances, share, Saldo or document metadata |
 
 The tenant Saldo branch is determined from the frozen confirmed advances and party subtotal:
 

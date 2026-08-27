@@ -1013,6 +1013,50 @@ class Statement(Base):
     )
 
 
+class StatementDraft(Base):
+    """Mutable, resumable preparation state for one future statement.
+
+    Drafts reference live source rows and store only deliberate wizard choices.
+    Finalization still creates the immutable ``Statement`` snapshot; a draft is
+    never reused as the legal archive itself.
+    """
+
+    __tablename__ = "statement_draft"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    title: Mapped[str]
+    period_start: Mapped[date]
+    period_end: Mapped[date]
+    status: Mapped[str] = mapped_column(default="DRAFT", server_default="DRAFT")
+    current_step: Mapped[int] = mapped_column(default=1, server_default="1")
+    version: Mapped[int] = mapped_column(default=1, server_default="1")
+    selected_unit_ids: Mapped[list[str]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    overrides: Mapped[dict[str, object]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    final_statement_id: Mapped[str | None]
+    correction_of_statement_id: Mapped[str | None]
+    correction_reason: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("statement_draft", "building_id", "building"),
+        _scoped_fk("statement_draft", "final_statement_id", "statement"),
+        _scoped_fk("statement_draft", "correction_of_statement_id", "statement"),
+        _scoped_pair("statement_draft"),
+        CheckConstraint("period_end >= period_start", name="ck_statement_draft_period_ordered"),
+        CheckConstraint("current_step BETWEEN 1 AND 6", name="ck_statement_draft_step"),
+        CheckConstraint("version >= 1", name="ck_statement_draft_version"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'REVIEW_REQUIRED', 'READY', 'FINALIZED', 'CANCELLED')",
+            name="ck_statement_draft_status",
+        ),
+        Index("ix_statement_draft_account", "account_id"),
+        Index("ix_statement_draft_building", "building_id", "updated_at"),
+    )
+
+
 class DeliveryAddress(Base):
     """Append-only tenancy delivery address selected verbatim at finalization."""
 
@@ -1066,6 +1110,7 @@ class StatementArchive(Base):
     statement_id: Mapped[str]
     audience: Mapped[str]
     tenancy_id: Mapped[str | None]
+    document_type: Mapped[str] = mapped_column(server_default="TENANT_STATEMENT")
     content_bytes: Mapped[bytes]
     sha256: Mapped[str]
     mime_type: Mapped[str]
@@ -1083,7 +1128,11 @@ class StatementArchive(Base):
             name="uq_statement_archive_delivery_context",
         ),
         UniqueConstraint(
-            "statement_id", "audience", "tenancy_id", name="uq_statement_archive_audience"
+            "statement_id",
+            "audience",
+            "tenancy_id",
+            "document_type",
+            name="uq_statement_archive_document_type",
         ),
         CheckConstraint(
             "(audience = 'OWNER' AND tenancy_id IS NULL) OR "
@@ -1091,6 +1140,10 @@ class StatementArchive(Base):
             name="ck_statement_archive_audience_tenancy",
         ),
         CheckConstraint("length(sha256) = 64", name="ck_statement_archive_sha256"),
+        CheckConstraint(
+            "document_type IN ('OWNER_OVERVIEW', 'COVER_LETTER', 'TENANT_STATEMENT')",
+            name="ck_statement_archive_document_type",
+        ),
         Index(
             "uq_statement_document_archive_owner",
             "statement_id",
@@ -3515,6 +3568,7 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "mdl_statement_position",
     "self_use_period",
     "statement",
+    "statement_draft",
     "statement_document_archive",
     "statement_settlement",
     "cost_entry",

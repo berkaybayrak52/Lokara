@@ -19,6 +19,7 @@ from .routers import (
     meters,
     payments,
     portal,
+    statement_drafts,
     statements,
     tax,
     uvi_runs,
@@ -54,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(mdl.router)
     app.include_router(extraction.router)
     app.include_router(statements.router)
+    app.include_router(statement_drafts.router)
     app.include_router(payments.router)
     app.include_router(uvi_runs.router)
     app.include_router(tax.router)

@@ -888,6 +888,7 @@ def create_delivery_schedule(
             StatementArchive.id == body.source_id,
             StatementArchive.audience == "TENANT",
             StatementArchive.tenancy_id.is_not(None),
+            StatementArchive.document_type == "TENANT_STATEMENT",
         )
     ).one_or_none()
     if source_context is None:

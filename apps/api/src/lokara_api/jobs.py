@@ -709,6 +709,7 @@ def freeze_renter_delivery_artifact(
             StatementArchive.id == source_id,
             StatementArchive.audience == "TENANT",
             StatementArchive.tenancy_id.is_not(None),
+            StatementArchive.document_type == "TENANT_STATEMENT",
         )
     )
     if archive is None or archive.tenancy_id is None:
@@ -1187,6 +1188,7 @@ def dispatch_renter_artifact(
                     StatementArchive.account_id == account_id,
                     StatementArchive.id == source_id,
                     StatementArchive.tenancy_id == artifact.tenancy_id,
+                    StatementArchive.document_type == "TENANT_STATEMENT",
                     Statement.account_id == account_id,
                     Statement.building_id == artifact.building_id,
                 )
@@ -1472,6 +1474,7 @@ def schedule_renter_deliveries(
                         StatementArchive.account_id == account_id,
                         StatementArchive.id == archive_id,
                         StatementArchive.audience == "TENANT",
+                        StatementArchive.document_type == "TENANT_STATEMENT",
                     )
                 ).all()
                 if row.id == archive_id

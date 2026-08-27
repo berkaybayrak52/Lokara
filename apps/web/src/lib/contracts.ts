@@ -260,6 +260,7 @@ export const FinalizedDocumentSchema = z.object({
   id: z.string(),
   audience: z.enum(['OWNER', 'TENANT']),
   tenancyId: z.string().nullable(),
+  documentType: z.enum(['OWNER_OVERVIEW', 'COVER_LETTER', 'TENANT_STATEMENT']),
   filename: z.string(),
   sha256: z.string(),
 });
@@ -277,10 +278,118 @@ export const StatementHistorySchema = z.object({
 });
 
 export const FinalizeStatementSchema = StatementHistorySchema.extend({
-  settlements: z.array(z.object({
-    tenancy_id: z.string(), saldo_cents: z.number().int(), kind: z.string(),
-  })),
+  settlements: z.array(
+    z.object({
+      tenancy_id: z.string(),
+      saldo_cents: z.number().int(),
+      kind: z.string(),
+    }),
+  ),
 });
+
+export const StatementDraftSchema = z.object({
+  id: z.string(),
+  buildingId: z.string(),
+  buildingName: z.string(),
+  title: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  status: z.enum(['DRAFT', 'REVIEW_REQUIRED', 'READY', 'FINALIZED', 'CANCELLED']),
+  currentStep: z.number().int().min(1).max(6),
+  version: z.number().int().positive(),
+  selectedUnitIds: z.array(z.string()),
+  overrides: z.record(z.string(), z.unknown()),
+  finalStatementId: z.string().nullable(),
+  correctionOfStatementId: z.string().nullable(),
+  correctionReason: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type StatementDraft = z.infer<typeof StatementDraftSchema>;
+
+export const StatementRecordSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['DRAFT', 'FINAL']),
+  buildingId: z.string(),
+  buildingName: z.string(),
+  title: z.string(),
+  unitCount: z.number().int().nonnegative(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  status: z.string(),
+  resultSummary: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type StatementRecord = z.infer<typeof StatementRecordSchema>;
+
+export const StatementPeriodSuggestionSchema = z.object({
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  label: z.string(),
+  reason: z.string(),
+});
+
+export const StatementReadinessFindingSchema = z.object({
+  code: z.string(),
+  area: z.string(),
+  severity: z.enum(['INFO', 'WARNING', 'BLOCKER']),
+  entityType: z.string().nullable(),
+  entityId: z.string().nullable(),
+  message: z.string(),
+  correctionRoute: z.string().nullable(),
+  allowedActions: z.array(z.string()),
+  provenance: z.string().nullable(),
+});
+
+export const StatementDraftUnitSchema = z.object({
+  unitId: z.string(),
+  tenancyId: z.string().nullable(),
+  label: z.string(),
+  usage: z.string(),
+  party: z.string(),
+  periodLabel: z.string(),
+  personCount: z.string(),
+  areaSqm: z.string(),
+  contractualAdvanceCents: z.number().int().nullable(),
+  actualAdvancesCents: z.number().int().nullable(),
+  saldoCents: z.number().int().nullable(),
+  included: z.boolean(),
+  status: z.enum(['READY', 'WARNING', 'BLOCKER']),
+});
+
+export const StatementDraftCostSchema = z.object({
+  costId: z.string(),
+  label: z.string(),
+  periodLabel: z.string(),
+  amountCents: z.number().int(),
+  allocableCents: z.number().int(),
+  allocationKey: z.string(),
+  status: z.enum(['READY', 'WARNING', 'BLOCKER']),
+});
+
+export const StatementDraftDocumentSchema = z.object({
+  key: z.string(),
+  tenancyId: z.string().nullable(),
+  recipient: z.string(),
+  documentType: z.string(),
+  readiness: z.enum(['READY', 'BLOCKED']),
+});
+
+export const StatementDraftReadinessSchema = z.object({
+  draft: StatementDraftSchema,
+  overallStatus: z.enum(['DRAFT', 'REVIEW_REQUIRED', 'READY', 'FINALIZED']),
+  findings: z.array(StatementReadinessFindingSchema),
+  units: z.array(StatementDraftUnitSchema),
+  costs: z.array(StatementDraftCostSchema),
+  documents: z.array(StatementDraftDocumentSchema),
+  nkTotalCents: z.number().int().nullable(),
+  heatingTotalCents: z.number().int().nullable(),
+  allocableTotalCents: z.number().int().nullable(),
+  ownerTotalCents: z.number().int().nullable(),
+  heatingPath: z.string().nullable(),
+});
+export type StatementDraftReadiness = z.infer<typeof StatementDraftReadinessSchema>;
 
 export const SelfUsePeriodOutSchema = z.object({
   kind: z.string(),

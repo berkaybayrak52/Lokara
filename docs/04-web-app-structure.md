@@ -296,6 +296,35 @@ finalization, history and stored-document download. The separate tenant archive 
 rendered and isolated, but is not a renter route, portal item, email/delivery feature or
 legal-production approval. The live demo PDF remains unchanged.
 
+### UI-05A development workflow — implemented, unverified
+
+On `development`, UI-05A extends page 6 without replacing the M6-B archive model:
+
+- `/a/{accountId}/abrechnung` lists resumable drafts and finalized versions;
+- `/a/{accountId}/abrechnung/neu` creates a building/period-scoped draft;
+- `/a/{accountId}/abrechnung/{draftId}` is the six-step, autosaving workflow;
+- `/a/{accountId}/abrechnung/archiv/{statementId}` reads stored versions and starts a linked
+  correction draft without changing predecessor bytes.
+
+The owner-only API adds statement records, period suggestions, version-checked draft create/read/
+update/cancel/finalize operations and a server-owned readiness projection. A readiness status
+change advances the same optimistic version; unexpected server faults remain server errors instead
+of being presented as incomplete billing inputs. Draft previews use
+`GET /a/{accountId}/buildings/{buildingId}/statements/preview.pdf` with one explicit tenancy and
+either `COVER_LETTER` or `TENANT_STATEMENT`. Finalization still uses the existing M6-B route and now
+archives one owner overview plus a separate cover letter and tenant statement per eligible tenancy.
+Downloads return stored bytes and hashes; no archive page recalculates a document.
+
+M9 annual-statement delivery accepts only archived `TENANT_STATEMENT` documents. A separately
+archived `COVER_LETTER` is never a complete annual statement source.
+
+Migration `0028` adds the account/building-scoped `statement_draft` table with ENABLE/FORCE RLS and
+a `WITH CHECK` policy, and adds the archived document type without rewriting append-only rows.
+Unresolved Page-02 authority remains a visible warning: affected technical-demo PDFs carry a
+non-production watermark. Email delivery and renter-portal actions remain inactive. This work was
+built in direct implementation mode and has compile-level and local live-flow evidence, but no test,
+gate, auditor or interactive-browser evidence.
+
 ## Bank and payment boundary: shipped through locally merged C3a
 
 Four owner-only routes, all under `/a/{accountId}` and all behind `require_owner` on top of the

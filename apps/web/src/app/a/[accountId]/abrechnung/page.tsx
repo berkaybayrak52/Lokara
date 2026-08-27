@@ -1,4 +1,4 @@
-import { StatementPage } from '@/features/portal/statement';
+import { StatementListPage } from '@/features/abrechnung/statement-list';
 
 export default async function AbrechnungPage({
   params,
@@ -6,5 +6,5 @@ export default async function AbrechnungPage({
   params: Promise<{ accountId: string }>;
 }) {
   const { accountId } = await params;
-  return <StatementPage accountId={accountId} />;
+  return <StatementListPage accountId={accountId} />;
 }

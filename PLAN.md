@@ -65,12 +65,17 @@ before UI. Dates are communication events, not planning inputs.
   M7-F remains deferred until after M10; its repair candidate still needs closing reviews and
   verification, and every M7 authority flag continues to block production output. M9 remains paused
   until after UI-08, with its known landlord-facing presentation and production blockers visible.
-  UI-00 through UI-02 retain their earlier evidence. UI-03 and UI-04 were implemented under the
-  direct implementation mode in `CLAUDE.md` § 10 and carry no test evidence. UI-05A is next and
-  future direct implementation continues on `development`. Nothing from this consolidation is
-  pushed. The six authorized compile-level checks pass on the combined branch, and Alembic reports
-  the single head `0027`; no tests, gates, migrations, audits, reviews, fingerprints or browser
-  checks ran during consolidation.
+  UI-00 through UI-02 retain their earlier evidence. UI-03, UI-04 and UI-05A were implemented under
+  the direct implementation mode in `CLAUDE.md` § 10 and carry no test evidence. UI-05A adds the
+  resumable statement workflow and migration `0028`; UI-05B is next. Nothing is pushed. Ruff,
+  strict mypy, web lint, typecheck and the production build pass. The UI-05A migration and complete
+  local draft → readiness → preview → finalization → correction/archive path were exercised against
+  the preserved demo database, and the generated A4 PDFs were visually checked. No tests, gates,
+  audits, reviewer-agent runs or live interactive-browser accessibility matrix ran.
+  A follow-up stability repair now requires the current optimistic draft version at finalization,
+  advances that version when readiness changes, preserves unexpected server faults as errors and
+  prevents M9 from treating a cover letter as the annual tenant statement. The compile-level checks
+  remain green.
 
 ---
 
@@ -285,7 +290,7 @@ not replace the complete documentation or reconciliation gates.
 | U | **Technically complete, reviewed and locally merged 24.08.2026** | UVI comparison, calculation and document | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10. |
 | M7 | **M7-0…M7-E technically complete; M7-F repair candidate integrated on `development` but deferred and unverified** | Tax export and AfA | The pure AfA/export foundation and Anlage-V paths retain their earlier branch evidence. M7-F still needs closing reviews and verification, and all flagged register values continue to block real output. |
 | M8 | **Lane A unblocked; lane B source-blocked** | Document and letter engine | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either. |
-| UI | **UI-00 through UI-04 integrated; UI-05A next on `development`; UI-03/UI-04 carry no test evidence** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
+| UI | **UI-00 through UI-05A implemented on `development`; UI-05B next; UI-03–UI-05A carry no test evidence** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
 | M9 | **Integrated on `development` but paused and unverified; resume after UI-08** | Reminders, email and checklists | The preserved W1–W8, immutable migration `0025`, account-scoped jobs/API, default-off delivery and `/waechter` work remains subject to known presentation, source/legal, provider, UVI-artifact and checklist-catalogue blockers. Earlier branch evidence is not consolidation evidence. |
 | M10 | **After resumed M9 is complete** | Portals and investment | Two independent lanes, R before I: renter activation, renter context and the renter portal, then the approved `docs/14` investment cockpit. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5. |
 | M11 | After M10 | Native apps, billing and load test | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test. |
@@ -1393,8 +1398,8 @@ required reviews are clean and all production blockers remain explicit.
 
 ### Portfolio UI 00–08 programme
 
-**Status — UI-00 through UI-04 are integrated; UI-05A is next on `development`. UI-03 and UI-04
-carry no test evidence.** UI-00 was prepared from
+**Status — UI-00 through UI-05A are implemented on `development`; UI-05B is next. UI-03 through
+UI-05A carry no test evidence.** UI-00 was prepared from
 clean `main` in the new `slice/ui-00-layout-global-clean` worktree, never from the dirty M7-F tree, the preserved M9
 worktree or the unwanted `slice/ui-00-layout-global` worktree. Static UI review, 108 web tests,
 lint, types, production build and the fast gate are green. A clean `scripts/gate.sh full` is also
@@ -1448,6 +1453,20 @@ readiness, payments under review and guard-derived meter hints produce no facts 
 has a persisted projection yet; "Vorgänge", contacts, documents and object activity are omitted; and
 OD18's three demo objects wait on the portfolio seed, which still carries one building.
 
+UI-05A supplies account/building-scoped, optimistic-versioned statement drafts, an idempotent demo
+evidence set, the Abrechnung list, start flow, six-step autosaving wizard, server-owned readiness,
+separate cover-letter and tenant-statement previews, immutable final archives and successor-based
+corrections. Migration `0028` adds the RLS-protected draft table and separates archived document
+types without rewriting existing archive evidence. The PDF renderer remains display-only and all
+money comes from the existing engines/frozen snapshot. Applicable Page-02 authority flags remain
+visible: technical demo documents are explicitly watermarked as not production-approved. M9 email
+and M10 portal actions stay inactive. Under direct implementation mode, ruff, strict mypy, web lint,
+typecheck and production build pass; the local end-to-end path and stored hashes were checked and
+the A4 output was visually inspected. No test suite, gate, boundary audit, reviewer-agent run or
+interactive browser accessibility matrix ran, so UI-05A is **implemented; unverified — no test
+evidence**. The 27.08 stability repair also binds finalization to the current optimistic draft
+version and restricts M9 annual-statement sources to archived `TENANT_STATEMENT` documents.
+
 The supplied files are authoritative UX intent. Existing approved legal rules, pure-engine
 contracts, account isolation and immutable evidence remain authoritative wherever a proposed
 backend detail conflicts. No page may invent counts, money, legal status, deadlines, provider
@@ -1481,7 +1500,7 @@ state, uploads, portal access or other unavailable product state.
 | UI-02 | `02_App-Shell-Desktop.md` | **Locally merged 25.08.2026; implementation, focused fixtures, statement review, fast/full and production build are green; Emir accepted the live shell; automated screenshot matrix remains outstanding** | Implement the 248px expanded and 72px collapsed sidebar, persistent account-scoped preference, full logo versus icon, accessible tooltips, active navigation, account menu and shared page header. Keep authorization server-enforced; hiding navigation is presentation only. Roll the shell across existing landlord routes and remove obsolete development navigation copy. Track this filename as UI-02 even though its internal heading says 09. |
 | UI-03 | `03_Objekte.md` | **Locally merged 25.08.2026 under direct implementation mode; ruff, strict mypy, typecheck, lint and the production build are green; implemented; unverified — no test evidence, no boundary audit, no statement review, no live browser check** | First repair the tenancy frontend contract to consume `advancePaymentSchedule` and send `initialAdvancePaymentCents` plus `advanceDeclarationRef`. Add building type, residential flag, country and nullable coordinates without silently changing engine decisions. Build object/unit routes and wizards, list/map switch and inactive photo slots. Geocoding and tiles use configurable adapters. Public Nominatim/OSM is demo-only, cached, attributed and failure-tolerant; production defaults disabled. |
 | UI-04 | `04_Objekt-Dashboard.md` | **Integrated on `development` under direct implementation mode; unverified — no test evidence, boundary audit, statement review or live browser check; OD5, OD10 receivable generation and OD18 remain source-blocked** | Add `/a/{account_id}/buildings/{building_id}/dashboard` as a server-owned read model with `asOf`, four authoritative KPIs, up to three prioritized facts, compact unit rows and explicit module availability. Do not aggregate financial truth in the browser. Generate object-summary PDFs server-side as immutable, owner-only snapshots with digest verification. Payment-dependent values are **source-blocked** until UI-07 supplies them. |
-| UI-05A | `05_Abrechnung-erstellen.md` | **Not started** | Add account/building-scoped, versioned statement drafts with optimistic concurrency and autosave. Build the list, six-step wizard, server-owned readiness projection, full-page preview and current finalized-statement integration. Reuse the M6-B archive now. M9-dependent delivery integration and actions remain **intentionally inactive** until M9 resumes; later connect the existing M9 records. Never add parallel finalization or delivery models. Advance-payment recommendations, exception reasons and letter text are **source-blocked** wherever authoritative input is missing. Record PDF fingerprints before and after the redesign. |
+| UI-05A | `05_Abrechnung-erstellen.md` | **Implemented on `development` under direct mode; compile checks, local end-to-end archive flow and the 27.08 version/delivery stability repair pass; unverified — no test/reviewer evidence or interactive browser matrix** | Account/building-scoped, optimistic-versioned drafts, list/start routes, six-step autosaving wizard, server-owned readiness, separate A4 cover/tenant previews, M6-B finalization/archive integration and append-only correction history are implemented. Finalization requires the current draft version, and M9 accepts only `TENANT_STATEMENT` as an annual-statement source. The demo seed supplies addresses, payment copy and confirmed actual advances. Page-02 authority flags remain visible and every affected PDF is marked as a technical, non-production-approved demo. M9 email and M10 portal actions remain intentionally inactive. Advance recommendations, late-positive exception capture and source-owned letter variants remain source-blocked rather than invented. |
 | UI-05B | `05_Einheiten-Dashboard.md` | **Not started** | Add `/a/{account_id}/units/{unit_id}/dashboard` with current tenancy first, collapsible history and explicit optional-module availability. Persist structured unit use, rooms, controlled amenities, parking/garage contract positions and append-only rent changes; unknown history stays null. Show only existing finalized documents. Payment data activates in UI-07. Portal controls are **intentionally inactive** until M10; messages and storage remain absent until real models and policies exist. |
 | UI-06 | `06_Kosten.md` | **Not started** | Replace the split form/list with a full-width list and `/a/{account_id}/kosten/neu`. Expose the server-owned BetrKV catalogue through a read endpoint and send `catalogueId`, optional `keyOverride` and `directUnitId`. Reuse existing classification findings and production blockers. Use the existing reason-required void workflow, never broken delete. Non-allocable catalogue entries may be stored for documentation but must never enter renter allocation. Beleg import remains an **intentionally inactive** beta path. |
 | UI-07 | `07_Zahlungen.md` | **Not started** | Replace four client-joined unpaginated feeds with one cursor-paginated server read model: 50 rows, stable newest-first order and server filters. Add bank-account/consent status, reversible ignore events, manual-match preview/confirm, immutable manual payments and correct partial/overpayment handling. Activate real aggregates in UI-01, UI-04 and UI-05B. Recurring receivables, due-date rules, credit use, receipt policy and productive finAPI remain **source-blocked**. |

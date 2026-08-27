@@ -808,6 +808,7 @@ def project_statement(
     audience: StatementAudience,
     *,
     tenancy_id: str | None = None,
+    allow_production_blocked: bool = False,
 ) -> StatementProjection:
     """Select the audience's slice of one already-computed result.
 
@@ -866,7 +867,7 @@ def project_statement(
     # Resolve the URL relationship before revealing that a building contains a
     # production-blocked Page-02 cost.  Unknown, foreign and zero-day tenancy
     # ids must retain their indistinguishable 404 precedence.
-    if bundle.page02_production_blocked:
+    if bundle.page02_production_blocked and not allow_production_blocked:
         raise StatementProductionBlockedError(
             "Die Mieteransicht ist wegen einer noch nicht produktionsfreigegebenen "
             "Betriebskostenposition gesperrt."

@@ -16,6 +16,8 @@ class PdfOptions:
     """A4 by default; statements are printed documents."""
 
     format: str = "A4"
+    display_header_footer: bool = False
+    footer_template: str = ""
 
 
 def render_html_to_pdf(html: str, options: PdfOptions | None = None) -> bytes:
@@ -40,6 +42,9 @@ def render_html_to_pdf(html: str, options: PdfOptions | None = None) -> bytes:
                 # /Title is NOT supplied by this flag — it comes from <title>, which
                 # `statement.py` now sets.
                 tagged=True,
+                display_header_footer=options.display_header_footer,
+                header_template="<span></span>",
+                footer_template=options.footer_template,
             )
         finally:
             browser.close()

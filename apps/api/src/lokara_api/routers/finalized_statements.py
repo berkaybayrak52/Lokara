@@ -17,6 +17,7 @@ from lokara_db import (
     PaymentInstruction,
     Statement,
     StatementArchive,
+    StatementDraft,
     StatementSettlement,
     StatementStatus,
     Tenancy,
@@ -27,7 +28,7 @@ from lokara_heating_engine import HeatingLine, HeatingResult, Page01bStatementRe
 from lokara_heating_engine import __version__ as HEATING_ENGINE_VERSION
 from lokara_nk_engine import CostItem, ShareLine
 from lokara_nk_engine import __version__ as NK_ENGINE_VERSION
-from lokara_pdf import DISCLAIMER, render_html_to_pdf
+from lokara_pdf import DISCLAIMER, PdfOptions, render_html_to_pdf
 from sqlalchemy import select
 
 from ..authorization import require_building, require_owner
@@ -56,6 +57,60 @@ from ..statement_service import (
 
 router = APIRouter(prefix="/a/{account_id}/buildings/{building_id}")
 root_router = APIRouter(prefix="/a/{account_id}")
+
+_DOCUMENT_PDF_OPTIONS = PdfOptions(
+    display_header_footer=True,
+    footer_template=(
+        '<div style="width:100%;font-size:8px;color:#596565;text-align:center;">'
+        'Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
+    ),
+)
+
+_A4_DOCUMENT_CSS = """
+<style>
+  * { box-sizing: border-box; }
+  html { color: #202a2b; font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; }
+  body { margin: 0; line-height: 1.45; }
+  h1 { margin: 0 0 7mm; font-size: 19pt; line-height: 1.15; }
+  h2 { margin: 8mm 0 3mm; border-bottom: 1.2px solid #202a2b; padding-bottom: 2mm; font-size: 13pt; break-after: avoid; }
+  h3 { margin: 5mm 0 2mm; font-size: 11pt; break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th { border-bottom: 1.2px solid #202a2b; padding: 2.2mm 1.5mm; text-align: left; vertical-align: bottom; }
+  td { border-bottom: .5px solid #c7cece; padding: 2.2mm 1.5mm; vertical-align: top; }
+  th:last-child, td:last-child { text-align: right; }
+  ul { margin: 2mm 0 4mm; padding-left: 5mm; }
+  .document-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-bottom: 8mm; }
+  .document-meta > :last-child { text-align: right; }
+  .address { min-height: 35mm; margin-top: 8mm; }
+  .sender-line { border-bottom: .5px solid #6b7575; padding-bottom: 1mm; font-size: 8pt; color: #596565; }
+  .subject { margin: 8mm 0 5mm; font-size: 13pt; font-weight: 700; }
+  .summary { margin: 6mm 0; border-top: 1.2px solid #202a2b; border-bottom: 1.2px solid #202a2b; padding: 4mm 0; }
+  .summary-row { display: flex; justify-content: space-between; gap: 8mm; margin: 1.5mm 0; }
+  .summary-row strong { font-size: 12pt; }
+  .muted { color: #596565; font-size: 9pt; }
+  .draft-banner { margin: 0 0 7mm; border: 1px solid #202a2b; padding: 2.5mm; text-align: center; font-weight: 700; letter-spacing: .05em; }
+  .page-break { break-before: page; }
+  .avoid-break { break-inside: avoid; }
+</style>
+"""
+
+
+def _document_html(
+    title: str, body: str, *, draft: bool = False, production_blocked: bool = False
+) -> str:
+    banner = '<div class="draft-banner">ENTWURF - NICHT VERSENDET</div>' if draft else ""
+    if production_blocked:
+        banner += (
+            '<div class="draft-banner">TECHNISCHE DEMO - RECHTSWERTE NICHT '
+            "PRODUKTIONSFREIGEGEBEN</div>"
+        )
+    return (
+        '<!doctype html><html lang="de"><head><meta charset="utf-8">'
+        f"<title>{escape(title)}</title>{_A4_DOCUMENT_CSS}</head><body>{banner}{body}</body></html>"
+    )
 
 
 def _decimal_de(value: Decimal) -> str:
@@ -391,6 +446,10 @@ def _finalized_snapshot(
     if not statement_authority_envelope_is_complete(production_blockers, statement_rule_evidence):
         production_blockers.insert(0, STATEMENT_AUTHORITY_ENVELOPE_INCOMPLETE)
     snapshot["production_blockers"] = production_blockers
+    final_render = cast(dict[str, object], snapshot["final_render"])
+    cast(dict[str, object], final_render["owner"])["production_blocked"] = bool(production_blockers)
+    for tenant in cast(list[dict[str, object]], final_render["tenants"]):
+        tenant["production_blocked"] = bool(production_blockers)
     return snapshot
 
 
@@ -399,6 +458,14 @@ def _archive_out(row: StatementArchive) -> FinalizedDocumentOut:
         id=row.id,
         audience=cast(Literal["OWNER", "TENANT"], row.audience),
         tenancy_id=row.tenancy_id,
+        document_type=(
+            "OWNER_OVERVIEW"
+            if row.audience == "OWNER"
+            else cast(
+                Literal["COVER_LETTER", "TENANT_STATEMENT"],
+                row.document_type,
+            )
+        ),
         filename=row.filename,
         sha256=row.sha256,
     )
@@ -713,6 +780,7 @@ def _final_render_payload(
         tenants.append(
             {
                 "tenancy_id": tenancy.id,
+                "landlord_name": landlord_name,
                 "building_name": building_name,
                 "unit_label": tenancy.unit.label,
                 "period_start": period_start.isoformat(),
@@ -882,13 +950,53 @@ def _owner_html_from_snapshot(render: dict[str, object]) -> str:
         for tenancy_id in cast(list[str], owner["zero_day_tenancy_ids"])
     )
     notices = "".join(f"<li>{escape(note)}</li>" for note in cast(list[str], owner["notices"]))
-    return f"""<!doctype html><html lang=\"de\"><meta charset=\"utf-8\"><body>
-    <h1>Abrechnung — Vermieterarchiv</h1><p>{escape(cast(str, owner["landlord_name"]))}<br>Objekt: {escape(cast(str, owner["building_name"]))}<br>Abrechnungszeitraum: {period_start.strftime("%d.%m.%Y")}–{period_end.strftime("%d.%m.%Y")}<br>Erstellt am: {_snapshot_date(owner["created_on"]).strftime("%d.%m.%Y")}</p>
+    body = f"""
+    <div class="document-meta"><div><strong>{escape(cast(str, owner["landlord_name"]))}</strong><br>{escape(cast(str, owner["building_name"]))}</div><div>Erstellt am {_snapshot_date(owner["created_on"]).strftime("%d.%m.%Y")}</div></div>
+    <h1>Vermieterübersicht</h1><p>Abrechnungszeitraum: {period_start.strftime("%d.%m.%Y")} - {period_end.strftime("%d.%m.%Y")}</p>
     <section><h2>Kostenübersicht</h2><table><tr><th>Kostenart</th><th>Partei</th><th>Anteil</th></tr>{cost_rows}</table><h3>Heiz- und Warmwasserkosten</h3>{heating_summary_html}<table><tr><th>Partei</th><th>Heizung Grund</th><th>Heizung Verbrauch</th><th>Warmwasser Grund</th><th>Warmwasser Verbrauch</th><th>Gesamt</th></tr>{heating_rows}</table></section><section><h2>Finalisierungsnachweis</h2>{reconciliation}{zero_days}{_vacancy_html_from_snapshot(cast(dict[str, object], owner["vacancy"]))}</section>
-    <section><h2>Hinweise</h2><ul>{notices}</ul></section><p>{escape(DISCLAIMER)}</p><p>Rechtsstand: {escape(", ".join(cast(list[str], owner["rechtsstaende"])))}</p></body></html>"""
+    <section><h2>Hinweise</h2><ul>{notices}</ul></section><p class="muted">{escape(DISCLAIMER)}</p><p class="muted">Rechtsstand: {escape(", ".join(cast(list[str], owner["rechtsstaende"])))}</p>"""
+    return _document_html(
+        "Vermieterübersicht",
+        body,
+        production_blocked=bool(owner.get("production_blocked", False)),
+    )
 
 
-def _tenant_html_from_snapshot(tenant: dict[str, object]) -> str:
+def _cover_letter_html_from_snapshot(tenant: dict[str, object], *, draft: bool = False) -> str:
+    """A restrained business letter from already frozen statement fields."""
+    address = cast(dict[str, object], tenant["address"])
+    labels = {
+        "RECHNERISCHER_SALDO": "Rechnerischer Saldo",
+        "NACHZAHLUNG": "Nachzahlung",
+        "GUTHABEN": "Guthaben",
+        "SALDO": "Ausgeglichen",
+    }
+    branch = cast(str, tenant["saldo_branch"])
+    amount = escape(format_eur(cents(abs(cast(int, tenant["saldo_cents"])))))
+    instruction = escape(cast(str, tenant["instruction"]))
+    body = f"""
+    <div class="sender-line">{escape(cast(str, tenant["landlord_name"]))}</div>
+    <div class="address">{escape(cast(str, address["addressee"]))}<br>{escape(cast(str, address["street"]))}<br>{escape(cast(str, address["postal_code"]))} {escape(cast(str, address["city"]))}<br>{escape(cast(str, address["country"]))}</div>
+    <p style="text-align:right">{escape(cast(str, tenant["building_name"]))}, {_snapshot_date(tenant["created_on"]).strftime("%d.%m.%Y")}</p>
+    <p class="subject">Betriebs- und Heizkostenabrechnung {_snapshot_date(tenant["period_end"]).year}</p>
+    <p>Guten Tag {escape(cast(str, address["addressee"]))},</p>
+    <p>anbei erhalten Sie Ihre Betriebs- und Heizkostenabrechnung für die Einheit {escape(cast(str, tenant["unit_label"]))} im Zeitraum {_snapshot_date(tenant["period_start"]).strftime("%d.%m.%Y")} - {_snapshot_date(tenant["period_end"]).strftime("%d.%m.%Y")}.</p>
+    <div class="summary"><div class="summary-row"><span>{labels[branch]}</span><strong>{amount}</strong></div></div>
+    {f"<p>{instruction}</p>" if instruction else ""}
+    <p>Bitte bewahren Sie die beigefügten Unterlagen auf. Bei Rückfragen können Sie sich an den Absender wenden.</p>
+    <p>Mit freundlichen Grüßen</p><p style="margin-top:10mm">{escape(cast(str, tenant["landlord_name"]))}</p>
+    <p class="muted" style="margin-top:14mm">Anlage: Betriebs- und Heizkostenabrechnung {_snapshot_date(tenant["period_end"]).year}</p>
+    <p class="muted">{escape(DISCLAIMER)}</p>
+    """
+    return _document_html(
+        "Anschreiben zur Abrechnung",
+        body,
+        draft=draft,
+        production_blocked=bool(tenant.get("production_blocked", False)),
+    )
+
+
+def _tenant_html_from_snapshot(tenant: dict[str, object], *, draft: bool = False) -> str:
     """Render one tenant archive solely from its selected JSON-safe payload."""
     address = cast(dict[str, object], tenant["address"])
     projection = cast(dict[str, object], tenant["projection"])
@@ -911,12 +1019,19 @@ def _tenant_html_from_snapshot(tenant: dict[str, object]) -> str:
         "GUTHABEN": "Guthaben",
         "SALDO": "Saldo",
     }
-    return f"""<!doctype html><html lang=\"de\"><meta charset=\"utf-8\"><body><h1>Mieter-Einzelabrechnung</h1>
-    <p>{escape(cast(str, address["addressee"]))}<br>{escape(cast(str, address["street"]))}<br>{escape(cast(str, address["postal_code"]))} {escape(cast(str, address["city"]))}<br>{escape(cast(str, address["country"]))}</p>
-    <p>Objekt: {escape(cast(str, tenant["building_name"]))}, {escape(cast(str, tenant["unit_label"]))}<br>Abrechnungszeitraum: {_snapshot_date(tenant["period_start"]).strftime("%d.%m.%Y")}–{_snapshot_date(tenant["period_end"]).strftime("%d.%m.%Y")}<br>Erstellt am: {_snapshot_date(tenant["created_on"]).strftime("%d.%m.%Y")}</p>
-    <h2>Kosten und Ihr Anteil</h2><table><tr><th>Kostenart</th><th>Gesamtkosten</th><th>Umlageschlüssel</th><th>Ihre Bemessung</th><th>Gesamtbemessung</th><th>Anteil</th></tr>{rows}</table><p>Berechnung je Kostenart: Anteil = Gesamtkosten × Ihre Bemessung ÷ Gesamtbemessung.</p>
+    body = f"""
+    <div class="document-meta"><div><strong>{escape(cast(str, tenant["building_name"]))}</strong><br>Einheit {escape(cast(str, tenant["unit_label"]))}</div><div>{escape(cast(str, address["addressee"]))}<br>Erstellt am {_snapshot_date(tenant["created_on"]).strftime("%d.%m.%Y")}</div></div>
+    <h1>Betriebs- und Heizkostenabrechnung</h1>
+    <p>Abrechnungszeitraum: {_snapshot_date(tenant["period_start"]).strftime("%d.%m.%Y")} - {_snapshot_date(tenant["period_end"]).strftime("%d.%m.%Y")}</p>
+    <h2>Umlagefähige Kosten und Ihr Anteil</h2><table><thead><tr><th>Kostenart</th><th>Gesamtkosten</th><th>Umlageschlüssel</th><th>Ihre Bemessung</th><th>Gesamtbemessung</th><th>Anteil</th></tr></thead><tbody>{rows}</tbody></table><p class="muted">Berechnung je Kostenart: Anteil = Gesamtkosten x Ihre Bemessung / Gesamtbemessung.</p>
     {heating}<section><h2>Zählernachweise</h2><ul>{devices}</ul></section><section><h2>Hinweise</h2><ul>{notices}</ul></section>
-    <p>Ihr Anteil gesamt: {escape(format_eur(cents(cast(int, tenant["subtotal_cents"]))))}<br>Geleistete Vorauszahlungen: {escape(format_eur(cents(cast(int, cast(dict[str, object], tenant["reconciliation"])["advances_cents"]))))}<br><strong>{labels[cast(str, tenant["saldo_branch"])]}: {escape(format_eur(cents(cast(int, tenant["saldo_cents"]))))}</strong></p><p>{escape(cast(str, tenant["instruction"]))}</p><p>{escape(DISCLAIMER)}</p><p>Rechtsstand: {escape(", ".join(cast(list[str], tenant["rechtsstaende"])))}</p></body></html>"""
+    <div class="summary"><div class="summary-row"><span>Ihr Anteil gesamt</span><span>{escape(format_eur(cents(cast(int, tenant["subtotal_cents"]))))}</span></div><div class="summary-row"><span>Bestätigte Vorauszahlungen</span><span>{escape(format_eur(cents(cast(int, cast(dict[str, object], tenant["reconciliation"])["advances_cents"]))))}</span></div><div class="summary-row"><strong>{labels[cast(str, tenant["saldo_branch"])]}</strong><strong>{escape(format_eur(cents(cast(int, tenant["saldo_cents"]))))}</strong></div></div><p>{escape(cast(str, tenant["instruction"]))}</p><p class="muted">{escape(DISCLAIMER)}</p><p class="muted">Rechtsstand: {escape(", ".join(cast(list[str], tenant["rechtsstaende"])))}</p>"""
+    return _document_html(
+        "Betriebs- und Heizkostenabrechnung",
+        body,
+        draft=draft,
+        production_blocked=bool(tenant.get("production_blocked", False)),
+    )
 
 
 def _heating_html_from_snapshot(row: dict[str, object]) -> str:
@@ -926,6 +1041,110 @@ def _heating_html_from_snapshot(row: dict[str, object]) -> str:
         cast(str, row["heat_unit"]), "Verbrauch"
     )
     return f"""<section><h2>Heiz- und Warmwasserkosten</h2><h3>Block A — Kosten und CO₂</h3><p>Gesamtkosten: {escape(format_eur(cents(cast(int, row["total_cents"]))))}; abrechenbare Kosten: {escape(format_eur(cents(cast(int, row["billable_cents"]))))}; {escape(cast(str, row["co2_text"]))}.</p><h3>Block B — Kostenanteile und Umlageschlüssel</h3><p>Heizkosten: Grundkosten {escape(format_eur(cents(cast(int, row["heat_base_cents"]))))}, Verbrauchskosten {escape(format_eur(cents(cast(int, row["heat_consumption_cents"]))))}; Warmwasser: Grundkosten {escape(format_eur(cents(cast(int, row["ww_base_cents"]))))}, Verbrauchskosten {escape(format_eur(cents(cast(int, row["ww_consumption_cents"]))))}.</p><p>Angewandter Heizkosten-Schlüssel: {_decimal_de(consumption_share * Decimal(100))} % Verbrauch / {_decimal_de((Decimal(1) - consumption_share) * Decimal(100))} % Grundkosten; Flächenanteile nach m²·Tagen, Verbrauchsanteile nach abgelesenem Verbrauch (§§ 7–9 HeizkostenV).</p><p>Flächenbemessung: {_number_de(_snapshot_decimal(row["base_weight"]))} m²·Tage von {_number_de(_snapshot_decimal(row["base_denominator"]))} m²·Tage. Heizverbrauch: {_decimal_de(_snapshot_decimal(row["heat_weight"]))} {escape(heat_unit)} von {_decimal_de(_snapshot_decimal(row["heat_denominator"]))} {escape(heat_unit)}. Warmwasserverbrauch: {_decimal_de(_snapshot_decimal(row["ww_weight"]))} m³ von {_decimal_de(_snapshot_decimal(row["ww_denominator"]))} m³. Warmwassertrennung: {"zentral nach § 9 HeizkostenV" if row["warm_water_separation"] else "keine zentrale Warmwassertrennung"}.</p><h3>Block C — Ihr Anteil und Herleitung</h3><p>Heizung Grundkosten {escape(format_eur(cents(cast(int, line["heating_base_cents"]))))}; Heizung Verbrauchskosten {escape(format_eur(cents(cast(int, line["heating_consumption_cents"]))))}; Warmwasser Grundkosten {escape(format_eur(cents(cast(int, line["ww_base_cents"]))))}; Warmwasser Verbrauchskosten {escape(format_eur(cents(cast(int, line["ww_consumption_cents"]))))}.</p><p>Operator: Anteil = Kostenanteil × Bemessung ÷ Gesamtbemessung. Flächen-Numerator: {_number_de(_snapshot_decimal(row["base_weight"]) / Decimal(cast(int, line["days"])))} m² × {line["days"]} Tage = {_number_de(_snapshot_decimal(row["base_weight"]))} m²·Tage; Gradtagszahlen {_decimal_de(_snapshot_decimal(line["degree_day_promille"]))} ‰ ÷ {_decimal_de(_snapshot_decimal(line["unit_degree_day_promille_total"]))} ‰.</p></section>"""
+
+
+@router.get("/statements/preview.pdf")
+def preview_tenant_document(
+    account_id: str,
+    building_id: str,
+    draft_id: str,
+    tenancy_id: str,
+    session: PathAccountSession,
+    document_type: Literal["COVER_LETTER", "TENANT_STATEMENT"] = "TENANT_STATEMENT",
+) -> Response:
+    """Render one audience-selected draft document without archiving its bytes."""
+    del account_id
+    require_owner(session)
+    building = require_building(session, building_id)
+    draft = session.get(StatementDraft, draft_id)
+    if draft is None or draft.building_id != building_id:
+        raise HTTPException(status_code=404, detail="Abrechnungsentwurf nicht gefunden.")
+    tenancy = session.get(Tenancy, tenancy_id)
+    if tenancy is None or tenancy.unit.building_id != building_id:
+        raise HTTPException(status_code=404, detail="Mietverhältnis nicht gefunden.")
+    window = Period(draft.period_start, draft.period_end + timedelta(days=1))
+    assert window.valid_to is not None
+    if (
+        overlap_days(
+            Period(tenancy.valid_from, tenancy.valid_to), window.valid_from, window.valid_to
+        )
+        == 0
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Das Mietverhältnis liegt nicht im Abrechnungszeitraum.",
+        )
+    try:
+        bundle = compute_statement(session, building_id=building_id, window=window)
+        projection = project_statement(
+            bundle,
+            StatementAudience.TENANT,
+            tenancy_id=tenancy.id,
+            allow_production_blocked=True,
+        )
+        owner_projection = project_statement(bundle, StatementAudience.OWNER)
+        vacancy_projection = project_statement(bundle, StatementAudience.TAX)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Die Dokumentvorschau ist wegen unvollständiger Abrechnungsdaten blockiert.",
+        ) from exc
+    reconciliation = session.scalar(
+        select(AdvanceReconciliation)
+        .where(
+            AdvanceReconciliation.tenancy_id == tenancy.id,
+            AdvanceReconciliation.period_start == draft.period_start,
+            AdvanceReconciliation.period_end == draft.period_end,
+        )
+        .order_by(AdvanceReconciliation.version.desc())
+    )
+    if reconciliation is None:
+        raise HTTPException(status_code=422, detail="Vorauszahlungen sind noch nicht bestätigt.")
+    subtotal = sum(int(line.amount) for line in projection.nk_lines) + sum(
+        int(line.total) for line in projection.heating_lines
+    )
+    render = _final_render_payload(
+        owner_projection=owner_projection,
+        vacancy_projection=vacancy_projection,
+        eligible=[
+            (
+                tenancy,
+                projection,
+                _address(session, tenancy.id, draft.period_end),
+                reconciliation,
+                subtotal,
+                subtotal - reconciliation.total_cents,
+            )
+        ],
+        instruction=_instruction(session, building_id, draft.period_end),
+        landlord_name=(building.landlord.legal_name if building.landlord else "Vermieter"),
+        building_name=building.name,
+        period_start=draft.period_start,
+        period_end=draft.period_end,
+        zero_day_tenancy_ids=(),
+        rechtsstaende=bundle.rechtsstand_entries,
+        heating_result=bundle.heating_result,
+        page01b_result=bundle.page01b_result,
+        late_positive_exception_reason=None,
+    )
+    tenant = cast(list[dict[str, object]], render["tenants"])[0]
+    tenant["production_blocked"] = bool(bundle.page02_production_blocked)
+    html = (
+        _cover_letter_html_from_snapshot(tenant, draft=True)
+        if document_type == "COVER_LETTER"
+        else _tenant_html_from_snapshot(tenant, draft=True)
+    )
+    pdf = render_html_to_pdf(html, _DOCUMENT_PDF_OPTIONS)
+    filename = (
+        f"entwurf-anschreiben-{tenancy.id}.pdf"
+        if document_type == "COVER_LETTER"
+        else f"entwurf-abrechnung-{tenancy.id}.pdf"
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.post("/tenancies/{tenancy_id}/delivery-addresses", status_code=201)
@@ -1058,6 +1277,27 @@ def finalize_statement(
 ) -> FinalizeStatementOut:
     require_owner(session)
     building = require_building(session, building_id)
+    draft = session.get(StatementDraft, body.draft_id) if body.draft_id is not None else None
+    if body.draft_id is not None and (
+        draft is None
+        or draft.building_id != building_id
+        or draft.period_start != body.period_start
+        or draft.period_end != body.period_end
+    ):
+        raise HTTPException(status_code=404, detail="Abrechnungsentwurf nicht gefunden.")
+    if draft is not None and draft.version != body.draft_version:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Der Entwurf wurde an anderer Stelle geändert. "
+                "Bitte laden Sie die aktuelle Fassung."
+            ),
+        )
+    if draft is not None and draft.status != "READY":
+        raise HTTPException(
+            status_code=422,
+            detail="Der Entwurf ist noch nicht bereit. Bitte lösen Sie zuerst alle Blocker.",
+        )
     window = Period(valid_from=body.period_start, valid_to=body.period_end + timedelta(days=1))
     assert window.valid_to is not None
     try:
@@ -1066,10 +1306,10 @@ def finalize_statement(
         raise HTTPException(
             status_code=422, detail=f"Die Abrechnung kann nicht finalisiert werden: {exc}"
         ) from exc
-    if bundle.page02_production_blocked or bundle.heating_missing_reason:
+    if bundle.heating_missing_reason:
         raise HTTPException(
             status_code=422,
-            detail="Die Abrechnung enthält produktionsgesperrte Kosten oder unvollständige Heizdaten.",
+            detail="Die Abrechnung enthält unvollständige Heizdaten.",
         )
     existing = session.scalars(
         select(Statement)
@@ -1124,7 +1364,10 @@ def finalize_statement(
                 )
             try:
                 projection = project_statement(
-                    bundle, StatementAudience.TENANT, tenancy_id=tenancy.id
+                    bundle,
+                    StatementAudience.TENANT,
+                    tenancy_id=tenancy.id,
+                    allow_production_blocked=True,
                 )
             except (EmptyTenancyError, StatementProductionBlockedError) as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -1178,11 +1421,25 @@ def finalize_statement(
         period_end=body.period_end,
         zero_day_tenancy_ids=(tenancy.id for tenancy in zero_day_tenancies),
     )
+    if draft is not None:
+        render_payload["draft"] = {
+            "id": draft.id,
+            "version": draft.version,
+            "title": draft.title,
+            "selected_unit_ids": list(draft.selected_unit_ids),
+            "overrides": dict(draft.overrides),
+            "correction_reason": draft.correction_reason,
+        }
     final_render = cast(dict[str, object], render_payload["final_render"])
-    owner_pdf = render_html_to_pdf(_owner_html_from_snapshot(final_render))
+    owner_pdf = render_html_to_pdf(_owner_html_from_snapshot(final_render), _DOCUMENT_PDF_OPTIONS)
     frozen_tenants = cast(list[dict[str, object]], final_render["tenants"])
-    tenant_pdfs = [
-        render_html_to_pdf(_tenant_html_from_snapshot(tenant)) for tenant in frozen_tenants
+    tenant_statement_pdfs = [
+        render_html_to_pdf(_tenant_html_from_snapshot(tenant), _DOCUMENT_PDF_OPTIONS)
+        for tenant in frozen_tenants
+    ]
+    cover_letter_pdfs = [
+        render_html_to_pdf(_cover_letter_html_from_snapshot(tenant), _DOCUMENT_PDF_OPTIONS)
+        for tenant in frozen_tenants
     ]
     statement = Statement(
         id=new_id(),
@@ -1207,24 +1464,42 @@ def finalize_statement(
             statement_id=statement.id,
             audience="OWNER",
             tenancy_id=None,
+            document_type="OWNER_OVERVIEW",
             content_bytes=owner_pdf,
             sha256=sha256(owner_pdf).hexdigest(),
             mime_type="application/pdf",
             filename=f"abrechnung-v{statement.version}-vermieter.pdf",
         )
     ]
-    for (tenancy, _, _, _, _, _), pdf in zip(eligible, tenant_pdfs, strict=True):
-        archives.append(
-            StatementArchive(
-                id=new_id(),
-                account_id=account_id,
-                statement_id=statement.id,
-                audience="TENANT",
-                tenancy_id=tenancy.id,
-                content_bytes=pdf,
-                sha256=sha256(pdf).hexdigest(),
-                mime_type="application/pdf",
-                filename=f"abrechnung-v{statement.version}-{tenancy.id}.pdf",
+    for (tenancy, _, _, _, _, _), cover_pdf, statement_pdf in zip(
+        eligible, cover_letter_pdfs, tenant_statement_pdfs, strict=True
+    ):
+        archives.extend(
+            (
+                StatementArchive(
+                    id=new_id(),
+                    account_id=account_id,
+                    statement_id=statement.id,
+                    audience="TENANT",
+                    tenancy_id=tenancy.id,
+                    document_type="COVER_LETTER",
+                    content_bytes=cover_pdf,
+                    sha256=sha256(cover_pdf).hexdigest(),
+                    mime_type="application/pdf",
+                    filename=f"anschreiben-v{statement.version}-{tenancy.id}.pdf",
+                ),
+                StatementArchive(
+                    id=new_id(),
+                    account_id=account_id,
+                    statement_id=statement.id,
+                    audience="TENANT",
+                    tenancy_id=tenancy.id,
+                    document_type="TENANT_STATEMENT",
+                    content_bytes=statement_pdf,
+                    sha256=sha256(statement_pdf).hexdigest(),
+                    mime_type="application/pdf",
+                    filename=f"abrechnung-v{statement.version}-{tenancy.id}.pdf",
+                ),
             )
         )
     session.add_all(archives)
@@ -1246,6 +1521,12 @@ def finalize_statement(
     )
     if latest is not None:
         latest.status = StatementStatus.SUPERSEDED
+    if draft is not None:
+        draft.status = "FINALIZED"
+        draft.final_statement_id = statement.id
+        draft.current_step = 6
+        draft.version += 1
+        draft.updated_at = datetime.now()
     session.flush()
     result = _history(session, statement)
     settlements = session.scalars(
