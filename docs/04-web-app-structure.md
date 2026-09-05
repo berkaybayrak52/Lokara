@@ -44,7 +44,8 @@ The uv workspace contains `apps/api` and every Python package shown above except
 workspace contains exactly `apps/web` and `packages/ui`.
 
 Integrated M9 work connects `packages/guard-engine` to migration `0025`, account-scoped jobs/API
-and `/a/{accountId}/waechter`. It is unverified on `development`, paused and production-blocked.
+and `/a/{accountId}/waechter`. M9 technically closed with clean reviews on 29.08.2026;
+production blockers remain. The later checkpoint has separate verification recorded in `PLAN.md`.
 
 `apps/mobile`, KPI engines, Redis and workers are absent. `packages/afa-engine`,
 `packages/export-engine` and the tax route/workspace are present; deferred M7-F repairs are
@@ -150,14 +151,19 @@ and unit creation out of the inline forms into their own account-scoped routes:
   `country`, joins street and house number into the existing single `street` column, and keeps the
   German five-digit `postal_code` rule unchanged. `BuildingSummary` gains `buildingType`, `latitude`
   and `longitude`;
-- geocoding lives behind `lokara_adapters.geocoding.GeocodingGateway`. `DisabledGeocodingGateway` is
-  the default: `geocoding_enabled` is **off** unless an operator turns it on, because public
-  Nominatim is a demo-only provider with no SLA. The adapter package owns the vendor format — query
-  parameters, User-Agent, response shape and coordinate validation — and stays socket-free, the same
-  line `dwd.py` draws; the HTTP transport, timeout, one-request-per-second policy and response cap
-  live in `apps/api/src/lokara_api/geocoding_http.py`, the only place that speaks to the provider.
-  It is server-side only and returns `None` on any error, timeout, empty result or blocked network.
-  Geocoding never blocks or fails building creation;
+- geocoding lives behind `lokara_adapters.geocoding.GeocodingGateway`.
+  `PlzGeocodingGateway` is the production default: it resolves the building's exact five-digit PLZ
+  offline from the pinned vendored centroid dataset, and an unknown or malformed PLZ fails loudly
+  with `422` before the building is created. `geocoding_enabled` is **off** unless an operator turns
+  it on; when enabled, Nominatim is only an optional finer-precision address fallback after the PLZ
+  has resolved, because the public provider is demo-only and has no SLA. The adapter package owns
+  the provider format — query parameters, User-Agent, response shape and coordinate validation —
+  and stays socket-free, the same line `dwd.py` draws; the HTTP transport, timeout,
+  one-request-per-second policy and response cap live in
+  `apps/api/src/lokara_api/geocoding_http.py`, the only place that speaks to the provider. It is
+  server-side only and returns `None` on any provider error, timeout, empty result or blocked
+  network, so optional address refinement never blocks creation and the offline PLZ centroid remains
+  the fallback;
 - routes `/a/{accountId}/objekte/neu` and `/a/{accountId}/objekte/{buildingId}/einheit/neu` are
   pages inside the same account-scoped segment, so the shell and server authorization enclose them.
   Both inline creation forms are gone; the list and unit list render full width behind an owner-only
@@ -176,9 +182,10 @@ renders the branded 404 until that module exists; no example photo asset was del
 show a token-only placeholder; the optional display-only photo slot on the detail pages was left out
 to respect the minimal-invasive rule protecting the later object dashboard.
 
-This step was implemented under the direct implementation mode recorded in `CLAUDE.md` § 10. Lint,
-strict mypy, type check and the web production build pass; no test suite was run for it, so it is
-**implemented; unverified — no test evidence**.
+This step was implemented under the former direct implementation mode. Later checkpoint full/demo
+gates are green (05.09.2026: `1967` Python, `188` web tests), with clean boundary and focused
+statement/UI re-reviews. It is **implemented; partially verified**; the separate live-browser
+acceptance matrix remains outstanding.
 
 ## Shipped UI-04 Objektakte
 
@@ -218,12 +225,53 @@ update route and UI-03 shipped only creation wizards, so the button would link t
 usage type (OD5's split of Wohnen and Gewerbe) has no authoritative field — deriving it from a label
 like "Büro" is exactly the guess the spec forbids — so the single weighted figure stands. "Vorgänge"
 is omitted entirely rather than shown as an empty counter, and contacts, documents and object
-activity stay absent until real persistence exists. The three demo objects of OD18 depend on the
-portfolio seed, which is not implemented; the seed still carries one building.
+activity stay absent until real persistence exists. The portfolio seed now supplies the three OD18
+demo objects; the remaining absent modules still wait on real persistence.
 
-This step was implemented under the direct implementation mode in `CLAUDE.md` § 10: ruff, strict
-mypy, typecheck, lint and the production build pass, and no test suite ran, so it is
-**implemented; unverified — no test evidence**.
+This step was implemented under the former direct implementation mode. The 05.09.2026 checkpoint
+full/demo gates now supply automated evidence, with clean boundary and focused statement/UI
+re-reviews. It remains **implemented; partially verified** pending the separate live-browser matrix
+and its recorded source-blocked scope.
+
+## UI-07 payment workspace on `development`
+
+UI-07 replaces the earlier browser join with owner-only server projections:
+
+- `GET /a/{account_id}/payment-workspace/accounts` returns connected account labels, masked IBANs,
+  provider labels and consent state. The current model has no persisted sync-run record, so
+  `last_sync_at` stays `null` and sync stays `idle`; productive finAPI OAuth, reconnect and provider
+  configuration remain source-blocked;
+- `GET /a/{account_id}/payment-workspace/transactions` returns one authoritative row per immutable
+  bank transaction, including transactions without proposals. It uses stable booking-date/ID order,
+  an opaque row-ID cursor, 50-row pages, a 100-day default window, server counts,
+  account/search/date/direction/status filters, renter/unit/building context and
+  ledger/classification history;
+- `POST /a/{account_id}/bank-transactions/{transaction_id}/classification` and the page-local bulk
+  route append `IGNORED` or `RESTORED` events. They never rewrite a bank transaction and refuse a
+  booked ledger transaction. Migration `0030` supplies the account-scoped composite FK, ENABLE/FORCE
+  RLS with `WITH CHECK`, and an update/delete refusal trigger;
+- `/a/{accountId}/zahlungen` renders one compact list, server counts and filters, a single inline
+  current-account/consent summary, page-local safe selection, and a 400px right detail drawer with
+  Escape close and focus return. It deliberately does not render one status card per Mietkonto;
+  the default all-account view shows only the nearest consent expiry, while a selected account shows
+  its own masked IBAN and expiry. Existing review proposals can still be confirmed through the
+  shipped matching service. Unit dashboards expose the same account-scoped workspace to owners;
+- the seed persists three property-labelled Mietkonten and 50 traceable rows over roughly 100 days.
+  Three prior rent months contribute 33 settled payments and nine classified outgoing movements;
+  the current month retains full, partial, review, unmatched, possible-duplicate and ignored cases.
+  The default list reads all three accounts; the account filter scopes the same server projection.
+  Re-seeding restores the visible ignored state by appending evidence; it does not erase prior
+  classification history.
+
+The source's `MUSS-INPUT` rules remain binding. UI-07 does not invent recurring rent due dates or
+joint-liability rules, a post-rejection manual-assignment meaning, later credit use, cash receipt
+evidence, or productive finAPI configuration. The free manual-assignment/payment wizard,
+overpayment decision flow, historical anomaly engine and complete shared account/object/reminder
+aggregates are also unfinished. The primary “Zahlung erfassen” action therefore stays disabled.
+The later checkpoint full/demo gates pass, and focused web regressions and the statement/UI
+re-review cover drawer focus trapping, background suppression and valid navigation controls.
+The complete live-browser/zoom/accessibility matrix remains outstanding; UI-07 remains a partial
+demo core, not a completed payment specification.
 
 ## Shipped API surface
 
@@ -235,9 +283,14 @@ There is one FastAPI application. Its current route families are:
 - `/a/{accountId}` building, unit, tenancy, cost/allocation-key, meter/reading, heating-cost and
   extraction routes;
 - `/a/{accountId}` bank, receivable and Page-01-handoff routes (M6-C2, owner-only).
-- `/a/{accountId}` guards, guard runs, schedules, reminders, checklists and deliveries (prepared
-  M9). Owners control sends and legal confirmation; employees are assigned-building scoped for
+- `/a/{accountId}` guards, guard runs, schedules, reminders, checklists and deliveries (implemented
+  M9; technical close 29.08.2026). Owners control sends and legal confirmation; employees are assigned-building scoped for
   guards/checklists; tax advisers have no M9 access.
+- Owner-only `POST /a/{accountId}/buildings/{buildingId}/uvi-runs` creates an archived run (`201`)
+  or returns the existing account/tenancy/month run (`200`) without another generated event.
+  `GET …/uvi-runs/support/{supportCode}` resolves support evidence in the authorized scope;
+  `GET …/uvi-runs/{runId}/document` renders the archived document snapshot as a PDF. This download
+  is not the frozen byte artifact required for M9 UVI delivery.
 
 There is no shipped bootstrap API route. JSON uses camelCase at the client boundary and snake_case
 inside Python; Pydantic validates the backend boundary.
@@ -296,7 +349,7 @@ finalization, history and stored-document download. The separate tenant archive 
 rendered and isolated, but is not a renter route, portal item, email/delivery feature or
 legal-production approval. The live demo PDF remains unchanged.
 
-### UI-05A development workflow — implemented, unverified
+### UI-05A development workflow — implemented, partially verified
 
 On `development`, UI-05A extends page 6 without replacing the M6-B archive model:
 
@@ -322,8 +375,92 @@ Migration `0028` adds the account/building-scoped `statement_draft` table with E
 a `WITH CHECK` policy, and adds the archived document type without rewriting append-only rows.
 Unresolved Page-02 authority remains a visible warning: affected technical-demo PDFs carry a
 non-production watermark. Email delivery and renter-portal actions remain inactive. This work was
-built in direct implementation mode and has compile-level and local live-flow evidence, but no test,
-gate, auditor or interactive-browser evidence.
+built in the former direct implementation mode. The later full/demo gates and clean boundary and
+focused statement/UI re-reviews add verification evidence; the separate interactive-browser matrix
+and source-blocked scope remain open.
+
+### UI-05B unit dashboard — implemented, partially verified
+
+`/a/{accountId}/einheiten/{unitId}` now consumes
+`GET /a/{account_id}/units/{unit_id}/dashboard`. One server-owned `asOf` resolves the unit state,
+current tenancy, every separate party, current cold rent, current advance, total monthly amount,
+rent per square metre, contract positions, newest-first occupancy history, allowed actions and up
+to five existing finalized tenant archives. The browser displays these decisions and does not use
+its clock to rebuild gaps or financial values.
+
+The current tenancy precedes a collapsed history. Unit profile and tenancy-create forms appear only
+after an owner action; they are not permanent side panels. Profile writes append a
+`UnitProfileVersion`. Separate owner-only endpoints append contract versions, garage/parking
+positions and documented rent changes. The UI converts an inclusive “Letzter Miettag” to the
+database's exclusive end boundary at the form edge. Unknown legacy facts stay “Nicht dokumentiert”.
+
+UI-07 now supplies the owner-only payment projection from existing receivable facts. The renter
+portal waits until M10, and messages until a real model and policy exist. Documents list only stored immutable archives and
+offer no upload control. Migration `0029` supplies the four account-scoped temporal tables. Ruff,
+strict mypy, web lint, typecheck, production build, local migration/seed and an authenticated live
+API read pass. Later checkpoint full/demo gates and clean boundary/focused statement/UI re-reviews
+provide partial verification. The separate live-browser acceptance matrix remains outstanding.
+
+### UI-06 Kosten — implemented, partially verified
+
+`/a/{accountId}/kosten` is now a full-width, object-local list with one billing-year filter and a
+dedicated `/a/{accountId}/kosten/neu?objektId={buildingId}` creation route. Cross-year entries appear
+in every touched year. The wizard keeps its account/object-scoped browser draft, separates the
+server-owned BetrKV identity from an optional display label, applies the catalogue default key and
+sends `keyOverride` only when the owner changes it. Receipt extraction is visible only as an
+inactive beta mode; its existing route remains available but is no longer in navigation.
+
+`GET /a/{accountId}/cost-catalogue` exposes the current versioned catalogue's display facts. Cost
+responses expose the persisted classification findings and `productionBlocked`; the client only
+maps those server codes to German display copy. `POST /a/{accountId}/costs/{costId}/void` is the sole
+list removal action and requires a reason. The broken hard-delete client path is gone.
+
+Migration `0031` permits a confirmed non-allocable classification to omit an allocation-key
+assignment. Such a cost persists with zero allocable cents and is skipped before renter-allocation
+input is built; no fallback key is invented and no engine formula changes. The local migration,
+allocable create with an effective override, non-allocable create, active-list read and reasoned
+void flow pass. An active non-allocable probe left the statement's 120,000-cent NK input and sole
+allocable cost unchanged before it was voided. Ruff, strict mypy, web lint, typecheck and production
+build pass. The later full/demo gates and focused copy/navigation regressions are green, and the
+statement/UI re-review is clean. The complete interactive browser/zoom/accessibility matrix remains
+outstanding.
+
+### UI-08 Zähler — implemented, partially verified
+
+`/a/{accountId}/zaehler` now reads one account-scoped workspace containing every visible,
+non-archived object, every unit including empty ones, building/unit meters, lifecycle history,
+calibration guards, readings and server-projected consumption periods. The full-width accessible
+hierarchy is object → building meters/units → meter. Active and historical devices are separated;
+the backend-owned expired list drives the focus-safe previous/next jump. Owner writes are absent in
+read-only views.
+
+`/a/{accountId}/zaehler/neu` is one route and one form with an account/object-scoped draft. It
+collects the explicit device type, fixed server-validated unit, exact location and own label,
+manufacturer/model, installation date, remote-readability and distinct calibration-data states.
+Replacement is one API transaction linking both devices and appending old-final/new-initial
+readings. Removal and controlled void append lifecycle events; no meter DELETE route remains.
+
+Manual readings use today's local date, show the current device and last effective value, and run a
+server preflight for lifecycle, duplicate-date, rollback, correction-target and tenancy context.
+Warnings require explicit confirmation and persist that confirmation; blockers cannot be written.
+Corrections append a linked successor. Available periods and measured/incomplete/estimated/
+not-applicable consumption evidence come from the backend, including exact opening and closing
+rows, missing-input reason and estimate provenance.
+
+Per object/period, append-only `HeatingBillingModeVersion` rows select Lokara or an external
+provider. An external result becomes authoritative only through the existing confirmed MDL
+statement path in the same object and period; the statement service suppresses the parallel
+internal result. Internal heating inputs are categorized, source-linked and backend-readiness
+projected. Radio connectivity, provider sync and upload/OCR remain intentionally inactive; the OCR
+segment is disabled and has no file input or request.
+
+Migrations `0033`/`0034` add the approved gas-volume tuple and split conversion evidence. Migration
+`0040` closes nullable reason/confirmation/provider checks and permits heating-cost updates only
+for the first reasoned void; invoice evidence cannot otherwise change or be deleted. All 20
+rollback-only boundary regressions pass, and the boundary re-audit is clean. The 05.09.2026
+full/demo gates pass `1967` Python and `188` web tests; focused GAS/navigation checks and the
+statement/UI re-review are green. The required 1280/1440/1920 px, keyboard and 200% zoom matrix
+remains outstanding, so this is partial verification, not complete UI-08 closure.
 
 ## Bank and payment boundary: shipped through locally merged C3a
 
@@ -333,34 +470,34 @@ authorization by itself, and every relationship the URL carries is verified — 
 the import route is looked up under the RLS-scoped session and 404s when it belongs to someone
 else.
 
-| Route | Contract |
-| --- | --- |
-| `POST /a/{accountId}/statements/{statementId}/receivables` | `BANKMATCH-F12`: a finalized `RECEIVABLE` settlement becomes an `nk_nachzahlung` receivable at exactly the settled cents. Copied, never recomputed. Refuses a second run for the same statement, a correcting version for a tenancy period that already has one, and a joint tenancy with more than one party. |
-| `GET /a/{accountId}/receivables` | Open debts, ordered by due date. |
-| `POST /a/{accountId}/bank-accounts/{bankAccountId}/transactions/import` | Pulls normalized transactions from the AIS adapter. An exact re-import of `provider_transaction_id` is skipped, not rejected. |
-| `GET /a/{accountId}/bank-transactions` | Imported movements, signed cents. |
+| Route                                                                   | Contract                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /a/{accountId}/statements/{statementId}/receivables`              | `BANKMATCH-F12`: a finalized `RECEIVABLE` settlement becomes an `nk_nachzahlung` receivable at exactly the settled cents. Copied, never recomputed. Refuses a second run for the same statement, a correcting version for a tenancy period that already has one, and a joint tenancy with more than one party. |
+| `GET /a/{accountId}/receivables`                                        | Open debts, ordered by due date.                                                                                                                                                                                                                                                                               |
+| `POST /a/{accountId}/bank-accounts/{bankAccountId}/transactions/import` | Pulls normalized transactions from the AIS adapter. An exact re-import of `provider_transaction_id` is skipped, not rejected.                                                                                                                                                                                  |
+| `GET /a/{accountId}/bank-transactions`                                  | Imported movements, signed cents.                                                                                                                                                                                                                                                                              |
 
-**The due date is a request field with no default.** `docs/08` flags *Zahlungsfrist bei
-Nachzahlung* `verify-before-production`: the register records no statutory deadline — the claim
+**The due date is a request field with no default.** `docs/08` flags _Zahlungsfrist bei
+Nachzahlung_ `verify-before-production`: the register records no statutory deadline — the claim
 falls due on receipt of a proper statement — and the customary 30 days is a `Konvention`. The
 handoff asks for the date and refuses without it rather than making that convention Lokara's
 answer on every statement.
 
 The C3a slice adds exactly five further owner-only API routes:
 
-| C3a route | Contract |
-| --- | --- |
-| `PUT /a/{accountId}/renters/{renterId}/matching-profile` | Normalize and upsert surname and optional payment code. |
-| `POST /a/{accountId}/bank-transactions/{transactionId}/match` | Run or return the transaction's immutable proposal run. |
-| `GET /a/{accountId}/match-proposals` | Return transaction-grouped German reasons, lowercase decisions, ranked candidates, confirmation and ledger reference. |
-| `POST /a/{accountId}/bank-transactions/{transactionId}/decision` | Record one final `confirmed`, `rejected` or `duplicate` outcome; the client cannot select a receivable. |
-| `GET /a/{accountId}/payment-ledger` | Return immutable payments, reversals, credit and allocation snapshots newest first. |
+| C3a route                                                        | Contract                                                                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `PUT /a/{accountId}/renters/{renterId}/matching-profile`         | Normalize and upsert surname and optional payment code.                                                               |
+| `POST /a/{accountId}/bank-transactions/{transactionId}/match`    | Run or return the transaction's immutable proposal run.                                                               |
+| `GET /a/{accountId}/match-proposals`                             | Return transaction-grouped German reasons, lowercase decisions, ranked candidates, confirmation and ledger reference. |
+| `POST /a/{accountId}/bank-transactions/{transactionId}/decision` | Record one final `confirmed`, `rejected` or `duplicate` outcome; the client cannot select a receivable.               |
+| `GET /a/{accountId}/payment-ledger`                              | Return immutable payments, reversals, credit and allocation snapshots newest first.                                   |
 
 These five routes and `matching_service.py` are technically complete, development-synchronized and
 locally merged into `main`. C3b's three jobs are technically complete and locally merged; they add no route and no
 screen.
 
-C3c adds the one *Zahlungen* client route, `/a/{accountId}/zahlungen`, technically complete and
+C3c adds the one _Zahlungen_ client route, `/a/{accountId}/zahlungen`, technically complete and
 locally merged. It is client-only — no endpoint, no schema, no migration. It reads
 the grouped proposals, the payment ledger, the bank transactions and the receivables, and writes one
 final outcome through the C3a decision route. Buttons appear only on an open `NEEDS_REVIEW` row;
@@ -402,7 +539,7 @@ production-blocking.
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.
 - Pure KPI packages wait for their approved implementation milestone. W3/W5–W8 guard work is
-  integrated on `development` through paused M9 but remains unverified. Pure AfA/export packages
+  technically closed on `development` through M9 on 29.08.2026; its production blockers remain. Pure AfA/export packages
   are present; M7-F closure remains deferred.
 - Redis plus Celery or Arq wait for a real rate-limit, retry, sync or scheduled-delivery slice.
 - Real Supabase Auth/Storage/Postgres credentials and real Vision, bank, email and MDL providers wait

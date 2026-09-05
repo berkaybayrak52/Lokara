@@ -54,6 +54,7 @@ from ..statement_service import (
     project_statement,
     statement_authority_envelope_is_complete,
 )
+from ..time import berlin_today
 
 router = APIRouter(prefix="/a/{account_id}/buildings/{building_id}")
 root_router = APIRouter(prefix="/a/{account_id}")
@@ -573,7 +574,7 @@ def _tenant_html(
     <p>{escape(address.addressee)}<br>{escape(address.street)}<br>{escape(address.postal_code)} {escape(address.city)}<br>{escape(address.country)}</p>
     <p>Objekt: {escape(tenancy.unit.building.name)}, {escape(tenancy.unit.label)}<br>
     Abrechnungszeitraum: {period_start.strftime("%d.%m.%Y")}–{period_end.strftime("%d.%m.%Y")}<br>
-    Erstellt am: {date.today().strftime("%d.%m.%Y")}</p>
+    Erstellt am: {berlin_today().strftime("%d.%m.%Y")}</p>
     <h2>Kosten und Ihr Anteil</h2><table><tr><th>Kostenart</th><th>Gesamtkosten</th><th>Umlageschlüssel</th><th>Ihre Bemessung</th><th>Gesamtbemessung</th><th>Anteil</th></tr>{rows}</table>
     <p>Berechnung je Kostenart: Anteil = Gesamtkosten × Ihre Bemessung ÷ Gesamtbemessung.</p>
     {heating}<section><h2>Zählernachweise</h2><ul>{device_rows}</ul></section><section><h2>Hinweise</h2><ul>{notices}</ul></section>
@@ -775,7 +776,7 @@ def _final_render_payload(
         notices = (
             [] if page01b_result is None else [risk.message_de for risk in page01b_result.risks]
         )
-        late_positive = saldo > 0 and date.today() > period_end.replace(year=period_end.year + 1)
+        late_positive = saldo > 0 and berlin_today() > period_end.replace(year=period_end.year + 1)
         withheld = late_positive and late_positive_exception_reason is None
         tenants.append(
             {
@@ -785,7 +786,7 @@ def _final_render_payload(
                 "unit_label": tenancy.unit.label,
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
-                "created_on": date.today().isoformat(),
+                "created_on": berlin_today().isoformat(),
                 "address": {
                     "addressee": address.addressee,
                     "street": address.street,
@@ -828,7 +829,7 @@ def _final_render_payload(
             "building_name": building_name,
             "period_start": period_start.isoformat(),
             "period_end": period_end.isoformat(),
-            "created_on": date.today().isoformat(),
+            "created_on": berlin_today().isoformat(),
             "projection": _projection_snapshot(owner_projection),
             "cost_rows": [
                 {
@@ -1385,7 +1386,7 @@ def finalize_statement(
                 )
             )
     instruction = _instruction(session, building_id, body.period_end)
-    late_positive = date.today() > body.period_end.replace(year=body.period_end.year + 1)
+    late_positive = berlin_today() > body.period_end.replace(year=body.period_end.year + 1)
     exception_reason = (
         body.late_positive_exception_reason.strip() or None
         if body.late_positive_exception_reason is not None

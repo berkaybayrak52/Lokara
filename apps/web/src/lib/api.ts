@@ -15,7 +15,10 @@ import { isDemoPreview, previewResponse } from './demo-preview';
  */
 
 /** Exported for the rare non-JSON case (PDF download links). */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// Keep browser requests on the frontend origin by default. Next.js proxies
+// account API paths to FastAPI in `next.config.ts`; deployments can still
+// provide an explicit API origin when frontend and API are hosted separately.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/backend';
 
 export class ApiError extends Error {
   constructor(

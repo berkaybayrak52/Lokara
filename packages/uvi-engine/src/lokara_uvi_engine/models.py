@@ -36,6 +36,7 @@ class BlockAInput:
     measurement_unit: MeasurementUnit
     energy_reference: EnergyReference
     calorific_factor_kwh_per_unit: Decimal | None = None
+    condition_number: Decimal | None = None
     correctly_segmented_device_change: bool = False
 
 
@@ -53,6 +54,27 @@ class BlockAResult:
 
 
 @dataclass(frozen=True, slots=True)
+class WarmWaterBlockAInput:
+    """A monthly warm-water volume resolved at the Block-A boundary."""
+
+    reading_start_x1000: int
+    reading_end_x1000: int
+    factor_kwh_per_m3: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class WarmWaterBlockAResult:
+    status: str
+    volume_m3: Decimal | None
+    heat_kwh: int | None
+    factor_kwh_per_m3: Decimal | None
+    rule_source: str | None
+    data_quality_flag: str | None = None
+    rule_evidence: tuple[RuleEvidence, ...] = ()
+    unresolved_conflicts: tuple[RuleConflict, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class NormalizedBlockAInput:
     """A persisted calendar-month movement, without fabricated meter endpoints."""
 
@@ -60,6 +82,7 @@ class NormalizedBlockAInput:
     measurement_unit: MeasurementUnit
     energy_reference: EnergyReference
     calorific_factor_kwh_per_unit: Decimal | None = None
+    condition_number: Decimal | None = None
     explicit_hkv_allocator: bool = False
     measured_building_heat_kwh_x1000: int | None = None
     building_hkv_movement_x1000: int | None = None
@@ -167,6 +190,30 @@ class BlockD2Result:
     rule_evidence: tuple[RuleEvidence, ...]
     unresolved_conflicts: tuple[RuleConflict, ...]
     data_quality_flag: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WarmWaterBlockD2Input:
+    current_warm_water_kwh: int
+    target_area_sqm: Decimal
+    monthly_share: Decimal
+    warm_water_deduction_kwh_m2a: Decimal
+    heizspiegel_vintage: str
+    attribution_de: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WarmWaterBlockD2Result:
+    status: str
+    norm_month_kwh: int | None
+    delta_kwh: int | None
+    percent: Decimal | None
+    warm_water_deduction_kwh_m2a: Decimal
+    heizspiegel_vintage: str
+    attribution_de: str | None
+    data_quality_flag: str | None = None
+    rule_evidence: tuple[RuleEvidence, ...] = ()
+    unresolved_conflicts: tuple[RuleConflict, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

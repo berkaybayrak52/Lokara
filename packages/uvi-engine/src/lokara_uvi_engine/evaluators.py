@@ -28,7 +28,15 @@ from .models import (
     LinearInterpolationResult,
     NormalizedBlockAInput,
     UviRuleBundle,
+    WarmWaterBlockAInput,
+    WarmWaterBlockAResult,
+    WarmWaterBlockD2Input,
+    WarmWaterBlockD2Result,
 )
+
+# Lokara conventions pending legal confirmation; see docs/16-uvi.md § 12.
+STATION_DISTANCE_WARNING_KM = Decimal("50")
+MINIMUM_VALID_UNITS_INCLUDING_TARGET = 3
 
 _ONE = Decimal(1)
 _ONE_TENTH = Decimal("0.1")
@@ -48,6 +56,11 @@ def _require_nonnegative_integer(value: int, field: str) -> None:
 def _require_finite_nonnegative(value: Decimal, field: str) -> None:
     if not value.is_finite() or value < 0:
         raise ValueError(f"{field} must be finite and >= 0")
+
+
+def _require_finite_positive(value: Decimal, field: str) -> None:
+    if not value.is_finite() or value <= 0:
+        raise ValueError(f"{field} must be finite and > 0")
 
 
 def _whole_kwh(value: Decimal) -> int:
@@ -97,8 +110,22 @@ def evaluate_block_a(input_: BlockAInput, rules: UviRuleBundle) -> BlockAResult:
                 unresolved_conflicts=rules.unresolved_conflicts,
                 data_quality_flag="missing_calorific_factor",
             )
-        _require_finite_nonnegative(factor, "calorific_factor_kwh_per_unit")
-        movement_kwh = raw_movement * factor
+        condition_number = input_.condition_number
+        if condition_number is None:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="missing_condition_number",
+            )
+        _require_finite_positive(factor, "calorific_factor_kwh_per_unit")
+        _require_finite_positive(condition_number, "condition_number")
+        movement_kwh = raw_movement * factor * condition_number
     else:
         return BlockAResult(
             status="blocked",
@@ -150,10 +177,22 @@ def evaluate_normalized_block_a(
                 unresolved_conflicts=rules.unresolved_conflicts,
                 data_quality_flag="missing_calorific_factor",
             )
-        _require_finite_nonnegative(factor, "calorific_factor_kwh_per_unit")
-        if factor == 0:
-            raise ValueError("calorific_factor_kwh_per_unit must be > 0")
-        heat = movement * factor
+        condition_number = input_.condition_number
+        if condition_number is None:
+            return BlockAResult(
+                status="blocked",
+                movement_kwh=None,
+                heat_kwh=None,
+                measurement_unit=input_.measurement_unit,
+                energy_reference=input_.energy_reference,
+                label_de=None,
+                rule_evidence=rules.evidence,
+                unresolved_conflicts=rules.unresolved_conflicts,
+                data_quality_flag="missing_condition_number",
+            )
+        _require_finite_positive(factor, "calorific_factor_kwh_per_unit")
+        _require_finite_positive(condition_number, "condition_number")
+        heat = movement * factor * condition_number
     else:
         if not input_.explicit_hkv_allocator:
             return BlockAResult(
@@ -275,6 +314,100 @@ def evaluate_block_b(input_: BlockBInput, rules: UviRuleBundle) -> BlockBResult:
     )
 
 
+def evaluate_warm_water_block_a(
+    input_: WarmWaterBlockAInput, rules: UviRuleBundle, *, rule_source: str | None = None
+) -> WarmWaterBlockAResult:
+    """Convert a measured warm-water volume using the resolved § 9 rule.
+
+    The factor is deliberately an input: the engine never supplies a water-to-energy
+    default.  An absent rule is a blocked result, not an estimate.
+    """
+    if isinstance(input_.reading_start_x1000, bool) or isinstance(input_.reading_end_x1000, bool):
+        raise ValueError("scaled readings must be integers")
+    volume = Decimal(input_.reading_end_x1000 - input_.reading_start_x1000) / _THOUSAND
+    if volume < 0:
+        return WarmWaterBlockAResult(
+            "blocked",
+            None,
+            None,
+            input_.factor_kwh_per_m3,
+            rule_source,
+            "negative_unsegmented_movement",
+            rules.evidence,
+            rules.unresolved_conflicts,
+        )
+    factor = input_.factor_kwh_per_m3
+    if factor is None:
+        return WarmWaterBlockAResult(
+            "blocked",
+            volume,
+            None,
+            None,
+            rule_source,
+            "missing_warm_water_conversion",
+            rules.evidence,
+            rules.unresolved_conflicts,
+        )
+    _require_finite_positive(factor, "factor_kwh_per_m3")
+    energy = volume * factor
+    return WarmWaterBlockAResult(
+        "ready",
+        volume,
+        _whole_kwh(energy),
+        factor,
+        rule_source,
+        None,
+        rules.evidence,
+        rules.unresolved_conflicts,
+    )
+
+
+def evaluate_warm_water_block_c(
+    current_warm_water_kwh: int,
+    previous_year_warm_water_kwh: int | None,
+    rules: UviRuleBundle,
+) -> BlockBResult:
+    """Raw prior-year warm-water comparison; no weather adjustment is possible."""
+    return evaluate_block_b(
+        BlockBInput(current_warm_water_kwh, previous_year_warm_water_kwh), rules
+    )
+
+
+def evaluate_warm_water_block_d2(
+    input_: WarmWaterBlockD2Input, rules: UviRuleBundle
+) -> WarmWaterBlockD2Result:
+    """Compare WW with the Heizspiegel warm-water component (not heat-only D2)."""
+    _require_nonnegative_integer(input_.current_warm_water_kwh, "current_warm_water_kwh")
+    for name, value in (
+        ("target_area_sqm", input_.target_area_sqm),
+        ("monthly_share", input_.monthly_share),
+        ("warm_water_deduction_kwh_m2a", input_.warm_water_deduction_kwh_m2a),
+    ):
+        _require_finite_nonnegative(value, name)
+    if input_.target_area_sqm == 0:
+        raise ValueError("target_area_sqm must be > 0")
+    if input_.monthly_share > 1:
+        raise ValueError("monthly_share must be <= 1")
+    if not input_.heizspiegel_vintage:
+        raise ValueError("heizspiegel_vintage must not be empty")
+    norm = _whole_kwh(
+        input_.warm_water_deduction_kwh_m2a * input_.target_area_sqm * input_.monthly_share
+    )
+    delta = input_.current_warm_water_kwh - norm
+    return WarmWaterBlockD2Result(
+        "ready",
+        norm,
+        delta,
+        _display_percent(delta, norm),
+        input_.warm_water_deduction_kwh_m2a,
+        input_.heizspiegel_vintage,
+        input_.attribution_de,
+        None,
+        rules.evidence,
+        rules.unresolved_conflicts,
+    )
+
+
 def evaluate_block_c(input_: BlockCInput, rules: UviRuleBundle) -> BlockCResult:
     """Compare to prior-year heat, weather-adjusting only with usable degree days."""
 
@@ -295,7 +428,7 @@ def evaluate_block_c(input_: BlockCInput, rules: UviRuleBundle) -> BlockCResult:
             distance_km=input_.distance_km,
             dataset_as_of=input_.dataset_as_of,
             station_distance_over_50_km=(
-                input_.distance_km is not None and input_.distance_km > Decimal(50)
+                input_.distance_km is not None and input_.distance_km > STATION_DISTANCE_WARNING_KM
             ),
             rule_evidence=rules.evidence,
             unresolved_conflicts=rules.unresolved_conflicts,
@@ -335,7 +468,7 @@ def evaluate_block_c(input_: BlockCInput, rules: UviRuleBundle) -> BlockCResult:
         distance_km=input_.distance_km,
         dataset_as_of=input_.dataset_as_of,
         station_distance_over_50_km=(
-            input_.distance_km is not None and input_.distance_km > Decimal(50)
+            input_.distance_km is not None and input_.distance_km > STATION_DISTANCE_WARNING_KM
         ),
         rule_evidence=rules.evidence,
         unresolved_conflicts=rules.unresolved_conflicts,
@@ -357,8 +490,10 @@ def _is_valid_comparable(unit: ComparableUnit, category: str) -> bool:
 def evaluate_block_d(input_: BlockDInput, rules: UviRuleBundle) -> BlockDResult:
     """Calculate the comparable building cross-section or select D2."""
 
-    if input_.minimum_valid_units_including_target != 3:
-        raise ValueError("minimum_valid_units_including_target must be exactly 3")
+    if input_.minimum_valid_units_including_target != MINIMUM_VALID_UNITS_INCLUDING_TARGET:
+        raise ValueError(
+            "minimum_valid_units_including_target must be the documented Lokara convention (3)"
+        )
     target = input_.target
     if not target.unit_id:
         raise ValueError("target unit_id must not be empty")

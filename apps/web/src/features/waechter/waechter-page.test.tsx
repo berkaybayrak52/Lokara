@@ -649,6 +649,29 @@ describe('M9 statement-reviewer contracts', () => {
 });
 
 describe('M9 statement re-review contracts', () => {
+  it('shows identical guard warning and production-blocker copy only once', async () => {
+    const page = await waechterModule();
+    const WaechterWorkspace = page?.WaechterWorkspace;
+    expect(WaechterWorkspace).toBeTypeOf('function');
+    if (!WaechterWorkspace) throw new Error('RED M9 final review: workspace missing');
+    const explanation = 'VPI-Quelle fehlt; Auswertung ist gesperrt.';
+    const html = renderToStaticMarkup(
+      <WaechterWorkspace
+        {...FIXTURE}
+        guards={[
+          {
+            ...GUARDS[6]!,
+            warningDe: explanation,
+            productionBlockers: [explanation],
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain('Produktionssperre');
+    expect(html.split(explanation).length - 1).toBe(1);
+  });
+
   it('shows an explicit German title for every W1-W8 card', async () => {
     const page = await waechterModule();
     const WaechterWorkspace = page?.WaechterWorkspace;

@@ -12,9 +12,9 @@
  *   - im Browser: eine Seite mit `?preview=1` öffnen (bleibt per localStorage
  *     aktiv), mit `?preview=0` wieder ausschalten.
  *
- * Grenzen: Buttons wie „Bestätigen" buchen nichts (die POST-Antwort ist
- * ebenfalls synthetisch). Dashboard-Aggregate, Kosten, Zähler und Portal
- * laufen weiter gegen das echte Backend.
+ * Grenzen: Unterstützte Lesewege und Zahlungsentscheidungen bleiben vollständig
+ * synthetisch. Nicht unterstützte Schreibaktionen werden in Vorschau-Dashboards
+ * nicht angeboten; unbekannte Routen fallen weiterhin auf das echte Backend zurück.
  */
 
 import { ALLOCATION_KEY_LABELS, type AllocationKey } from './contracts';
@@ -73,6 +73,7 @@ interface UnitSpec {
   label: string;
   areaSqm: number;
   occupied: boolean;
+  usageType?: 'RESIDENTIAL' | 'COMMERCIAL' | 'OTHER';
 }
 interface BuildingSpec {
   id: string;
@@ -102,7 +103,14 @@ const BUILDINGS: BuildingSpec[] = [
       { id: 'u_muster_c', label: 'Wohnung C · 1. OG links', areaSqm: 20, occupied: true },
       { id: 'u_muster_d', label: 'Wohnung D · 1. OG rechts', areaSqm: 45, occupied: true },
       { id: 'u_muster_dg', label: 'Dachgeschoss', areaSqm: 62, occupied: true },
-      { id: 'u_muster_laden', label: 'Ladenlokal (Gewerbe)', areaSqm: 78, occupied: true },
+      {
+        id: 'u_muster_laden',
+        label: 'Ladenlokal (Gewerbe)',
+        areaSqm: 78,
+        occupied: true,
+        usageType: 'COMMERCIAL',
+      },
+      { id: 'u_muster_hof', label: 'Hofhaus', areaSqm: 41, occupied: true },
     ],
   },
   {
@@ -117,8 +125,7 @@ const BUILDINGS: BuildingSpec[] = [
     units: [
       { id: 'u_linden_1', label: 'Wohnung 1 · EG', areaSqm: 58, occupied: true },
       { id: 'u_linden_2', label: 'Wohnung 2 · 1. OG', areaSqm: 49, occupied: true },
-      { id: 'u_linden_3', label: 'Wohnung 3 · 2. OG', areaSqm: 66, occupied: true },
-      { id: 'u_linden_elw', label: 'Einliegerwohnung', areaSqm: 42, occupied: false },
+      { id: 'u_linden_3', label: 'Wohnung 3 · 2. OG', areaSqm: 66, occupied: false },
     ],
   },
   {
@@ -133,7 +140,13 @@ const BUILDINGS: BuildingSpec[] = [
     units: [
       { id: 'u_hafen_l1', label: 'Loft 1', areaSqm: 82, occupied: true },
       { id: 'u_hafen_l2', label: 'Loft 2', areaSqm: 74, occupied: true },
-      { id: 'u_hafen_buero', label: 'Büroeinheit (Gewerbe)', areaSqm: 132, occupied: true },
+      {
+        id: 'u_hafen_buero',
+        label: 'Büroeinheit (Gewerbe)',
+        areaSqm: 132,
+        occupied: true,
+        usageType: 'COMMERCIAL',
+      },
     ],
   },
 ];
@@ -156,18 +169,138 @@ const WOHNEN = 'bank_prev_wohnen';
 const HAFEN = 'bank_prev_hafen';
 
 const PARTIES: Party[] = [
-  { renterId: 'r_anna', tenancyId: 't_anna', unitId: 'u_muster_a', name: 'Anna Beispiel', base: 95000, nk: 16000, heating: 6000, bank: WOHNEN, startOffset: -60 },
-  { renterId: 'r_fatma', tenancyId: 't_fatma', unitId: 'u_muster_b', name: 'Fatma Yilmaz', base: 68000, nk: 11000, heating: 4000, bank: WOHNEN, startOffset: -5 },
-  { renterId: 'r_clara', tenancyId: 't_clara', unitId: 'u_muster_c', name: 'Clara Vorlage', base: 52000, nk: 8000, heating: 3000, bank: WOHNEN, startOffset: -60 },
-  { renterId: 'r_david', tenancyId: 't_david', unitId: 'u_muster_d', name: 'David Sommer', base: 78000, nk: 14000, heating: 5000, bank: WOHNEN, startOffset: -60 },
-  { renterId: 'r_eva', tenancyId: 't_eva', unitId: 'u_muster_dg', name: 'Eva König', base: 110000, nk: 18000, heating: 7000, bank: WOHNEN, startOffset: -23 },
-  { renterId: 'r_kiez', tenancyId: 't_kiez', unitId: 'u_muster_laden', name: 'Kiez Café GmbH', base: 145000, nk: 22000, heating: 8000, bank: WOHNEN, startOffset: -60 },
-  { renterId: 'r_jonas', tenancyId: 't_jonas', unitId: 'u_linden_1', name: 'Jonas Weber', base: 89000, nk: 15500, heating: 5500, bank: WOHNEN, startOffset: -40 },
-  { renterId: 'r_lea', tenancyId: 't_lea', unitId: 'u_linden_2', name: 'Lea Neumann', base: 76000, nk: 13000, heating: 5000, bank: WOHNEN, startOffset: -30 },
-  { renterId: 'r_maria', tenancyId: 't_maria', unitId: 'u_linden_3', name: 'Maria Santos', base: 99000, nk: 16500, heating: 6500, bank: WOHNEN, startOffset: -28 },
-  { renterId: 'r_noah', tenancyId: 't_noah', unitId: 'u_hafen_l1', name: 'Noah Richter', base: 125000, nk: 20000, heating: 8000, bank: HAFEN, startOffset: -30 },
-  { renterId: 'r_sophie', tenancyId: 't_sophie', unitId: 'u_hafen_l2', name: 'Sophie Klein', base: 108000, nk: 17500, heating: 6500, bank: HAFEN, startOffset: -30 },
-  { renterId: 'r_rheinblick', tenancyId: 't_rheinblick', unitId: 'u_hafen_buero', name: 'Rheinblick Design UG', base: 210000, nk: 33000, heating: 12000, bank: HAFEN, startOffset: -50 },
+  {
+    renterId: 'r_anna',
+    tenancyId: 't_anna',
+    unitId: 'u_muster_a',
+    name: 'Anna Beispiel',
+    base: 95000,
+    nk: 16000,
+    heating: 6000,
+    bank: WOHNEN,
+    startOffset: -60,
+  },
+  {
+    renterId: 'r_fatma',
+    tenancyId: 't_fatma',
+    unitId: 'u_muster_b',
+    name: 'Fatma Yilmaz',
+    base: 68000,
+    nk: 11000,
+    heating: 4000,
+    bank: WOHNEN,
+    startOffset: -5,
+  },
+  {
+    renterId: 'r_clara',
+    tenancyId: 't_clara',
+    unitId: 'u_muster_c',
+    name: 'Clara Vorlage',
+    base: 52000,
+    nk: 8000,
+    heating: 3000,
+    bank: WOHNEN,
+    startOffset: -60,
+  },
+  {
+    renterId: 'r_david',
+    tenancyId: 't_david',
+    unitId: 'u_muster_d',
+    name: 'David Sommer',
+    base: 78000,
+    nk: 14000,
+    heating: 5000,
+    bank: WOHNEN,
+    startOffset: -60,
+  },
+  {
+    renterId: 'r_eva',
+    tenancyId: 't_eva',
+    unitId: 'u_muster_dg',
+    name: 'Eva König',
+    base: 110000,
+    nk: 18000,
+    heating: 7000,
+    bank: WOHNEN,
+    startOffset: -23,
+  },
+  {
+    renterId: 'r_kiez',
+    tenancyId: 't_kiez',
+    unitId: 'u_muster_laden',
+    name: 'Kiez Café GmbH',
+    base: 145000,
+    nk: 22000,
+    heating: 8000,
+    bank: WOHNEN,
+    startOffset: -60,
+  },
+  {
+    renterId: 'r_jonas',
+    tenancyId: 't_jonas',
+    unitId: 'u_linden_1',
+    name: 'Jonas Weber',
+    base: 89000,
+    nk: 15500,
+    heating: 5500,
+    bank: WOHNEN,
+    startOffset: -40,
+  },
+  {
+    renterId: 'r_lea',
+    tenancyId: 't_lea',
+    unitId: 'u_linden_2',
+    name: 'Lea Neumann',
+    base: 76000,
+    nk: 13000,
+    heating: 5000,
+    bank: WOHNEN,
+    startOffset: -30,
+  },
+  {
+    renterId: 'r_maria',
+    tenancyId: 't_maria',
+    unitId: 'u_muster_hof',
+    name: 'Maria Santos',
+    base: 99000,
+    nk: 16500,
+    heating: 6500,
+    bank: WOHNEN,
+    startOffset: -28,
+  },
+  {
+    renterId: 'r_noah',
+    tenancyId: 't_noah',
+    unitId: 'u_hafen_l1',
+    name: 'Noah Richter',
+    base: 125000,
+    nk: 20000,
+    heating: 8000,
+    bank: HAFEN,
+    startOffset: -30,
+  },
+  {
+    renterId: 'r_sophie',
+    tenancyId: 't_sophie',
+    unitId: 'u_hafen_l2',
+    name: 'Sophie Klein',
+    base: 108000,
+    nk: 17500,
+    heating: 6500,
+    bank: HAFEN,
+    startOffset: -30,
+  },
+  {
+    renterId: 'r_rheinblick',
+    tenancyId: 't_rheinblick',
+    unitId: 'u_hafen_buero',
+    name: 'Rheinblick Design UG',
+    base: 210000,
+    nk: 33000,
+    heating: 12000,
+    bank: HAFEN,
+    startOffset: -50,
+  },
 ];
 
 const soll = (p: Party): number => p.base + p.nk + p.heating;
@@ -179,7 +312,13 @@ const BERND = { renterId: 'r_bernd', tenancyId: 't_bernd', name: 'Bernd Muster',
 // ── Generatoren ────────────────────────────────────────────────────────────
 type Json = Record<string, unknown>;
 
-function allocation(id: string, receivableId: string, p: Party, amount: number, status: string): Json {
+function allocation(
+  id: string,
+  receivableId: string,
+  p: Party,
+  amount: number,
+  status: string,
+): Json {
   const settled = status === 'settled';
   return {
     id,
@@ -194,7 +333,13 @@ function allocation(id: string, receivableId: string, p: Party, amount: number, 
       garage_cents: 0,
     },
     resulting_status: status,
-    before: { open_costs_cents: 0, open_interest_cents: 0, open_principal_cents: soll(p), open_cents: soll(p), status: 'open' },
+    before: {
+      open_costs_cents: 0,
+      open_interest_cents: 0,
+      open_principal_cents: soll(p),
+      open_cents: soll(p),
+      status: 'open',
+    },
     after: {
       open_costs_cents: 0,
       open_interest_cents: 0,
@@ -227,16 +372,40 @@ function generate(): Generated {
         if (offset === -6) continue; // Leerstandsmonat: keine Forderung
         if (offset < -5) {
           const recId = `rec_bernd_${offset}`;
-          receivables.push(rentReceivable(recId, BERND.renterId, BERND.tenancyId, offset, BERND.amount, 0, 'settled'));
-          ledger.push(rentLedger(`led_bernd_${offset}`, offset, order++, { ...p, base: BERND.amount, nk: 0, heating: 0 }, recId, BERND.amount, 'settled'));
+          receivables.push(
+            rentReceivable(
+              recId,
+              BERND.renterId,
+              BERND.tenancyId,
+              offset,
+              BERND.amount,
+              0,
+              'settled',
+            ),
+          );
+          ledger.push(
+            rentLedger(
+              `led_bernd_${offset}`,
+              offset,
+              order++,
+              { ...p, base: BERND.amount, nk: 0, heating: 0 },
+              recId,
+              BERND.amount,
+              'settled',
+            ),
+          );
           continue;
         }
       }
       if (offset < p.startOffset) continue;
 
       const recId = `rec_${p.renterId}_${offset}`;
-      receivables.push(rentReceivable(recId, p.renterId, p.tenancyId, offset, soll(p), 0, 'settled'));
-      ledger.push(rentLedger(`led_${p.renterId}_${offset}`, offset, order++, p, recId, soll(p), 'settled'));
+      receivables.push(
+        rentReceivable(recId, p.renterId, p.tenancyId, offset, soll(p), 0, 'settled'),
+      );
+      ledger.push(
+        rentLedger(`led_${p.renterId}_${offset}`, offset, order++, p, recId, soll(p), 'settled'),
+      );
     }
   }
 
@@ -254,7 +423,9 @@ function generate(): Generated {
     created_at: tsISO(-2, 14),
     allocations: [],
   });
-  ledger.push(rentLedger('led_david_ersatz', -2, order++, david, 'rec_r_david_-2', soll(david), 'settled'));
+  ledger.push(
+    rentLedger('led_david_ersatz', -2, order++, david, 'rec_r_david_-2', soll(david), 'settled'),
+  );
 
   // Anna: offene Betriebskosten-Nachzahlung 245,00 €, davon 120,00 € bar in M-1.
   receivables.push({
@@ -287,10 +458,27 @@ function generate(): Generated {
         costs_cents: 12000,
         interest_cents: 0,
         principal_cents: 0,
-        components: { base_rent_cents: 0, nk_advance_cents: 0, heating_advance_cents: 0, garage_cents: 0 },
+        components: {
+          base_rent_cents: 0,
+          nk_advance_cents: 0,
+          heating_advance_cents: 0,
+          garage_cents: 0,
+        },
         resulting_status: 'partial',
-        before: { open_costs_cents: 24500, open_interest_cents: 0, open_principal_cents: 0, open_cents: 24500, status: 'open' },
-        after: { open_costs_cents: 12500, open_interest_cents: 0, open_principal_cents: 0, open_cents: 12500, status: 'partial' },
+        before: {
+          open_costs_cents: 24500,
+          open_interest_cents: 0,
+          open_principal_cents: 0,
+          open_cents: 24500,
+          status: 'open',
+        },
+        after: {
+          open_costs_cents: 12500,
+          open_interest_cents: 0,
+          open_principal_cents: 0,
+          open_cents: 12500,
+          status: 'partial',
+        },
       },
     ],
   });
@@ -299,7 +487,16 @@ function generate(): Generated {
   const anna = partyByUnit('u_muster_a')!;
   const noah = partyByUnit('u_hafen_l1')!;
   const autoBookedM0 = PARTIES.filter((p) =>
-    ['r_anna', 'r_fatma', 'r_clara', 'r_david', 'r_kiez', 'r_lea', 'r_noah', 'r_rheinblick'].includes(p.renterId),
+    [
+      'r_anna',
+      'r_fatma',
+      'r_clara',
+      'r_david',
+      'r_kiez',
+      'r_lea',
+      'r_noah',
+      'r_rheinblick',
+    ].includes(p.renterId),
   );
   for (const p of autoBookedM0) {
     const recId = `rec_${p.renterId}_0`;
@@ -309,7 +506,17 @@ function generate(): Generated {
 
   // Jonas: Teilzahlung 600,00 € auf 1.100,00 €.
   const jonas = partyByUnit('u_linden_1')!;
-  receivables.push(rentReceivable('rec_jonas_0', jonas.renterId, jonas.tenancyId, 0, soll(jonas), 50000, 'partial'));
+  receivables.push(
+    rentReceivable(
+      'rec_jonas_0',
+      jonas.renterId,
+      jonas.tenancyId,
+      0,
+      soll(jonas),
+      50000,
+      'partial',
+    ),
+  );
   ledger.push({
     id: 'led_jonas_0',
     bank_transaction_id: 'btx_jonas_0',
@@ -325,51 +532,121 @@ function generate(): Generated {
 
   // Offene M0-Forderungen ohne Buchung: Sophie (kein Eingang), Eva/Maria (Prüfung).
   const sophie = partyByUnit('u_hafen_l2')!;
-  receivables.push(rentReceivable('rec_sophie_0', sophie.renterId, sophie.tenancyId, 0, soll(sophie), soll(sophie), 'open'));
+  receivables.push(
+    rentReceivable(
+      'rec_sophie_0',
+      sophie.renterId,
+      sophie.tenancyId,
+      0,
+      soll(sophie),
+      soll(sophie),
+      'open',
+    ),
+  );
   const eva = partyByUnit('u_muster_dg')!;
-  receivables.push(rentReceivable('rec_eva_0', eva.renterId, eva.tenancyId, 0, soll(eva), soll(eva), 'open'));
+  receivables.push(
+    rentReceivable('rec_eva_0', eva.renterId, eva.tenancyId, 0, soll(eva), soll(eva), 'open'),
+  );
   const maria = partyByUnit('u_linden_3')!;
-  receivables.push(rentReceivable('rec_maria_0', maria.renterId, maria.tenancyId, 0, soll(maria), soll(maria), 'open'));
+  receivables.push(
+    rentReceivable(
+      'rec_maria_0',
+      maria.renterId,
+      maria.tenancyId,
+      0,
+      soll(maria),
+      soll(maria),
+      'open',
+    ),
+  );
 
   // ── Zuordnung prüfen (Bankumsätze + Vorschläge) ──────────────────────────
   // Eva — Betrag/Zeitraum passen, Absender weicht ab → Prüfung.
-  transactions.push(btx('btx_eva_0', eva.bank, soll(eva), monthISO(0, 2), 'E. König-Fischer', 'Miete Wohnung DG', false));
+  transactions.push(
+    btx(
+      'btx_eva_0',
+      eva.bank,
+      soll(eva),
+      monthISO(0, 2),
+      'E. König-Fischer',
+      'Miete Wohnung DG',
+      false,
+    ),
+  );
   proposals.push({
     transaction_id: 'btx_eva_0',
     decision: 'needs_review',
     reason_de: 'Betrag und Zeitraum passen, aber der Absendername weicht vom üblichen Konto ab.',
-    candidates: [candidate('mp_eva_0', 'rec_eva_0', 'r_eva', { iban: 0, amount: 30, code_or_surname: 20, end_to_end: 0, period: 20 }, 70)],
+    candidates: [
+      candidate(
+        'mp_eva_0',
+        'rec_eva_0',
+        'r_eva',
+        { iban: 0, amount: 30, code_or_surname: 20, end_to_end: 0, period: 20 },
+        70,
+      ),
+    ],
     confirmation: null,
     ledger_entry_id: null,
     created_at: tsISO(0, 2),
   });
 
   // Maria — 100,00 € über der offenen Forderung → Prüfung.
-  transactions.push(btx('btx_maria_0', maria.bank, soll(maria) + 10000, monthISO(0, 3), 'Maria Santos', 'Miete', false));
+  transactions.push(
+    btx(
+      'btx_maria_0',
+      maria.bank,
+      soll(maria) + 10000,
+      monthISO(0, 3),
+      'Maria Santos',
+      'Miete',
+      false,
+    ),
+  );
   proposals.push({
     transaction_id: 'btx_maria_0',
     decision: 'needs_review',
     reason_de: 'Zahlung liegt 100,00 € über der offenen Forderung — bitte prüfen.',
-    candidates: [candidate('mp_maria_0', 'rec_maria_0', 'r_maria', { iban: 40, amount: 0, code_or_surname: 20, end_to_end: 0, period: 20 }, 80)],
+    candidates: [
+      candidate(
+        'mp_maria_0',
+        'rec_maria_0',
+        'r_maria',
+        { iban: 40, amount: 0, code_or_surname: 20, end_to_end: 0, period: 20 },
+        80,
+      ),
+    ],
     confirmation: null,
     ledger_entry_id: null,
     created_at: tsISO(0, 3),
   });
 
   // Nicht zuzuordnender Eingang.
-  transactions.push(btx('btx_emir_0', WOHNEN, 5000, monthISO(0, 6), 'Emir P.', 'Überweisung', false));
+  transactions.push(
+    btx('btx_emir_0', WOHNEN, 5000, monthISO(0, 6), 'Emir P.', 'Überweisung', false),
+  );
   proposals.push({
     transaction_id: 'btx_emir_0',
     decision: 'unmatched',
     reason_de: 'Kein Zahlungscode und kein passender Betrag gefunden.',
-    candidates: [candidate('mp_emir_0', null, null, { iban: 0, amount: 0, code_or_surname: 0, end_to_end: 0, period: 0 }, 0)],
+    candidates: [
+      candidate(
+        'mp_emir_0',
+        null,
+        null,
+        { iban: 0, amount: 0, code_or_surname: 0, end_to_end: 0, period: 0 },
+        0,
+      ),
+    ],
     confirmation: null,
     ledger_entry_id: null,
     created_at: tsISO(0, 6),
   });
 
   // Kiez Café — mögliche Dublette.
-  transactions.push(btx('btx_kiez_dup', WOHNEN, 175000, monthISO(0, 5), 'Kiez Café GmbH', 'Miete Ladenlokal', true));
+  transactions.push(
+    btx('btx_kiez_dup', WOHNEN, 175000, monthISO(0, 5), 'Kiez Café GmbH', 'Miete Ladenlokal', true),
+  );
   proposals.push({
     transaction_id: 'btx_kiez_dup',
     decision: 'deduped',
@@ -381,22 +658,42 @@ function generate(): Generated {
   });
 
   // Bereits automatisch gebuchte M0-Umsätze als Nachweis in der Prüfliste.
-  transactions.push(btx('btx_anna_0', anna.bank, soll(anna), monthISO(0, 1), 'Anna Beispiel', 'Miete', false));
+  transactions.push(
+    btx('btx_anna_0', anna.bank, soll(anna), monthISO(0, 1), 'Anna Beispiel', 'Miete', false),
+  );
   proposals.push({
     transaction_id: 'btx_anna_0',
     decision: 'auto_match',
     reason_de: 'Eindeutige IBAN und exakter Betrag.',
-    candidates: [candidate('mp_anna_0c', 'rec_r_anna_0', 'r_anna', { iban: 40, amount: 30, code_or_surname: 20, end_to_end: 0, period: 20 }, 100)],
+    candidates: [
+      candidate(
+        'mp_anna_0c',
+        'rec_r_anna_0',
+        'r_anna',
+        { iban: 40, amount: 30, code_or_surname: 20, end_to_end: 0, period: 20 },
+        100,
+      ),
+    ],
     confirmation: null,
     ledger_entry_id: 'led_r_anna_0',
     created_at: tsISO(0, 1),
   });
-  transactions.push(btx('btx_noah_0', noah.bank, soll(noah), monthISO(0, 1), 'Noah Richter', 'Miete Loft 1', false));
+  transactions.push(
+    btx('btx_noah_0', noah.bank, soll(noah), monthISO(0, 1), 'Noah Richter', 'Miete Loft 1', false),
+  );
   proposals.push({
     transaction_id: 'btx_noah_0',
     decision: 'auto_match',
     reason_de: 'Eindeutige IBAN und exakter Betrag.',
-    candidates: [candidate('mp_noah_0c', 'rec_r_noah_0', 'r_noah', { iban: 40, amount: 30, code_or_surname: 20, end_to_end: 0, period: 20 }, 100)],
+    candidates: [
+      candidate(
+        'mp_noah_0c',
+        'rec_r_noah_0',
+        'r_noah',
+        { iban: 40, amount: 30, code_or_surname: 20, end_to_end: 0, period: 20 },
+        100,
+      ),
+    ],
     confirmation: null,
     ledger_entry_id: 'led_r_noah_0',
     created_at: tsISO(0, 1),
@@ -479,10 +776,23 @@ function candidate(
   proposalId: string,
   receivableId: string | null,
   renterId: string | null,
-  signals: { iban: number; amount: number; code_or_surname: number; end_to_end: number; period: number },
+  signals: {
+    iban: number;
+    amount: number;
+    code_or_surname: number;
+    end_to_end: number;
+    period: number;
+  },
   confidence: number,
 ): Json {
-  return { proposal_id: proposalId, rank: 1, receivable_id: receivableId, renter_id: renterId, signals, confidence };
+  return {
+    proposal_id: proposalId,
+    rank: 1,
+    receivable_id: receivableId,
+    renter_id: renterId,
+    signals,
+    confidence,
+  };
 }
 
 let cache: Generated | null = null;
@@ -590,6 +900,138 @@ function buildingDetail(buildingId: string): Json | undefined {
   };
 }
 
+function buildingDashboard(buildingId: string): Json | undefined {
+  const b = BUILDINGS.find((item) => item.id === buildingId);
+  if (!b) return undefined;
+  const activeParties = b.units
+    .map((unit) => ({ unit, party: partyByUnit(unit.id) }))
+    .filter((item): item is { unit: UnitSpec; party: Party } => item.party !== undefined);
+  const coldRentCents = activeParties.reduce((sum, item) => sum + item.party.base, 0);
+  const rentSollCents = activeParties.reduce((sum, item) => sum + soll(item.party), 0);
+  const totalAreaSqmX100 = b.units.reduce((sum, unit) => sum + unit.areaSqm * 100, 0);
+  const rentedAreaSqmX100 = activeParties.reduce((sum, item) => sum + item.unit.areaSqm * 100, 0);
+  const avgColdRentCentsPerSqm =
+    rentedAreaSqmX100 > 0 ? Math.round((coldRentCents * 100) / rentedAreaSqmX100) : null;
+  const vacant = b.units.filter((unit) => !unit.occupied).length;
+  const usageTotals = new Map<string, { area: number; rent: number }>();
+  for (const item of activeParties) {
+    const usage = item.unit.usageType ?? 'RESIDENTIAL';
+    const current = usageTotals.get(usage) ?? { area: 0, rent: 0 };
+    usageTotals.set(usage, {
+      area: current.area + item.unit.areaSqm * 100,
+      rent: current.rent + item.party.base,
+    });
+  }
+  return {
+    asOf: NOW.toISOString().slice(0, 10),
+    id: b.id,
+    name: b.name,
+    street: b.street,
+    postalCode: b.postalCode,
+    city: b.city,
+    country: 'Deutschland',
+    buildingType: b.buildingType,
+    buildingTypeLabel: b.buildingType === 'WOHNHAUS' ? 'Wohnhaus' : 'Wohn- und Geschäftshaus',
+    isResidential: true,
+    unitCount: b.units.length,
+    kpis: {
+      coldRentCentsMonthly: coldRentCents,
+      coldRentEurMonthly: eur(coldRentCents),
+      totalAreaSqmX100,
+      totalAreaSqm: totalAreaSqmX100 / 100,
+      rentedAreaSqmX100,
+      rentedAreaSqm: rentedAreaSqmX100 / 100,
+      avgColdRentCentsPerSqm,
+      avgColdRentEurPerSqm: avgColdRentCentsPerSqm === null ? null : eur(avgColdRentCentsPerSqm),
+      occupancy: {
+        rented: b.units.length - vacant,
+        vacant,
+        selfUse: 0,
+        total: b.units.length,
+      },
+      usageBreakdown: [...usageTotals.entries()].map(([usageType, values]) => {
+        const average = values.area > 0 ? Math.round((values.rent * 100) / values.area) : null;
+        return {
+          usageType,
+          usageLabel: usageType === 'COMMERCIAL' ? 'Gewerbe' : 'Wohnen',
+          rentedAreaSqmX100: values.area,
+          rentedAreaSqm: values.area / 100,
+          coldRentCentsMonthly: values.rent,
+          coldRentEurMonthly: eur(values.rent),
+          avgColdRentCentsPerSqm: average,
+          avgColdRentEurPerSqm: average === null ? null : eur(average),
+        };
+      }),
+    },
+    facts: [],
+    factsTotal: 0,
+    units: b.units.map((unit) => {
+      const party = partyByUnit(unit.id);
+      return {
+        id: unit.id,
+        label: unit.label,
+        areaSqmX100: unit.areaSqm * 100,
+        areaSqm: unit.areaSqm,
+        state: party ? 'RENTED' : 'VACANT',
+        stateLabel: party ? 'Vermietet' : 'Leerstand',
+        partyNames: party ? [party.name] : [],
+        hasTenancyOverlap: false,
+        coldRentCents: party?.base ?? null,
+        coldRentEur: party ? eur(party.base) : null,
+        balance: {
+          status: 'NONE',
+          openCents: 0,
+          openEur: eur(0),
+          label: 'Keine Forderung',
+        },
+        nextEvent: null,
+      };
+    }),
+    modules: [
+      {
+        key: 'payments',
+        title: 'Zahlungen',
+        available: true,
+        unavailableReason: null,
+        facts: [
+          { label: 'Mietsoll (Monat)', value: eur(rentSollCents) },
+          { label: 'Offen', value: eur(0) },
+          { label: 'Forderungen', value: '0' },
+        ],
+        actionLabel: 'Zu den Zahlungen',
+        actionHref: '/a/acc_demo_lokara/zahlungen',
+      },
+      {
+        key: 'costs_and_statement',
+        title: 'Kosten & Abrechnung',
+        available: true,
+        unavailableReason: null,
+        facts: [
+          { label: 'Abrechnungsjahr', value: String(YEAR) },
+          { label: 'Kostenpositionen', value: String(COSTS[b.id]?.length ?? 0) },
+          { label: 'Abrechnung', value: 'Vorschau' },
+        ],
+        actionLabel: 'Zu den Kosten',
+        actionHref: '/a/acc_demo_lokara/kosten',
+      },
+      {
+        key: 'meters',
+        title: 'Zähler',
+        available: true,
+        unavailableReason: null,
+        facts: [
+          { label: 'Aktive Zähler', value: String(METERS[b.id]?.length ?? 0) },
+          { label: `Ohne Ablesung ${NOW.getUTCFullYear()}`, value: '0' },
+          { label: 'Wächterhinweise', value: 'Noch nicht verfügbar' },
+        ],
+        actionLabel: 'Zu den Zählern',
+        actionHref: '/a/acc_demo_lokara/zaehler',
+      },
+    ],
+    permissions: { canEdit: false, canCreateUnit: false, canExportPdf: false },
+  };
+}
+
 function unitDetail(unitId: string): Json | undefined {
   for (const b of BUILDINGS) {
     const u = b.units.find((x) => x.id === unitId);
@@ -604,6 +1046,113 @@ function unitDetail(unitId: string): Json | undefined {
         selfUsePeriods: [],
       };
     }
+  }
+  return undefined;
+}
+
+function unitDashboard(unitId: string): Json | undefined {
+  for (const building of BUILDINGS) {
+    const unit = building.units.find((item) => item.id === unitId);
+    if (!unit) continue;
+    const party = partyByUnit(unit.id);
+    const asOf = NOW.toISOString().slice(0, 10);
+    const advanceCents = party ? party.nk + party.heating : 0;
+    const validFrom = party ? monthISO(party.startOffset, 1) : null;
+    return {
+      asOf,
+      id: unit.id,
+      label: unit.label,
+      areaSqmX100: unit.areaSqm * 100,
+      areaSqmDisplay: unit.areaSqm.toLocaleString('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      buildingId: building.id,
+      buildingName: building.name,
+      buildingAddress: `${building.street}, ${building.postalCode} ${building.city}`,
+      state: party ? 'RENTED' : 'VACANT',
+      stateLabel: party ? 'Vermietet' : 'Leerstand',
+      profile: {
+        version: null,
+        usageType: null,
+        usageLabel: 'Nicht dokumentiert',
+        roomsX100: null,
+        roomsDisplay: null,
+        amenities: [],
+        amenityLabels: [],
+        amenityNote: null,
+        evidenceRef: null,
+      },
+      currentTenancy: party
+        ? {
+            id: party.tenancyId,
+            parties: [{ id: party.renterId, name: party.name, email: null }],
+            validFrom,
+            validTo: null,
+            contractType: null,
+            contractTypeLabel: 'Nicht dokumentiert',
+            contractEvidenceRef: null,
+            coldRentCents: party.base,
+            coldRentEur: eur(party.base),
+            coldRentPerSqmEur: (party.base / 100 / unit.areaSqm).toLocaleString('de-DE', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
+            advancePaymentCents: advanceCents,
+            advancePaymentEur: eur(advanceCents),
+            totalMonthlyCents: party.base + advanceCents,
+            totalMonthlyEur: eur(party.base + advanceCents),
+            positions: [],
+            lastRentChange: null,
+          }
+        : null,
+      history:
+        party && validFrom
+          ? [
+              {
+                kind: 'RENTED',
+                label: 'Vermietet',
+                validFrom,
+                validTo: null,
+                partyNames: [party.name],
+                current: true,
+              },
+            ]
+          : [],
+      historyTotal: party ? 1 : 0,
+      historyHasMore: false,
+      documents: [],
+      modules: [
+        {
+          key: 'PAYMENTS',
+          available: false,
+          unavailableReason: 'Zahlungsprojektion wird mit UI-07 aktiviert.',
+        },
+        {
+          key: 'PORTAL',
+          available: false,
+          unavailableReason: 'Das Mieterportal wird mit M10 aktiviert.',
+        },
+        {
+          key: 'MESSAGES',
+          available: false,
+          unavailableReason: 'Nachrichten sind für diese Ansicht noch nicht verfügbar.',
+        },
+        { key: 'DOCUMENTS', available: true, unavailableReason: null },
+      ],
+      primaryAction: party
+        ? {
+            key: 'OPEN_TENANCY',
+            label: 'Mietverhältnis ansehen',
+            href: '#aktuelles-mietverhaeltnis',
+          }
+        : null,
+      permissions: {
+        canEditProfile: false,
+        canCreateTenancy: false,
+        canRecordContractFacts: false,
+      },
+    };
   }
   return undefined;
 }
@@ -680,6 +1229,8 @@ function reading(id: string, iso: string, valueX1000: number, symbol: string): J
     reason: 'PERIODIC',
     source: 'MDL',
     note: null,
+    supersedesReadingId: null,
+    confirmationNote: null,
     tenancyId: null,
     estimatedConsumptionX1000: null,
     estimationBasis: null,
@@ -705,50 +1256,319 @@ function meter(
   close: number,
 ): Json {
   const symbol = SYMBOL[mUnit] ?? '';
+  const deviceType =
+    kind === 'HEAT' && mUnit === 'KWH'
+      ? 'HEAT_METER'
+      : kind === 'HEAT'
+        ? 'HEAT_COST_ALLOCATOR'
+        : kind === 'WARM_WATER'
+          ? 'WARM_WATER_METER'
+          : 'COLD_WATER_METER';
+  const deviceTypeLabel =
+    deviceType === 'HEAT_METER'
+      ? 'Wärmemengenzähler'
+      : deviceType === 'HEAT_COST_ALLOCATOR'
+        ? 'Heizkostenverteiler'
+        : deviceType === 'WARM_WATER_METER'
+          ? 'Warmwasserzähler'
+          : 'Kaltwasserzähler';
   return {
     id,
     unitId,
     unitLabel,
+    deviceType,
+    deviceTypeLabel,
     kind,
-    kindLabel,
+    kindLabel: deviceTypeLabel || kindLabel,
     measurementUnit: mUnit,
     unitSymbol: symbol,
     serial,
     label,
+    location: null,
+    manufacturer: null,
+    model: null,
+    installedOn: `${YEAR - 4}-01-01`,
+    lifecycleStatus: 'ACTIVE',
+    lifecycleEndedOn: null,
+    relatedMeterId: null,
+    lifecycleEvents: [
+      {
+        id: `${id}_installed`,
+        eventType: 'INSTALLED',
+        effectiveOn: `${YEAR - 4}-01-01`,
+        reason: null,
+        relatedMeterId: null,
+        createdAt: `${YEAR - 4}-01-01T09:00:00.000Z`,
+      },
+    ],
+    remoteReadability: 'UNKNOWN',
+    calibrationDataState:
+      calibrationStatus === 'NOT_APPLICABLE' ? 'NOT_APPLICABLE' : 'DATA_AVAILABLE',
+    calibrationDate: calibrationStatus === 'NOT_APPLICABLE' ? null : `${YEAR - 5}-06-01`,
+    calibrationEvidenceRef:
+      calibrationStatus === 'NOT_APPLICABLE' ? null : `Gerätekennzeichnung ${serial}`,
     calibrationValidUntil,
     valuationFactorX1000: factorX1000,
-    valuationFactorDisplay: factorX1000 === null ? null : (factorX1000 / 1000).toLocaleString('de-DE'),
+    valuationFactorDisplay:
+      factorX1000 === null ? null : (factorX1000 / 1000).toLocaleString('de-DE'),
     calibrationStatus,
-    readings: [reading(`${id}_open`, Y1_FROM, open, symbol), reading(`${id}_close`, Y1_TO, close, symbol)],
+    calibrationMessage:
+      calibrationStatus === 'EXPIRED'
+        ? 'Eichfrist abgelaufen'
+        : calibrationStatus === 'NOT_APPLICABLE'
+          ? 'Nicht eichpflichtig'
+          : null,
+    calibrationRechtsstand: calibrationStatus === 'NOT_APPLICABLE' ? null : 'Rechtsstand 08/2026',
+    calibrationProductionBlockers: [],
+    readings: [
+      reading(`${id}_open`, Y1_FROM, open, symbol),
+      reading(`${id}_close`, Y1_TO, close, symbol),
+    ],
+    consumptionPeriods: [
+      {
+        periodFrom: Y1_FROM,
+        periodTo: `${YEAR + 1}-01-01`,
+        periodLabel: `01.01.${YEAR} – 31.12.${YEAR}`,
+        status: 'MEASURED',
+        openingReading: {
+          id: `${id}_open`,
+          readAt: Y1_FROM,
+          valueX1000: open,
+          valueDisplay: fmt(open, symbol).replace(` ${symbol}`, ''),
+          source: 'MDL',
+        },
+        closingReading: {
+          id: `${id}_close`,
+          readAt: Y1_TO,
+          valueX1000: close,
+          valueDisplay: fmt(close, symbol).replace(` ${symbol}`, ''),
+          source: 'MDL',
+        },
+        consumptionX1000: close - open,
+        consumptionDisplay: fmt(close - open, symbol),
+        finding: null,
+        estimationBasis: null,
+        provenanceRef: null,
+      },
+    ],
     periodConsumptionDisplay: fmt(close - open, symbol),
   };
 }
 
 const METERS: Record<string, Json[]> = {
   bld_prev_muster: [
-    meter('m_m_heat', null, null, 'HEAT', 'Wärme', 'KWH', 'WMZ-2022-004711', 'Wärmemengenzähler Heizzentrale', '2027-12-31', 'VALID', 1000, 148_500_000, 168_500_000),
-    meter('m_m_ww', null, null, 'WARM_WATER', 'Warmwasser', 'CUBIC_METRE', 'WWZ-2022-118342', 'Warmwasserzähler Heizzentrale', '2028-12-31', 'VALID', null, 812_000, 852_000),
-    meter('m_m_hkv_a', 'u_muster_a', 'Wohnung A · EG links', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-A-100231', null, null, 'NOT_APPLICABLE', 1000, 1_200_000, 1_800_000),
-    meter('m_m_hkv_b', 'u_muster_b', 'Wohnung B · EG rechts', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-B-100232', null, null, 'NOT_APPLICABLE', 1000, 3_400_000, 3_650_000),
-    meter('m_m_kw_c', 'u_muster_c', 'Wohnung C · 1. OG links', 'COLD_WATER', 'Kaltwasser', 'CUBIC_METRE', 'KWZ-C-441097', null, '2025-12-31', 'EXPIRED', null, 302_400, 340_900),
+    meter(
+      'm_m_heat',
+      null,
+      null,
+      'HEAT',
+      'Wärme',
+      'KWH',
+      'WMZ-2022-004711',
+      'Wärmemengenzähler Heizzentrale',
+      '2027-12-31',
+      'VALID',
+      1000,
+      148_500_000,
+      168_500_000,
+    ),
+    meter(
+      'm_m_ww',
+      null,
+      null,
+      'WARM_WATER',
+      'Warmwasser',
+      'CUBIC_METRE',
+      'WWZ-2022-118342',
+      'Warmwasserzähler Heizzentrale',
+      '2028-12-31',
+      'VALID',
+      null,
+      812_000,
+      852_000,
+    ),
+    meter(
+      'm_m_hkv_a',
+      'u_muster_a',
+      'Wohnung A · EG links',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-A-100231',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      1_200_000,
+      1_800_000,
+    ),
+    meter(
+      'm_m_hkv_b',
+      'u_muster_b',
+      'Wohnung B · EG rechts',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-B-100232',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      3_400_000,
+      3_650_000,
+    ),
+    meter(
+      'm_m_kw_c',
+      'u_muster_c',
+      'Wohnung C · 1. OG links',
+      'COLD_WATER',
+      'Kaltwasser',
+      'CUBIC_METRE',
+      'KWZ-C-441097',
+      null,
+      '2025-12-31',
+      'EXPIRED',
+      null,
+      302_400,
+      340_900,
+    ),
   ],
   bld_prev_linden: [
-    meter('m_l_heat', null, null, 'HEAT', 'Wärme', 'KWH', 'WMZ-2021-220145', 'Hauptwärmezähler', '2027-12-31', 'VALID', 1000, 61_000_000, 78_400_000),
-    meter('m_l_hkv_1', 'u_linden_1', 'Wohnung 1 · EG', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-LW1-3301', null, null, 'NOT_APPLICABLE', 1000, 0, 720_000),
-    meter('m_l_hkv_2', 'u_linden_2', 'Wohnung 2 · 1. OG', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-LW2-3302', null, null, 'NOT_APPLICABLE', 1000, 0, 540_000),
-    meter('m_l_hkv_3', 'u_linden_3', 'Wohnung 3 · 2. OG', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-LW3-3303', null, null, 'NOT_APPLICABLE', 1000, 0, 810_000),
+    meter(
+      'm_l_heat',
+      null,
+      null,
+      'HEAT',
+      'Wärme',
+      'KWH',
+      'WMZ-2021-220145',
+      'Hauptwärmezähler',
+      '2027-12-31',
+      'VALID',
+      1000,
+      61_000_000,
+      78_400_000,
+    ),
+    meter(
+      'm_l_hkv_1',
+      'u_linden_1',
+      'Wohnung 1 · EG',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-LW1-3301',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      0,
+      720_000,
+    ),
+    meter(
+      'm_l_hkv_2',
+      'u_linden_2',
+      'Wohnung 2 · 1. OG',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-LW2-3302',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      0,
+      540_000,
+    ),
+    meter(
+      'm_l_hkv_3',
+      'u_linden_3',
+      'Wohnung 3 · 2. OG',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-LW3-3303',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      0,
+      810_000,
+    ),
   ],
   bld_prev_hafen: [
-    meter('m_h_heat', null, null, 'HEAT', 'Wärme', 'KWH', 'WMZ-2020-559120', 'Hauptwärmezähler', '2026-11-30', 'EXPIRING_SOON', 1000, 92_000_000, 118_600_000),
-    meter('m_h_ww', null, null, 'WARM_WATER', 'Warmwasser', 'CUBIC_METRE', 'WWZ-2023-771204', 'Warmwasserzähler', '2029-12-31', 'VALID', null, 410_000, 468_000),
-    meter('m_h_hkv_l1', 'u_hafen_l1', 'Loft 1', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-HA-L1', null, null, 'NOT_APPLICABLE', 1000, 0, 940_000),
-    meter('m_h_hkv_l2', 'u_hafen_l2', 'Loft 2', 'HEAT', 'Wärme', 'HKV_UNITS', 'HKV-HA-L2', null, null, 'NOT_APPLICABLE', 1000, 0, 815_000),
+    meter(
+      'm_h_heat',
+      null,
+      null,
+      'HEAT',
+      'Wärme',
+      'KWH',
+      'WMZ-2020-559120',
+      'Hauptwärmezähler',
+      '2026-11-30',
+      'EXPIRING_SOON',
+      1000,
+      92_000_000,
+      118_600_000,
+    ),
+    meter(
+      'm_h_ww',
+      null,
+      null,
+      'WARM_WATER',
+      'Warmwasser',
+      'CUBIC_METRE',
+      'WWZ-2023-771204',
+      'Warmwasserzähler',
+      '2029-12-31',
+      'VALID',
+      null,
+      410_000,
+      468_000,
+    ),
+    meter(
+      'm_h_hkv_l1',
+      'u_hafen_l1',
+      'Loft 1',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-HA-L1',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      0,
+      940_000,
+    ),
+    meter(
+      'm_h_hkv_l2',
+      'u_hafen_l2',
+      'Loft 2',
+      'HEAT',
+      'Wärme',
+      'HKV_UNITS',
+      'HKV-HA-L2',
+      null,
+      null,
+      'NOT_APPLICABLE',
+      1000,
+      0,
+      815_000,
+    ),
   ],
 };
 
-function heatingCost(id: string, label: string, cents: number, co2Kg: number | null, co2Cost: number | null): Json {
+function heatingCost(
+  id: string,
+  label: string,
+  cents: number,
+  co2Kg: number | null,
+  co2Cost: number | null,
+): Json {
   return {
     id,
+    category: 'FUEL_OR_HEAT_SUPPLY',
     label,
     amountCents: cents,
     amountEur: eur(cents),
@@ -758,11 +1578,77 @@ function heatingCost(id: string, label: string, cents: number, co2Kg: number | n
     co2KgDisplay: co2Kg === null ? null : co2Kg.toLocaleString('de-DE'),
     co2CostCents: co2Cost,
     co2CostEur: co2Cost === null ? null : eur(co2Cost),
+    sourceRef: `Vorschau-Beleg ${id}`,
+    voidedAt: null,
+    voidReason: null,
+  };
+}
+
+function meterWorkspace(): Json {
+  const buildings = BUILDINGS.map((building) => {
+    const meters = METERS[building.id] ?? [];
+    const buildingMeters = meters.filter((item) => item.unitId === null);
+    const units = building.units.map((unit) => {
+      const unitMeters = meters.filter((item) => item.unitId === unit.id);
+      const party = PARTIES.find((item) => item.unitId === unit.id);
+      return {
+        id: unit.id,
+        label: unit.label,
+        activeMeterCount: unitMeters.length,
+        warningCount: unitMeters.filter((item) =>
+          ['EXPIRED', 'MISSING_DATA', 'REVIEW_REQUIRED'].includes(String(item.calibrationStatus)),
+        ).length,
+        tenancies: party
+          ? [
+              {
+                id: party.tenancyId,
+                label: party.name,
+                validFrom: `${YEAR - 4}-01-01`,
+                validTo: null,
+              },
+            ]
+          : [],
+        meters: unitMeters,
+      };
+    });
+    return {
+      id: building.id,
+      name: building.name,
+      address: `${building.street}, ${building.postalCode} ${building.city}`,
+      activeMeterCount: meters.length,
+      expiredCount: meters.filter((item) => item.calibrationStatus === 'EXPIRED').length,
+      missingDataCount: meters.filter((item) =>
+        ['MISSING_DATA', 'REVIEW_REQUIRED'].includes(String(item.calibrationStatus)),
+      ).length,
+      buildingMeters,
+      units,
+    };
+  });
+  return {
+    asOf: NOW.toISOString(),
+    periodLabel: `01.01.${YEAR} – 31.12.${YEAR}`,
+    buildings,
+    expiredMeterIds: buildings.flatMap((building) =>
+      (building.units as Json[])
+        .flatMap((unit) => unit.meters as Json[])
+        .concat(building.buildingMeters as Json[])
+        .filter((item) => item.calibrationStatus === 'EXPIRED')
+        .map((item) => String(item.id)),
+    ),
+    permissions: { canWrite: false },
   };
 }
 
 const HEATING_COSTS: Record<string, Json[]> = {
-  bld_prev_muster: [heatingCost('hc_m', 'Heizung & Warmwasser (Brennstoff, Wartung, Betriebsstrom)', 1_030_000, 4000, 26180)],
+  bld_prev_muster: [
+    heatingCost(
+      'hc_m',
+      'Heizung & Warmwasser (Brennstoff, Wartung, Betriebsstrom)',
+      1_030_000,
+      4000,
+      26180,
+    ),
+  ],
   bld_prev_linden: [heatingCost('hc_l', 'Heizung & Warmwasser', 680_000, 2600, 17020)],
   bld_prev_hafen: [heatingCost('hc_h', 'Heizung & Warmwasser', 940_000, 3600, 23560)],
 };
@@ -787,12 +1673,27 @@ export function previewResponse(path: string, init?: RequestInit): unknown {
     }
     if (/\/a\/[^/]+\/portfolio\/overview$/.test(clean)) return portfolioOverview();
     if (/\/a\/[^/]+\/buildings$/.test(clean)) return buildingList();
+    if (/\/a\/[^/]+\/meter-workspace$/.test(clean)) return meterWorkspace();
+    const bDashboard = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)\/dashboard$/);
+    if (bDashboard?.[1]) return buildingDashboard(bDashboard[1]);
+    const uDashboard = clean.match(/\/a\/[^/]+\/units\/([^/]+)\/dashboard$/);
+    if (uDashboard?.[1]) return unitDashboard(uDashboard[1]);
     const costs = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)\/costs$/);
     if (costs?.[1]) return { costs: COSTS[costs[1]] ?? [] };
     const meters = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)\/meters$/);
-    if (meters?.[1]) return { meters: METERS[meters[1]] ?? [], periodLabel: `01.01.${YEAR} – 31.12.${YEAR}` };
+    if (meters?.[1])
+      return { meters: METERS[meters[1]] ?? [], periodLabel: `01.01.${YEAR} – 31.12.${YEAR}` };
     const heating = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)\/heating-costs$/);
-    if (heating?.[1]) return { heatingCosts: HEATING_COSTS[heating[1]] ?? [] };
+    if (heating?.[1])
+      return {
+        heatingCosts: HEATING_COSTS[heating[1]] ?? [],
+        readiness: 'COMPLETE',
+        findings: [],
+      };
+    const modes = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)\/heating-billing-modes$/);
+    if (modes?.[1]) return [];
+    const mdl = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)\/mdl-statements$/);
+    if (mdl?.[1]) return [];
     const bDetail = clean.match(/\/a\/[^/]+\/buildings\/([^/]+)$/);
     if (bDetail?.[1]) return buildingDetail(bDetail[1]);
     const uDetail = clean.match(/\/a\/[^/]+\/units\/([^/]+)$/);

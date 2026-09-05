@@ -10,12 +10,19 @@ from decimal import Decimal
 from typing import Literal
 
 from lokara_domain import (
-    CANONICAL_UNITS,
+    DEVICE_TYPE_FACTS,
     AllocationKey,
+    CalibrationDataState,
+    ExternalHeatingStatus,
+    HeatingBillingMode,
+    HeatingCostCategory,
     MeasurementUnit,
+    MeterDeviceType,
     MeterKind,
+    MeterLifecycleEventType,
     ReadingReason,
     ReadingSource,
+    RemoteReadability,
 )
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -229,6 +236,19 @@ class CostCreate(ApiModel):
         return self
 
 
+class CostCataloguePositionOut(ApiModel):
+    catalogue_id: str
+    label: str
+    betrkv_number: str | None
+    default_key: AllocationKey | None
+    naming_required: bool
+    allocable: bool
+
+
+class CostCatalogueResponse(ApiModel):
+    positions: list[CostCataloguePositionOut]
+
+
 class CostEntryOut(ApiModel):
     id: str
     label: str
@@ -236,8 +256,8 @@ class CostEntryOut(ApiModel):
     amount_eur: str
     period_from: date
     period_to: date
-    key: AllocationKey  # the CURRENT assignment (latest row wins)
-    key_label: str
+    key: AllocationKey | None  # null for documented non-allocable costs
+    key_label: str | None
     direct_unit_id: str | None
     direct_tenancy_id: str | None
     # Length of the append-only assignment history — re-keying grows this and
@@ -412,6 +432,17 @@ class BuildingDashboardOccupancy(ApiModel):
     total: int
 
 
+class BuildingDashboardUsageKpi(ApiModel):
+    usage_type: Literal["RESIDENTIAL", "COMMERCIAL", "OTHER"]
+    usage_label: str
+    rented_area_sqm_x100: int
+    rented_area_sqm: float
+    cold_rent_cents_monthly: int
+    cold_rent_eur_monthly: str
+    avg_cold_rent_cents_per_sqm: int | None
+    avg_cold_rent_eur_per_sqm: str | None
+
+
 class BuildingDashboardKpis(ApiModel):
     cold_rent_cents_monthly: int
     cold_rent_eur_monthly: str
@@ -423,6 +454,7 @@ class BuildingDashboardKpis(ApiModel):
     avg_cold_rent_cents_per_sqm: int | None
     avg_cold_rent_eur_per_sqm: str | None
     occupancy: BuildingDashboardOccupancy
+    usage_breakdown: list[BuildingDashboardUsageKpi]
 
 
 class BuildingDashboardFact(ApiModel):
@@ -596,34 +628,315 @@ class UnitDetailResponse(ApiModel):
     self_use_periods: list[SelfUsePeriodOut]
 
 
+class UnitProfileVersionCreate(ApiModel):
+    effective_from: date
+    usage_type: Literal["RESIDENTIAL", "COMMERCIAL", "OTHER"]
+    rooms_x100: int | None = Field(default=None, ge=0)
+    amenities: list[
+        Literal[
+            "BALCONY",
+            "TERRACE",
+            "ELEVATOR",
+            "CELLAR",
+            "FITTED_KITCHEN",
+            "BARRIER_REDUCED",
+        ]
+    ] = Field(default_factory=list)
+    amenity_note: str | None = Field(default=None, max_length=500)
+    evidence_ref: str = Field(min_length=1, max_length=500)
+
+
+class TenancyContractVersionCreate(ApiModel):
+    effective_from: date
+    contract_type: Literal[
+        "RESIDENTIAL_OPEN_ENDED",
+        "RESIDENTIAL_FIXED_TERM",
+        "COMMERCIAL_OPEN_ENDED",
+        "COMMERCIAL_FIXED_TERM",
+        "OTHER",
+    ]
+    evidence_ref: str = Field(min_length=1, max_length=500)
+
+
+class TenancyContractPositionCreate(ApiModel):
+    position_type: Literal["GARAGE", "PARKING"]
+    inclusion_type: Literal["INCLUDED", "SEPARATE"]
+    label: str | None = Field(default=None, max_length=200)
+    monthly_amount_cents: int | None = Field(default=None, ge=0)
+    valid_from: date
+    valid_to: date | None = None
+    evidence_ref: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _position_is_consistent(self) -> "TenancyContractPositionCreate":
+        if self.valid_to is not None and self.valid_to <= self.valid_from:
+            raise ValueError("valid_to must be after valid_from")
+        if self.inclusion_type == "SEPARATE" and self.monthly_amount_cents is None:
+            raise ValueError("a separate position needs a monthly amount")
+        return self
+
+
+class TenancyRentChangeCreate(ApiModel):
+    effective_from: date
+    new_base_rent_cents: int = Field(ge=0)
+    evidence_ref: str = Field(min_length=1, max_length=500)
+
+
+class UnitDashboardWriteResponse(ApiModel):
+    id: str
+
+
+class UnitDashboardProfile(ApiModel):
+    version: int | None
+    usage_type: str | None
+    usage_label: str
+    rooms_x100: int | None
+    rooms_display: str | None
+    amenities: list[str]
+    amenity_labels: list[str]
+    amenity_note: str | None
+    evidence_ref: str | None
+
+
+class UnitDashboardParty(ApiModel):
+    id: str
+    name: str
+    email: str | None
+
+
+class UnitDashboardContractPosition(ApiModel):
+    id: str
+    position_type: str
+    position_label: str
+    inclusion_type: str
+    inclusion_label: str
+    label: str | None
+    monthly_amount_cents: int | None
+    monthly_amount_eur: str | None
+
+
+class UnitDashboardRentChange(ApiModel):
+    effective_from: date
+    new_base_rent_cents: int
+    new_base_rent_eur: str
+    evidence_ref: str
+
+
+class UnitDashboardTenancy(ApiModel):
+    id: str
+    parties: list[UnitDashboardParty]
+    valid_from: date
+    valid_to: date | None
+    contract_type: str | None
+    contract_type_label: str
+    contract_evidence_ref: str | None
+    cold_rent_cents: int
+    cold_rent_eur: str
+    cold_rent_per_sqm_eur: str | None
+    advance_payment_cents: int
+    advance_payment_eur: str
+    total_monthly_cents: int
+    total_monthly_eur: str
+    positions: list[UnitDashboardContractPosition]
+    last_rent_change: UnitDashboardRentChange | None
+
+
+class UnitDashboardHistorySegment(ApiModel):
+    kind: Literal["RENTED", "VACANT", "SELF_USE", "GRATUITOUS"]
+    label: str
+    valid_from: date
+    valid_to: date | None
+    party_names: list[str]
+    current: bool
+
+
+class UnitDashboardDocument(ApiModel):
+    id: str
+    statement_id: str
+    document_type: str
+    filename: str
+    sha256: str
+    size_bytes: int
+    created_at: datetime
+    download_href: str
+
+
+class UnitDashboardModule(ApiModel):
+    key: Literal["PAYMENTS", "PORTAL", "MESSAGES", "DOCUMENTS"]
+    available: bool
+    unavailable_reason: str | None
+
+
+class UnitDashboardAction(ApiModel):
+    key: str
+    label: str
+    href: str
+
+
+class UnitDashboardPermissions(ApiModel):
+    can_edit_profile: bool
+    can_create_tenancy: bool
+    can_record_contract_facts: bool
+
+
+class UnitDashboardResponse(ApiModel):
+    as_of: date
+    id: str
+    label: str
+    area_sqm_x100: int
+    area_sqm_display: str
+    building_id: str
+    building_name: str
+    building_address: str
+    state: Literal["RENTED", "VACANT", "SELF_USE", "GRATUITOUS", "CONFLICT"]
+    state_label: str
+    profile: UnitDashboardProfile
+    current_tenancy: UnitDashboardTenancy | None
+    history: list[UnitDashboardHistorySegment]
+    history_total: int
+    history_has_more: bool
+    documents: list[UnitDashboardDocument]
+    modules: list[UnitDashboardModule]
+    primary_action: UnitDashboardAction | None
+    permissions: UnitDashboardPermissions
+
+
 # ── Zähler (docs/04 M3 page 5) ───────────────────────────────────────────────
 
 
+class GasConversionCreate(ApiModel):
+    """Exact supplier-invoice facts used to convert gas volume to heat."""
+
+    calorific_factor_kwh_per_m3: Decimal = Field(gt=0, max_digits=12, decimal_places=6)
+    condition_number: Decimal = Field(gt=0, max_digits=12, decimal_places=6)
+    valid_from: date
+    valid_to: date | None = None
+    supplier_invoice_reference: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _period_is_ordered(self) -> "GasConversionCreate":
+        if self.valid_to is not None and self.valid_to <= self.valid_from:
+            raise ValueError("gas conversion valid_to must be after valid_from")
+        if not self.supplier_invoice_reference.strip():
+            raise ValueError("gas conversion supplier reference is required")
+        self.supplier_invoice_reference = self.supplier_invoice_reference.strip()
+        return self
+
+
+class GasConversionOut(ApiModel):
+    calorific_factor_kwh_per_m3: Decimal
+    condition_number: Decimal
+    valid_from: date
+    valid_to: date | None
+    supplier_invoice_reference: str
+    source_type: Literal["SUPPLIER_INVOICE"]
+    source_id: str
+    rechtsstand: Literal["08/2026"]
+    verification_status: Literal["verify-before-production"]
+    configuration_id: str
+    supersedes_configuration_id: str | None
+
+
 class MeterCreate(ApiModel):
-    """A device. unit_id null = a building-level Hauptzähler."""
+    """One immutable device identity; replacement is one atomic workflow."""
 
     unit_id: str | None = None
-    kind: MeterKind
-    measurement_unit: MeasurementUnit
+    device_type: MeterDeviceType | None = None
+    kind: MeterKind | None = None
+    measurement_unit: MeasurementUnit | None = None
     serial: str = Field(min_length=1, max_length=100)
     label: str | None = Field(default=None, max_length=200)
-    calibration_valid_until: date | None = None  # Eichfrist; null = nicht eichpflichtig
+    location: str | None = Field(default=None, max_length=200)
+    manufacturer: str | None = Field(default=None, max_length=200)
+    model: str | None = Field(default=None, max_length=200)
+    installed_on: date
+    remote_readability: RemoteReadability = RemoteReadability.UNKNOWN
+    calibration_data_state: CalibrationDataState
+    calibration_date: date | None = None
+    calibration_evidence_ref: str | None = Field(default=None, max_length=500)
+    # Legacy input remains accepted during migration, but never drives a new
+    # calculation. UI-08 stores the observed calibration date instead.
+    calibration_valid_until: date | None = None
     # Exact K11 factor × 1000. Heat devices default to the neutral 1.000.
     valuation_factor_x1000: int | None = Field(default=None, gt=0)
+    creation_mode: Literal["NEW", "EXISTING", "REPLACEMENT"] = "NEW"
+    replaces_meter_id: str | None = None
+    replacement_date: date | None = None
+    old_final_value_x1000: int | None = Field(default=None, ge=0)
+    new_initial_value_x1000: int | None = Field(default=None, ge=0)
+    replacement_reason: str | None = Field(default=None, max_length=500)
+    gas_conversion: GasConversionCreate | None = None
 
     @model_validator(mode="after")
     def _unit_matches_kind(self) -> "MeterCreate":
-        """Water is always counted in m³, and only a heat device may count kWh
-        or HKV units — a Kaltwasserzähler in kWh is a data-entry error, and one
-        that reached the DB would silently corrupt the § 9 denominator."""
-        expected = CANONICAL_UNITS.get(self.kind)
-        if expected is not None and self.measurement_unit is not expected:
-            raise ValueError(f"{self.kind.value} is measured in {expected.value}")
-        if self.kind is MeterKind.HEAT and self.measurement_unit is (MeasurementUnit.CUBIC_METRE):
-            raise ValueError("HEAT is measured in KWH or HKV_UNITS")
-        if self.kind is not MeterKind.HEAT and self.valuation_factor_x1000 is not None:
+        if self.device_type is None:
+            if self.kind is None or self.measurement_unit is None:
+                raise ValueError("device_type is required")
+            matches = [
+                device
+                for device, facts in DEVICE_TYPE_FACTS.items()
+                if facts == (self.kind, self.measurement_unit)
+            ]
+            if len(matches) != 1:
+                raise ValueError("kind and measurement_unit do not identify one device type")
+            self.device_type = matches[0]
+        expected_kind, expected_unit = DEVICE_TYPE_FACTS[self.device_type]
+        if self.kind is not None and self.kind is not expected_kind:
+            raise ValueError("device_type does not match kind")
+        if self.measurement_unit is not None and self.measurement_unit is not expected_unit:
+            raise ValueError("device_type does not match measurement_unit")
+        self.kind = expected_kind
+        self.measurement_unit = expected_unit
+        if self.device_type is MeterDeviceType.GAS_METER:
+            if self.gas_conversion is None:
+                raise ValueError("gas_conversion is required for GAS_METER")
+        elif self.gas_conversion is not None:
+            raise ValueError("gas_conversion is only valid for GAS_METER")
+        if expected_kind is not MeterKind.HEAT and self.valuation_factor_x1000 is not None:
             raise ValueError("valuation_factor_x1000 is only valid for HEAT meters")
+        if self.calibration_data_state is CalibrationDataState.DATA_AVAILABLE:
+            if self.calibration_date is None or not self.calibration_evidence_ref:
+                raise ValueError("calibration_date and evidence are required")
+        elif self.calibration_date is not None or self.calibration_evidence_ref is not None:
+            raise ValueError("calibration facts are only valid with DATA_AVAILABLE")
+        if self.creation_mode == "REPLACEMENT":
+            required = (
+                self.replaces_meter_id,
+                self.replacement_date,
+                self.old_final_value_x1000,
+                self.new_initial_value_x1000,
+                self.replacement_reason,
+            )
+            if any(value is None or value == "" for value in required):
+                raise ValueError("replacement requires old meter, date, both readings and reason")
+            if self.replacement_date != self.installed_on:
+                raise ValueError("replacement_date must equal installed_on")
+        elif any(
+            value is not None
+            for value in (
+                self.replaces_meter_id,
+                self.replacement_date,
+                self.old_final_value_x1000,
+                self.new_initial_value_x1000,
+                self.replacement_reason,
+            )
+        ):
+            raise ValueError("replacement fields require creation_mode REPLACEMENT")
         return self
+
+
+class MeterLifecycleCreate(ApiModel):
+    effective_on: date
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class MeterLifecycleOut(ApiModel):
+    id: str
+    event_type: MeterLifecycleEventType
+    effective_on: date
+    reason: str | None
+    related_meter_id: str | None
+    created_at: datetime
 
 
 class MeterReadingCreate(ApiModel):
@@ -636,6 +949,9 @@ class MeterReadingCreate(ApiModel):
     reason: ReadingReason
     source: ReadingSource = ReadingSource.MANUAL
     note: str | None = Field(default=None, max_length=500)
+    supersedes_reading_id: str | None = None
+    confirmation_note: str | None = Field(default=None, max_length=500)
+    confirmed_finding_codes: list[str] = Field(default_factory=list)
     tenancy_id: str | None = None
     estimated_consumption_x1000: int | None = Field(default=None, ge=0)
     estimation_basis: str | None = Field(default=None, min_length=1, max_length=500)
@@ -645,7 +961,26 @@ class MeterReadingCreate(ApiModel):
     def _estimate_has_basis(self) -> "MeterReadingCreate":
         if (self.estimated_consumption_x1000 is None) != (self.estimation_basis is None):
             raise ValueError("estimated_consumption_x1000 and estimation_basis belong together")
+        if self.reason is ReadingReason.CORRECTION:
+            if self.supersedes_reading_id is None or not self.confirmation_note:
+                raise ValueError("a correction requires its target and a reason")
+        elif self.supersedes_reading_id is not None:
+            raise ValueError("only a correction may supersede a reading")
+        if self.reason is ReadingReason.DEVICE_CHANGE:
+            raise ValueError("use the atomic replacement workflow for a device change")
         return self
+
+
+class ReadingPlausibilityFinding(ApiModel):
+    code: str
+    severity: Literal["NOTICE", "WARNING", "BLOCKER"]
+    message: str
+    requires_confirmation: bool
+
+
+class ReadingPlausibilityResponse(ApiModel):
+    findings: list[ReadingPlausibilityFinding]
+    suggested_tenancy_id: str | None
 
 
 class MeterReadingOut(ApiModel):
@@ -656,6 +991,8 @@ class MeterReadingOut(ApiModel):
     reason: ReadingReason
     source: ReadingSource
     note: str | None
+    supersedes_reading_id: str | None
+    confirmation_note: str | None
     tenancy_id: str | None
     estimated_consumption_x1000: int | None
     estimation_basis: str | None
@@ -666,22 +1003,70 @@ class MeterReadingOut(ApiModel):
     superseded: bool
 
 
+class MeterConsumptionReading(ApiModel):
+    id: str
+    read_at: date
+    value_x1000: int
+    value_display: str
+    source: ReadingSource
+
+
+class MeterConsumptionPeriod(ApiModel):
+    period_from: date
+    period_to: date
+    period_label: str
+    status: Literal["MEASURED", "INCOMPLETE", "ESTIMATED", "NOT_APPLICABLE"]
+    opening_reading: MeterConsumptionReading | None
+    closing_reading: MeterConsumptionReading | None
+    consumption_x1000: int | None
+    consumption_display: str | None
+    finding: str | None
+    estimation_basis: str | None
+    provenance_ref: str | None
+
+
 class MeterOut(ApiModel):
     id: str
     unit_id: str | None
     unit_label: str | None  # null = building-level (Hauptzähler)
+    device_type: MeterDeviceType
+    device_type_label: str
     kind: MeterKind
     kind_label: str
     measurement_unit: MeasurementUnit
     unit_symbol: str  # "kWh", "m³", "Einheiten"
     serial: str
     label: str | None
+    location: str | None
+    manufacturer: str | None
+    model: str | None
+    installed_on: date
+    lifecycle_status: Literal["ACTIVE", "REMOVED", "REPLACED", "VOID"]
+    lifecycle_ended_on: date | None
+    related_meter_id: str | None
+    lifecycle_events: list[MeterLifecycleOut]
+    remote_readability: RemoteReadability
+    calibration_data_state: CalibrationDataState
+    calibration_date: date | None
+    calibration_evidence_ref: str | None
     calibration_valid_until: date | None
     valuation_factor_x1000: int | None
     valuation_factor_display: str | None
+    gas_conversion: GasConversionOut | None
     # Computed, never stored (CLAUDE.md: guards are derived from data).
-    calibration_status: Literal["EXPIRED", "EXPIRING_SOON", "VALID", "NOT_APPLICABLE"]
+    calibration_status: Literal[
+        "EXPIRED",
+        "EXPIRING_SOON",
+        "VALID",
+        "MISSING_DATA",
+        "NOT_APPLICABLE",
+        "REVIEW_REQUIRED",
+    ]
+    calibration_message: str | None
+    calibration_rechtsstand: str | None
+    calibration_production_blockers: list[str]
     readings: list[MeterReadingOut]  # newest first
+    consumption_periods: list[MeterConsumptionPeriod]
     # Consumption over the billing period, from the effective opening/closing
     # readings; null when the pair is missing or unusable (→ § 9a estimate).
     period_consumption_display: str | None
@@ -692,13 +1077,54 @@ class MeterListResponse(ApiModel):
     period_label: str
 
 
+class MeterWorkspaceUnit(ApiModel):
+    id: str
+    label: str
+    active_meter_count: int
+    warning_count: int
+    tenancies: list["MeterWorkspaceTenancy"]
+    meters: list[MeterOut]
+
+
+class MeterWorkspaceTenancy(ApiModel):
+    id: str
+    label: str
+    valid_from: date
+    valid_to: date | None
+
+
+class MeterWorkspaceBuilding(ApiModel):
+    id: str
+    name: str
+    address: str
+    active_meter_count: int
+    expired_count: int
+    missing_data_count: int
+    building_meters: list[MeterOut]
+    units: list[MeterWorkspaceUnit]
+
+
+class MeterWorkspacePermissions(ApiModel):
+    can_write: bool
+
+
+class MeterWorkspaceResponse(ApiModel):
+    as_of: datetime
+    period_label: str
+    buildings: list[MeterWorkspaceBuilding]
+    expired_meter_ids: list[str]
+    permissions: MeterWorkspacePermissions
+
+
 class HeatingCostCreate(ApiModel):
+    category: HeatingCostCategory
     label: str = Field(min_length=1, max_length=200)
     amount_cents: int = Field(gt=0)  # total, incl. the CO₂ portion
     period_from: date
     period_to: date  # exclusive
     co2_kg_x1000: int | None = Field(default=None, ge=0)
     co2_cost_cents: int | None = Field(default=None, ge=0)
+    source_ref: str = Field(min_length=1, max_length=500)
 
     @model_validator(mode="after")
     def _period_order(self) -> "HeatingCostCreate":
@@ -711,6 +1137,7 @@ class HeatingCostCreate(ApiModel):
 
 class HeatingCostOut(ApiModel):
     id: str
+    category: HeatingCostCategory
     label: str
     amount_cents: int
     amount_eur: str
@@ -720,10 +1147,69 @@ class HeatingCostOut(ApiModel):
     co2_kg_display: str | None
     co2_cost_cents: int | None
     co2_cost_eur: str | None
+    source_ref: str | None
+    voided_at: datetime | None
+    void_reason: str | None
 
 
 class HeatingCostListResponse(ApiModel):
     heating_costs: list[HeatingCostOut]
+    readiness: Literal["COMPLETE", "MISSING_INFORMATION", "REVIEW_REQUIRED"]
+    findings: list[str]
+
+
+class HeatingCostVoid(ApiModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class HeatingBillingModeCreate(ApiModel):
+    period_from: date
+    period_to: date
+    mode: HeatingBillingMode
+    provider_name: str | None = Field(default=None, max_length=200)
+    provider_reference: str | None = Field(default=None, max_length=200)
+    external_status: ExternalHeatingStatus | None = None
+    mdl_statement_id: str | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def _mode_shape(self) -> "HeatingBillingModeCreate":
+        if self.period_to <= self.period_from:
+            raise ValueError("period_to must be after period_from")
+        if self.mode is HeatingBillingMode.LOKARA:
+            if any(
+                value is not None
+                for value in (
+                    self.provider_name,
+                    self.provider_reference,
+                    self.external_status,
+                    self.mdl_statement_id,
+                )
+            ):
+                raise ValueError("LOKARA mode cannot carry external provider data")
+        elif not self.provider_name or self.external_status is None:
+            raise ValueError("external mode requires provider and workflow status")
+        if (
+            self.external_status is ExternalHeatingStatus.UEBERNOMMEN
+            and self.mdl_statement_id is None
+        ):
+            raise ValueError("adoption requires a confirmed MDL statement")
+        return self
+
+
+class HeatingBillingModeOut(ApiModel):
+    id: str
+    building_id: str
+    period_from: date
+    period_to: date
+    version: int
+    mode: HeatingBillingMode
+    provider_name: str | None
+    provider_reference: str | None
+    external_status: ExternalHeatingStatus | None
+    mdl_statement_id: str | None
+    note: str | None
+    created_at: datetime
 
 
 # ── Beleg-Upload / Extraktion (docs/04 M4, canned) ───────────────────────────

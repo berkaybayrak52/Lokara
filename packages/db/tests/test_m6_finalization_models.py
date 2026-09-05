@@ -64,6 +64,7 @@ def test_m6b_archive_stores_downloadable_immutable_bytes_and_hash() -> None:
         "statement_id",
         "audience",
         "tenancy_id",
+        "document_type",
         "content_bytes",
         "sha256",
         "mime_type",
@@ -85,10 +86,10 @@ def test_m6b_archive_stores_downloadable_immutable_bytes_and_hash() -> None:
 
 
 def test_m6b_archive_uniqueness_keeps_one_owner_and_one_tenant_document() -> None:
-    """M6B-F16/F17: no duplicate audience/tenancy archive rows per version."""
+    """M6B-F16/F17: no duplicate document type per audience/tenancy and version."""
     archive = _table("statement_document_archive")
     unique_sets = _unique_column_sets(archive)
-    assert frozenset({"statement_id", "audience", "tenancy_id"}) in unique_sets
+    assert frozenset({"statement_id", "audience", "tenancy_id", "document_type"}) in unique_sets
     # A nullable tenancy cannot make the owner row unique on PostgreSQL by
     # itself.  The implementation must add a partial unique owner index.
     assert any(

@@ -118,6 +118,7 @@ def client() -> Iterator[TestClient]:
                     person_id=person_id,
                     account_id=account_id,
                     role=role,
+                    accepted_at=datetime(2025, 1, 1, 9, 0, tzinfo=UTC),
                 )
             )
 

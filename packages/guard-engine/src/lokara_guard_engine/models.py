@@ -69,6 +69,7 @@ class MeterCalibrationRuleBundle:
     evidence: tuple[RuleEvidence, ...]
     unresolved_conflicts: tuple[RuleConflict, ...]
     years_by_medium: Mapping[str, int]
+    legacy_years_by_medium: Mapping[str, int]
     medium_labels_de: Mapping[str, str]
     excluded_media: tuple[str, ...]
     expiry_month: int

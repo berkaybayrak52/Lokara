@@ -4,20 +4,59 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { api } from '@/lib/api';
-import type { MeasurementUnit, MeterKind, ReadingReason } from '@/lib/contracts';
+import type {
+  CalibrationDataState,
+  HeatingCostCategory,
+  MeterDeviceType,
+  ReadingReason,
+  RemoteReadability,
+} from '@/lib/contracts';
 import {
+  HeatingBillingModeListSchema,
+  HeatingBillingModeOutSchema,
   HeatingCostListResponseSchema,
   HeatingCostOutSchema,
-  MeterListResponseSchema,
   MeterOutSchema,
+  MeterWorkspaceResponseSchema,
+  ReadingPlausibilityResponseSchema,
 } from '@/lib/contracts';
 
-export function useMeters(accountId: string, buildingId: string) {
+const MdlStatementOutSchema = z.object({
+  id: z.string(),
+  branch: z.enum(['NET', 'GROSS']),
+  periodLabel: z.string(),
+  confirmedTotalCents: z.number().int(),
+  ownerPositionCents: z.number().int(),
+  positionCount: z.number().int(),
+  sourceRef: z.string(),
+  version: z.number().int(),
+});
+const MdlStatementListSchema = z.array(MdlStatementOutSchema);
+
+export function useMeterWorkspace(accountId: string) {
   return useQuery({
-    queryKey: ['account', accountId, 'buildings', buildingId, 'meters'],
-    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/meters`, MeterListResponseSchema),
+    queryKey: ['account', accountId, 'meter-workspace'],
+    queryFn: () => api(`/a/${accountId}/meter-workspace`, MeterWorkspaceResponseSchema),
     retry: false,
   });
+}
+
+export function useMeters(accountId: string, buildingId: string) {
+  const workspace = useMeterWorkspace(accountId);
+  return {
+    ...workspace,
+    data: workspace.data
+      ? {
+          meters: workspace.data.buildings
+            .filter((building) => building.id === buildingId)
+            .flatMap((building) => [
+              ...building.buildingMeters,
+              ...building.units.flatMap((unit) => unit.meters),
+            ]),
+          periodLabel: workspace.data.periodLabel,
+        }
+      : undefined,
+  };
 }
 
 export function useHeatingCosts(accountId: string, buildingId: string) {
@@ -29,17 +68,34 @@ export function useHeatingCosts(accountId: string, buildingId: string) {
   });
 }
 
-/**
- * Meters and heating costs both feed the Heizkostenabrechnung, so every
- * mutation here invalidates the statement too — the Abrechnung can never show
- * numbers derived from readings that have since changed.
- */
-function useMeterInvalidation(accountId: string, buildingId: string) {
+export function useHeatingBillingModes(accountId: string, buildingId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'buildings', buildingId, 'heating-billing-modes'],
+    queryFn: () =>
+      api(
+        `/a/${accountId}/buildings/${buildingId}/heating-billing-modes`,
+        HeatingBillingModeListSchema,
+      ),
+    retry: false,
+  });
+}
+
+export function useMdlStatements(accountId: string, buildingId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'buildings', buildingId, 'mdl-statements'],
+    queryFn: () =>
+      api(`/a/${accountId}/buildings/${buildingId}/mdl-statements`, MdlStatementListSchema),
+    retry: false,
+  });
+}
+
+function useMeterInvalidation(accountId: string, buildingId?: string) {
   const queryClient = useQueryClient();
   return () => {
-    for (const key of ['meters', 'heating-costs']) {
+    void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'meter-workspace'] });
+    if (buildingId) {
       void queryClient.invalidateQueries({
-        queryKey: ['account', accountId, 'buildings', buildingId, key],
+        queryKey: ['account', accountId, 'buildings', buildingId],
       });
     }
     void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'statement'] });
@@ -48,11 +104,31 @@ function useMeterInvalidation(accountId: string, buildingId: string) {
 
 export interface MeterCreateInput {
   unitId?: string | null;
-  kind: MeterKind;
-  measurementUnit: MeasurementUnit;
+  deviceType: MeterDeviceType;
   serial: string;
   label?: string | null;
-  calibrationValidUntil?: string | null;
+  location?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  installedOn: string;
+  remoteReadability: RemoteReadability;
+  calibrationDataState: CalibrationDataState;
+  calibrationDate?: string | null;
+  calibrationEvidenceRef?: string | null;
+  valuationFactorX1000?: number | null;
+  creationMode: 'NEW' | 'EXISTING' | 'REPLACEMENT';
+  replacesMeterId?: string | null;
+  replacementDate?: string | null;
+  oldFinalValueX1000?: number | null;
+  newInitialValueX1000?: number | null;
+  replacementReason?: string | null;
+  gasConversion?: {
+    calorificFactorKwhPerM3: string;
+    conditionNumber: string;
+    validFrom: string;
+    validTo: string | null;
+    supplierInvoiceReference: string;
+  } | null;
 }
 
 export function useCreateMeter(accountId: string, buildingId: string) {
@@ -68,11 +144,23 @@ export function useCreateMeter(accountId: string, buildingId: string) {
   });
 }
 
-export function useDeleteMeter(accountId: string, buildingId: string) {
+export function useEndMeter(accountId: string, buildingId: string, action: 'remove' | 'void') {
   const invalidate = useMeterInvalidation(accountId, buildingId);
   return useMutation({
-    mutationFn: (meterId: string) =>
-      api(`/a/${accountId}/meters/${meterId}`, z.undefined(), { method: 'DELETE' }),
+    mutationFn: ({
+      meterId,
+      effectiveOn,
+      reason,
+    }: {
+      meterId: string;
+      effectiveOn: string;
+      reason: string;
+    }) =>
+      api(`/a/${accountId}/meters/${meterId}/${action}`, MeterOutSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ effectiveOn, reason }),
+      }),
     onSuccess: invalidate,
   });
 }
@@ -83,10 +171,22 @@ export interface ReadingCreateInput {
   valueX1000: number;
   reason: ReadingReason;
   note?: string | null;
+  supersedesReadingId?: string | null;
+  confirmationNote?: string | null;
+  confirmedFindingCodes?: string[];
 }
 
-/** Create-only by design: there is no update mutation, because there is no
- *  update endpoint — a correction is another POST. */
+export function useCheckReading(accountId: string) {
+  return useMutation({
+    mutationFn: ({ meterId, ...body }: ReadingCreateInput) =>
+      api(`/a/${accountId}/meters/${meterId}/readings/check`, ReadingPlausibilityResponseSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+  });
+}
+
 export function useCreateReading(accountId: string, buildingId: string) {
   const invalidate = useMeterInvalidation(accountId, buildingId);
   return useMutation({
@@ -101,12 +201,14 @@ export function useCreateReading(accountId: string, buildingId: string) {
 }
 
 export interface HeatingCostCreateInput {
+  category: HeatingCostCategory;
   label: string;
   amountCents: number;
   periodFrom: string;
   periodTo: string;
   co2KgX1000?: number | null;
   co2CostCents?: number | null;
+  sourceRef: string;
 }
 
 export function useCreateHeatingCost(accountId: string, buildingId: string) {
@@ -122,11 +224,71 @@ export function useCreateHeatingCost(accountId: string, buildingId: string) {
   });
 }
 
-export function useDeleteHeatingCost(accountId: string, buildingId: string) {
+export function useVoidHeatingCost(accountId: string, buildingId: string) {
   const invalidate = useMeterInvalidation(accountId, buildingId);
   return useMutation({
-    mutationFn: (heatingCostId: string) =>
-      api(`/a/${accountId}/heating-costs/${heatingCostId}`, z.undefined(), { method: 'DELETE' }),
+    mutationFn: ({ heatingCostId, reason }: { heatingCostId: string; reason: string }) =>
+      api(`/a/${accountId}/heating-costs/${heatingCostId}/void`, HeatingCostOutSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+interface HeatingBillingModeInput {
+  periodFrom: string;
+  periodTo: string;
+  mode: 'LOKARA' | 'EXTERNAL_PROVIDER';
+  providerName?: string | null;
+  providerReference?: string | null;
+  externalStatus?:
+    'BEAUFTRAGT' | 'DATEN_UEBERMITTELT' | 'ABRECHNUNG_ERHALTEN' | 'GEPRUEFT' | 'UEBERNOMMEN' | null;
+  mdlStatementId?: string | null;
+  note?: string | null;
+}
+
+export function useCreateHeatingBillingMode(accountId: string, buildingId: string) {
+  const invalidate = useMeterInvalidation(accountId, buildingId);
+  return useMutation({
+    mutationFn: (input: HeatingBillingModeInput) =>
+      api(
+        `/a/${accountId}/buildings/${buildingId}/heating-billing-modes`,
+        HeatingBillingModeOutSchema,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+interface MdlStatementInput {
+  branch: 'NET' | 'GROSS';
+  periodFrom: string;
+  periodTo: string;
+  confirmedTotalCents: number;
+  ownerPositionCents: number;
+  positions: { tenancyId: string; amountCents: number }[];
+  sourceRef: string;
+  co2KgX1000?: number | null;
+  co2CostCents?: number | null;
+  heatedAreaSqmX100?: number | null;
+  co2EvidencePresent: boolean;
+}
+
+export function useConfirmMdlStatement(accountId: string, buildingId: string) {
+  const invalidate = useMeterInvalidation(accountId, buildingId);
+  return useMutation({
+    mutationFn: (input: MdlStatementInput) =>
+      api(`/a/${accountId}/buildings/${buildingId}/mdl-statements`, MdlStatementOutSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
     onSuccess: invalidate,
   });
 }

@@ -1,6 +1,8 @@
 """Pure calculation engine for monthly Verbrauchsinformation."""
 
 from .evaluators import (
+    MINIMUM_VALID_UNITS_INCLUDING_TARGET,
+    STATION_DISTANCE_WARNING_KM,
     evaluate_block_a,
     evaluate_block_b,
     evaluate_block_c,
@@ -8,6 +10,9 @@ from .evaluators import (
     evaluate_block_d2,
     evaluate_hkv_provisional,
     evaluate_normalized_block_a,
+    evaluate_warm_water_block_a,
+    evaluate_warm_water_block_c,
+    evaluate_warm_water_block_d2,
     interpolate_month,
 )
 from .models import (
@@ -31,9 +36,15 @@ from .models import (
     NormalizedBlockAInput,
     ResolvedHeizspiegelRow,
     UviRuleBundle,
+    WarmWaterBlockAInput,
+    WarmWaterBlockAResult,
+    WarmWaterBlockD2Input,
+    WarmWaterBlockD2Result,
 )
 
 __all__ = [
+    "MINIMUM_VALID_UNITS_INCLUDING_TARGET",
+    "STATION_DISTANCE_WARNING_KM",
     "BlockAInput",
     "BlockAResult",
     "BlockBInput",
@@ -54,6 +65,10 @@ __all__ = [
     "NormalizedBlockAInput",
     "ResolvedHeizspiegelRow",
     "UviRuleBundle",
+    "WarmWaterBlockAInput",
+    "WarmWaterBlockAResult",
+    "WarmWaterBlockD2Input",
+    "WarmWaterBlockD2Result",
     "evaluate_block_a",
     "evaluate_block_b",
     "evaluate_block_c",
@@ -61,5 +76,8 @@ __all__ = [
     "evaluate_block_d2",
     "evaluate_hkv_provisional",
     "evaluate_normalized_block_a",
+    "evaluate_warm_water_block_a",
+    "evaluate_warm_water_block_c",
+    "evaluate_warm_water_block_d2",
     "interpolate_month",
 ]

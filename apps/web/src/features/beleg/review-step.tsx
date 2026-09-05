@@ -64,6 +64,7 @@ export function ReviewStep({
   const create = useCreateCost(accountId, buildingId);
   const prefilled: CostForm = {
     ...EMPTY_COST_FORM,
+    catalogueId: extraction.prefill.catalogueId,
     label: extraction.prefill.label,
     amount: centsToEurInput(extraction.prefill.amountCents),
     periodFrom: extraction.prefill.periodFrom,
@@ -78,7 +79,7 @@ export function ReviewStep({
   const selectedKey = form.watch('key');
 
   const onSubmit = form.handleSubmit((values) => {
-    const input = toCostCreateInput(values);
+    const input = toCostCreateInput(values, extraction.prefill.label, extraction.prefill.key);
     if (input === null) return; // zod already guards this
     create.mutate(input, {
       onSuccess: (cost) => {

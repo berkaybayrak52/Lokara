@@ -1,5 +1,8 @@
-import React from 'react';
+// @vitest-environment happy-dom
+
+import React, { act } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -38,6 +41,78 @@ const queryState = vi.hoisted(() => ({
 }));
 
 vi.mock('./queries', () => ({
+  usePaymentWorkspaceAccounts: () => ({
+    data: { accounts: [] },
+    isPending: false,
+    isError: false,
+    isSuccess: true,
+  }),
+  usePaymentWorkspace: () => {
+    const rows = queryState.transactions.map((transaction) => {
+      const bankTransaction = transaction as BankTransactionOut;
+      const proposal = queryState.proposals.find(
+        (item) => (item as MatchProposalGroup).transaction_id === bankTransaction.id,
+      ) as MatchProposalGroup | undefined;
+      const candidate = proposal?.candidates[0];
+      const receivable = queryState.receivables.find(
+        (item) => (item as ReceivableOut).id === candidate?.receivable_id,
+      ) as ReceivableOut | undefined;
+      const decided = proposal?.confirmation !== null && proposal?.confirmation !== undefined;
+      const status =
+        proposal?.decision === 'needs_review' && !decided
+          ? 'review'
+          : proposal?.decision === 'auto_match' || decided
+            ? 'assigned'
+            : proposal?.decision === 'deduped'
+              ? 'ignored'
+              : 'unassigned';
+      return {
+        id: bankTransaction.id,
+        bank_account_id: bankTransaction.bank_account_id,
+        account_label: 'Mietkonto',
+        amount_cents: bankTransaction.amount_cents,
+        direction: bankTransaction.amount_cents >= 0 ? 'incoming' : 'outgoing',
+        booking_date: bankTransaction.bank_booking_date,
+        value_date: bankTransaction.bank_booking_date,
+        counterpart_name: bankTransaction.counterpart_name,
+        counterpart_iban_masked: null,
+        purpose: bankTransaction.purpose,
+        status,
+        status_label:
+          status === 'review'
+            ? 'Prüfen'
+            : status === 'assigned'
+              ? 'Zugeordnet'
+              : status === 'ignored'
+                ? 'Ignoriert'
+                : 'Nicht zugeordnet',
+        ignored: status === 'ignored',
+        assignment_label: receivable ? `${receivable.period} · ${receivable.category}` : null,
+        receivable_id: receivable?.id ?? null,
+        open_cents: receivable?.open_cents ?? null,
+        confidence: candidate?.confidence ?? null,
+        match_reason_de: proposal?.reason_de ?? null,
+        available_actions: status === 'ignored' ? ['restore'] : ['ignore'],
+        history: [],
+      };
+    });
+    const counts = {
+      all: rows.length,
+      unassigned: rows.filter((row) => row.status === 'unassigned').length,
+      review: rows.filter((row) => row.status === 'review').length,
+      assigned: rows.filter((row) => row.status === 'assigned').length,
+      partial: rows.filter((row) => row.status === 'partial').length,
+      ignored: rows.filter((row) => row.status === 'ignored').length,
+    };
+    return {
+      data: { rows, counts, next_cursor: null, total: rows.length },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    };
+  },
+  useClassifyTransaction: () => ({ isPending: false, mutate: () => undefined }),
+  useBulkClassifyTransactions: () => ({ isPending: false, mutate: () => undefined }),
   useMatchProposals: () => ({
     data: { transactions: queryState.proposals },
     isPending: false,
@@ -62,6 +137,9 @@ vi.mock('./queries', () => ({
 }));
 
 import { ZahlungenPage } from './zahlungen-page';
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
 
 // ---------------------------------------------------------------------------
 // Fixtures — shapes from the M6-C3c contract transcription.
@@ -238,6 +316,34 @@ function renderPage(): string {
       <ZahlungenPage accountId="acc-1" />
     </QueryClientProvider>,
   );
+}
+
+async function mountPage(): Promise<{
+  container: HTMLDivElement;
+  root: ReturnType<typeof createRoot>;
+}> {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ZahlungenPage accountId="acc-1" />
+      </QueryClientProvider>,
+    );
+  });
+  return { container, root };
+}
+
+async function openPaymentDrawer(container: HTMLDivElement): Promise<HTMLElement> {
+  const details = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+    (candidate) => candidate.textContent?.trim() === 'Details',
+  );
+  expect(details, 'the payment row needs a Details trigger').toBeDefined();
+  await act(async () => details?.click());
+  const dialog = container.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
+  expect(dialog, 'PaymentDrawer must expose modal dialog semantics').toBeDefined();
+  return dialog as HTMLElement;
 }
 
 function textOfAll(html: string, tag: 'button' | 'a'): string[] {
@@ -484,5 +590,82 @@ describe('Zahlungen — renter identity', () => {
     // This slice resolves no renter name, so a bare id must not stand in for
     // one anywhere on the page.
     expect(html).not.toContain(RENTER_ID);
+  });
+});
+
+describe('Zahlungen — PaymentDrawer dialog behavior', () => {
+  it('moves focus into the dialog and Escape closes it', async () => {
+    populate();
+    const { container, root } = await mountPage();
+    try {
+      const dialog = await openPaymentDrawer(container);
+      expect(dialog.contains(document.activeElement)).toBe(true);
+
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
+  });
+
+  it('traps forward and reverse Tab focus inside the dialog', async () => {
+    populate();
+    const { container, root } = await mountPage();
+    try {
+      const dialog = await openPaymentDrawer(container);
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), summary',
+        ),
+      );
+      expect(focusable.length).toBeGreaterThan(1);
+      const first = focusable[0]!;
+      const last = focusable.at(-1)!;
+
+      last.focus();
+      const forward = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => last.dispatchEvent(forward));
+      expect(forward.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(first);
+
+      const reverse = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => first.dispatchEvent(reverse));
+      expect(reverse.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(last);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
+  });
+
+  it('suppresses background interaction while the modal dialog is open', async () => {
+    populate();
+    const { container, root } = await mountPage();
+    try {
+      await openPaymentDrawer(container);
+      const backgroundDetails = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+        (candidate) => candidate.textContent?.trim() === 'Details',
+      );
+      expect(backgroundDetails).toBeDefined();
+      const suppressed =
+        backgroundDetails?.tabIndex === -1 ||
+        backgroundDetails?.closest('[inert], [aria-hidden="true"]') !== null;
+      expect(suppressed).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
   });
 });

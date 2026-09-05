@@ -14,13 +14,13 @@ a rejected upload leaves no trace to clean up.
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, status
-from lokara_db import MdlBranch, MdlStatement, MdlStatementPosition
-from lokara_domain import Period
+from lokara_db import HeatingBillingModeVersion, MdlBranch, MdlStatement, MdlStatementPosition
+from lokara_domain import HeatingBillingMode, Period
 from lokara_heating_engine import calculate_page01b_statement
 from lokara_rules_store import CO2_SPLIT_TABLE, get_rule
 from sqlalchemy import select
 
-from ..authorization import require_building
+from ..authorization import require_building, require_owner
 from ..deps import PathAccountSession
 from ..schemas import MdlStatementCreate, MdlStatementOut
 from ..statement_service import RULES_AS_OF, mdl_statement_input, period_label
@@ -43,7 +43,22 @@ def confirm_mdl_statement(
     confirmation in place (`CLAUDE.md` § 3.2). Nothing here updates a row.
     """
     del account_id  # scoping happened in the dependency
+    require_owner(session)
     building = require_building(session, building_id)
+    latest_mode = session.scalars(
+        select(HeatingBillingModeVersion)
+        .where(
+            HeatingBillingModeVersion.building_id == building_id,
+            HeatingBillingModeVersion.period_from == body.period_from,
+            HeatingBillingModeVersion.period_to == body.period_to + timedelta(days=1),
+        )
+        .order_by(HeatingBillingModeVersion.version.desc())
+    ).first()
+    if latest_mode is not None and latest_mode.mode is not HeatingBillingMode.EXTERNAL_PROVIDER:
+        raise HTTPException(
+            status_code=422,
+            detail="Für diesen Zeitraum ist Lokara als maßgebliche Heizkostenquelle gewählt.",
+        )
 
     # Each position's tenancy must belong to *this* building. RLS already keeps
     # another account out; this closes the same-account, wrong-building case,

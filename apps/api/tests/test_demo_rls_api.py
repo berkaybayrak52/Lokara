@@ -31,6 +31,7 @@ TEST_JWT_ISSUER = "https://lokara.test/auth/v1"
 
 ISO_ACCOUNT_ID = "acc_iso_check"
 ISO_PERSON_ID = "per_iso_owner"
+DEMO_BUILDING_NAMES = ["Musterstraße 12", "Hafenallee 27", "Lindenweg 8"]
 
 
 @pytest.fixture(scope="module")
@@ -144,9 +145,6 @@ class TestDemoReset:
                 "houseNumber": "5",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
-                "houseNumber": "1",
-                "buildingType": "WOHNHAUS",
-                "isResidential": True,
             },
         )
         assert created.status_code == 201
@@ -156,7 +154,7 @@ class TestDemoReset:
         assert client.post("/demo/reset", headers=headers).status_code == 200
 
         buildings = client.get(f"{base}/buildings", headers=headers).json()["buildings"]
-        assert [b["name"] for b in buildings] == ["Musterstraße 12"]
+        assert [b["name"] for b in buildings] == DEMO_BUILDING_NAMES
         # Re-seeded, not merely emptied: the scenario is back in full.
         assert buildings[0]["unitCount"] == 3
         summary = client.get(f"/a/{DEMO_ACCOUNT_ID}/summary", headers=headers).json()
@@ -184,9 +182,6 @@ class TestDemoReset:
                 "houseNumber": "9",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
-                "houseNumber": "1",
-                "buildingType": "WOHNHAUS",
-                "isResidential": True,
             },
         )
         assert building.status_code == 201
@@ -238,7 +233,7 @@ class TestDemoReset:
         assert client.post("/demo/reset", headers=headers).status_code == 200
 
         buildings = client.get(f"{base}/buildings", headers=headers).json()["buildings"]
-        assert [row["name"] for row in buildings] == ["Musterstraße 12"]
+        assert [row["name"] for row in buildings] == DEMO_BUILDING_NAMES
         after = client.get(f"{base}/buildings/bld_demo_muster12/costs", headers=headers)
         assert after.status_code == 200
         assert [cost["id"] for cost in after.json()["costs"]] == evidence_ids
@@ -283,9 +278,6 @@ class TestDemoReset:
                 "houseNumber": "1",
                 "postalCode": "10115",
                 "city": "Berlin",
-                "houseNumber": "1",
-                "buildingType": "WOHNHAUS",
-                "isResidential": True,
             },
         )
         assert created.status_code == 201
@@ -296,4 +288,4 @@ class TestDemoReset:
         assert [b["name"] for b in survivors["buildings"]] == ["Fremdes Haus"]
         # …and the demo account is the one that got re-seeded.
         demo = client.get(f"/a/{DEMO_ACCOUNT_ID}/buildings", headers=_token(DEMO_PERSON_ID)).json()
-        assert [b["name"] for b in demo["buildings"]] == ["Musterstraße 12"]
+        assert [b["name"] for b in demo["buildings"]] == DEMO_BUILDING_NAMES

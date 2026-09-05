@@ -49,10 +49,12 @@ Person ──< Membership >── Account ──< Landlord ──< Building ─�
 
 Building ──< CostEntry ──< AllocationKeyAssignment
          ├──< HeatingCostEntry
+         ├──< HeatingBillingModeVersion
          ├──< MdlStatement ──< MdlStatementPosition >── Tenancy
          └──< Statement
 Tenancy ──< PersonCount
-Meter ──< MeterReading
+Meter ──< MeterLifecycleEvent
+      ├──< MeterReading
       └──< MonthlyMeterReading ──< MonthlyMeterReadingSource >── MeterReading
 Building ──< BuildingUviConfiguration
          ├──< UviBuildingMonthlyEvidence ──< UviBuildingMonthlyEvidenceSource
@@ -69,13 +71,13 @@ account-scoped tables carries the same `account_id`; section 3 records the enfor
 | Identity and access | `Person`, `Account`, `Membership`, `BuildingAssignment`, `Landlord`, `Renter` | **Shipped** |
 | Property and occupancy | `Building` (with `fiktivbelegung_mode` and `fiktivbelegung_waiver_note`), `Unit`, `Tenancy`, `TenancyParty`, `SelfUsePeriod`, `PersonCount` | **Shipped** |
 | Operating-cost inputs | `CostEntry`, `AllocationKeyAssignment` | **Shipped** |
-| Metering and heating inputs | `Meter`, `MeterReading`, `HeatingCostEntry` | **Shipped** |
+| Metering and heating inputs | `Meter`, `MeterLifecycleEvent`, `MeterReading`, `HeatingCostEntry`, `HeatingBillingModeVersion` | Base model **shipped**; UI-08 extensions are **implemented, partially verified** on `development`, including the `0040` invariant repair and clean boundary re-audit |
 | Monthly UVI evidence, weather, configuration and archive | U4/U4b records in migrations `0022`/`0023`; U5 composes them into immutable `UviRun` inputs/results and a `GENERATED` event | **Technically implemented** for owner-side generation and document download; no scheduling, email or renter publication |
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
 | Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
-| Guards, reminders, delivery and checklists | W1–W8 evaluations plus immutable reminders/resolutions, versioned schedules, exact-byte artifacts, email/status/suppression evidence and checklist events | **Integrated but unverified** on `development` in M9 migration `0025`; M9 remains paused and production-blocked |
+| Guards, reminders, delivery and checklists | W1–W8 evaluations plus immutable reminders/resolutions, versioned schedules, exact-byte artifacts, email/status/suppression evidence and checklist events | **Technically closed 29.08.2026** on `development` in M9 migration `0025`; production blockers remain; later checkpoint verification is separate |
 | AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Integrated on `development`** with deferred M7-F repairs; closure reviews and runtime authority remain blocked |
 | Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
 
@@ -276,6 +278,10 @@ Building 1 ── N Unit 1 ── N Tenancy N ── N Renter
 | `MdlStatement` | A confirmed third-party Messdienstleister statement, append-only and versioned per building period. | **Shipped** |
 | `MdlStatementPosition` | One renter's amount on that statement, stored as delivered and never recomputed. | **Shipped** |
 | `AdvancePaymentPeriod` | Dated contractual advance amount replacing the tenancy scalar. | **Shipped**, M6-A |
+| `UnitProfileVersion` | Effective-dated use, fixed-point rooms, controlled amenities and source evidence. | **Implemented on `development`; partially verified**, UI-05B |
+| `TenancyContractVersion` | Effective-dated contract classification with source evidence. | **Implemented on `development`; partially verified**, UI-05B |
+| `TenancyContractPosition` | Dated garage/parking position; inclusion is `INCLUDED` or `SEPARATE`, never a boolean shortcut. | **Implemented on `development`; partially verified**, UI-05B |
+| `TenancyRentChange` | Effective date, new cold-rent cents and evidence; insert-only history. | **Implemented on `development`; partially verified**, UI-05B |
 
 Shipped validity and cost ranges use half-open dates: `valid_from` or `period_from` is included and
 `valid_to` or `period_to` is excluded. Page 01's user-facing billing period is inclusive; adapters
@@ -285,12 +291,19 @@ must convert that boundary explicitly instead of mixing the two conventions.
 | --- | --- | --- |
 | `Building` | account, optional landlord, name and address, `fiktivbelegung_mode`, nullable `fiktivbelegung_waiver_note` | Composite optional landlord edge; account-scoped root for property calculations. The mode defaults to `LETZTE_BELEGUNG` (spelling note below) and `CheckConstraint ck_building_fiktivbelegung_waiver_logged` refuses `KEINE` unless a waiver note is present. |
 | `Unit` | building, label, `area_sqm_x100` | Integer area; composite building edge. |
-| `Tenancy` | unit, `valid_from`, nullable `valid_to`, base rent, `advance_payment_cents` | One lease identity over time; composite unit edge. Overlap refusal is a domain invariant. |
+| `Tenancy` | unit, `valid_from`, nullable `valid_to`, `base_rent_cents` | One lease identity over time; composite unit edge. Overlap refusal is a domain invariant. Contractual advance amounts come only from temporal `AdvancePaymentPeriod` rows. |
 | `TenancyParty` | tenancy, renter | Unique `(tenancy_id, renter_id)` join permits several renters on one lease without duplicating the tenancy. |
 | `SelfUsePeriod` | unit, `sqm_x100`, kind, note, validity | Partial-area self-use over time; composite unit edge. |
 | `PersonCount` | tenancy, `count`, `valid_from`, nullable `valid_to` | Half-open Personenzahl history; composite tenancy edge. `CheckConstraint ck_person_count_non_negative` allows `0` (an empty but running lease) and rejects negatives. |
 | `MdlStatement` | building, `branch`, `period_from`, exclusive `period_to`, `confirmed_total_cents`, `owner_position_cents`, nullable `co2_kg_x1000` / `co2_cost_cents` / `heated_area_sqm_x100`, `co2_evidence_present`, `source_ref`, `version`, `confirmed_at` | Composite building edge. Unique `(building_id, period_from, period_to, version)`; a correction inserts `version + 1` and the earlier row stays, so nothing UPDATEs a confirmed row. `source_ref` is required: a passed-through figure whose origin nobody can name is not evidence. |
 | `MdlStatementPosition` | `mdl_statement_id`, `tenancy_id`, `amount_cents` | Composite statement and tenancy edges; unique `(mdl_statement_id, tenancy_id)`; amount non-negative. Stored as delivered — `docs/03` H7 validates and passes through, never recomputes. |
+
+Migration `0029` adds the four UI-05B records above. Each carries `account_id`, a composite
+account-safe edge to its unit or tenancy, ENABLE/FORCE RLS with `WITH CHECK`, and an append-only
+database trigger. Unknown legacy profile or contract facts remain absent and render as “Nicht
+dokumentiert”; neither the seed nor the read model infers them from labels or dates. Money remains
+integer cents. UI-05B does not create payment truth: UI-07 now supplies its owner-only payment
+projection from existing receivable facts; recurring receivable generation remains source-blocked.
 
 ### Eigennutzung (self-use) is NOT a Renter
 
@@ -309,11 +322,11 @@ tenancy and is flagged for tax review rather than converted into self-use. Mid-y
 self-use and rental is specified by `docs/10-afa.md` as an unresolved production choice: the Page
 preserves both month-accurate and day-accurate results and blocks production until one is approved.
 
-### DEFECT: `Tenancy.advance_payment_cents` is a scalar on a temporal row
+### Resolved M6-A defect: the former `Tenancy.advance_payment_cents` scalar
 
-The shipped scalar records only the monthly contractual Soll at tenancy creation. It cannot express
+The former scalar recorded only the monthly contractual Soll at tenancy creation. It could not express
 an adjustment during a continuing lease, although § 560 Abs. 4 BGB permits an advance adjustment
-after a statement. Current APIs expose no tenancy update path. Ending the tenancy and opening
+after a statement. The old APIs exposed no tenancy update path. Ending the tenancy and opening
 another one is not an acceptable workaround: statement parties are keyed by tenancy, so one
 continuing renter would appear as two parties even though the consecutive periods do not overlap
 and ordinary allocation checks stay green.
@@ -430,27 +443,48 @@ and read this schema only through an account-scoped session. C3c's landlord *Zah
 technically complete and locally merged; it is client-only and adds no table, column or migration
 either.
 
-### Meters: `MeterKind` and `MeasurementUnit` are independent axes
+UI-07 on `development` adds `BankTransactionClassificationEvent` through migration `0030`. Each
+row records one `IGNORED` or `RESTORED` action, optional reason, actor and timestamp against the
+immutable bank transaction. The table is account-scoped, uses the composite
+`(bank_transaction_id, account_id)` edge, forces RLS with `WITH CHECK`, and rejects UPDATE and
+DELETE. Current state is the newest event; restoring or a demo reset appends evidence instead of
+rewriting history. The unified workspace remains a read model and adds no mutable summary table.
 
-`Meter.kind` and `Meter.measurement_unit` are independent. A building heat meter and a unit heat-cost
-allocator can share a kind while only the measurement unit determines whether a reading can serve
-as a denominator. Conversely, the same unit such as cubic metres can belong to cold- or warm-water
-devices, so the unit alone does not identify the device.
+### UI-08 meters, lifecycle and heating-source choice — implemented, partially verified
 
-| Record | Shipped evidence fields | Invariant |
+Migration `0032` keeps `MeterKind` and `MeasurementUnit` as the normalized engine axes and adds the
+explicit administration type `MeterDeviceType`: heat meter, heat-cost allocator, warm-water meter
+or cold-water meter. The database and API enforce the type → medium/unit relation. Remote
+readability is a device fact only; it never claims a connection or changes a manually entered
+reading's source.
+
+| Record | Development evidence fields | Invariant |
 | --- | --- | --- |
-| `Meter` | building, optional unit, kind, measurement unit, serial, label, `calibration_valid_until`, optional exact `valuation_factor_x1000` | `unit_id = NULL` means building-level meter. Serial is unique per building. Every heat meter has a positive factor; migration `0006` backfills the neutral **1.000**. Water factors remain null. Expiry is derived, never stored as a flag. |
-| `MeterReading` | meter, `read_at`, `value_x1000`, reason, source, note, optional tenancy, optional `estimated_consumption_x1000` plus basis, provenance reference, `recorded_at` | Point-in-time, fixed-point and create-only. Unit and kind come from the referenced meter. Estimates require their basis; tenancy uses an account-scoped composite FK. |
-| `HeatingCostEntry` | building, label, amount, period, optional CO₂ mass and cost | Separate invoice input; it never exposes an ordinary allocation key. |
+| `Meter` | building, optional unit, explicit device type, medium/unit, serial, own label, installation place, manufacturer/model, installation date, remote-readability and calibration-data facts | `unit_id = NULL` means building-level. Serial is unique per building. Type/medium/unit and calibration facts are constrained. `DATA_AVAILABLE` requires observed date plus evidence; missing, not-applicable and review-required remain distinct. |
+| `MeterLifecycleEvent` | building, meter, `INSTALLED`, `REMOVED`, `REPLACED` or `VOID`, effective date, reason and optional related meter | Append-only. Replacement links predecessor and successor and writes both device-change readings in one transaction. Hard deletion is not an API operation. |
+| `MeterReading` | meter, date, fixed-point value, reason/source, note, optional tenancy/estimate provenance, optional direct predecessor and confirmation evidence | Append-only at the database trigger. Corrections require one same-meter predecessor and a reason; a direct predecessor has at most one successor. Manual API writes always persist source `MANUAL`. |
+| `HeatingCostEntry` | building, backend category, amount/period, source reference, optional source-linked CO₂ facts and reasoned void state | Structured invoice input; voiding preserves the row. It never exposes an ordinary allocation key. |
+| `HeatingBillingModeVersion` | building and exact period, increasing version, `LOKARA` or external provider, provider workflow and optional confirmed MDL statement | Append-only and account-scoped. An adopted external result references a confirmed statement in the same building/period; the statement path never uses internal and external heating results simultaneously. |
 
-Readings are create-only by shipped API shape and model design: there is no replacement pointer or
-update timestamp and no PUT/PATCH route. A wrong value is corrected by inserting a new reading for
-the same `read_at` with reason `CORRECTION`; later `recorded_at` evidence wins while the original
-remains visible, including as struck-through history where the UI shows it. Adapter and manual
-sources normalize into the same downstream shape. Effective corrections, tenant-change segments,
-estimates, device replacements and provenance survive the adapter boundary and feed the shared
-Page 01b result. A meter's calibration deadline feeds the shared
-guard system; null means not applicable for a device such as a heat-cost allocator, not “unknown.”
+The API projects available billing periods and, per meter, the effective opening/closing evidence,
+measured difference, incomplete reason, estimate basis/provenance or device-change exclusion. The
+browser selects and renders this projection; it does not generate years, interpolate or subtract
+across devices.
+
+Calibration status comes only from the shared Page-05 G1 guard and the versioned rules store.
+Approved `docs/12` supersedes the older five-year reading: applicable cold-water, warm-water and
+heat meters use six years and calendar-year-end expiry at Rechtsstand 08/2026. The transition note
+and missing register rows remain visible authority limits; expiry remains a warning, not an
+automatic statement blocker.
+
+Migration `0032` enables and forces RLS with `WITH CHECK` on both new tables and uses composite
+account/building foreign keys. Migration `0040` makes terminal lifecycle reasons, correction
+confirmation, heating-cost void reasons and external-provider names NULL-safe, and rejects provider
+fields on `LOKARA` mode rows. Its heating-cost trigger rejects deletion and substantive updates,
+allowing only the first atomic transition from no void to a timestamp plus nonblank reason.
+All 20 rollback-only app-role regressions pass and the boundary re-audit is clean. The 05.09.2026
+full and non-fresh demo gates pass `1967` Python and `188` web tests. The separate live-browser matrix and remaining
+UI acceptance still prevent a full UI-08 closure claim.
 
 ### Monthly UVI evidence and archives
 
@@ -464,6 +498,17 @@ Migrations `0022` and `0023` persist the U4/U4b boundary defined in `docs/16`:
 | `BuildingUviConfiguration` | Effective-dated building energy/configuration inputs with source identity, Rechtsstand and verification status. |
 | `UviBuildingMonthlyEvidence`, `UviBuildingMonthlyEvidenceSource` | Immutable building-month heat/HKV evidence, its main-meter identity and authoritative raw reading links; a correction appends one direct successor. |
 | `UviRun`, `UviDeliveryEvent` | Immutable normalized input/result archive, resolved source snapshots and hash, followed by append-only lifecycle evidence. |
+
+Subsequent migrations extend this boundary without replacing archived evidence:
+
+| Migration | Persisted extension |
+| --- | --- |
+| `0033` / `0034` | Admit exactly `GAS_METER + HEAT + CUBIC_METRE`, persist separate effective `calorific_factor` (Brennwert for split rows) and `condition_number`, and repair legacy gas evidence while preserving original source/history. `docs/16` § 3.2 owns the bounded legacy rule. |
+| `0035` | Persist `centroid_dataset_identity` and `centroid_dataset_version` on station assignments, pinning the WZB PLZ source; the archived source snapshot retains licence/attribution provenance. |
+| `0036` | Add nullable effective `BuildingUviConfiguration.warm_water_hot_temp_c` for versioned warm-water conversion; absence does not invent a temperature. |
+| `0037` | Add nullable landlord `phone`, `email` and `logo` for the archived letter header. |
+| `0038` | Store an immutable run `support_code`, resolved only within the authorized account/building context. |
+| `0039` | Enforce one run per `(account_id, tenancy_id, month)` and one `EMAILED` claim per run; repeated generation returns the existing run without appending another `GENERATED` event. |
 
 U5 resolves the effective correction leaf for every month it consumes, records the normalized
 evidence in `UviRun`, creates only a `GENERATED` event and renders a separate German renter
@@ -939,7 +984,8 @@ guard evaluations, reminders and resolutions, versioned default-off schedules, f
 artifacts with SHA-256, email attempts and status events, bounce/complaint suppression events,
 checklist instances and append-only item events. Composite foreign keys bind every building,
 tenancy, renter, artifact and actor context. Provider delivery status is not legal receipt. This
-record set is integrated but unverified on `development`; M9 remains paused and production-blocked.
+record set is technically closed and review-clean on `development` as of 29.08.2026; production
+blockers remain. The later checkpoint's gates are separate evidence, recorded in `PLAN.md`.
 
 The statement's Saldo is BGH formal minimum #4. It must use **geleistete** advances from accepted
 payment allocations, not `advance_payment_cents × months`. The temporal Soll schedule is still
@@ -964,9 +1010,9 @@ with M7-F's read-only reviews still open.
 | M6-A temporal advances/confirmed actual advances and M6-B Saldo, settlements, finalization and owner-only archives | **Shipped** technical scope; no renter delivery or legal-production approval | M6-A/M6-B |
 | Payment ledger, bank matching and matching evidence | **Shipped on local `main` through C3a**; service/final `0021` technically complete and development-synchronized | M6-C1/M6-C2/M6-C3-0/M6-C3a |
 | Three matching jobs | **Locally merged**; no schema change, read through an account-scoped session only | M6-C3b |
-| Landlord *Zahlungen* screen | **Locally merged**; confirm/reject/duplicate only, no manual assignment, no schema change | M6-C3c |
-| W1–W8 guards, reminders, email delivery and checklists | **Integrated but unverified on `development`** with migration `0025`, account-scoped jobs/API and `/waechter`; M9 is paused, delivery defaults off and real execution remains blocked | M9 / `docs/12` |
-| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**; paused M9 scheduling on `development` refuses delivery because immutable UVI PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
+| Landlord *Zahlungen* screen | **UI-07 demo core implemented on `development`; partial, with automated and focused review evidence**. Unified server read model, account/consent status, filters, pagination, proposal confirmation and append-only single/bulk ignore are live. Manual payment/assignment, anomaly engine, complete shared aggregates and the live-browser matrix remain unfinished or source-blocked. | UI-07 / M6-C3c |
+| W1–W8 guards, reminders, email delivery and checklists | **Technically closed 29.08.2026 on `development`** with migration `0025`, account-scoped jobs/API and `/waechter`; delivery defaults off and real execution remains blocked | M9 / `docs/12` |
+| U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**, including later GAS/warm-water extensions; M9 scheduling on `development` refuses UVI delivery because immutable PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
 | Renter portal publication | **Future** | M10 |
 | Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |

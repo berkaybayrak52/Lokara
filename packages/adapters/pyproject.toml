@@ -5,10 +5,12 @@ description = "External-edge ports as Protocols + fixture stubs (bank, vision, e
 requires-python = ">=3.12"
 dependencies = [
   "lokara-domain",
+  "lokara-rules-store",
 ]
 
 [tool.uv.sources]
 lokara-domain = { workspace = true }
+lokara-rules-store = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

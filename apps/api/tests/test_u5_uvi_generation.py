@@ -22,7 +22,7 @@ from typing import Any, cast
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 from lokara_db import DbSettings, Role, UviDeliveryEvent, UviRun, create_db_engine, new_id
 from sqlalchemy import Connection, select, text
@@ -32,6 +32,8 @@ from sqlalchemy.orm import Session
 ACCOUNT = "{account_id}"
 BUILDING = "{building_id}"
 RUN = "{run_id}"
+PLZ_CENTROID_DATASET_IDENTITY = "WZBSocialScienceCenter/plz_geocoord"
+PLZ_CENTROID_DATASET_VERSION = "2019-01"
 
 GENERATE = f"/a/{ACCOUNT}/buildings/{BUILDING}/uvi-runs"
 DOCUMENT = f"/a/{ACCOUNT}/buildings/{BUILDING}/uvi-runs/{RUN}/document"
@@ -143,9 +145,44 @@ def test_u5_adds_no_scheduled_send_or_renter_publication_route(
     paths = schema["paths"]
     assert isinstance(paths, dict)
     uvi_paths = {path for path in paths if "uvi" in path.lower()}
-    assert uvi_paths == {GENERATE, DOCUMENT}
+    assert uvi_paths == {
+        GENERATE,
+        DOCUMENT,
+        "/a/{account_id}/buildings/{building_id}/uvi-runs/support/{support_code}",
+    }
     forbidden = ("publish", "portal", "email", "send", "schedule", "deliver")
     assert not any(word in path.lower() for path in uvi_paths for word in forbidden)
+
+
+def test_u5_support_lookup_rejects_a_run_from_another_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A support code is never accepted from a different account context."""
+    module = _uvi_module()
+    from lokara_api.authorization import PortalScope
+
+    class ForeignRunSession:
+        def __init__(self) -> None:
+            self.info: dict[str, object] = {
+                "portal_scope": PortalScope(
+                    role=Role.OWNER, building_ids=frozenset(), membership_id="membership"
+                )
+            }
+
+        def scalar(self, _statement: object) -> object:
+            return SimpleNamespace(
+                account_id="account-b",
+                support_code="UVI-FOREIGN",
+                tenancy_id="tenancy-b",
+                month=date(2026, 7, 1),
+            )
+
+    monkeypatch.setattr(module, "require_building", lambda _session, _building_id: None)
+    with pytest.raises(HTTPException) as exc_info:
+        module.lookup_uvi_support_code(
+            "account-a", "building-a", "UVI-FOREIGN", ForeignRunSession()
+        )
+    assert exc_info.value.status_code == 404
 
 
 def test_u5_resolves_the_named_u4b_models_and_normalized_engine_server_side() -> None:
@@ -183,11 +220,186 @@ def test_u5_configuration_resolution_never_resurrects_an_expired_ancestor() -> N
     assert result.status == "blocked"
 
 
+@pytest.mark.parametrize(
+    "configurations",
+    (
+        pytest.param(
+            (
+                SimpleNamespace(
+                    id="config-valid-to-inside-month",
+                    supersedes_configuration_id=None,
+                    valid_from=date(2026, 7, 1),
+                    valid_to=date(2026, 7, 15),
+                ),
+            ),
+            id="valid-to-inside-month",
+        ),
+        pytest.param(
+            (
+                SimpleNamespace(
+                    id="config-root",
+                    supersedes_configuration_id=None,
+                    valid_from=date(2026, 7, 1),
+                    valid_to=None,
+                ),
+                SimpleNamespace(
+                    id="config-successor-inside-month",
+                    supersedes_configuration_id="config-root",
+                    valid_from=date(2026, 7, 15),
+                    valid_to=None,
+                ),
+            ),
+            id="successor-starts-inside-month",
+        ),
+    ),
+)
+def test_u5_configuration_resolution_blocks_any_boundary_inside_calendar_month(
+    configurations: tuple[object, ...],
+) -> None:
+    """GAS-BOUNDARY-01: one supplier pair must cover the complete calendar month."""
+    resolver = getattr(_uvi_module(), "resolve_building_uvi_configuration", None)
+    assert callable(resolver), "U5 configuration resolver is missing"
+
+    result = resolver(configurations, date(2026, 7, 1))
+
+    assert result.status == "blocked"
+
+
+@pytest.mark.parametrize(
+    ("configurations", "selected_configuration_id"),
+    (
+        pytest.param(
+            (
+                SimpleNamespace(
+                    id="config-starts-at-month-boundary",
+                    supersedes_configuration_id=None,
+                    valid_from=date(2026, 7, 1),
+                    valid_to=None,
+                ),
+            ),
+            "config-starts-at-month-boundary",
+            id="selected-valid-from-is-target-month-start",
+        ),
+        pytest.param(
+            (
+                SimpleNamespace(
+                    id="config-ends-at-next-month-boundary",
+                    supersedes_configuration_id=None,
+                    valid_from=date(2026, 1, 1),
+                    valid_to=date(2026, 8, 1),
+                ),
+            ),
+            "config-ends-at-next-month-boundary",
+            id="selected-valid-to-is-next-month-start",
+        ),
+        pytest.param(
+            (
+                SimpleNamespace(
+                    id="config-current-month",
+                    supersedes_configuration_id=None,
+                    valid_from=date(2026, 1, 1),
+                    valid_to=None,
+                ),
+                SimpleNamespace(
+                    id="config-next-month-successor",
+                    supersedes_configuration_id="config-current-month",
+                    valid_from=date(2026, 8, 1),
+                    valid_to=None,
+                ),
+            ),
+            "config-current-month",
+            id="successor-valid-from-is-next-month-start",
+        ),
+    ),
+)
+def test_u5_configuration_resolution_accepts_exact_calendar_month_edges(
+    configurations: tuple[object, ...],
+    selected_configuration_id: str,
+) -> None:
+    """GAS-BOUNDARY-01: exact month edges do not split the target month."""
+    resolver = getattr(_uvi_module(), "resolve_building_uvi_configuration", None)
+    assert callable(resolver), "U5 configuration resolver is missing"
+
+    result = resolver(configurations, date(2026, 7, 1))
+
+    assert result.selected_configuration_id == selected_configuration_id
+    assert result.status == "ready"
+
+
 def _uvi_module() -> ModuleType:
     try:
         return importlib.import_module("lokara_api.routers.uvi_runs")
     except ModuleNotFoundError as exc:
         pytest.fail(f"U5 production module is missing: {exc}")
+
+
+def test_u5_weather_provenance_localizes_centroid_distance_and_warning() -> None:
+    """U5-DOC-REVIEW-05: DWD provenance explains the centroid and long distance."""
+    formatter = getattr(_uvi_module(), "_weather_provenance_de", None)
+    assert callable(formatter), "U5 German weather provenance formatter is missing"
+
+    line = formatter(
+        label="Zielmonat",
+        assignment=SimpleNamespace(
+            id="assignment-target",
+            station_id="U5-target",
+            distance_km=Decimal("51.234"),
+            centroid_dataset_identity=PLZ_CENTROID_DATASET_IDENTITY,
+            centroid_dataset_version=PLZ_CENTROID_DATASET_VERSION,
+            source_type="DWD_MONTHLY",
+            source_id="DWD-assignment-target",
+        ),
+        degree=SimpleNamespace(
+            month=date(2026, 7, 1),
+            monthly_degree_days=Decimal("590"),
+            source_file="DWD-target.csv",
+            source_id="DWD-degree-target",
+        ),
+    )
+
+    assert isinstance(line, str)
+    for expected in (
+        "Zielmonat 07/2026",
+        "590 Kd",
+        "Station U5-target",
+        "PLZ-Zentroid WZBSocialScienceCenter/plz_geocoord (2019-01)",
+        "51,2 km",
+        "Achtung: mehr als 50 km vom PLZ-Zentroid entfernt",
+        "DWD-target.csv",
+        "DWD-degree-target",
+        "DWD-assignment-target",
+    ):
+        assert expected in line
+    assert "51.234" not in line
+    assert "51,234 km" not in line
+
+
+def test_u5_weather_provenance_uses_persisted_centroid_identity() -> None:
+    """U5-DOC-REVIEW-06: renderer never relabels other persisted data as WZB."""
+    formatter = getattr(_uvi_module(), "_weather_provenance_de", None)
+    assert callable(formatter), "U5 German weather provenance formatter is missing"
+
+    line = formatter(
+        label="Zielmonat",
+        assignment=SimpleNamespace(
+            id="assignment-other",
+            station_id="OTHER-target",
+            distance_km=Decimal("4.321"),
+            centroid_dataset_identity="example.invalid/other-centroids",
+            centroid_dataset_version="test-1",
+            source_type="DWD_MONTHLY",
+            source_id="DWD-assignment-other",
+        ),
+        degree=SimpleNamespace(
+            month=date(2026, 7, 1),
+            monthly_degree_days=Decimal("590"),
+            source_file="DWD-target.csv",
+            source_id="DWD-degree-target",
+        ),
+    )
+
+    assert "PLZ-Zentroid example.invalid/other-centroids (test-1)" in line
+    assert PLZ_CENTROID_DATASET_IDENTITY not in line
 
 
 def test_u5_employee_generation_is_forbidden_before_any_write() -> None:
@@ -212,7 +424,7 @@ def test_u5_employee_generation_is_forbidden_before_any_write() -> None:
 
     body = request_type(tenancy_id="t-1", target_month=date(2026, 7, 1))
     with pytest.raises(HTTPException) as refused:
-        create("a-1", "b-1", body, RefuseWrites())
+        create("a-1", "b-1", body, RefuseWrites(), Response())
     assert refused.value.status_code == 403
 
 
@@ -278,6 +490,8 @@ def _seed_u5_graph(
     *,
     missing: str | None,
     block_d_ready: bool = False,
+    gas_meter: bool = False,
+    warm_water: bool = False,
 ) -> dict[str, str]:
     block_a = UVI_EXAMPLES["emir_spec_block_a_kwh"]
     block_b = UVI_EXAMPLES["emir_spec_block_b_previous_month"]
@@ -324,6 +538,16 @@ def _seed_u5_graph(
             "comparable_monthly_2",
             "comparable_source_1",
             "comparable_source_2",
+            "warm_water_meter",
+            "warm_water_raw_target",
+            "warm_water_raw_previous",
+            "warm_water_raw_prior_year",
+            "warm_water_monthly_target",
+            "warm_water_monthly_previous",
+            "warm_water_monthly_prior_year",
+            "warm_water_source_target",
+            "warm_water_source_previous",
+            "warm_water_source_prior_year",
         )
     }
     connection.execute(
@@ -359,7 +583,7 @@ def _seed_u5_graph(
             " (:unit, :account, :building, 'U5 Wohnung', :target_area),"
             " (:foreign_unit, :account, :foreign_building, 'Andere Wohnung', 8000)"
         ),
-        {**ids, "target_area": 8000 if block_d_ready else 30000},
+        {**ids, "target_area": 8000 if block_d_ready or warm_water else 30000},
     )
     connection.execute(
         text(
@@ -387,12 +611,19 @@ def _seed_u5_graph(
     connection.execute(
         text(
             "INSERT INTO meter"
-            " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
-            " calibration_valid_until, valuation_factor_x1000) VALUES"
-            " (:meter, :account, :building, :unit, 'HEAT', 'KWH', :serial,"
-            " '2029-12-31', 1000)"
+            " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+            " serial, installed_on, calibration_data_state, calibration_valid_until,"
+            " valuation_factor_x1000) VALUES"
+            " (:meter, :account, :building, :unit, 'HEAT', :measurement_unit, :device_type,"
+            " :serial,"
+            " '2025-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000)"
         ),
-        {**ids, "serial": f"U5-{ids['meter']}"},
+        {
+            **ids,
+            "measurement_unit": "CUBIC_METRE" if gas_meter else "KWH",
+            "device_type": "GAS_METER" if gas_meter else "HEAT_METER",
+            "serial": f"U5-{ids['meter']}",
+        },
     )
 
     if block_d_ready:
@@ -431,10 +662,11 @@ def _seed_u5_graph(
             connection.execute(
                 text(
                     "INSERT INTO meter"
-                    " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
-                    " calibration_valid_until, valuation_factor_x1000) VALUES"
-                    " (:meter, :account, :building, :unit, 'HEAT', 'KWH', :serial,"
-                    " '2029-12-31', 1000)"
+                    " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+                    " serial, installed_on, calibration_data_state, calibration_valid_until,"
+                    " valuation_factor_x1000) VALUES"
+                    " (:meter, :account, :building, :unit, 'HEAT', 'KWH', 'HEAT_METER', :serial,"
+                    " '2025-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000)"
                 ),
                 {
                     **ids,
@@ -535,6 +767,80 @@ def _seed_u5_graph(
             {**ids, "id": source_id, "monthly": monthly_id, "raw": raw_id},
         )
 
+    if warm_water:
+        connection.execute(
+            text(
+                "INSERT INTO meter"
+                " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+                " serial, installed_on, remote_readability, calibration_data_state,"
+                " calibration_valid_until, valuation_factor_x1000) VALUES"
+                " (:warm_water_meter, :account, :building, :unit, 'WARM_WATER', 'CUBIC_METRE',"
+                " 'WARM_WATER_METER', :serial, '2025-01-01', 'REMOTE_READABLE',"
+                " 'REVIEW_REQUIRED', '2029-12-31', NULL)"
+            ),
+            {**ids, "serial": f"U5-WW-{ids['warm_water_meter']}"},
+        )
+        warm_water_rows = (
+            (
+                "target",
+                date(2026, 7, 1),
+                4_000,
+                ids["warm_water_raw_target"],
+                ids["warm_water_monthly_target"],
+                ids["warm_water_source_target"],
+            ),
+            (
+                "previous",
+                date(2026, 6, 1),
+                1_000,
+                ids["warm_water_raw_previous"],
+                ids["warm_water_monthly_previous"],
+                ids["warm_water_source_previous"],
+            ),
+            (
+                "prior_year",
+                date(2025, 7, 1),
+                2_000,
+                ids["warm_water_raw_prior_year"],
+                ids["warm_water_monthly_prior_year"],
+                ids["warm_water_source_prior_year"],
+            ),
+        )
+        for name, month, movement_x1000, raw_id, monthly_id, source_id in warm_water_rows:
+            connection.execute(
+                text(
+                    "INSERT INTO meter_reading"
+                    " (id, account_id, meter_id, read_at, value_x1000, reason, source)"
+                    " VALUES (:raw, :account, :warm_water_meter, :month, :value,"
+                    " 'PERIODIC', 'MANUAL')"
+                ),
+                {**ids, "raw": raw_id, "month": month, "value": movement_x1000},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO monthly_meter_reading"
+                    " (id, account_id, meter_id, tenancy_id, unit_id, month, consumption_x1000,"
+                    " reason, source, interpolation_method, supersedes_reading_id) VALUES"
+                    " (:monthly, :account, :warm_water_meter, :tenancy, :unit, :month, :value,"
+                    " 'PERIODIC', 'MANUAL', :method, NULL)"
+                ),
+                {
+                    **ids,
+                    "monthly": monthly_id,
+                    "month": month,
+                    "value": movement_x1000,
+                    "method": f"source-backed-u5-warm-water-{name}",
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO monthly_meter_reading_source"
+                    " (id, account_id, monthly_meter_reading_id, meter_reading_id)"
+                    " VALUES (:source, :account, :monthly, :raw)"
+                ),
+                {**ids, "source": source_id, "monthly": monthly_id, "raw": raw_id},
+            )
+
     station_rows = (
         (
             ids["station_target"],
@@ -558,8 +864,10 @@ def _seed_u5_graph(
             text(
                 "INSERT INTO uvi_station_assignment"
                 " (id, account_id, postal_code, month, station_id, distance_km,"
-                " source_type, source_id) VALUES"
-                " (:id, :account, '10115', :month, :station, 12.345, 'DWD_MONTHLY',"
+                " centroid_dataset_identity, centroid_dataset_version, source_type, source_id)"
+                " VALUES"
+                " (:id, :account, '10115', :month, :station, 12.345,"
+                " :centroid_dataset_identity, :centroid_dataset_version, 'DWD_MONTHLY',"
                 " :source_id)"
             ),
             {
@@ -567,6 +875,8 @@ def _seed_u5_graph(
                 "id": assignment_id,
                 "month": month,
                 "station": f"U5-{suffix}",
+                "centroid_dataset_identity": PLZ_CENTROID_DATASET_IDENTITY,
+                "centroid_dataset_version": PLZ_CENTROID_DATASET_VERSION,
                 "source_id": f"DWD-assignment-{ids['account']}-{suffix}",
             },
         )
@@ -603,13 +913,18 @@ def _seed_u5_graph(
                 "INSERT INTO building_uvi_configuration"
                 " (id, account_id, building_id, energy_source, energy_reference,"
                 " explicit_hkv_allocator, calorific_factor, valid_from, valid_to, source_type,"
-                " source_id,"
+                " source_id, warm_water_hot_temp_c,"
                 " rechtsstand, verification_status, supersedes_configuration_id) VALUES"
                 " (:configuration, :account, :building, 'Erdgas', 'HO', false, NULL,"
-                " '2025-01-01', NULL, 'UVI_CONFIGURATION', :source_id, '08/2026',"
+                " '2025-01-01', NULL, 'UVI_CONFIGURATION', :source_id, :warm_water_hot_temp_c,"
+                " '08/2026',"
                 " 'verify-before-production', NULL)"
             ),
-            {**ids, "source_id": f"U5-config-{ids['account']}"},
+            {
+                **ids,
+                "source_id": f"U5-config-{ids['account']}",
+                "warm_water_hot_temp_c": Decimal("60") if warm_water else None,
+            },
         )
     return ids
 
@@ -620,6 +935,8 @@ def _live_u5_graph(
     *,
     missing: str | None = None,
     block_d_ready: bool = False,
+    gas_meter: bool = False,
+    warm_water: bool = False,
 ) -> Iterator[_LiveU5]:
     monkeypatch.setenv("ENVIRONMENT", "local")
     monkeypatch.setenv("SUPABASE_JWT_SECRET", "u5-live-contract-secret-32-chars")
@@ -638,12 +955,26 @@ def _live_u5_graph(
     transaction = connection.begin()
     app: Any = None
     try:
-        ids = _seed_u5_graph(connection, missing=missing, block_d_ready=block_d_ready)
+        ids = _seed_u5_graph(
+            connection,
+            missing=missing,
+            block_d_ready=block_d_ready,
+            gas_meter=gas_meter,
+            warm_water=warm_water,
+        )
         from lokara_api import create_app
         from lokara_api.authorization import PortalScope
         from lokara_api.deps import account_session_for_path
 
         module = importlib.import_module("lokara_api.routers.uvi_runs")
+        if warm_water:
+            monkeypatch.setattr(
+                module,
+                "_central_remote_warm_water_meter",
+                lambda session, _account_id, _building_id: session.get(
+                    module.Meter, ids["warm_water_meter"]
+                ),
+            )
         rendered_html: list[str] = []
 
         def fake_render_html_to_pdf(html: str) -> bytes:
@@ -846,9 +1177,11 @@ def _insert_water_distractors(live: _LiveU5) -> None:
         live.connection.execute(
             text(
                 "INSERT INTO meter"
-                " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
-                " calibration_valid_until, valuation_factor_x1000) VALUES"
-                " (:meter, :account, :building, :unit, 'COLD_WATER', 'CUBIC_METRE', :serial,"
+                " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+                " serial, installed_on, calibration_data_state, calibration_valid_until,"
+                " valuation_factor_x1000) VALUES"
+                " (:meter, :account, :building, :unit, 'COLD_WATER', 'CUBIC_METRE',"
+                " 'COLD_WATER_METER', :serial, '2025-01-01', 'REVIEW_REQUIRED',"
                 " '2032-12-31', NULL)"
             ),
             {
@@ -894,13 +1227,21 @@ def _insert_water_distractors(live: _LiveU5) -> None:
 
 
 def _insert_three_month_configurations(live: _LiveU5) -> None:
-    """Persist distinct compatible conversion rules for the three compared months."""
+    """Persist distinct supplier-backed gas conversions for all compared months."""
+    # Synthetic exact pairs preserve this boundary's existing products 1, 2 and 3.
+    # They are not supplier defaults or legal values.
     configurations = (
-        ("prior_year", date(2025, 1, 1), Decimal("1"), None),
-        ("previous", date(2026, 6, 1), Decimal("2"), "prior_year"),
-        ("target", date(2026, 7, 1), Decimal("3"), "previous"),
+        ("prior_year", date(2025, 1, 1), Decimal("1"), Decimal("1"), None),
+        ("previous", date(2026, 6, 1), Decimal("4"), Decimal("0.5"), "prior_year"),
+        ("target", date(2026, 7, 1), Decimal("6"), Decimal("0.5"), "previous"),
     )
-    for suffix, valid_from, factor, predecessor_suffix in configurations:
+    for (
+        suffix,
+        valid_from,
+        calorific_factor,
+        condition_number,
+        predecessor_suffix,
+    ) in configurations:
         configuration_id = new_id()
         live.ids[f"configuration_{suffix}"] = configuration_id
         predecessor_id = (
@@ -910,26 +1251,24 @@ def _insert_three_month_configurations(live: _LiveU5) -> None:
             text(
                 "INSERT INTO building_uvi_configuration"
                 " (id, account_id, building_id, energy_source, energy_reference,"
-                " explicit_hkv_allocator, calorific_factor, valid_from, valid_to, source_type,"
+                " explicit_hkv_allocator, calorific_factor, condition_number, valid_from,"
+                " valid_to, source_type,"
                 " source_id,"
                 " rechtsstand, verification_status, supersedes_configuration_id) VALUES"
-                " (:id, :account, :building, 'Erdgas', 'HO', false, :factor, :valid_from, NULL,"
-                " 'UVI_CONFIGURATION', :source_id, '08/2026', 'verify-before-production',"
-                " :predecessor)"
+                " (:id, :account, :building, 'Erdgas', 'HO', false, :calorific_factor,"
+                " :condition_number, :valid_from, NULL, 'SUPPLIER_INVOICE', :source_id,"
+                " '08/2026', 'verify-before-production', :predecessor)"
             ),
             {
                 **live.ids,
                 "id": configuration_id,
-                "factor": factor,
+                "calorific_factor": calorific_factor,
+                "condition_number": condition_number,
                 "valid_from": valid_from,
-                "source_id": f"U5-config-{suffix}-{live.ids['account']}",
+                "source_id": f"gas-invoice-{suffix}-{live.ids['account']}",
                 "predecessor": predecessor_id,
             },
         )
-    live.connection.execute(
-        text("UPDATE meter SET measurement_unit = 'CUBIC_METRE' WHERE id = :meter"),
-        live.ids,
-    )
 
 
 def _insert_building_evidence_with_two_sources(live: _LiveU5) -> list[dict[str, str]]:
@@ -947,10 +1286,11 @@ def _insert_building_evidence_with_two_sources(live: _LiveU5) -> list[dict[str, 
     live.connection.execute(
         text(
             "INSERT INTO meter"
-            " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
-            " calibration_valid_until, valuation_factor_x1000) VALUES"
-            " (:building_main_meter, :account, :building, NULL, 'HEAT', 'KWH', :serial,"
-            " '2029-12-31', 1000)"
+            " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+            " serial, installed_on, calibration_data_state, calibration_valid_until,"
+            " valuation_factor_x1000) VALUES"
+            " (:building_main_meter, :account, :building, NULL, 'HEAT', 'KWH', 'HEAT_METER',"
+            " :serial, '2025-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000)"
         ),
         {**live.ids, "serial": f"U5-MAIN-{live.ids['building_main_meter']}"},
     )
@@ -1070,6 +1410,7 @@ def test_u5_database_generation_archives_exact_inputs_results_and_retry(
             "energy_reference": "HO",
             "explicit_hkv_allocator": False,
             "calorific_factor": None,
+            "condition_number": None,
             "source_type": "UVI_CONFIGURATION",
             "source_id": f"U5-config-{live.ids['account']}",
             "rechtsstand": "08/2026",
@@ -1124,6 +1465,8 @@ def test_u5_database_generation_archives_exact_inputs_results_and_retry(
                 "id": live.ids["station_target"],
                 "station_id": "U5-target",
                 "distance_km": "12.345",
+                "centroid_dataset_identity": PLZ_CENTROID_DATASET_IDENTITY,
+                "centroid_dataset_version": PLZ_CENTROID_DATASET_VERSION,
                 "source_type": "DWD_MONTHLY",
                 "source_id": f"DWD-assignment-{live.ids['account']}-target",
             },
@@ -1131,6 +1474,8 @@ def test_u5_database_generation_archives_exact_inputs_results_and_retry(
                 "id": live.ids["station_prior_year"],
                 "station_id": "U5-prior-year",
                 "distance_km": "12.345",
+                "centroid_dataset_identity": PLZ_CENTROID_DATASET_IDENTITY,
+                "centroid_dataset_version": PLZ_CENTROID_DATASET_VERSION,
                 "source_type": "DWD_MONTHLY",
                 "source_id": f"DWD-assignment-{live.ids['account']}-prior-year",
             },
@@ -1141,6 +1486,7 @@ def test_u5_database_generation_archives_exact_inputs_results_and_retry(
                 "measurement_unit": "KWH",
                 "energy_reference": "HO",
                 "calorific_factor": None,
+                "condition_number": None,
                 "explicit_hkv_allocator": False,
                 "measured_building_heat_kwh_x1000": None,
                 "building_hkv_movement_x1000": None,
@@ -1206,7 +1552,7 @@ def test_u5_database_generation_archives_exact_inputs_results_and_retry(
         assert {
             item["code"]
             for item in cast(list[dict[str, object]], first.results["unresolved_conflicts"])
-        } == {"uvi_plz_geodataset_unresolved", "uvi_register_rows_missing"}
+        } == {"uvi_register_rows_missing"}
         evidence_sources = {
             item["source"] for item in cast(list[dict[str, object]], first.results["rule_evidence"])
         }
@@ -1235,15 +1581,15 @@ def test_u5_database_generation_archives_exact_inputs_results_and_retry(
         frozen_results = first.results
         frozen_hash = first.sha256
         retry = _post_generation(live)
-        assert retry.status_code == 201, retry.text
+        assert retry.status_code == 200, retry.text
         retry_runs, retry_events = _archive_rows(live)
-        assert len(retry_runs) == len(retry_events) == 2
+        assert len(retry_runs) == len(retry_events) == 1
         original = next(row for row in retry_runs if row.id == first.id)
         assert original.inputs == frozen_inputs
         assert original.results == frozen_results
         assert original.sha256 == frozen_hash
-        assert retry.json()["runId"] != first.id
-        assert {event.status for event in retry_events} == {"GENERATED"}
+        assert retry.json()["runId"] == first.id
+        assert retry_events[0].uvi_run_id == first.id
 
 
 def test_u5_selects_only_heat_rows_in_one_compatible_device_category(
@@ -1274,7 +1620,7 @@ def test_u5_uses_the_configuration_effective_in_each_compared_month(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """U5-BOUNDARY-02: target, previous and prior-year conversion are independently temporal."""
-    with _live_u5_graph(monkeypatch, missing="config") as live:
+    with _live_u5_graph(monkeypatch, missing="config", gas_meter=True) as live:
         _insert_three_month_configurations(live)
 
         response = _post_generation(live)
@@ -1282,8 +1628,72 @@ def test_u5_uses_the_configuration_effective_in_each_compared_month(
         run = _archive_rows(live)[0][0]
         block_b = cast(dict[str, object], run.results["block_b"])
         block_c = cast(dict[str, object], run.results["block_c"])
-        assert block_b["delta_kwh"] == 1000  # 900*3 - 850*2
-        assert block_c["reference_kwh"] == 952  # 1000*1, weather-adjusted by 590/620
+        assert block_b["delta_kwh"] == 1000  # 900*(6*0.5) - 850*(4*0.5)
+        assert block_c["reference_kwh"] == 952  # 1000*(1*1), adjusted by 590/620
+
+        normalized_months = cast(dict[str, dict[str, object]], run.inputs["normalized_months"])
+        expected_configurations = {
+            "prior_year": ("1", "1", "2025-01-01", None),
+            "previous": (
+                "4",
+                "0.5",
+                "2026-06-01",
+                live.ids["configuration_prior_year"],
+            ),
+            "target": (
+                "6",
+                "0.5",
+                "2026-07-01",
+                live.ids["configuration_previous"],
+            ),
+        }
+        for month_name, (
+            calorific_factor,
+            condition_number,
+            valid_from,
+            supersedes_configuration_id,
+        ) in expected_configurations.items():
+            configuration = cast(
+                dict[str, object], normalized_months[month_name]["building_configuration"]
+            )
+            assert configuration == {
+                "id": live.ids[f"configuration_{month_name}"],
+                "energy_source": "Erdgas",
+                "energy_reference": "HO",
+                "explicit_hkv_allocator": False,
+                "calorific_factor": calorific_factor,
+                "condition_number": condition_number,
+                "valid_from": valid_from,
+                "valid_to": None,
+                "source_type": "SUPPLIER_INVOICE",
+                "source_id": f"gas-invoice-{month_name}-{live.ids['account']}",
+                "rechtsstand": "08/2026",
+                "verification_status": "verify-before-production",
+                "supersedes_configuration_id": supersedes_configuration_id,
+            }
+
+        document_text = json.dumps(run.results["document"], ensure_ascii=False)
+        for month_name, (
+            calorific_factor,
+            condition_number,
+            _valid_from,
+            _,
+        ) in expected_configurations.items():
+            assert f"gas-invoice-{month_name}-{live.ids['account']}" in document_text
+            assert f"Brennwert {calorific_factor} kWh/m³" in document_text
+            assert f"Zustandszahl {condition_number.replace('.', ',')}" in document_text
+
+        document = cast(dict[str, object], run.results["document"])
+        block_a = cast(dict[str, object], document["block_a"])
+        target_provenance = cast(list[str], block_a["provenance_de"])
+        target_gas_provenance = next(
+            value for value in target_provenance if value.startswith("Gaskonfiguration Zielmonat:")
+        )
+        assert target_gas_provenance == (
+            "Gaskonfiguration Zielmonat: Brennwert 6 kWh/m³ · Zustandszahl 0,5 · "
+            "gültig ab 01.07.2026 · "
+            f"Versorgerrechnung gas-invoice-target-{live.ids['account']}"
+        )
 
 
 def test_u5_hash_archive_contains_complete_block_a_snapshots_for_all_three_months(
@@ -1360,21 +1770,11 @@ def test_u5_building_evidence_snapshot_archives_sorted_authoritative_source_link
         )
 
         retry = _post_generation(live)
-        assert retry.status_code == 201, retry.text
+        assert retry.status_code == 200, retry.text
         runs = _archive_rows(live)[0]
-        original = next(run for run in runs if run.id == first.id)
-        replacement = next(run for run in runs if run.id != first.id)
-        replacement_months = cast(
-            dict[str, dict[str, object]], replacement.inputs["normalized_months"]
-        )
-        replacement_evidence = cast(
-            dict[str, object], replacement_months["target"]["building_monthly_evidence"]
-        )
-        assert replacement_evidence["source_links"] == sorted(
-            [*expected_links, {"id": third_link, "meter_reading_id": third_reading}],
-            key=lambda item: item["id"],
-        )
-        assert replacement.sha256 != frozen_hash
+        assert len(runs) == 1
+        original = runs[0]
+        assert original.id == first.id
         assert original.inputs == frozen_inputs
         assert original.sha256 == frozen_hash
 
@@ -1398,7 +1798,8 @@ def test_u5_archived_document_provenance_identifies_both_weather_months_and_d2_s
                 "Zielmonat 07/2026",
                 "590 Kd",
                 "Station U5-target",
-                "12,345 km",
+                "PLZ-Zentroid WZBSocialScienceCenter/plz_geocoord (2019-01)",
+                "12,3 km",
                 "DWD-target.csv",
                 f"DWD-degree-{live.ids['account']}-target",
                 f"DWD-assignment-{live.ids['account']}-target",
@@ -1407,7 +1808,8 @@ def test_u5_archived_document_provenance_identifies_both_weather_months_and_d2_s
                 "Vorjahresmonat 07/2025",
                 "620 Kd",
                 "Station U5-prior-year",
-                "12,345 km",
+                "PLZ-Zentroid WZBSocialScienceCenter/plz_geocoord (2019-01)",
+                "12,3 km",
                 "DWD-prior-year.csv",
                 f"DWD-degree-{live.ids['account']}-prior-year",
                 f"DWD-assignment-{live.ids['account']}-prior-year",
@@ -1425,6 +1827,53 @@ def test_u5_archived_document_provenance_identifies_both_weather_months_and_d2_s
             f"DWD-degree-{live.ids['account']}-target",
         ):
             assert exact_d2_fact in block_d2_provenance
+
+
+def test_u5_warm_water_document_keeps_block_b_raw_prior_year_and_d2_separate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Warm-water document carriers retain every comparison and its own provenance."""
+    with _live_u5_graph(monkeypatch, warm_water=True) as live:
+        response = _post_generation(live)
+        assert response.status_code == 201, response.text
+        run = _archive_rows(live)[0][0]
+        document = cast(dict[str, object], run.results["document"])
+
+        block_b = cast(dict[str, object], document["warm_water_block_b"])
+        block_c = cast(dict[str, object], document["warm_water_block_c"])
+        block_d2 = cast(dict[str, object], document["warm_water_block_d2"])
+        assert (block_b["reference_kwh"], block_b["delta_kwh"], block_b["percent"]) == (
+            125,
+            375,
+            "300.0",
+        )
+        assert (block_c["reference_kwh"], block_c["delta_kwh"], block_c["percent"]) == (
+            250,
+            250,
+            "100.0",
+        )
+        assert block_c["label_de"] == "nicht witterungsbereinigt"
+        assert (block_d2["reference_kwh"], block_d2["delta_kwh"], block_d2["percent"]) == (
+            365,
+            135,
+            "37.0",
+        )
+
+        for comparison in (block_b, block_c, block_d2):
+            assert comparison["basis_de"]
+            assert comparison["attribution_de"]
+            assert comparison["provenance_de"]
+
+        rendered = live.client.get(live.document_path(run.id))
+        assert rendered.status_code == 200, rendered.text
+        visible_html = live.rendered_html[0]
+        for expected in (
+            "nicht witterungsbereinigt",
+            "Warmwasser-Regel",
+            "Quelle: co2online gGmbH (Heizspiegel)",
+            "Heizspiegel",
+        ):
+            assert expected in visible_html
 
 
 def test_u5_archived_document_translates_internal_interpolation_provenance_to_german(
@@ -1458,7 +1907,7 @@ def test_u5_document_reads_only_the_archived_run_after_later_source_corrections(
         assert first_pdf.content.startswith(b"%PDF-1.7")
         assert len(live.rendered_html) == 1
         archived_html = live.rendered_html[0]
-        assert "07/2026" in archived_html
+        assert "07/2026" not in archived_html
         assert "U5 Wohnung" in archived_html
         assert "900" in archived_html
         assert "Andere Wohnung" not in archived_html
@@ -1576,14 +2025,9 @@ def test_u5_hash_binds_comparable_source_identity_without_rewriting_prior_run(
 
         _insert_equivalent_comparable_source_correction(live)
         second_response = _post_generation(live)
-        assert second_response.status_code == 201, second_response.text
+        assert second_response.status_code == 200, second_response.text
         runs, events = _archive_rows(live)
-        assert len(runs) == len(events) == 2
-        original = next(row for row in runs if row.id == first_run.id)
-        replacement = next(row for row in runs if row.id != first_run.id)
+        assert len(runs) == len(events) == 1
+        original = runs[0]
         assert original.inputs == frozen_inputs
         assert original.sha256 == frozen_hash
-        assert replacement.sha256 != frozen_hash
-        replacement_d = cast(dict[str, object], replacement.results["block_d"])
-        original_d = cast(dict[str, object], first_run.results["block_d"])
-        assert replacement_d["expected_target_kwh"] == original_d["expected_target_kwh"]

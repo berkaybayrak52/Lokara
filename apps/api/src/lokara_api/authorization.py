@@ -76,4 +76,4 @@ def default_building_id(session: PathAccountSession) -> str | None:
 
 def require_owner(session: PathAccountSession) -> None:
     if _scope(session).role is not Role.OWNER:
-        raise HTTPException(status_code=403, detail="Only owners may create buildings")
+        raise HTTPException(status_code=403, detail="Only owners may perform this action")

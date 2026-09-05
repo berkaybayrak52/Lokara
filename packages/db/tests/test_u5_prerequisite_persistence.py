@@ -186,6 +186,7 @@ def test_u4b_building_configuration_is_temporal_and_source_backed() -> None:
         "energy_reference",
         "explicit_hkv_allocator",
         "calorific_factor",
+        "condition_number",
         "valid_from",
         "valid_to",
         "source_id",
@@ -199,12 +200,19 @@ def test_u4b_building_configuration_is_temporal_and_source_backed() -> None:
         ("supersedes_configuration_id", "account_id", "building_id"),
         "building_uvi_configuration",
     )
-    assert isinstance(table.columns["calorific_factor"].type, Numeric)
-    assert table.columns["calorific_factor"].type.python_type is Decimal
-    assert table.columns["calorific_factor"].nullable
+    for column in ("calorific_factor", "condition_number"):
+        assert isinstance(table.columns[column].type, Numeric)
+        assert table.columns[column].type.python_type is Decimal
+        assert table.columns[column].nullable
     checks = _check_text(table)
     assert "valid_from" in checks and "valid_to" in checks
     assert "calorific_factor" in checks and "> 0" in checks
+    assert "condition_number" in checks
+    assert "calorific_factor IS NULL" in checks
+    assert "condition_number IS NULL" in checks
+    assert "calorific_factor IS NOT NULL" in checks
+    assert "condition_number IS NOT NULL" in checks
+    assert "calorific_factor IS NOT NULL AND condition_number IS NULL" in checks
     assert "id <> supersedes_configuration_id" in checks
     for identifier in ("Erdgas", "Heizoel", "Fernwaerme", "Waermepumpe", "Holzpellets"):
         assert identifier in checks
@@ -353,12 +361,10 @@ def _graph(owner: Engine) -> Iterator[tuple[Connection, dict[str, str]]]:
             "replacement_main_meter",
             "unit_heat_meter",
             "building_water_meter",
-            "building_heat_cubic_meter",
             "raw_reading",
             "replacement_raw_reading",
             "unit_heat_reading",
             "building_water_reading",
-            "building_heat_cubic_reading",
         )
     }
     connection = owner.connect()
@@ -390,18 +396,20 @@ def _graph(owner: Engine) -> Iterator[tuple[Connection, dict[str, str]]]:
         connection.execute(
             text(
                 "INSERT INTO meter"
-                " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
-                " calibration_valid_until, valuation_factor_x1000) VALUES"
-                " (:main_meter, :account_a, :building, NULL, 'HEAT', 'KWH', 'U4B-MAIN',"
-                " '2029-12-31', 1000),"
+                " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+                " serial, installed_on, calibration_data_state, calibration_valid_until,"
+                " valuation_factor_x1000) VALUES"
+                " (:main_meter, :account_a, :building, NULL, 'HEAT', 'KWH', 'HEAT_METER',"
+                " 'U4B-MAIN', '2024-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000),"
                 " (:replacement_main_meter, :account_a, :building, NULL, 'HEAT', 'KWH',"
-                " 'U4B-MAIN-2', '2029-12-31', 1000),"
+                " 'HEAT_METER', 'U4B-MAIN-2', '2024-01-01', 'REVIEW_REQUIRED',"
+                " '2029-12-31', 1000),"
                 " (:unit_heat_meter, :account_a, :building, :unit, 'HEAT', 'KWH',"
-                " 'U4B-UNIT', '2029-12-31', 1000),"
+                " 'HEAT_METER', 'U4B-UNIT', '2024-01-01', 'REVIEW_REQUIRED',"
+                " '2029-12-31', 1000),"
                 " (:building_water_meter, :account_a, :building, NULL, 'COLD_WATER',"
-                " 'CUBIC_METRE', 'U4B-WATER', '2029-12-31', NULL),"
-                " (:building_heat_cubic_meter, :account_a, :building, NULL, 'HEAT',"
-                " 'CUBIC_METRE', 'U4B-HEAT-M3', '2029-12-31', 1000)"
+                " 'CUBIC_METRE', 'COLD_WATER_METER', 'U4B-WATER', '2024-01-01',"
+                " 'REVIEW_REQUIRED', '2029-12-31', NULL)"
             ),
             ids,
         )
@@ -416,9 +424,7 @@ def _graph(owner: Engine) -> Iterator[tuple[Connection, dict[str, str]]]:
                 " (:unit_heat_reading, :account_a, :unit_heat_meter, '2025-01-01', 100000,"
                 " 'PERIODIC', 'MANUAL'),"
                 " (:building_water_reading, :account_a, :building_water_meter, '2025-01-01',"
-                " 100000, 'PERIODIC', 'MANUAL'),"
-                " (:building_heat_cubic_reading, :account_a, :building_heat_cubic_meter,"
-                " '2025-01-01', 100000, 'PERIODIC', 'MANUAL')"
+                " 100000, 'PERIODIC', 'MANUAL')"
             ),
             ids,
         )
@@ -496,6 +502,126 @@ def test_u4b_records_reject_real_cross_account_writes(owner: Engine) -> None:
             finally:
                 savepoint.rollback()
             assert getattr(refused.value.orig, "sqlstate", None) == "42501"
+
+
+@pytest.mark.parametrize(
+    ("energy_source", "energy_reference", "source_type", "rechtsstand", "verification_status"),
+    (
+        pytest.param(
+            "Heizoel",
+            "HO",
+            "SUPPLIER_INVOICE",
+            "08/2026",
+            "verify-before-production",
+            id="not-erdgas",
+        ),
+        pytest.param(
+            "Erdgas",
+            "HU",
+            "SUPPLIER_INVOICE",
+            "08/2026",
+            "verify-before-production",
+            id="not-ho",
+        ),
+        pytest.param(
+            "Erdgas",
+            "HO",
+            "UVI_CONFIGURATION",
+            "08/2026",
+            "verify-before-production",
+            id="not-supplier-invoice",
+        ),
+        pytest.param(
+            "Erdgas",
+            "HO",
+            "SUPPLIER_INVOICE",
+            "07/2026",
+            "verify-before-production",
+            id="wrong-rechtsstand",
+        ),
+        pytest.param(
+            "Erdgas",
+            "HO",
+            "SUPPLIER_INVOICE",
+            "08/2026",
+            "geprüft",
+            id="wrong-verification-status",
+        ),
+    ),
+)
+def test_gas_conversion_pair_rejects_every_non_supplier_shape(
+    owner: Engine,
+    energy_source: str,
+    energy_reference: str,
+    source_type: str,
+    rechtsstand: str,
+    verification_status: str,
+) -> None:
+    """GAS-DB-01: paired conversion facts have one exact persisted evidence shape."""
+    with _graph(owner) as (connection, ids):
+        savepoint = connection.begin_nested()
+        try:
+            with pytest.raises(DBAPIError):
+                connection.execute(
+                    text(
+                        "INSERT INTO building_uvi_configuration"
+                        " (id, account_id, building_id, energy_source, energy_reference,"
+                        " explicit_hkv_allocator, calorific_factor, condition_number,"
+                        " valid_from, valid_to, source_type, source_id, rechtsstand,"
+                        " verification_status, supersedes_configuration_id) VALUES"
+                        " (:id, :account_a, :building, :energy_source, :energy_reference,"
+                        " false, 2, 0.5, '2026-07-01', NULL, :source_type,"
+                        " 'synthetic-supplier-evidence', :rechtsstand,"
+                        " :verification_status, NULL)"
+                    ),
+                    {
+                        **ids,
+                        "id": new_id(),
+                        "energy_source": energy_source,
+                        "energy_reference": energy_reference,
+                        "source_type": source_type,
+                        "rechtsstand": rechtsstand,
+                        "verification_status": verification_status,
+                    },
+                )
+        finally:
+            savepoint.rollback()
+
+
+def test_gas_conversion_pair_accepts_and_retains_the_exact_supplier_shape(owner: Engine) -> None:
+    """GAS-DB-02: the approved shape remains usable and keeps both exact components."""
+    with _graph(owner) as (connection, ids):
+        configuration_id = new_id()
+        connection.execute(
+            text(
+                "INSERT INTO building_uvi_configuration"
+                " (id, account_id, building_id, energy_source, energy_reference,"
+                " explicit_hkv_allocator, calorific_factor, condition_number, valid_from,"
+                " valid_to, source_type, source_id, rechtsstand, verification_status,"
+                " supersedes_configuration_id) VALUES"
+                " (:id, :account_a, :building, 'Erdgas', 'HO', false, 2, 0.5,"
+                " '2026-07-01', NULL, 'SUPPLIER_INVOICE', 'synthetic-supplier-evidence',"
+                " '08/2026', 'verify-before-production', NULL)"
+            ),
+            {**ids, "id": configuration_id},
+        )
+        row = connection.execute(
+            text(
+                "SELECT energy_source, energy_reference, calorific_factor, condition_number,"
+                " source_type, rechtsstand, verification_status"
+                " FROM building_uvi_configuration WHERE id = :id"
+            ),
+            {"id": configuration_id},
+        ).one()
+        assert tuple(row) == (
+            "Erdgas",
+            "HO",
+            Decimal("2.000000"),
+            Decimal("0.500000"),
+            "SUPPLIER_INVOICE",
+            "08/2026",
+            "verify-before-production",
+        )
 
 
 def test_u4b_configuration_supersedes_open_row_by_insert_without_branching(owner: Engine) -> None:
@@ -785,7 +911,6 @@ def test_u4b_evidence_rejects_non_main_or_non_kwh_heat_meters(owner: Engine) -> 
         invalid_meters = (
             (ids["unit_heat_meter"], ids["unit_heat_reading"]),
             (ids["building_water_meter"], ids["building_water_reading"]),
-            (ids["building_heat_cubic_meter"], ids["building_heat_cubic_reading"]),
         )
         for meter_id, reading_id in invalid_meters:
             savepoint = connection.begin_nested()
@@ -1005,6 +1130,45 @@ def test_u4b_referenced_main_meter_keeps_its_evidence_identity_and_eligibility(
                     )
             finally:
                 savepoint.rollback()
+
+
+def test_meter_with_historical_reading_rejects_identity_calculation_rewrite_or_delete(
+    owner: Engine,
+) -> None:
+    """GAS-DB-03: old readings always retain the meter facts that interpreted them."""
+    with _graph(owner) as (connection, ids):
+        changes = (
+            "device_type = 'GAS_METER', measurement_unit = 'CUBIC_METRE'",
+            "device_type = 'COLD_WATER_METER', kind = 'COLD_WATER', "
+            "measurement_unit = 'CUBIC_METRE', valuation_factor_x1000 = NULL",
+            "unit_id = NULL",
+            "serial = 'U4B-REINTERPRETED'",
+            "installed_on = '2025-01-02'",
+            "valuation_factor_x1000 = 2000",
+            "id = :replacement_main_meter",
+            "account_id = :account_b",
+            "building_id = :other_building",
+        )
+        for assignment in changes:
+            savepoint = connection.begin_nested()
+            try:
+                with pytest.raises(DBAPIError, match="append-only"):
+                    connection.execute(
+                        text(f"UPDATE meter SET {assignment} WHERE id = :unit_heat_meter"),
+                        ids,
+                    )
+            finally:
+                savepoint.rollback()
+
+        savepoint = connection.begin_nested()
+        try:
+            with pytest.raises(DBAPIError, match="append-only"):
+                connection.execute(
+                    text("DELETE FROM meter WHERE id = :unit_heat_meter"),
+                    ids,
+                )
+        finally:
+            savepoint.rollback()
 
 
 def test_u4b_rejects_blank_or_empty_source_metadata(owner: Engine) -> None:

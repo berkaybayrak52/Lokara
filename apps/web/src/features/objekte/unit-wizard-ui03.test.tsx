@@ -10,7 +10,7 @@ import { BuildingDetailPage } from './building-detail-page';
   true;
 
 const mocks = vi.hoisted(() => ({
-  useBuildingDetail: vi.fn(),
+  useBuildingDashboard: vi.fn(),
   mutate: vi.fn(),
   clearDraft: vi.fn(),
 }));
@@ -26,7 +26,7 @@ vi.mock('@/lib/form-draft', () => ({
   useFormDraft: () => ({ draftRestored: false, clearDraft: mocks.clearDraft }),
 }));
 vi.mock('./queries', () => ({
-  useBuildingDetail: mocks.useBuildingDetail,
+  useBuildingDashboard: mocks.useBuildingDashboard,
   useCreateUnit: () => ({
     mutate: mocks.mutate,
     isPending: false,
@@ -81,16 +81,38 @@ describe('UI-03 BuildingDetailPage and UnitWizard', () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    mocks.useBuildingDetail.mockReturnValue({
+    mocks.useBuildingDashboard.mockReturnValue({
       isPending: false,
       isError: false,
       data: {
+        asOf: '2026-08-28',
         id: 'building-1',
         name: 'Musterstraße 12',
         street: 'Musterstraße 12',
         postalCode: '60311',
         city: 'Frankfurt am Main',
+        country: 'Deutschland',
+        buildingType: 'WOHNHAUS',
+        buildingTypeLabel: 'Wohnhaus',
+        isResidential: true,
+        unitCount: 0,
+        kpis: {
+          coldRentCentsMonthly: 0,
+          coldRentEurMonthly: '0,00 €',
+          totalAreaSqmX100: 0,
+          totalAreaSqm: 0,
+          rentedAreaSqmX100: 0,
+          rentedAreaSqm: 0,
+          avgColdRentCentsPerSqm: null,
+          avgColdRentEurPerSqm: null,
+          occupancy: { rented: 0, vacant: 0, selfUse: 0, total: 0 },
+          usageBreakdown: [],
+        },
+        facts: [],
+        factsTotal: 0,
         units: [],
+        modules: [],
+        permissions: { canEdit: true, canCreateUnit: true, canExportPdf: true },
       },
     });
     mocks.mutate.mockImplementation(

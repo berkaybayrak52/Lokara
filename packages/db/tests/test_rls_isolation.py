@@ -35,6 +35,7 @@ from lokara_db import (
     AllocationKeyAssignment,
     BankAccount,
     BankTransaction,
+    BankTransactionClassificationEvent,
     Building,
     BuildingAssignment,
     ChecklistInstance,
@@ -49,6 +50,7 @@ from lokara_db import (
     GuardEvaluation,
     GuardReminder,
     GuardResolutionEvent,
+    HeatingBillingModeVersion,
     HeatingCostEntry,
     IbanHistory,
     Landlord,
@@ -59,6 +61,7 @@ from lokara_db import (
     MdlStatementPosition,
     Membership,
     Meter,
+    MeterLifecycleEvent,
     MeterReading,
     OperatingCostAgreement,
     PaymentAllocation,
@@ -76,6 +79,7 @@ from lokara_db import (
     SelfUsePeriod,
     Statement,
     StatementArchive,
+    StatementDraft,
     StatementSettlement,
     StatementStatus,
     TaxAdviserProfileVersion,
@@ -85,8 +89,12 @@ from lokara_db import (
     TaxExportReadinessAttempt,
     TaxMappingVersion,
     Tenancy,
+    TenancyContractPosition,
+    TenancyContractVersion,
     TenancyParty,
+    TenancyRentChange,
     Unit,
+    UnitProfileVersion,
     UviRun,
     account_scoped_session,
     create_db_engine,
@@ -94,10 +102,16 @@ from lokara_db import (
 )
 from lokara_domain import (
     AllocationKey,
+    CalibrationDataState,
+    HeatingBillingMode,
+    HeatingCostCategory,
     MeasurementUnit,
+    MeterDeviceType,
     MeterKind,
+    MeterLifecycleEventType,
     ReadingReason,
     ReadingSource,
+    RemoteReadability,
 )
 from sqlalchemy import CursorResult, Engine, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
@@ -303,6 +317,7 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 id=ids.heating_cost_a,
                 account_id=ids.account_a,
                 building_id=ids.building_a,
+                category=HeatingCostCategory.OTHER_ALLOWED,
                 label="Heizung & Warmwasser",
                 amount_cents=1_030_000,
                 period_from=date(2025, 1, 1),
@@ -328,7 +343,11 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
                 building_id=ids.building_a,
                 kind=MeterKind.HEAT,
                 measurement_unit=MeasurementUnit.KWH,
+                device_type=MeterDeviceType.HEAT_METER,
                 serial="WMZ-A-1",
+                installed_on=date(2024, 1, 1),
+                remote_readability=RemoteReadability.UNKNOWN,
+                calibration_data_state=CalibrationDataState.REVIEW_REQUIRED,
                 calibration_valid_until=date(2029, 12, 31),
             )
         )
@@ -1568,7 +1587,8 @@ class TestM9CrossAccountIsolation:
                     " 'source_id', CAST(:source_id AS text),"
                     " 'station_assignment_id', CAST(NULL AS text),"
                     " 'station_id', CAST(NULL AS text),"
-                    " 'station_distance_km', CAST(NULL AS numeric(9,3))"
+                    " 'station_distance_km', CAST(NULL AS numeric(9,3)),"
+                    " 'support_code', CAST(NULL AS text)"
                     ")::text, 'UTF8'), 'sha256'), 'hex')"
                 ),
                 {
@@ -1762,10 +1782,11 @@ class TestU4AndU4bCrossAccountReads:
             connection.execute(
                 text(
                     "INSERT INTO meter"
-                    " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
+                    " (id, account_id, building_id, unit_id, kind, measurement_unit,"
+                    " device_type, serial, installed_on, calibration_data_state,"
                     " calibration_valid_until, valuation_factor_x1000) VALUES"
-                    " (:id, :account, :building, :unit, 'HEAT', 'KWH', :serial,"
-                    " '2029-12-31', 1000)"
+                    " (:id, :account, :building, :unit, 'HEAT', 'KWH', 'HEAT_METER', :serial,"
+                    " '2024-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000)"
                 ),
                 {
                     "id": ids["unit_meter"],
@@ -1935,7 +1956,8 @@ class TestU4AndU4bCrossAccountReads:
                     " 'source_id', CAST(:source_id AS text),"
                     " 'station_assignment_id', CAST(:assignment AS text),"
                     " 'station_id', CAST(:station_id AS text),"
-                    " 'station_distance_km', CAST(:distance AS numeric(9,3))"
+                    " 'station_distance_km', CAST(:distance AS numeric(9,3)),"
+                    " 'support_code', CAST(NULL AS text)"
                     ")::text, 'UTF8'), 'sha256'), 'hex')"
                 ),
                 hash_params,
@@ -2039,7 +2061,8 @@ class TestU4CrossAccountWrites:
                     " 'source_id', CAST(:source_id AS text),"
                     " 'station_assignment_id', CAST(:assignment AS text),"
                     " 'station_id', CAST(:station_id AS text),"
-                    " 'station_distance_km', CAST(:distance AS numeric(9,3))"
+                    " 'station_distance_km', CAST(:distance AS numeric(9,3)),"
+                    " 'support_code', CAST(NULL AS text)"
                     ")::text, 'UTF8'), 'sha256'), 'hex')"
                 ),
                 run_hash_params,
@@ -3083,7 +3106,11 @@ class TestCrossAccountForeignKeys:
                     unit_id=seed.unit_a,
                     kind=MeterKind.HEAT,
                     measurement_unit=MeasurementUnit.KWH,
+                    device_type=MeterDeviceType.HEAT_METER,
                     serial="WMZ-B-1",
+                    installed_on=date(2024, 1, 1),
+                    remote_readability=RemoteReadability.UNKNOWN,
+                    calibration_data_state=CalibrationDataState.REVIEW_REQUIRED,
                     calibration_valid_until=date(2029, 12, 31),
                 )
             )
@@ -4088,6 +4115,398 @@ def m6c2_bank_rows(engines: tuple[Engine, Engine], seed: _Seed) -> _M6C2BankRows
     return ids
 
 
+class TestUiWorkspaceCrossAccountWrites:
+    """Migrations 0027 and 0029–0032: every new tenant table proves WITH CHECK."""
+
+    def test_all_eight_workspace_tables_refuse_account_a_rows_in_account_b(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m6c2_bank_rows: _M6C2BankRows,
+    ) -> None:
+        """Every probe is rolled back even if a broken policy unexpectedly permits it."""
+
+        class _WriteUnexpectedlyPermitted(Exception):
+            pass
+
+        builders = (
+            lambda: BankTransactionClassificationEvent(
+                id=new_id(),
+                account_id=seed.account_a,
+                bank_transaction_id=m6c2_bank_rows.transaction_id,
+                action="IGNORED",
+                reason="RLS-Probe",
+                actor_person_id=seed.person_a,
+            ),
+            lambda: HeatingBillingModeVersion(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                period_from=date(2025, 1, 1),
+                period_to=date(2026, 1, 1),
+                version=99,
+                mode=HeatingBillingMode.LOKARA,
+                provider_name=None,
+                provider_reference=None,
+                external_status=None,
+                mdl_statement_id=None,
+                note="RLS-Probe",
+            ),
+            lambda: MeterLifecycleEvent(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                meter_id=seed.meter_a,
+                event_type=MeterLifecycleEventType.INSTALLED,
+                effective_on=date(2024, 1, 1),
+                reason=None,
+                related_meter_id=None,
+            ),
+            lambda: StatementDraft(
+                id=new_id(),
+                account_id=seed.account_a,
+                building_id=seed.building_a,
+                title="RLS-Probe",
+                period_start=date(2025, 1, 1),
+                period_end=date(2025, 12, 31),
+                status="DRAFT",
+                current_step=1,
+                version=1,
+                selected_unit_ids=[seed.unit_a],
+                overrides={},
+                final_statement_id=None,
+                correction_of_statement_id=None,
+                correction_reason=None,
+            ),
+            lambda: TenancyContractPosition(
+                id=new_id(),
+                account_id=seed.account_a,
+                tenancy_id=seed.tenancy_a,
+                position_type="GARAGE",
+                inclusion_type="INCLUDED",
+                label="RLS-Probe",
+                monthly_amount_cents=None,
+                valid_from=date(2025, 1, 1),
+                valid_to=None,
+                evidence_ref="RLS-Probe",
+            ),
+            lambda: TenancyContractVersion(
+                id=new_id(),
+                account_id=seed.account_a,
+                tenancy_id=seed.tenancy_a,
+                version=99,
+                effective_from=date(2025, 1, 1),
+                contract_type="RESIDENTIAL_OPEN_ENDED",
+                evidence_ref="RLS-Probe",
+            ),
+            lambda: TenancyRentChange(
+                id=new_id(),
+                account_id=seed.account_a,
+                tenancy_id=seed.tenancy_a,
+                effective_from=date(2099, 1, 1),
+                new_base_rent_cents=85_000,
+                evidence_ref="RLS-Probe",
+            ),
+            lambda: UnitProfileVersion(
+                id=new_id(),
+                account_id=seed.account_a,
+                unit_id=seed.unit_a,
+                version=99,
+                effective_from=date(2025, 1, 1),
+                usage_type="RESIDENTIAL",
+                rooms_x100=300,
+                amenities=[],
+                amenity_note=None,
+                evidence_ref="RLS-Probe",
+            ),
+        )
+        _, app = engines
+        for build in builders:
+            with (
+                pytest.raises(ProgrammingError, match="row-level security"),
+                account_scoped_session(app, seed.account_b) as session,
+            ):
+                session.add(build())
+                session.flush()
+                raise _WriteUnexpectedlyPermitted
+
+
+class _Ui08InvariantUnexpectedlyPermitted(Exception):
+    """Force rollback when a missing UI-08 database guard permits a probe."""
+
+
+class _Ui08InvariantRollback(Exception):
+    """Roll back a UI-08 positive-control probe that must be accepted."""
+
+
+class TestUi08WorkspaceInvariants:
+    """UI-08 evidence invariants must hold for the normal application role."""
+
+    @staticmethod
+    def _assert_statement_rejected(
+        app: Engine,
+        account_id: str,
+        statement: str,
+        params: dict[str, object],
+    ) -> None:
+        with (
+            pytest.raises(IntegrityError),
+            account_scoped_session(app, account_id) as session,
+        ):
+            session.execute(text(statement), params)
+            raise _Ui08InvariantUnexpectedlyPermitted
+
+    @pytest.mark.parametrize(
+        ("assignment", "value"),
+        (
+            ("amount_cents = :value", 1_030_001),
+            ("source_ref = :value", "changed-source"),
+            ("period_from = :value", date(2024, 12, 31)),
+            ("period_to = :value", date(2026, 1, 2)),
+        ),
+        ids=("amount", "source", "period-from", "period-to"),
+    )
+    def test_heating_cost_rejects_substantive_update_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        assignment: str,
+        value: object,
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            f"UPDATE heating_cost_entry SET {assignment} WHERE id = :id",
+            {"id": seed.heating_cost_a, "value": value},
+        )
+
+    def test_heating_cost_rejects_delete_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            "DELETE FROM heating_cost_entry WHERE id = :id",
+            {"id": seed.heating_cost_a},
+        )
+
+    def test_heating_cost_allows_first_atomic_void_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        voided_at = datetime(2026, 9, 4, 10, 0, tzinfo=UTC)
+        with (
+            pytest.raises(_Ui08InvariantRollback),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            result = session.execute(
+                text(
+                    "UPDATE heating_cost_entry "
+                    "SET voided_at = :voided_at, void_reason = :reason WHERE id = :id "
+                    "RETURNING id"
+                ),
+                {
+                    "id": seed.heating_cost_a,
+                    "voided_at": voided_at,
+                    "reason": "Beleg storniert",
+                },
+            )
+            assert result.scalar_one() == seed.heating_cost_a
+            stored = session.execute(
+                text("SELECT voided_at, void_reason FROM heating_cost_entry WHERE id = :id"),
+                {"id": seed.heating_cost_a},
+            ).one()
+            assert stored.voided_at == voided_at
+            assert stored.void_reason == "Beleg storniert"
+            raise _Ui08InvariantRollback
+
+    @pytest.mark.parametrize(
+        ("second_voided_at", "second_reason"),
+        (
+            (datetime(2026, 9, 4, 10, 0, tzinfo=UTC), "Beleg storniert"),
+            (datetime(2026, 9, 4, 10, 0, tzinfo=UTC), "Anderer Grund"),
+            (datetime(2026, 9, 4, 11, 0, tzinfo=UTC), "Beleg storniert"),
+        ),
+        ids=("repeat", "change-reason", "change-timestamp"),
+    )
+    def test_heating_cost_rejects_repeat_or_changed_void_metadata_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        second_voided_at: datetime,
+        second_reason: str,
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(_Ui08InvariantRollback),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            session.execute(
+                text(
+                    "UPDATE heating_cost_entry "
+                    "SET voided_at = :voided_at, void_reason = :reason WHERE id = :id"
+                ),
+                {
+                    "id": seed.heating_cost_a,
+                    "voided_at": datetime(2026, 9, 4, 10, 0, tzinfo=UTC),
+                    "reason": "Beleg storniert",
+                },
+            )
+            with pytest.raises(IntegrityError), session.begin_nested():
+                session.execute(
+                    text(
+                        "UPDATE heating_cost_entry "
+                        "SET voided_at = :voided_at, void_reason = :reason WHERE id = :id"
+                    ),
+                    {
+                        "id": seed.heating_cost_a,
+                        "voided_at": second_voided_at,
+                        "reason": second_reason,
+                    },
+                )
+                raise _Ui08InvariantUnexpectedlyPermitted
+            raise _Ui08InvariantRollback
+
+    @pytest.mark.parametrize("reason", (None, "   "), ids=("null", "blank"))
+    def test_terminal_meter_lifecycle_event_requires_nonblank_reason_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        reason: str | None,
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            "INSERT INTO meter_lifecycle_event "
+            "(id, account_id, building_id, meter_id, event_type, effective_on, reason) "
+            "VALUES (:id, :account_id, :building_id, :meter_id, 'REMOVED', "
+            "DATE '2026-09-04', :reason)",
+            {
+                "id": new_id(),
+                "account_id": seed.account_a,
+                "building_id": seed.building_a,
+                "meter_id": seed.meter_a,
+                "reason": reason,
+            },
+        )
+
+    @pytest.mark.parametrize("confirmation", (None, "   "), ids=("null", "blank"))
+    def test_meter_reading_correction_requires_nonblank_confirmation_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        confirmation: str | None,
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            "INSERT INTO meter_reading "
+            "(id, account_id, meter_id, read_at, value_x1000, reason, source, "
+            "supersedes_reading_id, confirmation_note) "
+            "VALUES (:id, :account_id, :meter_id, DATE '2025-01-01', 148500001, "
+            "'CORRECTION', 'MANUAL', :supersedes, :confirmation)",
+            {
+                "id": new_id(),
+                "account_id": seed.account_a,
+                "meter_id": seed.meter_a,
+                "supersedes": seed.reading_a,
+                "confirmation": confirmation,
+            },
+        )
+
+    @pytest.mark.parametrize(
+        ("voided_at", "reason"),
+        (
+            (datetime(2026, 9, 4, 10, 0, tzinfo=UTC), None),
+            (None, "Beleg storniert"),
+            (datetime(2026, 9, 4, 10, 0, tzinfo=UTC), "   "),
+        ),
+        ids=("missing-reason", "missing-timestamp", "blank-reason"),
+    )
+    def test_heating_cost_void_requires_timestamp_and_nonblank_reason_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        voided_at: datetime | None,
+        reason: str | None,
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            "INSERT INTO heating_cost_entry "
+            "(id, account_id, building_id, category, label, amount_cents, period_from, "
+            "period_to, voided_at, void_reason) VALUES (:id, :account_id, :building_id, "
+            "'OTHER_ALLOWED', 'Void-Probe', 1, DATE '2025-01-01', DATE '2026-01-01', "
+            ":voided_at, :reason)",
+            {
+                "id": new_id(),
+                "account_id": seed.account_a,
+                "building_id": seed.building_a,
+                "voided_at": voided_at,
+                "reason": reason,
+            },
+        )
+
+    @pytest.mark.parametrize("provider", (None, "   "), ids=("null", "blank"))
+    def test_external_heating_mode_requires_nonblank_provider_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        provider: str | None,
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            "INSERT INTO heating_billing_mode_version "
+            "(id, account_id, building_id, period_from, period_to, version, mode, "
+            "provider_name, provider_reference, external_status) VALUES "
+            "(:id, :account_id, :building_id, DATE '2025-01-01', DATE '2026-01-01', 99, "
+            "'EXTERNAL_PROVIDER', :provider, 'EXT-1', 'BEAUFTRAGT')",
+            {
+                "id": new_id(),
+                "account_id": seed.account_a,
+                "building_id": seed.building_a,
+                "provider": provider,
+            },
+        )
+
+    @pytest.mark.parametrize(
+        ("provider_name", "provider_reference"),
+        (("Messdienst", None), (None, "EXT-1")),
+        ids=("provider-name", "provider-reference"),
+    )
+    def test_lokara_heating_mode_rejects_provider_metadata_rollback_only(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        provider_name: str | None,
+        provider_reference: str | None,
+    ) -> None:
+        _, app = engines
+        self._assert_statement_rejected(
+            app,
+            seed.account_a,
+            "INSERT INTO heating_billing_mode_version "
+            "(id, account_id, building_id, period_from, period_to, version, mode, "
+            "provider_name, provider_reference, external_status) VALUES "
+            "(:id, :account_id, :building_id, DATE '2025-01-01', DATE '2026-01-01', 99, "
+            "'LOKARA', :provider_name, :provider_reference, NULL)",
+            {
+                "id": new_id(),
+                "account_id": seed.account_a,
+                "building_id": seed.building_a,
+                "provider_name": provider_name,
+                "provider_reference": provider_reference,
+            },
+        )
+
+
 class TestM6C2BankBoundaries:
     """docs/15 § 6: every matching row is account-scoped, and money is append-only."""
 
@@ -4421,6 +4840,7 @@ class TestPage02CrossAccountWrites:
                 id=new_id(),
                 account_id=seed.account_a,
                 building_id=seed.building_a,
+                category=HeatingCostCategory.OTHER_ALLOWED,
                 label="Eingeschleust",
                 amount_cents=1,
                 period_from=date(2025, 1, 1),

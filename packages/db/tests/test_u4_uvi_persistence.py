@@ -18,6 +18,7 @@ from typing import NamedTuple
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from lokara_db import Base, DbSettings, create_db_engine, new_id
 from sqlalchemy import (
     CheckConstraint,
@@ -92,6 +93,17 @@ def test_u4_f02_all_six_account_scoped_records_exist() -> None:
         assert table.columns["account_id"].nullable is False
 
 
+def test_uvi_run_generation_key_and_email_claim_are_unique() -> None:
+    """Repeated generation cannot mint a second run or email claim."""
+    run = _table("uvi_run")
+    event = _table("uvi_delivery_event")
+    assert frozenset({"account_id", "tenancy_id", "month"}) in _unique_column_sets(run)
+    assert any(
+        index.unique and index.name == "uq_uvi_delivery_event_emailed_once"
+        for index in event.indexes
+    )
+
+
 def test_u4_f03_normalized_monthly_readings_retain_correction_evidence() -> None:
     """U4-F03: normalized months are fixed-point, sourced and superseded by INSERT."""
     monthly = _table("monthly_meter_reading")
@@ -152,6 +164,8 @@ def test_u4_f04_station_assignment_is_exact_and_never_recomputed() -> None:
         "month",
         "station_id",
         "distance_km",
+        "centroid_dataset_identity",
+        "centroid_dataset_version",
         "source_type",
         "source_id",
         "created_at",
@@ -260,11 +274,12 @@ def upgraded_owner() -> Iterator[Engine]:
 
 
 def test_u4_live_database_reached_current_head_after_0022(upgraded_owner: Engine) -> None:
-    """U4 runs on a schema at least as new as 0022; the repository head is 0025."""
+    """U4 runs on the repository's single migration head, including revision 0022."""
+    scripts = ScriptDirectory.from_config(Config(str(_DB_DIR / "alembic.ini")))
     with upgraded_owner.connect() as connection:
         revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-    assert revision == "0025"
-    assert int(revision) >= 22
+    assert revision == scripts.get_current_head()
+    assert "0022" in {item.revision for item in scripts.walk_revisions()}
 
 
 def test_u4_f08_all_six_records_are_database_append_only(upgraded_owner: Engine) -> None:
@@ -377,18 +392,21 @@ def u4_graph(engine: Engine) -> Iterator[tuple[Connection, U4Graph]]:
         connection.execute(
             text(
                 "INSERT INTO meter"
-                " (id, account_id, building_id, unit_id, kind, measurement_unit, serial,"
-                " calibration_valid_until, valuation_factor_x1000) VALUES"
-                " (:meter, :account, :building, :unit, 'HEAT', 'KWH', 'U4-A',"
-                " '2029-12-31', 1000),"
-                " (:replacement_meter, :account, :building, :unit, 'HEAT', 'KWH', 'U4-B',"
-                " '2029-12-31', 1000),"
-                " (:peer_meter, :account, :building, :peer_unit, 'HEAT', 'KWH', 'U4-C',"
-                " '2029-12-31', 1000),"
+                " (id, account_id, building_id, unit_id, kind, measurement_unit, device_type,"
+                " serial, installed_on, calibration_data_state, calibration_valid_until,"
+                " valuation_factor_x1000) VALUES"
+                " (:meter, :account, :building, :unit, 'HEAT', 'KWH', 'HEAT_METER', 'U4-A',"
+                " '2024-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000),"
+                " (:replacement_meter, :account, :building, :unit, 'HEAT', 'KWH',"
+                " 'HEAT_METER', 'U4-B', '2024-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000),"
+                " (:peer_meter, :account, :building, :peer_unit, 'HEAT', 'KWH',"
+                " 'HEAT_METER', 'U4-C', '2024-01-01', 'REVIEW_REQUIRED', '2029-12-31', 1000),"
                 " (:other_building_meter, :account, :other_building, :other_building_unit,"
-                " 'HEAT', 'KWH', 'U4-D', '2029-12-31', 1000),"
+                " 'HEAT', 'KWH', 'HEAT_METER', 'U4-D', '2024-01-01', 'REVIEW_REQUIRED',"
+                " '2029-12-31', 1000),"
                 " (:foreign_meter, :foreign_account, :foreign_building, :foreign_unit,"
-                " 'HEAT', 'KWH', 'U4-F', '2029-12-31', 1000)"
+                " 'HEAT', 'KWH', 'HEAT_METER', 'U4-F', '2024-01-01', 'REVIEW_REQUIRED',"
+                " '2029-12-31', 1000)"
             ),
             params,
         )
@@ -840,6 +858,7 @@ def _uvi_values(ids: U4Graph, **changes: object) -> dict[str, object]:
         "assignment": ids.assignment,
         "station_id": "00433",
         "distance": Decimal("12.345"),
+        "support_code": None,
         "sha256": "0" * 64,
     }
     values.update(changes)
@@ -849,10 +868,11 @@ def _uvi_values(ids: U4Graph, **changes: object) -> dict[str, object]:
 _UVI_INSERT = text(
     "INSERT INTO uvi_run"
     " (id, account_id, tenancy_id, unit_id, month, inputs, results, heizspiegel_vintage,"
-    " source_type, source_id, station_assignment_id, station_id, station_distance_km, sha256)"
+    " source_type, source_id, station_assignment_id, station_id, station_distance_km,"
+    " support_code, sha256)"
     " VALUES (:id, :account, :tenancy, :unit, :month, CAST(:inputs AS jsonb),"
     " CAST(:results AS jsonb), :heizspiegel_vintage, :source_type, :source_id,"
-    " :assignment, :station_id, :distance, :sha256)"
+    " :assignment, :station_id, :distance, :support_code, :sha256)"
 )
 
 
@@ -869,7 +889,8 @@ def _canonical_uvi_hash(connection: Connection, values: Mapping[str, object]) ->
             " 'source_id', CAST(:source_id AS text),"
             " 'station_assignment_id', CAST(:assignment AS text),"
             " 'station_id', CAST(:station_id AS text),"
-            " 'station_distance_km', CAST(:distance AS numeric(9,3))"
+            " 'station_distance_km', CAST(:distance AS numeric(9,3)),"
+            " 'support_code', CAST(:support_code AS text)"
             ")::text, 'UTF8'), 'sha256'), 'hex')"
         ),
         values,

@@ -10,8 +10,9 @@ Two orthogonal facts about a meter that are easy to conflate:
 - ``MeterKind`` — *what medium* it measures (Wärme / Warmwasser / Kaltwasser).
 - ``MeasurementUnit`` — *in which unit* it counts. A building's Wärmemengenzähler
   counts kWh, while the Heizkostenverteiler in each flat counts dimensionless
-  HKV-Einheiten. Both are ``HEAT``; only the unit tells them apart, and only the
-  kWh one may serve as the § 9 HeizkostenV energy denominator.
+  HKV-Einheiten. A gas meter also measures ``HEAT`` but counts m³. Only the
+  approved device-type facts distinguish those combinations, and only the kWh
+  heat meter may serve as the § 9 HeizkostenV energy denominator.
 
 ``ReadingReason`` is the HeiWaKo *Ablesegrund*. It matters legally (a
 Nutzerwechsel reading splits a period) and operationally: readings are
@@ -27,9 +28,60 @@ class MeterKind(StrEnum):
     COLD_WATER = "COLD_WATER"
 
 
+class MeterDeviceType(StrEnum):
+    """The concrete device, separate from medium and measurement unit."""
+
+    HEAT_METER = "HEAT_METER"
+    HEAT_COST_ALLOCATOR = "HEAT_COST_ALLOCATOR"
+    WARM_WATER_METER = "WARM_WATER_METER"
+    COLD_WATER_METER = "COLD_WATER_METER"
+    GAS_METER = "GAS_METER"
+
+
+class RemoteReadability(StrEnum):
+    REMOTE_READABLE = "REMOTE_READABLE"
+    NOT_REMOTE_READABLE = "NOT_REMOTE_READABLE"
+    UNKNOWN = "UNKNOWN"
+
+
+class CalibrationDataState(StrEnum):
+    DATA_AVAILABLE = "DATA_AVAILABLE"
+    MISSING_DATA = "MISSING_DATA"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class MeterLifecycleEventType(StrEnum):
+    INSTALLED = "INSTALLED"
+    REMOVED = "REMOVED"
+    REPLACED = "REPLACED"
+    VOID = "VOID"
+
+
+class HeatingBillingMode(StrEnum):
+    LOKARA = "LOKARA"
+    EXTERNAL_PROVIDER = "EXTERNAL_PROVIDER"
+
+
+class ExternalHeatingStatus(StrEnum):
+    BEAUFTRAGT = "BEAUFTRAGT"
+    DATEN_UEBERMITTELT = "DATEN_UEBERMITTELT"
+    ABRECHNUNG_ERHALTEN = "ABRECHNUNG_ERHALTEN"
+    GEPRUEFT = "GEPRUEFT"
+    UEBERNOMMEN = "UEBERNOMMEN"
+
+
+class HeatingCostCategory(StrEnum):
+    FUEL_OR_HEAT_SUPPLY = "FUEL_OR_HEAT_SUPPLY"
+    OPERATING_ELECTRICITY = "OPERATING_ELECTRICITY"
+    MAINTENANCE = "MAINTENANCE"
+    METERING_SERVICE = "METERING_SERVICE"
+    OTHER_ALLOWED = "OTHER_ALLOWED"
+
+
 class MeasurementUnit(StrEnum):
     KWH = "KWH"  # Wärmemengenzähler — the § 9 energy denominator
-    CUBIC_METRE = "CUBIC_METRE"  # Wasserzähler
+    CUBIC_METRE = "CUBIC_METRE"  # Wasserzähler or Erdgas volume meter
     HKV_UNITS = "HKV_UNITS"  # Heizkostenverteiler — dimensionless Einheiten
 
 
@@ -50,9 +102,18 @@ class ReadingSource(StrEnum):
 
 
 # Which unit each medium is counted in when it is *not* an HKV allocator.
-# Cold/warm water are always m³; heat is kWh at the building meter and
-# HKV_UNITS at the flat allocators, so it has no single default.
+# Cold/warm water are always m³. Heat may be kWh, gas m³ or HKV_UNITS, so it
+# has no single default and must be resolved through the concrete device type.
 CANONICAL_UNITS: dict[MeterKind, MeasurementUnit] = {
     MeterKind.WARM_WATER: MeasurementUnit.CUBIC_METRE,
     MeterKind.COLD_WATER: MeasurementUnit.CUBIC_METRE,
+}
+
+
+DEVICE_TYPE_FACTS: dict[MeterDeviceType, tuple[MeterKind, MeasurementUnit]] = {
+    MeterDeviceType.HEAT_METER: (MeterKind.HEAT, MeasurementUnit.KWH),
+    MeterDeviceType.HEAT_COST_ALLOCATOR: (MeterKind.HEAT, MeasurementUnit.HKV_UNITS),
+    MeterDeviceType.WARM_WATER_METER: (MeterKind.WARM_WATER, MeasurementUnit.CUBIC_METRE),
+    MeterDeviceType.COLD_WATER_METER: (MeterKind.COLD_WATER, MeasurementUnit.CUBIC_METRE),
+    MeterDeviceType.GAS_METER: (MeterKind.HEAT, MeasurementUnit.CUBIC_METRE),
 }

@@ -20,6 +20,8 @@ from math import atan2, cos, radians, sin, sqrt
 from typing import Final, Protocol
 from xml.etree import ElementTree
 
+from lokara_rules_store import lookup_plz_geocoord
+
 DWD_ANNUAL_SOURCE_VERSION: Final = "v22.3"
 DWD_ATTRIBUTION: Final = "Quelle: Deutscher Wetterdienst"
 DWD_MONTHLY_SOURCE_PATH: Final = (
@@ -597,6 +599,39 @@ def assign_monthly_station(
         verification_status=_MONTHLY_VERIFICATION_STATUS,
         assignment_method=_ASSIGNMENT_METHOD,
         assignment_method_version=_ASSIGNMENT_METHOD_VERSION,
+    )
+
+
+def assign_monthly_station_for_plz(
+    postal_code: str | None = None,
+    *,
+    plz: str | None = None,
+    target_month: str,
+    comparison_month: str,
+    target_records: tuple[MonthlyDegreeDayRecord, ...],
+    comparison_records: tuple[MonthlyDegreeDayRecord, ...],
+) -> MonthlyStationAssignment | None:
+    """Resolve the pinned offline PLZ centroid and assign a monthly station."""
+
+    if postal_code is None:
+        if plz is None:
+            raise MonthlyDegreeDayImportError("PLZ is required")
+        postal_code = plz
+    elif plz is not None:
+        raise MonthlyDegreeDayImportError("provide postal_code or plz, not both")
+    coordinate = lookup_plz_geocoord(postal_code)
+    return assign_monthly_station(
+        centroid=PlzCentroid(
+            plz=coordinate.plz,
+            latitude=coordinate.latitude,
+            longitude=coordinate.longitude,
+            dataset_identity=coordinate.dataset_identity,
+            dataset_version=coordinate.dataset_version,
+        ),
+        target_month=target_month,
+        comparison_month=comparison_month,
+        target_records=target_records,
+        comparison_records=comparison_records,
     )
 
 

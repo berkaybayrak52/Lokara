@@ -116,6 +116,18 @@ export const BuildingDashboardKpisSchema = z.object({
   avgColdRentCentsPerSqm: z.number().int().nullable(),
   avgColdRentEurPerSqm: z.string().nullable(),
   occupancy: BuildingDashboardOccupancySchema,
+  usageBreakdown: z.array(
+    z.object({
+      usageType: z.enum(['RESIDENTIAL', 'COMMERCIAL', 'OTHER']),
+      usageLabel: z.string(),
+      rentedAreaSqmX100: z.number().int(),
+      rentedAreaSqm: z.number(),
+      coldRentCentsMonthly: z.number().int(),
+      coldRentEurMonthly: z.string(),
+      avgColdRentCentsPerSqm: z.number().int().nullable(),
+      avgColdRentEurPerSqm: z.string().nullable(),
+    }),
+  ),
 });
 
 export const BuildingDashboardFactSchema = z.object({
@@ -409,6 +421,129 @@ export const UnitDetailResponseSchema = z.object({
 });
 export type UnitDetailResponse = z.infer<typeof UnitDetailResponseSchema>;
 
+export const UnitAmenitySchema = z.enum([
+  'BALCONY',
+  'TERRACE',
+  'ELEVATOR',
+  'CELLAR',
+  'FITTED_KITCHEN',
+  'BARRIER_REDUCED',
+]);
+export type UnitAmenity = z.infer<typeof UnitAmenitySchema>;
+
+export const UnitDashboardProfileSchema = z.object({
+  version: z.number().int().nullable(),
+  usageType: z.enum(['RESIDENTIAL', 'COMMERCIAL', 'OTHER']).nullable(),
+  usageLabel: z.string(),
+  roomsX100: z.number().int().nullable(),
+  roomsDisplay: z.string().nullable(),
+  amenities: z.array(UnitAmenitySchema),
+  amenityLabels: z.array(z.string()),
+  amenityNote: z.string().nullable(),
+  evidenceRef: z.string().nullable(),
+});
+
+export const UnitDashboardTenancySchema = z.object({
+  id: z.string(),
+  parties: z.array(z.object({ id: z.string(), name: z.string(), email: z.string().nullable() })),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+  contractType: z
+    .enum([
+      'RESIDENTIAL_OPEN_ENDED',
+      'RESIDENTIAL_FIXED_TERM',
+      'COMMERCIAL_OPEN_ENDED',
+      'COMMERCIAL_FIXED_TERM',
+      'OTHER',
+    ])
+    .nullable(),
+  contractTypeLabel: z.string(),
+  contractEvidenceRef: z.string().nullable(),
+  coldRentCents: z.number().int(),
+  coldRentEur: z.string(),
+  coldRentPerSqmEur: z.string().nullable(),
+  advancePaymentCents: z.number().int(),
+  advancePaymentEur: z.string(),
+  totalMonthlyCents: z.number().int(),
+  totalMonthlyEur: z.string(),
+  positions: z.array(
+    z.object({
+      id: z.string(),
+      positionType: z.enum(['GARAGE', 'PARKING']),
+      positionLabel: z.string(),
+      inclusionType: z.enum(['INCLUDED', 'SEPARATE']),
+      inclusionLabel: z.string(),
+      label: z.string().nullable(),
+      monthlyAmountCents: z.number().int().nullable(),
+      monthlyAmountEur: z.string().nullable(),
+    }),
+  ),
+  lastRentChange: z
+    .object({
+      effectiveFrom: z.string(),
+      newBaseRentCents: z.number().int(),
+      newBaseRentEur: z.string(),
+      evidenceRef: z.string(),
+    })
+    .nullable(),
+});
+
+export const UnitDashboardHistorySegmentSchema = z.object({
+  kind: z.enum(['RENTED', 'VACANT', 'SELF_USE', 'GRATUITOUS']),
+  label: z.string(),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+  partyNames: z.array(z.string()),
+  current: z.boolean(),
+});
+export type UnitDashboardHistorySegment = z.infer<typeof UnitDashboardHistorySegmentSchema>;
+
+export const UnitDashboardResponseSchema = z.object({
+  asOf: z.string(),
+  id: z.string(),
+  label: z.string(),
+  areaSqmX100: z.number().int(),
+  areaSqmDisplay: z.string(),
+  buildingId: z.string(),
+  buildingName: z.string(),
+  buildingAddress: z.string(),
+  state: z.enum(['RENTED', 'VACANT', 'SELF_USE', 'GRATUITOUS', 'CONFLICT']),
+  stateLabel: z.string(),
+  profile: UnitDashboardProfileSchema,
+  currentTenancy: UnitDashboardTenancySchema.nullable(),
+  history: z.array(UnitDashboardHistorySegmentSchema),
+  historyTotal: z.number().int(),
+  historyHasMore: z.boolean(),
+  documents: z.array(
+    z.object({
+      id: z.string(),
+      statementId: z.string(),
+      documentType: z.string(),
+      filename: z.string(),
+      sha256: z.string(),
+      sizeBytes: z.number().int(),
+      createdAt: z.string(),
+      downloadHref: z.string(),
+    }),
+  ),
+  modules: z.array(
+    z.object({
+      key: z.enum(['PAYMENTS', 'PORTAL', 'MESSAGES', 'DOCUMENTS']),
+      available: z.boolean(),
+      unavailableReason: z.string().nullable(),
+    }),
+  ),
+  primaryAction: z.object({ key: z.string(), label: z.string(), href: z.string() }).nullable(),
+  permissions: z.object({
+    canEditProfile: z.boolean(),
+    canCreateTenancy: z.boolean(),
+    canRecordContractFacts: z.boolean(),
+  }),
+});
+export type UnitDashboardResponse = z.infer<typeof UnitDashboardResponseSchema>;
+
+export const UnitDashboardWriteResponseSchema = z.object({ id: z.string() });
+
 export const ALLOCATION_KEYS = [
   'AREA',
   'PERSONS',
@@ -437,15 +572,38 @@ export const CostEntryOutSchema = z.object({
   amountEur: z.string(),
   periodFrom: z.string(),
   periodTo: z.string(),
-  key: AllocationKeySchema,
-  keyLabel: z.string(),
+  key: AllocationKeySchema.nullable(),
+  keyLabel: z.string().nullable(),
   directUnitId: z.string().nullable(),
   directTenancyId: z.string().nullable(),
   assignmentCount: z.number().int(),
+  catalogueId: z.string().nullable().optional(),
+  classificationFindings: z.array(z.string()).optional(),
+  productionBlocked: z.boolean().optional(),
 });
 export type CostEntryOut = z.infer<typeof CostEntryOutSchema>;
 
 export const CostListResponseSchema = z.object({ costs: z.array(CostEntryOutSchema) });
+
+export const CostCataloguePositionSchema = z.object({
+  catalogueId: z.string(),
+  label: z.string(),
+  betrkvNumber: z.string().nullable(),
+  defaultKey: AllocationKeySchema.nullable(),
+  namingRequired: z.boolean(),
+  allocable: z.boolean(),
+});
+export type CostCataloguePosition = z.infer<typeof CostCataloguePositionSchema>;
+
+export const CostCatalogueResponseSchema = z.object({
+  positions: z.array(CostCataloguePositionSchema),
+});
+
+export const CostVoidOutSchema = z.object({
+  id: z.string(),
+  voidedAt: z.string(),
+  successorWorkflowTarget: z.string(),
+});
 
 // ── Zähler (docs/04 M3 page 5) ───────────────────────────────────────────────
 
@@ -475,10 +633,65 @@ export const MEASUREMENT_UNIT_LABELS: Record<MeasurementUnit, string> = {
  * would corrupt the § 9 HeizkostenV denominator.
  */
 export const UNITS_BY_KIND: Record<MeterKind, readonly MeasurementUnit[]> = {
-  HEAT: ['KWH', 'HKV_UNITS'],
+  HEAT: ['KWH', 'CUBIC_METRE', 'HKV_UNITS'],
   WARM_WATER: ['CUBIC_METRE'],
   COLD_WATER: ['CUBIC_METRE'],
 };
+
+export const METER_DEVICE_TYPES = [
+  'HEAT_METER',
+  'HEAT_COST_ALLOCATOR',
+  'WARM_WATER_METER',
+  'COLD_WATER_METER',
+  'GAS_METER',
+] as const;
+export const MeterDeviceTypeSchema = z.enum(METER_DEVICE_TYPES);
+export type MeterDeviceType = z.infer<typeof MeterDeviceTypeSchema>;
+
+export const METER_DEVICE_TYPE_LABELS: Record<MeterDeviceType, string> = {
+  HEAT_METER: 'Wärmemengenzähler',
+  HEAT_COST_ALLOCATOR: 'Heizkostenverteiler',
+  WARM_WATER_METER: 'Warmwasserzähler',
+  COLD_WATER_METER: 'Kaltwasserzähler',
+  GAS_METER: 'Gaszähler',
+};
+
+export const DEVICE_TYPE_UNIT: Record<MeterDeviceType, MeasurementUnit> = {
+  HEAT_METER: 'KWH',
+  HEAT_COST_ALLOCATOR: 'HKV_UNITS',
+  WARM_WATER_METER: 'CUBIC_METRE',
+  COLD_WATER_METER: 'CUBIC_METRE',
+  GAS_METER: 'CUBIC_METRE',
+};
+
+export const GasConversionOutSchema = z.object({
+  calorificFactorKwhPerM3: z.string(),
+  conditionNumber: z.string(),
+  validFrom: z.string(),
+  validTo: z.string().nullable(),
+  supplierInvoiceReference: z.string(),
+  sourceType: z.literal('SUPPLIER_INVOICE'),
+  sourceId: z.string(),
+  rechtsstand: z.literal('08/2026'),
+  verificationStatus: z.literal('verify-before-production'),
+  configurationId: z.string(),
+  supersedesConfigurationId: z.string().nullable(),
+});
+
+export const RemoteReadabilitySchema = z.enum([
+  'REMOTE_READABLE',
+  'NOT_REMOTE_READABLE',
+  'UNKNOWN',
+]);
+export type RemoteReadability = z.infer<typeof RemoteReadabilitySchema>;
+
+export const CalibrationDataStateSchema = z.enum([
+  'DATA_AVAILABLE',
+  'MISSING_DATA',
+  'NOT_APPLICABLE',
+  'REVIEW_REQUIRED',
+]);
+export type CalibrationDataState = z.infer<typeof CalibrationDataStateSchema>;
 
 export const READING_REASONS = [
   'PERIODIC',
@@ -515,6 +728,8 @@ export const MeterReadingOutSchema = z.object({
   reason: ReadingReasonSchema,
   source: ReadingSourceSchema,
   note: z.string().nullable(),
+  supersedesReadingId: z.string().nullable(),
+  confirmationNote: z.string().nullable(),
   tenancyId: z.string().nullable(),
   estimatedConsumptionX1000: z.number().int().nullable(),
   estimationBasis: z.string().nullable(),
@@ -524,11 +739,43 @@ export const MeterReadingOutSchema = z.object({
 });
 export type MeterReadingOut = z.infer<typeof MeterReadingOutSchema>;
 
+export const MeterConsumptionPeriodSchema = z.object({
+  periodFrom: z.string(),
+  periodTo: z.string(),
+  periodLabel: z.string(),
+  status: z.enum(['MEASURED', 'INCOMPLETE', 'ESTIMATED', 'NOT_APPLICABLE']),
+  openingReading: z
+    .object({
+      id: z.string(),
+      readAt: z.string(),
+      valueX1000: z.number().int(),
+      valueDisplay: z.string(),
+      source: ReadingSourceSchema,
+    })
+    .nullable(),
+  closingReading: z
+    .object({
+      id: z.string(),
+      readAt: z.string(),
+      valueX1000: z.number().int(),
+      valueDisplay: z.string(),
+      source: ReadingSourceSchema,
+    })
+    .nullable(),
+  consumptionX1000: z.number().int().nullable(),
+  consumptionDisplay: z.string().nullable(),
+  finding: z.string().nullable(),
+  estimationBasis: z.string().nullable(),
+  provenanceRef: z.string().nullable(),
+});
+
 export const CalibrationStatusSchema = z.enum([
   'EXPIRED',
   'EXPIRING_SOON',
   'VALID',
+  'MISSING_DATA',
   'NOT_APPLICABLE',
+  'REVIEW_REQUIRED',
 ]);
 export type CalibrationStatus = z.infer<typeof CalibrationStatusSchema>;
 
@@ -536,17 +783,45 @@ export const MeterOutSchema = z.object({
   id: z.string(),
   unitId: z.string().nullable(),
   unitLabel: z.string().nullable(),
+  deviceType: MeterDeviceTypeSchema,
+  deviceTypeLabel: z.string(),
   kind: MeterKindSchema,
   kindLabel: z.string(),
   measurementUnit: MeasurementUnitSchema,
   unitSymbol: z.string(),
   serial: z.string(),
   label: z.string().nullable(),
+  location: z.string().nullable(),
+  manufacturer: z.string().nullable(),
+  model: z.string().nullable(),
+  installedOn: z.string(),
+  lifecycleStatus: z.enum(['ACTIVE', 'REMOVED', 'REPLACED', 'VOID']),
+  lifecycleEndedOn: z.string().nullable(),
+  relatedMeterId: z.string().nullable(),
+  lifecycleEvents: z.array(
+    z.object({
+      id: z.string(),
+      eventType: z.enum(['INSTALLED', 'REMOVED', 'REPLACED', 'VOID']),
+      effectiveOn: z.string(),
+      reason: z.string().nullable(),
+      relatedMeterId: z.string().nullable(),
+      createdAt: z.string(),
+    }),
+  ),
+  remoteReadability: RemoteReadabilitySchema,
+  calibrationDataState: CalibrationDataStateSchema,
+  calibrationDate: z.string().nullable(),
+  calibrationEvidenceRef: z.string().nullable(),
   calibrationValidUntil: z.string().nullable(),
   valuationFactorX1000: z.number().int().nullable(),
   valuationFactorDisplay: z.string().nullable(),
+  gasConversion: GasConversionOutSchema.nullable(),
   calibrationStatus: CalibrationStatusSchema,
+  calibrationMessage: z.string().nullable(),
+  calibrationRechtsstand: z.string().nullable(),
+  calibrationProductionBlockers: z.array(z.string()),
   readings: z.array(MeterReadingOutSchema),
+  consumptionPeriods: z.array(MeterConsumptionPeriodSchema),
   periodConsumptionDisplay: z.string().nullable(),
 });
 export type MeterOut = z.infer<typeof MeterOutSchema>;
@@ -556,8 +831,68 @@ export const MeterListResponseSchema = z.object({
   periodLabel: z.string(),
 });
 
+export const MeterWorkspaceResponseSchema = z.object({
+  asOf: z.string(),
+  periodLabel: z.string(),
+  buildings: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      address: z.string(),
+      activeMeterCount: z.number().int(),
+      expiredCount: z.number().int(),
+      missingDataCount: z.number().int(),
+      buildingMeters: z.array(MeterOutSchema),
+      units: z.array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          activeMeterCount: z.number().int(),
+          warningCount: z.number().int(),
+          tenancies: z.array(
+            z.object({
+              id: z.string(),
+              label: z.string(),
+              validFrom: z.string(),
+              validTo: z.string().nullable(),
+            }),
+          ),
+          meters: z.array(MeterOutSchema),
+        }),
+      ),
+    }),
+  ),
+  expiredMeterIds: z.array(z.string()),
+  permissions: z.object({ canWrite: z.boolean() }),
+});
+export type MeterWorkspaceResponse = z.infer<typeof MeterWorkspaceResponseSchema>;
+
+export const ReadingPlausibilityResponseSchema = z.object({
+  findings: z.array(
+    z.object({
+      code: z.string(),
+      severity: z.enum(['NOTICE', 'WARNING', 'BLOCKER']),
+      message: z.string(),
+      requiresConfirmation: z.boolean(),
+    }),
+  ),
+  suggestedTenancyId: z.string().nullable(),
+});
+export type ReadingPlausibilityResponse = z.infer<typeof ReadingPlausibilityResponseSchema>;
+
+export const HEATING_COST_CATEGORIES = [
+  'FUEL_OR_HEAT_SUPPLY',
+  'OPERATING_ELECTRICITY',
+  'MAINTENANCE',
+  'METERING_SERVICE',
+  'OTHER_ALLOWED',
+] as const;
+export const HeatingCostCategorySchema = z.enum(HEATING_COST_CATEGORIES);
+export type HeatingCostCategory = z.infer<typeof HeatingCostCategorySchema>;
+
 export const HeatingCostOutSchema = z.object({
   id: z.string(),
+  category: HeatingCostCategorySchema,
   label: z.string(),
   amountCents: z.number().int(),
   amountEur: z.string(),
@@ -567,12 +902,36 @@ export const HeatingCostOutSchema = z.object({
   co2KgDisplay: z.string().nullable(),
   co2CostCents: z.number().int().nullable(),
   co2CostEur: z.string().nullable(),
+  sourceRef: z.string().nullable(),
+  voidedAt: z.string().nullable(),
+  voidReason: z.string().nullable(),
 });
 export type HeatingCostOut = z.infer<typeof HeatingCostOutSchema>;
 
 export const HeatingCostListResponseSchema = z.object({
   heatingCosts: z.array(HeatingCostOutSchema),
+  readiness: z.enum(['COMPLETE', 'MISSING_INFORMATION', 'REVIEW_REQUIRED']),
+  findings: z.array(z.string()),
 });
+
+export const HeatingBillingModeOutSchema = z.object({
+  id: z.string(),
+  buildingId: z.string(),
+  periodFrom: z.string(),
+  periodTo: z.string(),
+  version: z.number().int(),
+  mode: z.enum(['LOKARA', 'EXTERNAL_PROVIDER']),
+  providerName: z.string().nullable(),
+  providerReference: z.string().nullable(),
+  externalStatus: z
+    .enum(['BEAUFTRAGT', 'DATEN_UEBERMITTELT', 'ABRECHNUNG_ERHALTEN', 'GEPRUEFT', 'UEBERNOMMEN'])
+    .nullable(),
+  mdlStatementId: z.string().nullable(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type HeatingBillingModeOut = z.infer<typeof HeatingBillingModeOutSchema>;
+export const HeatingBillingModeListSchema = z.array(HeatingBillingModeOutSchema);
 
 export const StatementNkLineSchema = z.object({
   partyLabel: z.string(),
@@ -712,6 +1071,7 @@ export type ExtractionField = z.infer<typeof ExtractionFieldSchema>;
 /** Exactly the CostCreate shape — the review form starts here and submits it
  * through the ordinary Kosten erfassen endpoint. */
 export const ExtractionPrefillSchema = z.object({
+  catalogueId: z.string(),
   label: z.string(),
   amountCents: z.number().int(),
   periodFrom: z.string(),
@@ -891,4 +1251,82 @@ export const MatchDecisionResultSchema = z.object({
   outcome: MatchOutcomeSchema,
   selected_rank: z.number().int().nullable(),
   ledger_entry_id: z.string().nullable(),
+});
+
+export const PaymentWorkspaceAccountSchema = z.object({
+  id: z.string(),
+  display_name: z.string(),
+  masked_iban: z.string(),
+  provider_label: z.string(),
+  consent_status: z.enum(['active', 'expiring', 'reconnect']),
+  consent_expires_at: z.string().nullable(),
+  last_sync_at: z.string().nullable(),
+  sync_status: z.enum(['idle', 'running', 'failed']),
+});
+
+export const PaymentWorkspaceAccountListSchema = z.object({
+  accounts: z.array(PaymentWorkspaceAccountSchema),
+});
+
+export const PaymentWorkspaceHistorySchema = z.object({
+  kind: z.string(),
+  label: z.string(),
+  actor_person_id: z.string().nullable(),
+  created_at: z.string(),
+});
+
+export const PaymentWorkspaceRowSchema = z.object({
+  id: z.string(),
+  bank_account_id: z.string(),
+  account_label: z.string(),
+  amount_cents: z.number().int(),
+  direction: z.enum(['incoming', 'outgoing']),
+  booking_date: z.string(),
+  value_date: z.string(),
+  counterpart_name: z.string().nullable(),
+  counterpart_iban_masked: z.string().nullable(),
+  purpose: z.string().nullable(),
+  source_label: z.string(),
+  status: z.enum(['unassigned', 'review', 'assigned', 'partial', 'ignored']),
+  status_label: z.string(),
+  ignored: z.boolean(),
+  assignment_label: z.string().nullable(),
+  receivable_id: z.string().nullable(),
+  tenancy_id: z.string().nullable(),
+  building_id: z.string().nullable(),
+  building_name: z.string().nullable(),
+  unit_label: z.string().nullable(),
+  renter_name: z.string().nullable(),
+  expected_cents: z.number().int().nullable(),
+  open_cents: z.number().int().nullable(),
+  confidence: z.number().int().nullable(),
+  match_reason_de: z.string().nullable(),
+  available_actions: z.array(z.string()),
+  history: z.array(PaymentWorkspaceHistorySchema),
+});
+export type PaymentWorkspaceRow = z.infer<typeof PaymentWorkspaceRowSchema>;
+
+export const PaymentWorkspaceSchema = z.object({
+  rows: z.array(PaymentWorkspaceRowSchema),
+  next_cursor: z.string().nullable(),
+  counts: z.record(z.string(), z.number().int()),
+  total: z.number().int(),
+});
+
+export const PaymentClassificationResultSchema = z.object({
+  id: z.string(),
+  transaction_id: z.string(),
+  action: z.enum(['ignored', 'restored']),
+});
+
+export const PaymentBulkClassificationResultSchema = z.object({
+  results: z.array(
+    z.object({
+      transaction_id: z.string(),
+      ok: z.boolean(),
+      id: z.string().optional(),
+      action: z.enum(['ignored', 'restored']).optional(),
+      detail: z.string().nullable(),
+    }),
+  ),
 });

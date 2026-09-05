@@ -58,24 +58,50 @@ before UI. Dates are communication events, not planning inputs.
   landlord Zahlungen screen (`6995bc4`) are technically complete and locally merged, which closes
   M6-C and with it M6.**
 - **G1 is technically complete and locally merged (`6c257f8`).** U1–U5 and M7-0 through M7-E are
-  also locally merged. Local `main` remains the last consolidated checkpoint at `5230724`.
-  The long-lived local `development` branch integrates UI-04, deferred M7-F repairs and paused M9
+  also locally merged. Local `main` remains the last consolidated checkpoint at `3898776`.
+  The long-lived local `development` branch integrates UI-04, deferred M7-F repairs and M9
   work, including all W1–W8 projections, migration `0025`, account-scoped jobs/API, immutable
-  delivery evidence and `/waechter`. Integration does not close or verify these workstreams.
+  delivery evidence and `/waechter`. Integration alone does not close the other workstreams.
   M7-F remains deferred until after M10; its repair candidate still needs closing reviews and
-  verification, and every M7 authority flag continues to block production output. M9 remains paused
-  until after UI-08, with its known landlord-facing presentation and production blockers visible.
-  UI-00 through UI-02 retain their earlier evidence. UI-03, UI-04 and UI-05A were implemented under
-  the direct implementation mode in `CLAUDE.md` § 10 and carry no test evidence. UI-05A adds the
-  resumable statement workflow and migration `0028`; UI-05B is next. Nothing is pushed. Ruff,
-  strict mypy, web lint, typecheck and the production build pass. The UI-05A migration and complete
+  verification, and every M7 authority flag continues to block production output. M9 is technically
+  complete and review-clean on `development`; it is not production-approved, and every source,
+  legal, provider, UVI-artifact and checklist-catalogue blocker remains visible. UI-08 has partial
+  automated/review verification, including the later `0040` boundary repair; its live-browser
+  matrix remains outstanding. UI-00 through UI-02 retain their earlier evidence. UI-03 through
+  UI-08 were implemented under the former direct implementation mode and now have checkpoint
+  full/demo and focused review evidence; UI-07 is only the
+  non-blocked demo core and remains partial. UI-05A adds the resumable statement workflow and
+  migration `0028`; UI-05B adds the server-owned unit dashboard and migration `0029`; UI-07 adds
+  the payment workspace and migration `0030`; UI-06 supplies the catalogue-backed cost workspace
+  and migration `0031`; UI-08 supplies the meter workspace and migration `0032`. Nothing is pushed.
+  Ruff, strict mypy, web lint, typecheck and the production build pass. The UI-05A migration and complete
   local draft → readiness → preview → finalization → correction/archive path were exercised against
-  the preserved demo database, and the generated A4 PDFs were visually checked. No tests, gates,
-  audits, reviewer-agent runs or live interactive-browser accessibility matrix ran.
+  the preserved demo database, and the generated A4 PDFs were visually checked. Those direct-mode UI
+  implementations still need complete per-step acceptance and the live interactive-browser
+  accessibility matrix; checkpoint gate/review evidence does not establish full UI closure.
   A follow-up stability repair now requires the current optimistic draft version at finalization,
   advances that version when readiness changes, preserves unexpected server faults as errors and
   prevents M9 from treating a cover letter as the annual tenant statement. The compile-level checks
   remain green.
+- **29.08.2026 M9 technical close is green and review-clean.** `scripts/gate.sh demo` passes with
+  `1916` Python tests and `183` web tests; RLS covers `73` tables and FK isolation covers `144`
+  account-scoped foreign keys. The final boundary audit and statement/UI re-review are clean. The
+  ordinary statement fingerprint is unchanged at `c4eecb355d57cec620dfcb0134fc9141` / `149275`
+  bytes, and no `.lokara-red` sentinel remains. M9 is technically complete on `development`, not
+  production-approved. Its provider/scheduler, frozen UVI artifact, checklist catalogue,
+  UVI-register/monthly-content/cadence and recorded legal/runtime audit blockers remain explicit.
+  No commit, merge or push was performed.
+- **05.09.2026 later checkpoint verification is green.** Full and non-fresh demo gates pass
+  `1967` Python tests (zero skips) and `188` web tests against migration `0040`; RLS covers `73`
+  tables and FK isolation covers `144` account-scoped edges. The ordinary statement retains all
+  `22` golden assertions and `8` scale canaries, with unchanged fingerprint
+  `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes. The `0040` repair has `20` rollback-only
+  app-role regressions and a clean boundary re-audit. UVI API (`31`), PDF (`13`, including real A4
+  rendering) and focused web (`19`) checks passed during the preceding repair session, and the
+  final statement/UI re-review is clean. GAS/warm-water conversion, comparison provenance and
+  layout repairs are implemented. The full UI live-browser matrix, UI-07's unfinished scope and
+  all production/legal limits remain open. Emir authorized the local checkpoint commit on
+  05.09.2026; promotion to `main` and push remain separate decisions.
 
 ---
 
@@ -85,18 +111,18 @@ Every Page is a calculation or deterministic legal/product-rule source. A milest
 Page directly from `berkay-work/`. First transcribe it into the target `docs/` file and create its
 golden fixtures. Existing docs are not assumed correct merely because they already exist.
 
-| Source | Target | Fixtures | Current coverage and dependency |
-| --- | --- | --- | --- |
-| Page 01 — Die Abrechnung | `docs/08-statement-document.md` + data changes in `docs/02` | `08-F01…F24` | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B and M6 ship the persisted calculation, bank/ledger flow and owner-only final archives. Paused M9 work integrated on `development` adds default-off, owner-controlled renter email delivery; M10 owns renter portal publication. |
-| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. U1–U5 now implement monthly DWD/UVI engineering, but technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or UVI production authority. |
-| Page 02 — BetrKV catalogue | `docs/09-betrkv-catalogue.md` + `packages/rules-store` | `09-F01…F32` | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking. |
-| Page 03 — AfA | `docs/10-afa.md` | `10-F01…F34` | Complete transcription approved and merged 21.08.2026. The normalized pure engine, server-owned rules and the AfA API/web boundary are locally merged and green under `scripts/gate.sh full`. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. F11 selects 453,798 ct, while K09 authority, Weg B and the missing Gutachten share still block production. |
-| Page 04 — Anlage V + DATEV | `docs/11-tax-export.md` | `11-F01…F16` | Complete transcription approved and merged 21.08.2026. The pure export engine, rules, the strengthened `0024` model and the server-owned artifact/API adapter are locally merged and green under `scripts/gate.sh full`. Artifact bytes are generated by the server from domain inputs; a caller can never supply them. Seven register rows are `geprüft`; six and all affected runtime outputs remain blocked. |
-| Page 05 — Wächter/Fristen | `docs/12-guards-deadlines.md` | `12-F01…F24` | Complete transcription approved and merged 21.08.2026. Paused, unverified M9 work integrated on `development` implements all 24 cases, immutable persistence, account-scoped jobs/API and `/waechter`. The original 18 Page-specific register rows remain flagged; the two superseding checked W2 rules still need matching register rows. Real delivery remains default-off and production-blocked. |
-| Page 06 — Vertragsklauseln | `docs/13-contract-clauses.md` | `CLAUSES-F01…F19` | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8. |
-| Page 07 — Investment-KPIs | `docs/14-investment-kpis.md` | `14-F01…F14`, with an exact `KPI-*` alias map | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10. |
-| Page 08 — Bank-Matching | `docs/15-bank-matching.md` | `BANKMATCH-F01…F13` | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's *Zahlungen* screen are technically complete and locally merged. |
-| UVI + DWD annexes | `docs/16-uvi.md` | Source-named Block A–D2, DWD and Heizspiegel fixture maps | U1–U3 ship the pure calculation and DWD adapters; U4/U4b ship monthly persistence and immutable archives through migration `0023`; U5 ships owner-side generation and the separate German renter PDF. Production Blocks C/D2 still require a chosen PLZ geodataset and three missing UVI register rows; scheduled delivery remains M9 and portal publication remains M10. |
+| Source                      | Target                                                          | Fixtures                                                  | Current coverage and dependency                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page 01 — Die Abrechnung    | `docs/08-statement-document.md` + data changes in `docs/02`     | `08-F01…F24`                                              | Full D1 source trace and exact 24-ID data oracle transcribed. Slice B and M6 ship the persisted calculation, bank/ledger flow and owner-only final archives. Technically closed M9 work on `development` adds default-off, owner-controlled renter email delivery; M10 owns renter portal publication.                                                                                                                                                                                                                           |
+| Page 01b — Heizkosten & CO₂ | `docs/03-nk-heating-engines.md`; output rules also in `docs/08` | Every `01b-Fxx`, including suffix variants                | Full source trace and exact 34-ID orchestrator suite are green; Slice A was approved and merged locally 21.08.2026. Self-billing and MDL converge on typed readiness, findings, provenance, device evidence, separate unapplied risks and annual comparison; migration `0006`, adapter, API, web and PDF projections are included. U1–U5 now implement monthly DWD/UVI engineering, but technical closure does not approve flagged values, final block-(c) wording, risk cumulation, MDL ingestion or UVI production authority. |
+| Page 02 — BetrKV catalogue  | `docs/09-betrkv-catalogue.md` + `packages/rules-store`          | `09-F01…F32`                                              | Slice C is technically complete (23.08.2026): full/non-fresh demo gates, unchanged PDF fingerprint and both reviews are green. `09-K01…K11`, `trinkwasseruntersuchung` and the administration-cost legal check remain production-blocking.                                                                                                                                                                                                                                                                                      |
+| Page 03 — AfA               | `docs/10-afa.md`                                                | `10-F01…F34`                                              | Complete transcription approved and merged 21.08.2026. The normalized pure engine, server-owned rules and the AfA API/web boundary are locally merged and green under `scripts/gate.sh full`. Four CSV rows are `geprüft`; 42 remain `verify-before-production`. F11 selects 453,798 ct, while K09 authority, Weg B and the missing Gutachten share still block production.                                                                                                                                                     |
+| Page 04 — Anlage V + DATEV  | `docs/11-tax-export.md`                                         | `11-F01…F16`                                              | Complete transcription approved and merged 21.08.2026. The pure export engine, rules, the strengthened `0024` model and the server-owned artifact/API adapter are locally merged and green under `scripts/gate.sh full`. Artifact bytes are generated by the server from domain inputs; a caller can never supply them. Seven register rows are `geprüft`; six and all affected runtime outputs remain blocked.                                                                                                                 |
+| Page 05 — Wächter/Fristen   | `docs/12-guards-deadlines.md`                                   | `12-F01…F24`                                              | Complete transcription approved and merged 21.08.2026. M9 was technically closed and review-clean on `development` on 29.08.2026, with later checkpoint verification on 05.09.2026. It implements all 24 cases, immutable persistence, account-scoped jobs/API and `/waechter`. The original 18 Page-specific register rows remain flagged; the two superseding checked W2 rules still need matching register rows. Real delivery remains default-off and production-blocked. |
+| Page 06 — Vertragsklauseln  | `docs/13-contract-clauses.md`                                   | `CLAUSES-F01…F19`                                         | Complete transcription approved and merged 21.08.2026 with the exact 19-ID data oracle, 17-row register surface and explicit ownership boundaries. No implementation exists. The source defines routing and risk rules, but not a complete clause-text/version catalogue or complete Mieterhöhung/Kündigung/Mahnung bodies; those missing sources still block M8.                                                                                                                                                               |
+| Page 07 — Investment-KPIs   | `docs/14-investment-kpis.md`                                    | `14-F01…F14`, with an exact `KPI-*` alias map             | Complete transcription approved and merged 21.08.2026 with all 14 data-only fixtures, 18 register rows and explicit Page-03/Page-09/Page-11 boundaries. No implementation exists; flagged conventions, interest-source ambiguity and absent concept sources block production and M10.                                                                                                                                                                                                                                           |
+| Page 08 — Bank-Matching     | `docs/15-bank-matching.md`                                      | `BANKMATCH-F01…F13`                                       | Complete transcription approved and merged 20.08.2026. Approved `docs/15` and its oracle preserve F03 as the Page's omitted E12 case, so all thirteen entries are executable dictionaries. M6-C1/M6-C2/M6-C3-0/C3a ship the engine, persistence, adapter, matching service, five owner endpoints and audited database invariants on local `main`; C3b's scheduler port and three job entrypoints and C3c's _Zahlungen_ screen are technically complete and locally merged.                                                      |
+| UVI + DWD annexes           | `docs/16-uvi.md`                                                | Source-named Block A–D2, DWD and Heizspiegel fixture maps | U1–U3 ship the pure calculation and DWD adapters; U4/U4b ship monthly persistence and immutable archives through migration `0023`; U5 ships owner-side generation and the separate German renter PDF. The vendored offline WZB lookup and PLZ-driven assignment are green, and the PLZ centroid is the production default. Three missing UVI register rows still block production C/D2; scheduled delivery remains M9 and portal publication remains M10.                                                                                                                                |
 
 The new numbers 13–16 are assigned here. Page 01b stays in `docs/03` because that is the active
 engine contract; it does not create a second competing heating specification.
@@ -164,8 +190,9 @@ Current trace status after merged `docs/09`, `docs/15` and approved `docs/12` tr
 - UVI/DWD has a complete annex/Page/W4/register/non-goal/correspondence trace and source-named
   oracles for Blocks A–D2, all nine annual DWD PLZ values/import guards and all 18 Heizspiegel
   rows. U1–U5 now implement calculation, adapters, monthly persistence, owner generation, immutable
-  archives and the separate renter document. The chosen PLZ geodataset, three missing register
-  rows and exact monthly content authority remain production-blocking.
+  archives and the separate renter document. The selected PLZ dataset's vendored offline lookup and
+  PLZ-driven assignment are green, and the PLZ centroid is the production default. Three missing
+  register rows and exact monthly content authority remain production-blocking.
 - Pages 03, 04, 06 and 07 have complete approved and merged transcriptions. Page 04 includes the
   exact 16-ID data oracle and final `docs/07` tax/archive reconciliation. Page 06 includes exactly
   `CLAUSES-F01…F19`; Page 07 includes exactly `14-F01…F14`.
@@ -276,25 +303,25 @@ Three bounded Page 01b fixes already precede the current sequence and remain pre
 and Ho/Hu wiring, the Eigentümer residual, and § 5 Abs. 1 S. 3 CO₂ rounding. They are green but do
 not replace the complete documentation or reconciliation gates.
 
-| Stage | Status | Work | Required result |
-| --- | --- | --- | --- |
-| D1 | **complete; approved 17.08.2026; final reconciliation closed 18.08.2026** | Reconcile existing `docs/00`–`docs/08` | Documentation and golden fixtures only; no implementation source changes. |
-| D2 | **complete; approved 21.08.2026** | Create source-backed `docs/09`–`docs/16` | All assigned transcriptions are approved and merged, including `docs/14`; the final `docs/07` tax/archive reconciliation is approved. The phase added documentation and data-only fixtures, not investment implementation. |
-| D3 | **complete; approved 21.08.2026** | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-five question file. Round 4 settled its answered decisions; Round 5 retains only its unanswered/source-delivery follow-ups and the external/legal-source gaps. Governance, permanent dependency guard and joint deletion remain intact. |
-| A | **complete; approved and merged 21.08.2026** | Reconcile M2 with Page 01b | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit. |
-| B | **complete; locally merged 23.08.2026** | Reconcile M3–M4 with Page 01 | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Finalization shipped in M6-B and the payment ledger in M6-C2. |
-| C | **technically complete; locally merged 23.08.2026** | Reconcile M1 with Page 02 | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check. |
-| M5 | After A–C | Roles, URL context and switcher | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7. |
-| M6 | **Technically complete; locally merged 24.08.2026** | Bank, ledger and finalized statements | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **C3b's scheduler port and three job entrypoints are locally merged**: no schema change, no endpoint, one consent precondition on every AIS pull. **C3c's Zahlungen screen is technically complete and locally merged**: a client-only owner screen that records one final confirm/reject/duplicate outcome, with no manual assignment and no backend change. That merge closes M6-C and completes M6; delivery and the renter portal remain M10. |
-| G | **Technically complete, reviewed and locally merged 24.08.2026** | Shared guard foundation | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration. |
-| U | **Technically complete, reviewed and locally merged 24.08.2026** | UVI comparison, calculation and document | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10. |
-| M7 | **M7-0…M7-E technically complete; M7-F repair candidate integrated on `development` but deferred and unverified** | Tax export and AfA | The pure AfA/export foundation and Anlage-V paths retain their earlier branch evidence. M7-F still needs closing reviews and verification, and all flagged register values continue to block real output. |
-| M8 | **Lane A unblocked; lane B source-blocked** | Document and letter engine | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either. |
-| UI | **UI-00 through UI-05A implemented on `development`; UI-05B next; UI-03–UI-05A carry no test evidence** | Portfolio UI 00–08 | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 in order from the supplied UX specifications. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`. |
-| M9 | **Integrated on `development` but paused and unverified; resume after UI-08** | Reminders, email and checklists | The preserved W1–W8, immutable migration `0025`, account-scoped jobs/API, default-off delivery and `/waechter` work remains subject to known presentation, source/legal, provider, UVI-artifact and checklist-catalogue blockers. Earlier branch evidence is not consolidation evidence. |
-| M10 | **After resumed M9 is complete** | Portals and investment | Two independent lanes, R before I: renter activation, renter context and the renter portal, then the approved `docs/14` investment cockpit. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5. |
-| M11 | After M10 | Native apps, billing and load test | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test. |
-| M7-F | **After M10; integrated repair candidate remains required before programme/production closure** | Finish tax/AfA review and repair | Revalidate the boundary repairs, complete statement/docs review, rerun focused and closing verification, and preserve every legal/runtime production blocker. |
+| Stage | Status                                                                                                                                                 | Work                                                 | Required result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1    | **complete; approved 17.08.2026; final reconciliation closed 18.08.2026**                                                                              | Reconcile existing `docs/00`–`docs/08`               | Documentation and golden fixtures only; no implementation source changes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| D2    | **complete; approved 21.08.2026**                                                                                                                      | Create source-backed `docs/09`–`docs/16`             | All assigned transcriptions are approved and merged, including `docs/14`; the final `docs/07` tax/archive reconciliation is approved. The phase added documentation and data-only fixtures, not investment implementation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| D3    | **complete; approved 21.08.2026**                                                                                                                      | Complete extraction and retire Berkay correspondence | Single historical ledger in `docs/03`, one current round-five question file. Round 4 settled its answered decisions; Round 5 retains only its unanswered/source-delivery follow-ups and the external/legal-source gaps. Governance, permanent dependency guard and joint deletion remain intact.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| A     | **complete; approved and merged 21.08.2026**                                                                                                           | Reconcile M2 with Page 01b                           | All 34 Page 01b fixtures, persistence, projections, full gate, non-fresh demo gate and PDF review are green. The approved implementation keeps the two unresolved Page 01b choices explicit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| B     | **complete; locally merged 23.08.2026**                                                                                                                | Reconcile M3–M4 with Page 01                         | Persisted calculation and extraction revalidated; Block-(c) renders only as the conditional owner-residual subline; full and non-fresh demo gates plus statement review are green. Finalization shipped in M6-B and the payment ledger in M6-C2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| C     | **technically complete; locally merged 23.08.2026**                                                                                                    | Reconcile M1 with Page 02                            | NK eligibility, allocation, classification and rounding repairs are verified by full/non-fresh demo gates, unchanged PDF fingerprint and both required reviews. Page 02 remains production-blocked by `09-K01`–`09-K11`, the Trinkwasser route and the administration-cost legal check.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| M5    | After A–C                                                                                                                                              | Roles, URL context and switcher                      | **Complete.** Secure bootstrap, membership/assigned-building authorization and the URL-based account chooser/switcher are shipped on `main` (`a748729`). Renter portal is M10; adviser profile/mapping and tax functions are M7.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| M6    | **Technically complete; locally merged 24.08.2026**                                                                                                    | Bank, ledger and finalized statements                | Implement approved `docs/08` and `docs/15`. **M6-A, M6-B, M6-C1, M6-C2, M6-C3-0 and M6-C3a are locally merged**: temporal advances, BGH minimum #4, immutable snapshots, isolated tenant archives, the pure matching engine against all thirteen fixtures, nine bank/receivable/ledger tables, the § 3.1 adapter, matching service, final `0021` and owner-scoped endpoints. **C3b's scheduler port and three job entrypoints are locally merged**: no schema change, no endpoint, one consent precondition on every AIS pull. **C3c's Zahlungen screen is technically complete and locally merged**: a client-only owner screen that records one final confirm/reject/duplicate outcome, with no manual assignment and no backend change. That merge closes M6-C and completes M6; delivery and the renter portal remain M10. |
+| G     | **Technically complete, reviewed and locally merged 24.08.2026**                                                                                       | Shared guard foundation                              | Pure W1, W2 and W4 evaluators execute all nine selected Page-05 fixtures with explicit source identity, caller-supplied rule evidence and unresolved production blockers. No database, API, UI, scheduler or PDF integration.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| U     | **Technically complete, reviewed and locally merged 24.08.2026**                                                                                       | UVI comparison, calculation and document             | U1–U5 ship the approved calculation, DWD adapters, monthly inputs, isolated immutable archive, owner generation and separate German renter PDF. Production authority blockers remain explicit; scheduled delivery waits for M9 and portal publication waits for M10.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| M7    | **M7-0…M7-E technically complete; M7-F repair candidate integrated on `development` but deferred and unverified**                                      | Tax export and AfA                                   | The pure AfA/export foundation and Anlage-V paths retain their earlier branch evidence. M7-F still needs closing reviews and verification, and all flagged register values continue to block real output.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| M8    | **Lane A unblocked; lane B source-blocked**                                                                                                            | Document and letter engine                           | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| UI    | **UI-00 through UI-06 and UI-08 are implemented on `development`; UI-07's non-blocked demo core is implemented but partial; later full/demo and focused reviews provide partial verification; live-browser acceptance remains open** | Portfolio UI 00–08                                   | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 from the supplied UX specifications. UI-07 was pulled forward by Emir for the demo. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| M9    | **Technically complete and review-clean on `development`; not production-approved**                                                              | Reminders, email and checklists                      | W1–W8, migration `0025`, account-scoped jobs/API, default-off delivery and `/waechter` are implemented. `scripts/gate.sh demo` is green with `1916` Python and `183` web tests; RLS/FK checks cover `73` tables and `144` account-scoped foreign keys. Boundary and statement reviews are clean, the ordinary statement fingerprint is unchanged at `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes, and no `.lokara-red` remains. Provider/scheduler, frozen UVI artifact, checklist catalogue, UVI-register/monthly-content/cadence and all recorded legal/runtime blockers remain production-blocking.                                                                                                                                                                                                                                                                                                                                                    |
+| M10   | **After M9 is technically closed**                                                                                                                     | Portals and investment                               | Two independent lanes, R before I: renter activation, renter context and the renter portal, then the approved `docs/14` investment cockpit. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| M11   | After M10                                                                                                                                              | Native apps, billing and load test                   | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| M7-F  | **After M10; integrated repair candidate remains required before programme/production closure**                                                        | Finish tax/AfA review and repair                     | Revalidate the boundary repairs, complete statement/docs review, rerun focused and closing verification, and preserve every legal/runtime production blocker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Slice A — progress and closure
 
@@ -584,7 +611,7 @@ fixtures are `M6B-F02`–`F04`, `F10`, `F14`, `F16`–`F19`, `M6B-IMM`, `M6B-COR
 - C3a joins the matching engine to persistence and is technically complete,
   development-synchronized and locally merged.
 - Add background job entrypoints for bank sync, 180-day reconsent cleanup and deadline watchers.
-- Add the landlord *Zahlungen* confirmation/rejection screen without inventing manual assignment.
+- Add the landlord _Zahlungen_ confirmation/rejection screen without inventing manual assignment.
 - Deliver/publish renter documents only after the separate M10 portal and legal-production work.
 
 **M6-B closed when:** confirmed advances produce frozen Saldo branches; owner-only finalization is
@@ -615,6 +642,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   `docs/15` § 4 and in `FRAGEN-an-Berkay-05.md`. `docs/15`'s status lines were updated in the
   same change. The § 5.3 reversal lookup is a different mechanism, is source-backed and
   fixture-covered by `F06`, and was not touched.
+
 - **Workflow correction — done and merged.** The short process slice `PLAN.md` put before M6-C2,
   from what M6-C1 cost:
   1. The stop gate cannot express "RED on purpose". `CLAUDE.md` § 10 forbids one agent from writing
@@ -622,7 +650,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
      and the gate rejects turn-endings inside it with an identical error dump. Measured over the
      session transcripts: **9 main-session blocks plus 2 in subagents during the M6-C1 session
      alone**, and roughly 47 across all sessions. **12 of the 19 subagent blocks were
-     `spec-scribe`**, the one role whose deliverable is a *failing* fixture — the gate is fighting
+     `spec-scribe`**, the one role whose deliverable is a _failing_ fixture — the gate is fighting
      the rule that creates the red window. **Shipped:** `.lokara-red` names the slice and the
      reason; `scripts/check_red_sentinel.py` reports it, `gate.sh fast` prints every failure and
      exits 0 while it exists, and `full`/`demo` treat it as a hard failure, so merging requires it
@@ -673,7 +701,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   advance that was never paid.
 
   **Boundary audit, 23.08.2026 — six HIGH findings, all fixed in migration `0019`.** `0017` got
-  account isolation right and constrained nothing *inside* one account. A `payment_allocation`
+  account isolation right and constrained nothing _inside_ one account. A `payment_allocation`
   could settle renter 2's debt from renter 1's cash (§ 6: "a match never moves money between
   renters"); an allocation could exceed the cents its entry carried, and a negative component
   cancelled inside the sum check and then fed Page 01 a negative advance; a `REVERSAL` could be
@@ -708,6 +736,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   `bank_account.consent_expires_at` is stored and never read, though a PSD2 consent expiry is a
   legal precondition for an AIS pull. `0017`'s downgrade raises, so a CI job that resets by
   downgrading wedges there.
+
 - **M6-C3-0 — invariant repair. Technically complete and locally merged 24.08.2026.**
   A `boundary-auditor` pass over `0020` and the slice diff — the one the previous handoff
   said had never run — found **two HIGH and five MEDIUM** defects in the repair itself.
@@ -743,7 +772,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   HIGH defects. **The fourth parent-scope trigger `docs/02` § 6 documents had never been written**,
   so an allocation could still settle another renter's debt — the one rule `docs/15` § 6 states
   outright, and the defect the whole `0017` audit was about, re-documented as fixed. A learned IBAN
-  could be minted for the wrong renter from a *rejected* confirmation. `open_costs_cents` and
+  could be minted for the wrong renter from a _rejected_ confirmation. `open_costs_cents` and
   `open_interest_cents` had no upper bound and no relation to `open_cents`. And
   `check_rls_coverage`'s new write-assertion requirement was **vacuous for all nine tables**: it
   split the suite only at method indentation, so the module-level `m6c2_bank_rows` fixture — which
@@ -782,7 +811,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   The final amended `0021` is verified from the disposable `lokara_c3a_check` database. Development
   now matches it exactly after one validated transactional hand-delta: column types, constraints,
   trigger timing/deferrability, hardened function definitions and hashes are identical. Evidence
-  counts and 68 legacy Auto confirmations are unchanged. C3a excludes jobs, the *Zahlungen* screen,
+  counts and 68 legacy Auto confirmations are unchanged. C3a excludes jobs, the _Zahlungen_ screen,
   pagination, manual assignment and automatic later use of renter credit.
 - **M6-C3b — job entrypoints. Technically complete 24.08.2026.** Three account-scoped functions in
   `apps/api/src/lokara_api/jobs.py` behind `lokara_adapters.SchedulerPort` and its in-memory
@@ -806,7 +835,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   enumeration exists — `account` is scoped by its own id and `CLAUDE.md` § 3.3 allows exactly one
   pre-context read, so a real scheduler must be handed its account ids. `docs/15` § 5.6 records
   that gap as open.
-- **M6-C3c — Zahlungen screen. Technically complete; locally merged 24.08.2026 (`6995bc4`).** The German landlord *Zahlungen*
+- **M6-C3c — Zahlungen screen. Technically complete; locally merged 24.08.2026 (`6995bc4`).** The German landlord _Zahlungen_
   screen at `/a/{accountId}/zahlungen`, client-side only: no endpoint, no schema, no migration
   (Alembic stays at `0021`) and no backend change. It reads `GET /match-proposals`,
   `GET /payment-ledger`, `GET /bank-transactions` and `GET /receivables`, and writes exactly one
@@ -834,8 +863,8 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   decision aid and states in German that they are not legal proof that a payment belongs to a
   claim. (3) The `Rechtsstand` stamp is a page-level constant. The authoritative per-proposal value
   is `match_proposal.convention_version`, which `_candidate_json` and `list_proposals` do not
-  expose — that payload gap is C3a's and stays open. (4) The E2E signal is rendered as *noch nicht
-  ausgewertet* rather than as an unmet criterion, because `docs/15` § 4 marks it inert and the
+  expose — that payload gap is C3a's and stays open. (4) The E2E signal is rendered as _noch nicht
+  ausgewertet_ rather than as an unmet criterion, because `docs/15` § 4 marks it inert and the
   engine returns 0 for it unconditionally; it goes live only when the stored reference exists.
   (5) The screen is owner-only in navigation as well as in the API: every route behind it calls
   `require_owner`, so the nav entry is hidden for `EMPLOYEE` to avoid a guaranteed dead end. That
@@ -844,7 +873,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
   `"Only owners may create buildings"` (`authorization.py`), which the client would print verbatim;
   the ledger renders `created_at` through a timezone-naive string split, so a late-evening booking
   on a UTC server can show the previous calendar day; the loading and error copy
-  *"Bitte API und Datenbank prüfen"* is developer-facing but is the established house convention in
+  _"Bitte API und Datenbank prüfen"_ is developer-facing but is the established house convention in
   seven other screens and was not diverged from here; `Ablehnen` and `Dublette` write an immutable
   record with no confirmation step; and a decided proposal does not link to the journal entry it
   produced. None of these is introduced by this slice's own code except the last two.
@@ -852,7 +881,7 @@ thirteen `BANKMATCH-F01`–`F13` fixtures are the acceptance surface. Three boun
 **Hard constraints:**
 
 - Provider transaction identity is unique on `(account_id, bank_account_id,
-  provider_transaction_id)`, never on the provider ID alone.
+provider_transaction_id)`, never on the provider ID alone.
 - The payment ledger is append-only. Reversals append compensating rows; nothing is edited.
 - An IBAN is learned only from a confirmed match and never when null.
 - The § 5.2 Largest-Remainder tie-break convention is missing from the authoritative source. The
@@ -905,9 +934,11 @@ finding. Technical closure does not clear any `verify-before-production` marker.
 **Engineering is done when:** every `docs/16` calculation fixture passes, the specified monthly
 `hdd_3807` input and persisted station assignment are implemented, durable inputs and the archive
 are tenant-isolated, and owner generation plus the separate renter document pass both required
-reviews and the demo gate. **Production clearance additionally requires** the chosen PLZ geodataset,
-the three missing UVI register rows and the exact versioned monthly content authority. Round 4
-resolved the calculation order; it did not clear those production blockers.
+reviews and the demo gate. **Production clearance additionally requires** the selected PLZ dataset's
+vendored lookup and PLZ-driven assignment to remain source-pinned and reproducible; both are green,
+and the former PLZ-dataset production flag is cleared. The three missing UVI register rows and the
+exact versioned monthly content authority still block production. Round 4 resolved the calculation
+order; it did not clear those remaining authority blockers.
 
 **U0 status:** the round-4 transcription is complete and locally merged as `738e048`, not pushed.
 `docs/16` §§ 7.1/7.2 carry the monthly `hdd_3807` dataset and the persisted station-to-PLZ
@@ -974,12 +1005,21 @@ canonical heating engine remains the only annual adjustment calculation path. Fo
 **U3b status:** monthly DWD normalization and deterministic station assignment are complete,
 boundary-audited and locally merged. Feature commit `a37f9a3` was merged as `78c5cce`; nothing is
 pushed. The parser retains all nine documented fields and canonical DWD evidence; assignment
-requires one station valid for at least 25 days in both months, uses caller-supplied versioned PLZ
-centroids and DWD-row coordinates, and returns reproducible source/convention/distance evidence
-with no invented German wording. Audit fixtures close coordinate drift, parser-origin bypass,
-incomplete archive provenance and unstable-distance findings. Focused tests pass 136, all adapter
-tests pass 184 and the full gate passes 1,425 Python plus 84 web tests. Together with U3a this closes
-U3's adapter work. The PLZ geodataset remains unchosen and all production blocks stay visible.
+requires one station valid for at least 25 days in both months, accepts the existing explicit
+versioned-centroid input, uses DWD-row coordinates and returns reproducible
+source/convention/distance evidence with no invented German wording. Audit fixtures close coordinate
+drift, parser-origin bypass, incomplete archive provenance and unstable-distance findings. Focused
+tests pass 136, all adapter tests pass 184 and the full gate passes 1,425 Python plus 84 web tests.
+The U3 PLZ-coordinate follow-up now selects
+`https://github.com/WZBSocialScienceCenter/plz_geocoord/commit/927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`,
+version January 2019, licence Apache-2.0, with WZB attribution. The exact raw source is
+`https://raw.githubusercontent.com/WZBSocialScienceCenter/plz_geocoord/927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2/plz_geocoord.csv`;
+the vendored bytes have SHA-256
+`d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2` and exactly 8,298 data rows
+excluding the header. Its vendored offline lookup and PLZ-driven assignment entrypoint are green;
+the existing explicit-centroid entrypoint remains compatible. The PLZ centroid is the production
+default, and the former PLZ-dataset production flag is cleared. All other production blocks stay
+visible.
 
 **U4/U5 closure status.** U4 feature `74857a6` was merged as `7a18bec`. U5 feature `36d62b2` was
 merged as `a54350f`. Migration `0023` adds the server-side normalized prerequisites; owner-side
@@ -989,13 +1029,31 @@ document. The closing boundary audit and statement review report no findings. Th
 1,542 Python and 84 web tests; the existing statement fingerprint remains
 `88eb8434eda65f8d7ff82826fc837a58` at 149269 bytes. Nothing is pushed.
 
-**Remaining external authority.** Choosing the PLZ geodataset is Emir's decision; `docs/16` § 7.2 names
-  OpenStreetMap-based centroids or a commercial dataset, and records that geocoding the building
-  address would be cleaner. The three missing UVI register rows need Berkay; they are requested in
-  `FRAGEN-an-Berkay-05.md` and the CSV stays at 180 rows until he answers. Until both land, Blocks C
-  and D2 stay production-blocked however much code exists. The exact monthly content list and the
-  other `verify-before-production` items in `docs/16` remain open. Scheduling is M9; renter portal
-  publication is M10.
+**Warmwasser UVI extension status.** The approved specification is transcribed in `docs/16-uvi.md`
+§ 8.3 and the golden fixture in this checkpoint is
+`packages/uvi-engine/tests/test_uvi_warm_water_golden.py`. The fixture covers a central,
+remotely-read `WARM_WATER` meter, the versioned § 9 conversion (`tw`-configured, `125 kWh/m³`
+for the fixture's 60 °C setting), Block B, raw
+prior-year comparison without weather adjustment and D2's `warm_water_deduction × area × monthly
+share`. The engine, API assembly and conditional PDF block are now implemented and the golden
+coverage is green. Separate API/PDF regressions retain distinct previous-month, raw prior-year
+and D2 values, per-block provenance and the complete legal/footer tail on one unclipped A4 page.
+Volumetric conversion must fail loudly if the approved rules-store conversion is not
+available; no heating-only shortcut is permitted. The applicable § 6a interpretation, monthly
+content authority and remote-read applicability remain `verify-before-production`.
+
+**Remaining external authority.** The PLZ dataset choice is closed:
+`WZBSocialScienceCenter/plz_geocoord`, January 2019, commit
+`927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`, SHA-256
+`d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`, 8,298 data rows and
+Apache-2.0, attributed to Markus Konrad and the Wissenschaftszentrum Berlin für Sozialforschung
+(WZB), is the production centroid default for DWD nearest-station assignment. The vendored offline
+lookup and PLZ-driven assignment entrypoint are green, and the former PLZ-dataset production flag
+is cleared. No runtime geocoding or network fallback is allowed for DWD assignment. The three
+missing UVI register rows still need Berkay; they are requested in `FRAGEN-an-Berkay-05.md` and the
+CSV stays at 180 rows until he answers. Blocks C and D2 remain production-blocked by those rows, the
+exact monthly content list and the other `verify-before-production` items in `docs/16`. Scheduling
+is M9; renter portal publication is M10.
 
 ### M7 — Tax export and AfA
 
@@ -1131,8 +1189,8 @@ stays as written because it is the correct milestone target, not because M8 can 
 approved for what Page 06 actually supplies: which clause combinations conflict, which signature
 route each combination forces, the B1–B8 increase and limit arithmetic, and the E1–E11 edge cases.
 It supplies **no clause body and no letter body**. `docs/13` §§ 3.1, 3.6, 7 and 11 each say so
-outright. A contract generator therefore has every rule needed to *validate* a contract and no text
-with which to *produce* one. The same applies to Mieterhöhung, Kündigung and Mahnung: Page 06
+outright. A contract generator therefore has every rule needed to _validate_ a contract and no text
+with which to _produce_ one. The same applies to Mieterhöhung, Kündigung and Mahnung: Page 06
 approves the workflow inputs and routing, never the declaration itself. This is a missing source,
 not a missing implementation, and no agent may close it by drafting German legal text.
 
@@ -1258,7 +1316,7 @@ added.
 The prerequisite is a source-backed catalogue containing the clause bodies with stable block IDs and
 versions, and complete Mieterhöhung, Kündigung and Mahnung bodies. **It is not a Berkay
 deliverable and will not arrive by asking him:** the round-five question file's
-*Nicht erneut erfragt* section classifies the complete clause catalogue with bodies as external
+_Nicht erneut erfragt_ section classifies the complete clause catalogue with bodies as external
 legal/source work, and round four already answered the Page-06 product decisions. No Page-06 item
 is currently open with Berkay. Obtaining the catalogue is therefore a separate sourcing decision.
 Until it lands, lane B has no acceptance surface at all: there is nothing to render and nothing to
@@ -1293,9 +1351,9 @@ compare a render against.
 
 ### M9 — Reminders, email and checklists
 
-**Status — integrated on `development`, paused by Emir on 25.08.2026 and unverified; resume after
-UI-08.** The checkpoint preserves the M9 implementation and its earlier branch evidence, but this
-consolidation does not claim closure. Before the pause, the workstream recorded these repairs:
+**Status — M9 is technically complete and review-clean on `development`; it is not
+production-approved.** The final repository-wide demo gate, boundary audit, statement/UI re-review
+and fingerprint check are green. The workstream includes these completed repairs:
 
 - Migration `0025` created `guard_resolution_event` before `renter_delivery_artifact`, so its W1
   foreign key could not resolve and the migration failed on any database that had not already
@@ -1323,6 +1381,19 @@ consolidation does not claim closure. Before the pause, the workstream recorded 
 The three M9 test modules also set `SUPABASE_JWT_SECRET` in the process environment at import time,
 which broke 31 unrelated authenticated API tests in a whole-suite run. Test environment is now
 fixture-scoped.
+
+The final GAS/UVI boundary close also repaired three explicit contracts:
+
+- Configuration resolution treats `[M, next M)` as the complete calendar month: a boundary strictly
+  inside blocks, while `valid_from = M`, `valid_to = next M` and a successor starting at `next M`
+  remain valid exact edges.
+- Fresh PostgreSQL migration acceptance from `0032` through `0034` proves that nullable
+  `condition_number` is added without an `UPDATE` or backfill and that the final constraint neither
+  rewrites existing append-only combined-factor evidence nor infers legacy status from supplier or
+  legal metadata. Legacy factor plus `NULL` remains persisted evidence and blocks gas conversion
+  until a source-backed successor supplies both components.
+- Renter-visible GAS provenance now uses German decimal commas and dates and renders an open period
+  as `gültig ab 01.07.2026`, never ISO date plus `bis offen`.
 
 **Approved-spec prerequisite:** `docs/12` and the G1 foundation. M9 extends the existing W1/W2/W4
 engine with remaining guard projections, reminders, email and checklists without redefining those
@@ -1367,24 +1438,41 @@ completed repair record, not the current resume task.
    blockers from the published `PAGE_01_STATEMENT_RULES` inventory instead of trusting the
    snapshot writer's blocker list.
 
-5. **Verification completed.** `scripts/gate.sh demo` is green with `1844` pytest and `130` vitest;
-   the ordinary statement fingerprint remains `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes.
-   The boundary review is clean. The separate statement review remains red as recorded below.
+5. **Earlier checkpoint verification completed.** At that checkpoint, `scripts/gate.sh demo` was
+   green with `1844` pytest and `130` vitest; the ordinary statement fingerprint was
+   `88eb8434eda65f8d7ff82826fc837a58` / `149269` bytes and the boundary review was clean. The
+   statement review was still red at that historical checkpoint; M9-U below records its repair and
+   the superseding final evidence.
 
-#### M9-U — final landlord-facing UI repair. Required before M9 closure.
+#### M9-U — final repository close green and review-clean
 
 The first UI repair added explicit German W1–W8 titles, known blocker labels, reminder-channel
-labels, suppression-reason labels and semantic blocker lists. The fresh statement review still
-found one HIGH presentation defect: actual lower-case blocker keys such as
-`missing_warning_copy:last_day`, `missing_post_retrofit_rule`, `missing_uvi_cadence_start` and
-`basis_year_mismatch` can still leak. The broad internal-code regex also hides the useful `SHA-256`
-part of an approved German integrity message, and the generic fallback can misdescribe technical
-blockers as missing legal/rule authority and duplicate identical bullets.
+labels, suppression-reason labels and semantic blocker lists. M9-U now adds explicit German labels
+for `missing_warning_copy:last_day`, `missing_warning_copy:reminder_90_days`,
+`missing_post_retrofit_rule`, `missing_uvi_cadence_start` and `basis_year_mismatch`. Authority
+markers use the legal/rule fallback; unknown internal keys use a neutral internal-production-blocker
+fallback. Identical displayed blocker messages are deduplicated. The approved German hash-integrity
+message is explicitly allowlisted, so its useful `SHA-256` wording remains visible.
 
-When M9 resumes, follow the working mode then active in `CLAUDE.md`. Fix these exact cases with
-explicit mappings/allowlisting, safe differentiated fallbacks and deduplication, then complete the
-verification and review required at that time. M9 cannot close while the presentation finding is
-open.
+The first re-review found one remaining HIGH defect: a warning identical to the first production
+blocker was rendered twice. A focused regression now requires the sentence to appear once while the
+explicit `Produktionssperre` field remains visible, and the repair uses “Sperrgrund: siehe Hinweis
+oben.” instead of repeating the text. Focused verification is green with `129` Python tests and `25`
+Vitest tests; web lint, strict typecheck and the production build pass. The final required
+statement/UI re-review is clean.
+
+The red non-destructive demo run on 28.08.2026 was an earlier checkpoint, not the final state. The
+final `scripts/gate.sh demo` is green with `1916` Python tests and `183` web tests. RLS coverage is
+green for `73` tables and FK isolation is green for `144` account-scoped foreign keys. The final
+boundary audit and statement/UI re-review are clean. The ordinary statement fingerprint remains
+unchanged throughout the final close at `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes, and no
+`.lokara-red` sentinel remains. M9 is therefore technically complete and review-clean on
+`development`; this does not approve production use.
+
+The production blockers are preserved: no real provider or scheduler is selected, automation stays
+default-off, UVI delivery still lacks a frozen artifact, the production checklist catalogue remains
+empty, and UVI register authority, exact monthly content and delivery cadence remain unresolved.
+The legal/runtime audit limits below also remain production-blocking.
 
 These audit findings stay open and unfixed, and are recorded as `verify-before-production` rather
 than repaired inside M9-R: client-supplied `today`/`now` on `POST /guard-runs` stamps immutable
@@ -1393,13 +1481,15 @@ claims `provider_idempotency_enforced = True` from per-process memory and accumu
 across accounts; and `evaluators.py` hardcodes five legal values and uses exact `days == 30` /
 `days == 90` equality, which permanently loses a W1 warning whenever a run is missed.
 
-**Done when:** the required verification is green, the ordinary statement fingerprint is unchanged,
-required reviews are clean and all production blockers remain explicit.
+**Technical DoD met:** required verification is green, the ordinary statement fingerprint is
+unchanged, required reviews are clean and all production blockers remain explicit. This closes M9
+technically on `development`, not legally or operationally for production.
 
 ### Portfolio UI 00–08 programme
 
-**Status — UI-00 through UI-05A are implemented on `development`; UI-05B is next. UI-03 through
-UI-05A carry no test evidence.** UI-00 was prepared from
+**Status — UI-00 through UI-06 and UI-08 are implemented on `development`; UI-07's non-blocked
+demo core is implemented but partial. UI-03 onward now has later checkpoint full/demo and focused
+review evidence; complete per-step acceptance and the live-browser matrix remain outstanding.** UI-00 was prepared from
 clean `main` in the new `slice/ui-00-layout-global-clean` worktree, never from the dirty M7-F tree, the preserved M9
 worktree or the unwanted `slice/ui-00-layout-global` worktree. Static UI review, 108 web tests,
 lint, types, production build and the fast gate are green. A clean `scripts/gate.sh full` is also
@@ -1431,10 +1521,9 @@ UI-03 supplies the repaired `advancePaymentSchedule` contract, the
 `initialAdvancePaymentCents`/`advanceDeclarationRef` create payload, migration `0026`'s five
 building columns, the gateway-bound best-effort geocoder with external lookup off by default, both
 wizard routes, the non-filtering Liste/Karte toggle on Leaflet and the inactive photo slots. It was
-built under the direct implementation mode: ruff, `mypy --strict`, typecheck, lint and the
-production build pass, and **no test suite, boundary audit or statement review was run**. UI-03 is
-therefore **implemented; unverified — no test evidence**, and the deferred UI-08 verification must
-cover it. `0026` and M9's `0025` are parallel children of `0024`; empty merge revision `0027`
+built under the former direct implementation mode with lint, strict types and production-build
+evidence. Later checkpoint full/demo gates and focused reviews add partial verification; complete
+live-browser acceptance remains outstanding. `0026` and M9's `0025` are parallel children of `0024`; empty merge revision `0027`
 joins them on `development`. Its Build-Notes assumptions live in `docs/04`: the placeholder Nominatim contact address,
 the still-unconfirmed `/a/{accountId}/vertraege/neu?unitId={unitId}` generator route, the
 token-only photo placeholder and the omitted optional detail-page slot.
@@ -1462,10 +1551,22 @@ money comes from the existing engines/frozen snapshot. Applicable Page-02 author
 visible: technical demo documents are explicitly watermarked as not production-approved. M9 email
 and M10 portal actions stay inactive. Under direct implementation mode, ruff, strict mypy, web lint,
 typecheck and production build pass; the local end-to-end path and stored hashes were checked and
-the A4 output was visually inspected. No test suite, gate, boundary audit, reviewer-agent run or
-interactive browser accessibility matrix ran, so UI-05A is **implemented; unverified — no test
-evidence**. The 27.08 stability repair also binds finalization to the current optimistic draft
+the A4 output was visually inspected. Later checkpoint full/demo gates and clean boundary/focused
+statement/UI re-reviews add partial verification; the complete live-browser accessibility matrix
+remains outstanding. The 27.08 stability repair also binds finalization to the current optimistic draft
 version and restricts M9 annual-statement sources to archived `TENANT_STATEMENT` documents.
+
+UI-05B supplies the unit record: one account-scoped dashboard read model resolves the current state,
+parties, contract facts, authoritative monthly amounts, server-generated use history and existing
+final tenant archives at one `asOf`. Migration `0029` adds append-only versions for unit profile and
+contract classification plus dated contract positions and documented rent changes. The owner-only
+forms are action-triggered; the page no longer exposes database boundary language or derives time
+segments from the browser clock. UI-07 now supplies the owner-only payment projection; the renter
+portal remains deferred until M10, and messages/upload storage until real models and policies exist. Under
+direct mode, ruff, strict mypy, web lint, typecheck and production build pass; the migration, demo
+seed and authenticated live API read also pass. Later checkpoint full/demo gates and clean
+boundary/focused statement/UI re-reviews add partial verification; the complete live-browser
+accessibility matrix remains outstanding.
 
 The supplied files are authoritative UX intent. Existing approved legal rules, pure-engine
 contracts, account isolation and immutable evidence remain authoritative wherever a proposed
@@ -1493,23 +1594,46 @@ state, uploads, portal access or other unavailable product state.
 
 #### Ordered UI register
 
-| Step | Source file | Current status | Required implementation and explicit limits |
-| --- | --- | --- | --- |
-| UI-00 | `00_Layout-Global.md` | **Locally merged 25.08.2026; implementation, static review and clean disposable-database full gate are green; live browser verification remains outstanding by explicit Emir decision** | Install the supplied horizontal logo and `app/icon.png`; update metadata; establish the 1440px content frame, shared page spacing, natural card heights, branded KPI accents and global loading/error/not-found states. Remove development-facing copy and the global object filter. Audit lifecycle metadata, but leave domain-specific schema additions to their owning later steps. |
-| UI-01 | `01_Dashboard.md` | **Locally merged 25.08.2026; implementation, reviews, fast/full and non-fresh demo are green; live browser verification remains outstanding by explicit Emir decision** | Add `GET /a/{account_id}/portfolio/overview` returning exactly `buildingCount`, `unitCount`, `occupiedUnitCount`, `vacantUnitCount` and `mietSollCentsMonthly`. Aggregate only visible, non-archived buildings and respect employee building scope. Replace the single-building dashboard with the portfolio layout. The proposed 82/18 finance mock and fake ticket counters are **intentionally inactive**; render real values or an honest unavailable/onboarding state. |
-| UI-02 | `02_App-Shell-Desktop.md` | **Locally merged 25.08.2026; implementation, focused fixtures, statement review, fast/full and production build are green; Emir accepted the live shell; automated screenshot matrix remains outstanding** | Implement the 248px expanded and 72px collapsed sidebar, persistent account-scoped preference, full logo versus icon, accessible tooltips, active navigation, account menu and shared page header. Keep authorization server-enforced; hiding navigation is presentation only. Roll the shell across existing landlord routes and remove obsolete development navigation copy. Track this filename as UI-02 even though its internal heading says 09. |
-| UI-03 | `03_Objekte.md` | **Locally merged 25.08.2026 under direct implementation mode; ruff, strict mypy, typecheck, lint and the production build are green; implemented; unverified — no test evidence, no boundary audit, no statement review, no live browser check** | First repair the tenancy frontend contract to consume `advancePaymentSchedule` and send `initialAdvancePaymentCents` plus `advanceDeclarationRef`. Add building type, residential flag, country and nullable coordinates without silently changing engine decisions. Build object/unit routes and wizards, list/map switch and inactive photo slots. Geocoding and tiles use configurable adapters. Public Nominatim/OSM is demo-only, cached, attributed and failure-tolerant; production defaults disabled. |
-| UI-04 | `04_Objekt-Dashboard.md` | **Integrated on `development` under direct implementation mode; unverified — no test evidence, boundary audit, statement review or live browser check; OD5, OD10 receivable generation and OD18 remain source-blocked** | Add `/a/{account_id}/buildings/{building_id}/dashboard` as a server-owned read model with `asOf`, four authoritative KPIs, up to three prioritized facts, compact unit rows and explicit module availability. Do not aggregate financial truth in the browser. Generate object-summary PDFs server-side as immutable, owner-only snapshots with digest verification. Payment-dependent values are **source-blocked** until UI-07 supplies them. |
-| UI-05A | `05_Abrechnung-erstellen.md` | **Implemented on `development` under direct mode; compile checks, local end-to-end archive flow and the 27.08 version/delivery stability repair pass; unverified — no test/reviewer evidence or interactive browser matrix** | Account/building-scoped, optimistic-versioned drafts, list/start routes, six-step autosaving wizard, server-owned readiness, separate A4 cover/tenant previews, M6-B finalization/archive integration and append-only correction history are implemented. Finalization requires the current draft version, and M9 accepts only `TENANT_STATEMENT` as an annual-statement source. The demo seed supplies addresses, payment copy and confirmed actual advances. Page-02 authority flags remain visible and every affected PDF is marked as a technical, non-production-approved demo. M9 email and M10 portal actions remain intentionally inactive. Advance recommendations, late-positive exception capture and source-owned letter variants remain source-blocked rather than invented. |
-| UI-05B | `05_Einheiten-Dashboard.md` | **Not started** | Add `/a/{account_id}/units/{unit_id}/dashboard` with current tenancy first, collapsible history and explicit optional-module availability. Persist structured unit use, rooms, controlled amenities, parking/garage contract positions and append-only rent changes; unknown history stays null. Show only existing finalized documents. Payment data activates in UI-07. Portal controls are **intentionally inactive** until M10; messages and storage remain absent until real models and policies exist. |
-| UI-06 | `06_Kosten.md` | **Not started** | Replace the split form/list with a full-width list and `/a/{account_id}/kosten/neu`. Expose the server-owned BetrKV catalogue through a read endpoint and send `catalogueId`, optional `keyOverride` and `directUnitId`. Reuse existing classification findings and production blockers. Use the existing reason-required void workflow, never broken delete. Non-allocable catalogue entries may be stored for documentation but must never enter renter allocation. Beleg import remains an **intentionally inactive** beta path. |
-| UI-07 | `07_Zahlungen.md` | **Not started** | Replace four client-joined unpaginated feeds with one cursor-paginated server read model: 50 rows, stable newest-first order and server filters. Add bank-account/consent status, reversible ignore events, manual-match preview/confirm, immutable manual payments and correct partial/overpayment handling. Activate real aggregates in UI-01, UI-04 and UI-05B. Recurring receivables, due-date rules, credit use, receipt policy and productive finAPI remain **source-blocked**. |
-| UI-08 | `08_Zaehler.md` | **Not started** | Build the object → unit → meter accordion and `/a/{account_id}/zaehler/neu`, with explicit device types, remote-readability state and lifecycle periods. Replace hard deletion with void, removal and atomic replacement workflows that preserve readings. Readings are append-only with structured plausibility findings and backend-provided periods. Use only the shared G1 calibration projection; never recreate 90-day or five/six-year logic. OCR, radio integration and MDL import are **intentionally inactive** without real adapters and evidence. |
+| Step   | Source file                  | Current status                                                                                                                                                                                                                                   | Required implementation and explicit limits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI-00  | `00_Layout-Global.md`        | **Locally merged 25.08.2026; implementation, static review and clean disposable-database full gate are green; live browser verification remains outstanding by explicit Emir decision**                                                          | Install the supplied horizontal logo and `app/icon.png`; update metadata; establish the 1440px content frame, shared page spacing, natural card heights, branded KPI accents and global loading/error/not-found states. Remove development-facing copy and the global object filter. Audit lifecycle metadata, but leave domain-specific schema additions to their owning later steps.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| UI-01  | `01_Dashboard.md`            | **Locally merged 25.08.2026; implementation, reviews, fast/full and non-fresh demo are green; live browser verification remains outstanding by explicit Emir decision**                                                                          | Add `GET /a/{account_id}/portfolio/overview` returning exactly `buildingCount`, `unitCount`, `occupiedUnitCount`, `vacantUnitCount` and `mietSollCentsMonthly`. Aggregate only visible, non-archived buildings and respect employee building scope. Replace the single-building dashboard with the portfolio layout. The proposed 82/18 finance mock and fake ticket counters are **intentionally inactive**; render real values or an honest unavailable/onboarding state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| UI-02  | `02_App-Shell-Desktop.md`    | **Locally merged 25.08.2026; implementation, focused fixtures, statement review, fast/full and production build are green; Emir accepted the live shell; automated screenshot matrix remains outstanding**                                       | Implement the 248px expanded and 72px collapsed sidebar, persistent account-scoped preference, full logo versus icon, accessible tooltips, active navigation, account menu and shared page header. Keep authorization server-enforced; hiding navigation is presentation only. Roll the shell across existing landlord routes and remove obsolete development navigation copy. Track this filename as UI-02 even though its internal heading says 09.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| UI-03  | `03_Objekte.md`              | **Locally merged 25.08.2026; later full/demo and focused reviews green; partially verified, live-browser matrix outstanding** | First repair the tenancy frontend contract to consume `advancePaymentSchedule` and send `initialAdvancePaymentCents` plus `advanceDeclarationRef`. Add building type, residential flag, country and nullable coordinates without silently changing engine decisions. Build object/unit routes and wizards, list/map switch and inactive photo slots. Geocoding and tiles use configurable adapters. Public Nominatim/OSM is demo-only, cached, attributed and failure-tolerant; production defaults disabled.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| UI-04  | `04_Objekt-Dashboard.md`     | **Integrated on `development`; later full/demo and focused reviews green; partially verified, live-browser matrix and recorded source-blocked scope remain open**                          | Add `/a/{account_id}/buildings/{building_id}/dashboard` as a server-owned read model with `asOf`, four authoritative KPIs, up to three prioritized facts, compact unit rows and explicit module availability. Do not aggregate financial truth in the browser. Generate object-summary PDFs server-side as immutable, owner-only snapshots with digest verification. Payment-dependent values now read UI-07's existing receivable facts; recurring receivable generation remains **source-blocked**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| UI-05A | `05_Abrechnung-erstellen.md` | **Implemented on `development`; archive flow, stability repair, later full/demo and focused reviews green; partially verified, interactive-browser matrix outstanding**                     | Account/building-scoped, optimistic-versioned drafts, list/start routes, six-step autosaving wizard, server-owned readiness, separate A4 cover/tenant previews, M6-B finalization/archive integration and append-only correction history are implemented. Finalization requires the current draft version, and M9 accepts only `TENANT_STATEMENT` as an annual-statement source. The demo seed supplies addresses, payment copy and confirmed actual advances. Page-02 authority flags remain visible and every affected PDF is marked as a technical, non-production-approved demo. M9 email and M10 portal actions remain intentionally inactive. Advance recommendations, late-positive exception capture and source-owned letter variants remain source-blocked rather than invented.                                                                                                                                                                                             |
+| UI-05B | `05_Einheiten-Dashboard.md`  | **Implemented on `development`; migration/seed/API, later full/demo and focused reviews green; partially verified, live-browser matrix outstanding**                                                                 | `/a/{account_id}/units/{unit_id}/dashboard` supplies one server-owned `asOf`, current tenancy first, collapsible server-generated history and explicit optional-module availability. Migration `0029` persists structured unit use, fixed-point rooms, controlled amenities, parking/garage contract positions and append-only rent changes with composite isolation-safe FKs, forced RLS and insert-only triggers; unknown facts stay absent. Only existing finalized tenant documents are listed. UI-07 now supplies the owner-only payment projection; portal controls remain deferred until M10, and messages/storage until real models and policies exist.                                                                                                                                                                                                                                                                                                                       |
+| UI-06  | `06_Kosten.md`               | **Implemented on `development`; create/list/void flow, full/demo, copy regressions and focused reviews green; partially verified, live-browser matrix outstanding**                                      | The full-width object-local list, touched-year filter, `/a/{account_id}/kosten/neu`, server-owned catalogue endpoint and grouped picker are implemented. Creation sends `catalogueId`, an optional effective `keyOverride` and `directUnitId`. Status uses persisted classification findings and production blockers. Removal uses the existing reason-required void workflow. Migration `0031` stores non-allocable documentation without an invented key and excludes it before renter-allocation input. Beleg import remains an **intentionally inactive** beta path and its old route remains unlinked.                                                                                                                                                                                                                                                                                                                                                                           |
+| UI-07  | `07_Zahlungen.md`            | **Demo core implemented on `development`; full/demo, focused drawer regressions and statement/UI re-review green; partial, complete scope and live-browser matrix outstanding**                                         | One owner-scoped cursor-paginated read model now supplies every bank transaction, backend counts and account/search/date/direction/status filters over a 100-day default window. The default page combines the three property-labelled demo Mietkonten; its local account filter scopes the list, and the table names the account in a dedicated column. The seed supplies 50 multi-month rows while preserving the current full/partial/review/unmatched/duplicate/ignored demo cases. The page also supplies a 400px detail drawer, proposal confirmation and append-only ignore/restore including safe page-local bulk actions. Unit and object payment links/projections use the same receivable facts. Manual reassignment, cash/manual-payment evidence, overpayment decisions, historical anomaly engine, recurring receivables, complete cross-dashboard aggregates, productive sync/reconnect and exact history-reset remain unimplemented or source-blocked; see `docs/04`. |
+| UI-08  | `08_Zaehler.md`              | **Implemented on `development`; full/demo, GAS checks, 0040 regressions and boundary/statement re-reviews green; partially verified, required browser matrix outstanding**                    | The full-width object → building/unit → meter hierarchy and `/a/{account_id}/zaehler/neu` are implemented with explicit device types, remote-readability state and lifecycle periods. Reason-required void/removal and atomic replacement preserve readings. Append-only readings use structured preflight findings, backend periods and consumption provenance. Versioned internal/external heating-billing modes, structured internal inputs and the confirmed MDL handoff prevent simultaneous authoritative results. Shared calibration evaluation is reused. OCR/upload, radio connection/import and productive provider sync remain **intentionally inactive**; calibration authority and the remaining live-browser acceptance matrix remain production/closure blockers.                                                                                                                                                                                                                          |
 
-Implement one numbered specification completely before the next. While `CLAUDE.md` § 10 direct
-implementation mode remains active, continue directly on `development` with compile-level checks
-and no new tests, fixtures, sentinel or agent runs. When Emir ends that mode, the normal
-`AGENTS.md` branch, fixture, review and gate flow resumes.
+Implement one numbered specification completely before the next. Direct implementation mode has
+ended; the normal `AGENTS.md` fixture, review and gate flow is active. Current checkpoint
+consolidation remains on the existing `development` branch; new slices follow branch discipline.
+
+#### UI-08 implementation record — implemented, partially verified
+
+**Source basis.** The reviewed
+`/Users/berkaybayrak/Claude/Projects/Lokara/Adjustments/08_Zaehler.md` and the tracked
+`berkay-work/Spec-Seiten/UI/08_Zaehler.md` are byte-identical. Implementation replaced the recorded
+starting conditions: one selected building with a flat meter list, an inline create form, a nullable
+calibration date with router-local status logic, hard deletion, 2025-bound reading/consumption
+presentation and one free-form heating-cost entry path.
+
+| Order | Adjustment scope | Implemented result | Remaining closure limit |
+| --- | --- | --- | --- |
+| 1 | **Z4, Z6, Z9 — contracts, lifecycle and calibration facts** | Migration `0032` adds account-scoped device facts, lifecycle/predecessor/successor links, remote readability and distinct calibration-data states. Device type and fixed unit are validated server-side. Replacement is atomic; removal and void append reasoned lifecycle evidence; readings and statement sources remain immutable. Calibration uses the shared evaluation path. | The authoritative versioned calibration rule and transition treatment remain **MUSS-INPUT/source-blocked** and must be approved before production. Migration `0040` closes nullable checks and invoice immutability; 20 rollback-only regressions pass and the boundary re-audit is clean. |
+| 2 | **Z1, Z2, Z3 — information architecture and inventory tree** | The short header and one primary action precede the full-width object → building meters/units → meter hierarchy. Active and historical devices are separated; the backend-owned expired list drives previous/next navigation. | Keyboard, focus and 200% zoom behaviour still require the deferred live-browser matrix. |
+| 3 | **Z5, Z7, Z8 — create wizard, readings and consumption** | `/a/{account_id}/zaehler/neu` has account/object-scoped draft recovery and server-fixed units. Reading preflight returns lifecycle, duplicate-date, rollback, correction and tenancy findings. Warnings require persisted confirmation, blockers refuse the write and corrections append linked successors. Backend periods expose measured/incomplete/estimated/not-applicable provenance and exact boundary readings. | Checkpoint full/demo and focused GAS/navigation regressions are green; complete live interaction acceptance remains outstanding. |
+| 4 | **Z10 — remote readability** | `REMOTE_READABLE`, `NOT_REMOTE_READABLE` and `UNKNOWN` are persisted and displayed; manual readings remain `MANUAL`. | Connection controls, credentials, productive sync and fake provider state remain **intentionally inactive**. |
+| 5 | **Z11, Z12, Z13 — heating-billing mode and inputs** | Append-only mode versions select Lokara or an external provider per object/period. A confirmed MDL statement is the only authoritative external handoff and suppresses the parallel internal statement result. Internal inputs are categorized, source-linked and readiness-projected; the OCR segment is disabled without a file input or request. | Productive provider integration, upload/OCR/storage and inferred legal values remain out of scope. The `0040` first-reasoned-void repair, 20 regressions and clean boundary/statement re-reviews now provide evidence; live-browser acceptance remains outstanding. |
+| 6 | **Z14, Z15, Z16 — states, accessibility and acceptance** | Loading, empty, error, success, draft, read-only and permission states are implemented. Migration `0032`, seed, Web lint/typecheck, Ruff, strict mypy, authenticated workspace/reading preflight and both Next routes pass locally. | Full/demo gates and focused boundary/statement re-reviews are green. The required 1280/1440/1920 px, keyboard and 200% zoom matrix is outstanding, so UI-08 is not technically closed. |
+
+**Out of scope for UI-08:** productive radio/MDL connectivity, OCR/upload/storage, provider contracts,
+invented calibration rules, UVI delivery, mobile/tablet variants, electricity meters, engine rewrites
+and changes to existing heating golden values. The original gas exclusion was superseded by the
+28.08.2026 decision in `docs/16` § 3.2; only the approved gas-volume tuple was added. M9 technically
+closed on 29.08.2026; UI-08's remaining acceptance matrix is still required before portfolio closure.
 
 #### Interfaces and invariants
 
@@ -1530,11 +1654,11 @@ and no new tests, fixtures, sentinel or agent runs. When Emir ends that mode, th
 
 #### Verification and closure
 
-**Direct implementation mode, set by Emir on 25.08.2026.** From UI-03 onward, and until Emir ends
-the mode, these steps are implemented without subagents, without new focused tests or fixtures and
-without gate runs; see `CLAUDE.md` § 10 "Current working mode". Lint, type checks and the web
-production build remain. A step built this way is recorded as **implemented; unverified — no test
-evidence**, never as focused-green, and the deferred UI-08 verification must cover it.
+**Historical direct implementation mode, set by Emir on 25.08.2026, has ended.** UI-03 onward
+initially had compile/live-flow evidence only. The later checkpoint adds automated full/demo
+verification and focused boundary/statement/UI reviews. These steps are now partially verified;
+complete per-step acceptance, including the required live-browser matrix, remains open. Normal
+`AGENTS.md` verification is active.
 
 - Run focused tests and `scripts/gate.sh fast` during each slice. Run `scripts/gate.sh full` before
   closing each numbered specification.
@@ -1551,7 +1675,8 @@ evidence**, never as focused-green, and the deferred UI-08 verification must cov
 
 ### M10 — Portals and investment
 
-**Execution prerequisite:** resume and complete M9 after UI-08 before starting M10.
+**Execution prerequisite:** M9's 29.08.2026 technical closure is recorded above. The later
+checkpoint must be consolidated and Emir must authorize the next implementation scope before M10.
 
 **Approved-spec prerequisite:** `docs/14`; its calculations also depend on approved `docs/09`–
 `docs/11`. Renter activation remains governed by `docs/02` and the M5 no-write guard.
@@ -1635,7 +1760,7 @@ immutability decision without an open choice, and the refusal cases are enumerab
 revision after `0024_m7_afa_tax_export.py`.
 
 - Add the account-scoped, composite-FK-protected activation-code table with `FORCE ROW LEVEL
-  SECURITY`, a `WITH CHECK` policy and a refused cross-account **write** assertion, or
+SECURITY`, a `WITH CHECK` policy and a refused cross-account **write** assertion, or
   `scripts/check_rls_coverage.py` rejects it.
 - Redemption is the **only** positive writer of `renter.person_id`
   (`packages/db/src/lokara_db/models.py`, `Renter`). Enforce single use in the database, not only in
@@ -1796,8 +1921,9 @@ attempts fail; renters see only their tenancy; and the investment cockpit uses t
 - The capital-markets permission claim is unconfirmed (`docs/14` § 2).
 - The negative `steuerCent` scenario, the editable 42% marginal-tax default and the Page-03 R13 /
   Page-07 R3 interest ambiguity stay scenario arithmetic, never a tax result.
-- Renter-facing UVI content stays blocked by the unchosen PLZ geodataset and the three missing UVI
-  register rows (`docs/16`); a portal does not clear them.
+- Renter-facing UVI content stays blocked until the three missing UVI register rows and the other
+  authority prerequisites in `docs/16` are resolved; the green vendored PLZ lookup and a portal do
+  not clear them.
 - Tickets remain unspecified and unscheduled.
 
 ### M11 — Native apps, billing and load test
@@ -1821,29 +1947,29 @@ Phase D1 owns the existing-doc reconciliation in the order below. Legal and calc
 assigned to `docs/09`–`docs/16` stays there; existing docs record only the dependency and settled
 cross-cutting claim. Source coverage and golden fixtures land with every calculation-doc change.
 
-| Existing doc | Why it needs work |
-| --- | --- |
-| `docs/03-nk-heating-engines.md` | Align the existing Page 01b contract and fixtures with the restored single Slice A. Preserve the current F02 decisions and record the unresolved DWD/UVI dependency without duplicating `docs/16`. |
-| `docs/08-statement-document.md` + relevant `docs/02-data-model.md` sections | Complete the Page 01 transcription, source coverage and `08-Fxx` fixtures. Record dependencies on future catalogue, tax, bank and UVI specs instead of copying their contracts here. |
-| `docs/00-product-overview.md` | Reconcile the product promise with shipped status, the Page 01 period hard stop, the owner-only M6-B final archive and still-incomplete renter delivery. |
-| `docs/04-web-app-structure.md` | Separate shipped structure from future architecture and preserve M10 renter ownership. Future packages remain dependencies, not shipped components. |
-| `docs/01-tech-stack-and-decisions.md` only | Reconcile locked decisions, shipped architecture and stale TODOs after `docs/04`. `docs/01-tech-stack-explanations.md` is Emir-owned and outside reconciliation; do not read, assess, use or modify it. |
-| `docs/06-demo-scenarios.md` | Reconcile the current demo, M5 bootstrap/onboarding limits and the D1 Page 01 output contract. |
-| `docs/07-compliance.md` | Include only settled cross-cutting claims during D1. Defer detailed Page 04 rules to `docs/11` and perform final reconciliation after the relevant D2 specs exist. |
-| `docs/05-design-system.md` | Ordinary drift review only; no missing Berkay calculation contract is assigned here. |
+| Existing doc                                                                | Why it needs work                                                                                                                                                                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/03-nk-heating-engines.md`                                             | Align the existing Page 01b contract and fixtures with the restored single Slice A. Preserve the current F02 decisions and record the unresolved DWD/UVI dependency without duplicating `docs/16`.      |
+| `docs/08-statement-document.md` + relevant `docs/02-data-model.md` sections | Complete the Page 01 transcription, source coverage and `08-Fxx` fixtures. Record dependencies on future catalogue, tax, bank and UVI specs instead of copying their contracts here.                    |
+| `docs/00-product-overview.md`                                               | Reconcile the product promise with shipped status, the Page 01 period hard stop, the owner-only M6-B final archive and still-incomplete renter delivery.                                                |
+| `docs/04-web-app-structure.md`                                              | Separate shipped structure from future architecture and preserve M10 renter ownership. Future packages remain dependencies, not shipped components.                                                     |
+| `docs/01-tech-stack-and-decisions.md` only                                  | Reconcile locked decisions, shipped architecture and stale TODOs after `docs/04`. `docs/01-tech-stack-explanations.md` is Emir-owned and outside reconciliation; do not read, assess, use or modify it. |
+| `docs/06-demo-scenarios.md`                                                 | Reconcile the current demo, M5 bootstrap/onboarding limits and the D1 Page 01 output contract.                                                                                                          |
+| `docs/07-compliance.md`                                                     | Include only settled cross-cutting claims during D1. Defer detailed Page 04 rules to `docs/11` and perform final reconciliation after the relevant D2 specs exist.                                      |
+| `docs/05-design-system.md`                                                  | Ordinary drift review only; no missing Berkay calculation contract is assigned here.                                                                                                                    |
 
 Create these docs because no current file owns their complete contracts:
 
-| New doc | Reason |
-| --- | --- |
-| `docs/09-betrkv-catalogue.md` | Versioned operating-cost classification and allocation rules from Page 02. |
-| `docs/10-afa.md` | AfA inputs, methods, guards, rounding and fixtures from Page 03. |
-| `docs/11-tax-export.md` | Anlage V and byte-exact DATEV rules from Page 04. |
-| `docs/12-guards-deadlines.md` | Reusable deadline/guard rules from Page 05. |
+| New doc                       | Reason                                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/09-betrkv-catalogue.md` | Versioned operating-cost classification and allocation rules from Page 02.                                                               |
+| `docs/10-afa.md`              | AfA inputs, methods, guards, rounding and fixtures from Page 03.                                                                         |
+| `docs/11-tax-export.md`       | Anlage V and byte-exact DATEV rules from Page 04.                                                                                        |
+| `docs/12-guards-deadlines.md` | Reusable deadline/guard rules from Page 05.                                                                                              |
 | `docs/13-contract-clauses.md` | Clause-selection decisions, risk gates and workflow routing from Page 06; complete clause/action texts remain a separate missing source. |
-| `docs/14-investment-kpis.md` | KPI definitions, financing assumptions and calculation order from Page 07. |
-| `docs/15-bank-matching.md` | Deterministic signals, confidence outcomes and review rules from Page 08. |
-| `docs/16-uvi.md` | Complete UVI calculation, DWD import, cadence, delivery and fallback contract from the annexes and linked Pages. |
+| `docs/14-investment-kpis.md`  | KPI definitions, financing assumptions and calculation order from Page 07.                                                               |
+| `docs/15-bank-matching.md`    | Deterministic signals, confidence outcomes and review rules from Page 08.                                                                |
+| `docs/16-uvi.md`              | Complete UVI calculation, DWD import, cadence, delivery and fallback contract from the annexes and linked Pages.                         |
 
 The new-doc table is the output inventory, not a second source assignment: the Berkay source
 registry above remains authoritative. Create these only in D2 and in its dependency order.

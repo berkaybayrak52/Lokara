@@ -142,6 +142,7 @@ def test_failed_generation_persists_readiness_only() -> None:
 
     class FakeSession:
         def __init__(self) -> None:
+            self.info = {"tax_role": Role.OWNER}
             self.added: list[object] = []
 
         def add(self, value: object) -> None:

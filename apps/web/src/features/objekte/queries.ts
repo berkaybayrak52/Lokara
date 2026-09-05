@@ -9,9 +9,12 @@ import {
   BuildingListResponseSchema,
   BuildingSummarySchema,
   TenancyOutSchema,
+  UnitDashboardResponseSchema,
+  UnitDashboardWriteResponseSchema,
   UnitDetailResponseSchema,
   UnitSummarySchema,
 } from '@/lib/contracts';
+import type { UnitAmenity } from '@/lib/contracts';
 
 export function useBuildings(accountId: string) {
   return useQuery({
@@ -42,6 +45,40 @@ export function useUnitDetail(accountId: string, unitId: string) {
     queryKey: ['account', accountId, 'units', unitId],
     queryFn: () => api(`/a/${accountId}/units/${unitId}`, UnitDetailResponseSchema),
     retry: false,
+  });
+}
+
+export function useUnitDashboard(accountId: string, unitId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'units', unitId, 'dashboard'],
+    queryFn: () => api(`/a/${accountId}/units/${unitId}/dashboard`, UnitDashboardResponseSchema),
+    retry: false,
+  });
+}
+
+interface UnitProfileVersionCreateInput {
+  effectiveFrom: string;
+  usageType: 'RESIDENTIAL' | 'COMMERCIAL' | 'OTHER';
+  roomsX100: number | null;
+  amenities: UnitAmenity[];
+  amenityNote: string | null;
+  evidenceRef: string;
+}
+
+export function useCreateUnitProfileVersion(accountId: string, unitId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UnitProfileVersionCreateInput) =>
+      api(`/a/${accountId}/units/${unitId}/profile-versions`, UnitDashboardWriteResponseSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['account', accountId, 'units', unitId, 'dashboard'],
+      });
+    },
   });
 }
 

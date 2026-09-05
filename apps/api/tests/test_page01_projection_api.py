@@ -25,6 +25,7 @@ import time
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -33,21 +34,15 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from lokara_api import create_app
+from lokara_api import create_app, statement_service
 from lokara_api.routers import portal
 from lokara_api.settings import ApiSettings
 from lokara_db import (
-    AdvanceAllocation,
-    AdvancePayment,
-    AdvanceReconciliation,
-    AdvanceReconciliationAllocation,
     Building,
     BuildingAssignment,
     DbSettings,
     FiktivbelegungMode,
     Membership,
-    Meter,
-    MeterReading,
     Person,
     PersonCount,
     Renter,
@@ -58,7 +53,7 @@ from lokara_db import (
     create_db_engine,
 )
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
-from lokara_domain import MeasurementUnit, MeterKind, ReadingReason, ReadingSource
+from lokara_domain import MeasurementUnit
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
@@ -425,48 +420,15 @@ class TestTenantProjectionIsAPrivacyBoundary:
         employee may retain the existing calculation view but not its advance
         evidence, reconciliation state, or Saldo.
         """
-        payment_id = "pay_p01_m6_preview"
-        allocation_id = "aal_p01_m6_preview"
-        reconciliation_id = "arc_p01_m6_preview"
+        reconciliation_id = "advance_reconciliation_demo_ten_demo_b1_2025"
         employee_id = "per_p01_m6_employee"
         membership_id = "mem_p01_m6_employee"
         assignment_id = "bas_p01_m6_employee"
         engine = _owner_engine()
         try:
             with Session(engine) as session, session.begin():
-                session.add(
-                    AdvancePayment(
-                        id=payment_id,
-                        account_id=DEMO_ACCOUNT_ID,
-                        tenancy_id=TEN_B,
-                        amount_cents=28_000,
-                        payment_date=date(2025, 12, 31),
-                        evidence_ref="M6A-F12",
-                        reversal_of_id=None,
-                    )
-                )
-                session.flush()
                 session.add_all(
                     [
-                        AdvanceAllocation(
-                            id=allocation_id,
-                            account_id=DEMO_ACCOUNT_ID,
-                            payment_id=payment_id,
-                            tenancy_id=TEN_B,
-                            period_start=date(2025, 1, 1),
-                            period_end=date(2025, 12, 31),
-                            amount_cents=28_000,
-                        ),
-                        AdvanceReconciliation(
-                            id=reconciliation_id,
-                            account_id=DEMO_ACCOUNT_ID,
-                            tenancy_id=TEN_B,
-                            period_start=date(2025, 1, 1),
-                            period_end=date(2025, 12, 31),
-                            version=1,
-                            total_cents=28_000,
-                            supersedes_id=None,
-                        ),
                         Person(id=employee_id, email="m6-preview-employee@lokara.example"),
                         Membership(
                             id=membership_id,
@@ -483,22 +445,13 @@ class TestTenantProjectionIsAPrivacyBoundary:
                         ),
                     ]
                 )
-                session.flush()
-                session.add(
-                    AdvanceReconciliationAllocation(
-                        id="ara_p01_m6_preview",
-                        account_id=DEMO_ACCOUNT_ID,
-                        reconciliation_id=reconciliation_id,
-                        allocation_id=allocation_id,
-                    )
-                )
 
             owner = _get(client, audience="TENANT", tenancy_id=TEN_B)
             assert owner["advanceReconciliationState"] == "CONFIRMED"
             assert owner["reconciliationId"] == reconciliation_id
             assert owner["reconciliationVersion"] == 1
-            assert owner["actualAdvancesCents"] == 28_000
-            assert owner["saldoCents"] == owner["subtotalCents"] - 28_000
+            assert owner["actualAdvancesCents"] == 90_000
+            assert owner["saldoCents"] == owner["subtotalCents"] - 90_000
 
             employee = client.get(
                 STATEMENT,
@@ -519,10 +472,6 @@ class TestTenantProjectionIsAPrivacyBoundary:
         finally:
             with Session(engine) as session, session.begin():
                 for table, row_id in (
-                    ("advance_reconciliation_allocation", "ara_p01_m6_preview"),
-                    ("advance_reconciliation", reconciliation_id),
-                    ("advance_allocation", allocation_id),
-                    ("advance_payment", payment_id),
                     ("building_assignment", assignment_id),
                     ("membership", membership_id),
                     ("person", employee_id),
@@ -1073,74 +1022,43 @@ class TestUnattributableConsumptionIsSaidNotSplit:
     @pytest.fixture(autouse=True)
     def unblocked_bundle(self, monkeypatch: pytest.MonkeyPatch) -> None:
         original_bundle = portal._bundle
+        original_meter_facts = statement_service._meter_facts
 
         def fixture_bundle(*args: Any, **kwargs: Any) -> Any:
             return replace(original_bundle(*args, **kwargs), page02_production_blocked=False)
 
-        monkeypatch.setattr(portal, "_bundle", fixture_bundle)
+        def fixture_meter_facts(*args: Any, **kwargs: Any) -> statement_service.MeterFacts:
+            facts = original_meter_facts(*args, **kwargs)
+            return replace(
+                facts,
+                cold_water_by_unit={**facts.cold_water_by_unit, "unit_demo_b": Decimal("22")},
+                cold_water_unit_by_unit={
+                    **facts.cold_water_unit_by_unit,
+                    "unit_demo_b": MeasurementUnit.CUBIC_METRE,
+                },
+            )
 
-    def _add_cold_water_meter_to_unit_b(self, session: Session) -> None:
-        session.merge(
-            Meter(
-                id="met_p01_kw_b",
-                account_id=DEMO_ACCOUNT_ID,
-                building_id=DEMO_BUILDING_ID,
-                unit_id="unit_demo_b",
-                kind=MeterKind.COLD_WATER,
-                measurement_unit=MeasurementUnit.CUBIC_METRE,
-                serial="KWZ-B-441098",
-                calibration_valid_until=date(2029, 12, 31),
-            )
-        )
-        for suffix, read_at, value in (
-            ("open", date(2025, 1, 1), 100_000),
-            ("close", date(2025, 12, 31), 122_000),
-        ):
-            session.merge(
-                MeterReading(
-                    id=f"mr_p01_kw_b_{suffix}",
-                    account_id=DEMO_ACCOUNT_ID,
-                    meter_id="met_p01_kw_b",
-                    read_at=read_at,
-                    value_x1000=value,
-                    reason=ReadingReason.PERIODIC,
-                    source=ReadingSource.MDL,
-                    recorded_at=datetime(2026, 1, 5, 9, 0),
-                )
-            )
+        monkeypatch.setattr(portal, "_bundle", fixture_bundle)
+        monkeypatch.setattr(statement_service, "_meter_facts", fixture_meter_facts)
 
     def test_the_owner_projection_carries_a_german_finding_and_the_renter_none(
         self, client: TestClient
     ) -> None:
-        engine = _owner_engine()
-        with Session(engine) as session, session.begin():
-            self._add_cold_water_meter_to_unit_b(session)
-        try:
-            owner = _get(client, audience="OWNER")
-            finding = next(
-                finding for finding in owner["findings"] if finding.startswith("Wohnung B")
-            )
-            assert finding.startswith("Wohnung B (EG rechts): ")
-            assert "Nutzerwechsel" in finding
-            assert "Zwischenablesung" in finding
+        owner = _get(client, audience="OWNER")
+        finding = next(finding for finding in owner["findings"] if finding.startswith("Wohnung B"))
+        assert finding.startswith("Wohnung B (EG rechts): ")
+        assert "Nutzerwechsel" in finding
+        assert "Zwischenablesung" in finding
 
-            tenant = client.get(
-                STATEMENT, headers=DEMO, params={"audience": "TENANT", "tenancy_id": TEN_B}
-            )
-            assert tenant.json()["findings"] == []
-            assert "Nutzerwechsel" not in tenant.text
-        finally:
-            with Session(engine) as session, session.begin():
-                session.execute(text("DELETE FROM meter_reading WHERE meter_id = 'met_p01_kw_b'"))
-                session.execute(text("DELETE FROM meter WHERE id = 'met_p01_kw_b'"))
-            engine.dispose()
+        tenant = client.get(
+            STATEMENT, headers=DEMO, params={"audience": "TENANT", "tenancy_id": TEN_B}
+        )
+        assert tenant.json()["findings"] == []
+        assert "Nutzerwechsel" not in tenant.text
 
     def test_the_unattributable_unit_contributes_no_consumption_share(
         self, client: TestClient
     ) -> None:
-        engine = _owner_engine()
-        with Session(engine) as session, session.begin():
-            self._add_cold_water_meter_to_unit_b(session)
         cost_id = _create_cost(client, "Wasser/Abwasser", 50000, "CONSUMPTION")
         try:
             body = _get(client, audience="OWNER")
@@ -1155,7 +1073,3 @@ class TestUnattributableConsumptionIsSaidNotSplit:
                 ).status_code
                 == 200
             )
-            with Session(engine) as session, session.begin():
-                session.execute(text("DELETE FROM meter_reading WHERE meter_id = 'met_p01_kw_b'"))
-                session.execute(text("DELETE FROM meter WHERE id = 'met_p01_kw_b'"))
-            engine.dispose()

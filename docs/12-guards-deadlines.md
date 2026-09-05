@@ -1,8 +1,8 @@
 # Guards and deadlines — shared trigger, escalation and resolution contract
 
-**Status:** complete D2 transcription; paused M9 implementation integrated on `development` and
-unverified by this consolidation. Earlier branch evidence recorded a green demo gate and clean
-boundary review, but the final statement review remained red — see `PLAN.md` § M9-U.
+**Status:** complete D2 transcription; M9 technically closed and review-clean on `development`
+on 29.08.2026. That dated demo gate passed `1916` Python and `183` web tests. The later checkpoint
+has separate closing verification in `PLAN.md`; technical closure is not production approval.
 
 **Authoritative source:**
 `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
@@ -16,18 +16,21 @@ boundary review, but the final statement review remained red — see `PLAN.md` �
 **Fixtures:** exactly `12-F01`–`12-F24` in
 `packages/rules-store/tests/berkay_12_golden.py`
 
-**Implementation status:** G1 remains the merged foundation. Paused M9 work on `development`
+**Implementation status:** G1 remains the merged foundation. M9 work on `development`
 implements all `12-F01`–`12-F24` through public W1–W8 evaluators and adds migration `0025`,
 account-scoped jobs and API, the `/waechter` landlord screen, immutable reminder/delivery evidence
-and a deterministic email stub. It is integrated but unverified; automation defaults off. This is
-not production authorization.
+and a deterministic email stub. It is technically verified; automation defaults off.
+The 29.08.2026 technical milestone closure is not production authorization.
 
 The M9-R endpoint, membership, trigger and writer-trust defects are repaired and verified against
-migrated Postgres; the fresh boundary audit is clean. The remaining closure defect is presentation,
-not transcription: `/waechter` maps known guard/status values to German, but lower-case internal
-blocker keys can still leak. Its broad internal-code heuristic can also hide useful `SHA-256`
-wording and apply a false legal fallback to technical blockers. `PLAN.md` § M9-U owns that final
-repair before M9 closure.
+migrated Postgres; the earlier boundary audit is clean. M9-U now maps the known lower-case blocker
+keys to German, separates authority and unspecified-internal fallbacks, deduplicates displayed
+blockers and allowlists the approved `SHA-256` integrity message. A final duplicate warning/blocker
+case is covered by regression and repaired without hiding the explicit production-blocker field.
+Focused tests, lint, strict typecheck and the production build pass, and the final statement/UI
+re-review is clean. The 29.08.2026 repository-wide demo gate closed M9 technically with an unchanged
+ordinary statement fingerprint of `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes. Later
+checkpoint verification is tracked separately in `PLAN.md`.
 
 This document owns Page 05's reusable date, money, trigger, warning, escalation and auto-resolution
 rules. All product and warning copy is German. Code structure and identifiers are English. Money is
@@ -484,10 +487,11 @@ shared rows and ten non-goals are mapped. The data-only checks may prove
 coverage and arithmetic, but they do not approve legal rules, resolve authority gaps or demonstrate
 production behavior.
 
-The approved D2 transcription was data-only. G1 is the locally merged foundation; paused M9 work
+The approved D2 transcription was data-only. G1 is the locally merged foundation; M9 work
 integrated on `development` implements all 24 fixtures through production evaluators and supplies
 immutable account-scoped persistence, idempotent jobs, owner/employee-safe endpoints, the landlord
-`/waechter` screen and a deterministic email adapter. The consolidation did not run those fixtures.
+`/waechter` screen and a deterministic email adapter. The 29.08.2026 technical close exercised the
+repository-wide demo gate and received clean boundary and statement/UI re-reviews.
 
 Real delivery remains blocked and default-off. No real email provider, worker, scheduler, push
 client/token boundary or GENESIS integration is selected. Each renter is a separate message;

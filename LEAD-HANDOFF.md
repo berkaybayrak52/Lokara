@@ -1,40 +1,34 @@
-# Lead handoff — active work consolidated on `development`
+# Lead handoff — M9 checkpoint verification green
 
-## Current branch
+## Current branch and authority
 
-The primary worktree is on the long-lived local `development` branch. Local `main` remains the
-last consolidated checkpoint at `5230724`; nothing from this consolidation is pushed.
+The verified checkpoint is on `development`, prepared from parent `edb7008`.
+Local `main` is `3898776` (UI-01 portfolio dashboard merge). Emir authorized the local
+checkpoint commit on 05.09.2026. Promotion, merge and push remain separate decisions.
+Preserve local reference artifacts outside the checkpoint; `LAST_OUTPUT.md` records current HEAD.
 
-`development` contains the checkpoint histories for:
+Normal agent/reviewer rules are active: the former direct-mode subsection has been removed
+from `CLAUDE.md`. Use one agent at a time unless Emir authorizes parallel work.
 
-- UI-04 from `slice/ui-04-objekt-dashboard`;
-- deferred M7-F repairs from `slice/m7-f-deferred-repairs`;
-- paused M9 guards/delivery from `slice/m9-guards-delivery`.
+## Verified checkpoint
 
-Migration `0027` is an empty merge revision over heads `0025` and `0026`. No migration was applied
-to a database during consolidation.
+On 05.09.2026, `scripts/gate.sh full` and `scripts/gate.sh demo` passed against the preserved
+local database at migration `0040`: 1967 Python tests, no skips, and 188 web tests.
+RLS covers 73 account-scoped tables and all 144 account-scoped foreign keys are safe.
+The ordinary demo statement fingerprint remains
+`c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes.
 
-All authorized compile-level checks pass: Ruff check and format, strict mypy over 249 source files,
-web lint, typecheck and the production build. Alembic reports `0027` as its single head.
+The prior boundary and statement/UI findings are repaired and their focused re-reviews are
+clean. Documentation reconciliation is complete and the local checkpoint commit is authorized.
+`HANDOFF.md` owns the exact continuation and `PLAN.md` owns durable milestone status.
 
-## Status boundaries
+## Scope boundaries
 
-UI-04, the M7-F repair candidate and M9 are integrated, not technically closed. Consolidation uses
-compile-level checks only and supplies no test, database, gate, audit, statement review, PDF
-fingerprint or browser evidence.
+M9 technical closure does not approve production. Delivery remains default-off. Provider,
+scheduler, frozen UVI artifact, checklist catalogue and recorded legal/runtime authority
+blockers remain open. UI-07 remains a partial demo core, and the portfolio's live-browser
+accessibility matrix remains outstanding. M7-F remains deferred until after M10.
 
-M9 remains paused until after UI-08. Its known landlord-facing blocker-label defects and its
-source/legal, provider, UVI-artifact and checklist-catalogue blockers remain open. Delivery stays
-default-off.
-
-M7-F remains deferred until after M10. Its repair candidate still needs closing boundary,
-statement and documentation review plus verification. Every applicable tax authority flag remains
-production-blocking.
-
-## Next implementation
-
-Continue direct implementation with UI-05A on `development`, under `CLAUDE.md` § 10. Do not start
-M9 or M7-F closure work unless Emir changes the recorded order.
-
-Existing branches and worktrees remain preserved. Commit, promotion to `main`, cleanup and push
-remain separate decisions.
+Emir's recurring rule: stop work and write a precise handoff when about 10% of the 5-hour
+usage limit remains. Do not infer remaining usage quota from elapsed wall-clock time;
+use visible quota information or Emir's warning.

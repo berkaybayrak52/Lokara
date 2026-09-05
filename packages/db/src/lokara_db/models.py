@@ -20,10 +20,17 @@ from decimal import Decimal
 
 from lokara_domain import (
     AllocationKey,
+    CalibrationDataState,
+    ExternalHeatingStatus,
+    HeatingBillingMode,
+    HeatingCostCategory,
     MeasurementUnit,
+    MeterDeviceType,
     MeterKind,
+    MeterLifecycleEventType,
     ReadingReason,
     ReadingSource,
+    RemoteReadability,
 )
 from sqlalchemy import (
     JSON,
@@ -223,6 +230,13 @@ class Base(DeclarativeBase):
         MdlBranch: SaEnum(MdlBranch, name="mdl_branch"),
         AllocationKey: SaEnum(AllocationKey, name="allocation_key"),
         MeterKind: SaEnum(MeterKind, name="meter_kind"),
+        MeterDeviceType: SaEnum(MeterDeviceType, name="meter_device_type"),
+        RemoteReadability: SaEnum(RemoteReadability, name="remote_readability"),
+        CalibrationDataState: SaEnum(CalibrationDataState, name="calibration_data_state"),
+        MeterLifecycleEventType: SaEnum(MeterLifecycleEventType, name="meter_lifecycle_event_type"),
+        HeatingBillingMode: SaEnum(HeatingBillingMode, name="heating_billing_mode"),
+        ExternalHeatingStatus: SaEnum(ExternalHeatingStatus, name="external_heating_status"),
+        HeatingCostCategory: SaEnum(HeatingCostCategory, name="heating_cost_category"),
         MeasurementUnit: SaEnum(MeasurementUnit, name="measurement_unit"),
         ReadingReason: SaEnum(ReadingReason, name="reading_reason"),
         ReadingSource: SaEnum(ReadingSource, name="reading_source"),
@@ -335,6 +349,9 @@ class Landlord(Base):
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
     legal_name: Mapped[str]
     address: Mapped[str]
+    phone: Mapped[str | None]
+    email: Mapped[str | None]
+    logo: Mapped[str | None]
 
     account: Mapped["Account"] = relationship(back_populates="landlords")
     buildings: Mapped[list["Building"]] = relationship(
@@ -506,6 +523,11 @@ class Unit(Base):
         primaryjoin="Unit.id == Meter.unit_id",
         foreign_keys="Meter.unit_id",
     )
+    profile_versions: Mapped[list["UnitProfileVersion"]] = relationship(
+        back_populates="unit",
+        primaryjoin="Unit.id == UnitProfileVersion.unit_id",
+        foreign_keys="UnitProfileVersion.unit_id",
+    )
 
     __table_args__ = (
         _scoped_fk("unit", "building_id", "building"),
@@ -560,6 +582,21 @@ class Tenancy(Base):
         primaryjoin="Tenancy.id == AdvanceReconciliation.tenancy_id",
         foreign_keys="AdvanceReconciliation.tenancy_id",
     )
+    contract_versions: Mapped[list["TenancyContractVersion"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == TenancyContractVersion.tenancy_id",
+        foreign_keys="TenancyContractVersion.tenancy_id",
+    )
+    contract_positions: Mapped[list["TenancyContractPosition"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == TenancyContractPosition.tenancy_id",
+        foreign_keys="TenancyContractPosition.tenancy_id",
+    )
+    rent_changes: Mapped[list["TenancyRentChange"]] = relationship(
+        back_populates="tenancy",
+        primaryjoin="Tenancy.id == TenancyRentChange.tenancy_id",
+        foreign_keys="TenancyRentChange.tenancy_id",
+    )
 
     __table_args__ = (
         _scoped_fk("tenancy", "unit_id", "unit"),
@@ -606,6 +643,166 @@ class AdvancePaymentPeriod(Base):
         ),
         Index("ix_advance_payment_period_account", "account_id"),
         Index("ix_advance_payment_period_tenancy", "tenancy_id"),
+    )
+
+
+class UnitProfileVersion(Base):
+    """Append-only, effective-dated facts shown on the unit dashboard."""
+
+    __tablename__ = "unit_profile_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    unit_id: Mapped[str]
+    version: Mapped[int]
+    effective_from: Mapped[date]
+    usage_type: Mapped[str]
+    rooms_x100: Mapped[int | None]
+    amenities: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    amenity_note: Mapped[str | None]
+    evidence_ref: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    unit: Mapped["Unit"] = relationship(
+        back_populates="profile_versions",
+        primaryjoin="Unit.id == UnitProfileVersion.unit_id",
+        foreign_keys="UnitProfileVersion.unit_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("unit_profile_version", "unit_id", "unit"),
+        _scoped_pair("unit_profile_version"),
+        UniqueConstraint("unit_id", "version", name="uq_unit_profile_version_unit_version"),
+        CheckConstraint("version >= 1", name="ck_unit_profile_version_version"),
+        CheckConstraint(
+            "usage_type IN ('RESIDENTIAL', 'COMMERCIAL', 'OTHER')",
+            name="ck_unit_profile_version_usage_type",
+        ),
+        CheckConstraint(
+            "rooms_x100 IS NULL OR rooms_x100 >= 0",
+            name="ck_unit_profile_version_rooms_non_negative",
+        ),
+        Index("ix_unit_profile_version_account", "account_id"),
+        Index("ix_unit_profile_version_unit", "unit_id", "effective_from"),
+    )
+
+
+class TenancyContractVersion(Base):
+    """Append-only classification of a tenancy contract."""
+
+    __tablename__ = "tenancy_contract_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    version: Mapped[int]
+    effective_from: Mapped[date]
+    contract_type: Mapped[str]
+    evidence_ref: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="contract_versions",
+        primaryjoin="Tenancy.id == TenancyContractVersion.tenancy_id",
+        foreign_keys="TenancyContractVersion.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("tenancy_contract_version", "tenancy_id", "tenancy"),
+        _scoped_pair("tenancy_contract_version"),
+        UniqueConstraint(
+            "tenancy_id", "version", name="uq_tenancy_contract_version_tenancy_version"
+        ),
+        CheckConstraint("version >= 1", name="ck_tenancy_contract_version_version"),
+        CheckConstraint(
+            "contract_type IN ('RESIDENTIAL_OPEN_ENDED', 'RESIDENTIAL_FIXED_TERM', "
+            "'COMMERCIAL_OPEN_ENDED', 'COMMERCIAL_FIXED_TERM', 'OTHER')",
+            name="ck_tenancy_contract_version_contract_type",
+        ),
+        Index("ix_tenancy_contract_version_account", "account_id"),
+        Index("ix_tenancy_contract_version_tenancy", "tenancy_id", "effective_from"),
+    )
+
+
+class TenancyContractPosition(Base):
+    """Garage or parking-space position linked to one tenancy contract."""
+
+    __tablename__ = "tenancy_contract_position"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    position_type: Mapped[str]
+    inclusion_type: Mapped[str]
+    label: Mapped[str | None]
+    monthly_amount_cents: Mapped[int | None]
+    valid_from: Mapped[date]
+    valid_to: Mapped[date | None]
+    evidence_ref: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="contract_positions",
+        primaryjoin="Tenancy.id == TenancyContractPosition.tenancy_id",
+        foreign_keys="TenancyContractPosition.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("tenancy_contract_position", "tenancy_id", "tenancy"),
+        _scoped_pair("tenancy_contract_position"),
+        CheckConstraint(
+            "position_type IN ('GARAGE', 'PARKING')",
+            name="ck_tenancy_contract_position_type",
+        ),
+        CheckConstraint(
+            "inclusion_type IN ('INCLUDED', 'SEPARATE')",
+            name="ck_tenancy_contract_position_inclusion",
+        ),
+        CheckConstraint(
+            "monthly_amount_cents IS NULL OR monthly_amount_cents >= 0",
+            name="ck_tenancy_contract_position_amount",
+        ),
+        CheckConstraint(
+            "inclusion_type = 'INCLUDED' OR monthly_amount_cents IS NOT NULL",
+            name="ck_tenancy_contract_position_separate_amount",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_tenancy_contract_position_period",
+        ),
+        Index("ix_tenancy_contract_position_account", "account_id"),
+        Index("ix_tenancy_contract_position_tenancy", "tenancy_id", "valid_from"),
+    )
+
+
+class TenancyRentChange(Base):
+    """Append-only evidence of an effective base-rent amount."""
+
+    __tablename__ = "tenancy_rent_change"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    effective_from: Mapped[date]
+    new_base_rent_cents: Mapped[int]
+    evidence_ref: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    tenancy: Mapped["Tenancy"] = relationship(
+        back_populates="rent_changes",
+        primaryjoin="Tenancy.id == TenancyRentChange.tenancy_id",
+        foreign_keys="TenancyRentChange.tenancy_id",
+    )
+
+    __table_args__ = (
+        _scoped_fk("tenancy_rent_change", "tenancy_id", "tenancy"),
+        _scoped_pair("tenancy_rent_change"),
+        UniqueConstraint("tenancy_id", "effective_from", name="uq_tenancy_rent_change_effective"),
+        CheckConstraint("new_base_rent_cents >= 0", name="ck_tenancy_rent_change_non_negative"),
+        Index("ix_tenancy_rent_change_account", "account_id"),
+        Index("ix_tenancy_rent_change_tenancy", "tenancy_id", "effective_from"),
     )
 
 
@@ -1317,7 +1514,9 @@ class ConfirmedCostClassification(Base):
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
     cost_entry_id: Mapped[str]
-    allocation_key_assignment_id: Mapped[str]
+    # Non-allocable catalogue positions are documented without inventing an
+    # allocation key. Allocable positions always reference their assignment.
+    allocation_key_assignment_id: Mapped[str | None]
     catalogue_id: Mapped[str]
     rule_source: Mapped[str]
     rule_rechtsstand: Mapped[str]
@@ -1381,8 +1580,17 @@ class Meter(Base):
     unit_id: Mapped[str | None]
     kind: Mapped[MeterKind]
     measurement_unit: Mapped[MeasurementUnit]
+    device_type: Mapped[MeterDeviceType]
     serial: Mapped[str]  # Zählernummer as printed on the device
-    label: Mapped[str | None]  # e.g. "Küche" when a flat has several
+    label: Mapped[str | None]  # user's own designation
+    location: Mapped[str | None]  # exact installation room/place, e.g. "Küche"
+    manufacturer: Mapped[str | None]
+    model: Mapped[str | None]
+    installed_on: Mapped[date]
+    remote_readability: Mapped[RemoteReadability]
+    calibration_data_state: Mapped[CalibrationDataState]
+    calibration_date: Mapped[date | None]
+    calibration_evidence_ref: Mapped[str | None]
     calibration_valid_until: Mapped[date | None]
     # Exact K11 factor × 1000.  Every heat device (including a kWh main
     # meter) has a factor; water meters do not participate in H5.
@@ -1422,9 +1630,78 @@ class Meter(Base):
             "(kind <> 'HEAT' AND valuation_factor_x1000 IS NULL)",
             name="ck_meter_heat_valuation_factor",
         ),
+        CheckConstraint(
+            "(device_type = 'HEAT_METER' AND kind = 'HEAT' AND measurement_unit = 'KWH') OR "
+            "(device_type = 'HEAT_COST_ALLOCATOR' AND kind = 'HEAT' "
+            "AND measurement_unit = 'HKV_UNITS') OR "
+            "(device_type = 'WARM_WATER_METER' AND kind = 'WARM_WATER' "
+            "AND measurement_unit = 'CUBIC_METRE') OR "
+            "(device_type = 'COLD_WATER_METER' AND kind = 'COLD_WATER' "
+            "AND measurement_unit = 'CUBIC_METRE') OR "
+            "(device_type = 'GAS_METER' AND kind = 'HEAT' "
+            "AND measurement_unit = 'CUBIC_METRE')",
+            name="ck_meter_device_type_facts",
+        ),
+        CheckConstraint(
+            "(calibration_data_state = 'DATA_AVAILABLE' AND calibration_date IS NOT NULL "
+            "AND calibration_evidence_ref IS NOT NULL) OR "
+            "(calibration_data_state <> 'DATA_AVAILABLE' AND calibration_date IS NULL "
+            "AND calibration_evidence_ref IS NULL)",
+            name="ck_meter_calibration_facts",
+        ),
         Index("ix_meter_account", "account_id"),
         Index("ix_meter_building", "building_id"),
         Index("ix_meter_unit", "unit_id"),
+    )
+
+
+class MeterLifecycleEvent(Base):
+    """Append-only installation, removal, replacement and void evidence."""
+
+    __tablename__ = "meter_lifecycle_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    meter_id: Mapped[str]
+    event_type: Mapped[MeterLifecycleEventType]
+    effective_on: Mapped[date]
+    reason: Mapped[str | None]
+    related_meter_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("meter_lifecycle_event", "building_id", "building"),
+        ForeignKeyConstraint(
+            ["meter_id", "account_id", "building_id"],
+            ["meter.id", "meter.account_id", "meter.building_id"],
+            name="meter_lifecycle_event_meter_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["related_meter_id", "account_id", "building_id"],
+            ["meter.id", "meter.account_id", "meter.building_id"],
+            name="meter_lifecycle_event_related_meter_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("meter_lifecycle_event"),
+        CheckConstraint(
+            "(event_type = 'INSTALLED' AND reason IS NULL) OR "
+            "(event_type <> 'INSTALLED' AND reason IS NOT NULL AND btrim(reason) <> '')",
+            name="ck_meter_lifecycle_reason",
+        ),
+        CheckConstraint(
+            "(event_type = 'REPLACED' AND related_meter_id IS NOT NULL) OR "
+            "(event_type <> 'REPLACED')",
+            name="ck_meter_lifecycle_replacement_link",
+        ),
+        CheckConstraint(
+            "related_meter_id IS NULL OR related_meter_id <> meter_id",
+            name="ck_meter_lifecycle_not_self_related",
+        ),
+        Index("ix_meter_lifecycle_event_account", "account_id"),
+        Index("ix_meter_lifecycle_event_meter", "meter_id", "effective_on"),
+        Index("ix_meter_lifecycle_event_building", "building_id"),
     )
 
 
@@ -1451,6 +1728,8 @@ class MeterReading(Base):
     reason: Mapped[ReadingReason]
     source: Mapped[ReadingSource]
     note: Mapped[str | None]
+    supersedes_reading_id: Mapped[str | None]
+    confirmation_note: Mapped[str | None]
     # Optional exact assignment/evidence for H5.  A tenant-change reading can
     # be tied to its tenancy; an estimate carries its already normalized
     # consumption × 1000 plus the basis and source reference.
@@ -1469,6 +1748,12 @@ class MeterReading(Base):
     __table_args__ = (
         _scoped_fk("meter_reading", "meter_id", "meter"),
         _scoped_fk("meter_reading", "tenancy_id", "tenancy"),
+        ForeignKeyConstraint(
+            ["supersedes_reading_id", "account_id", "meter_id"],
+            ["meter_reading.id", "meter_reading.account_id", "meter_reading.meter_id"],
+            name="meter_reading_supersedes_reading_id_fkey",
+            match="SIMPLE",
+        ),
         _scoped_pair("meter_reading"),
         UniqueConstraint("id", "account_id", "meter_id", name="uq_meter_reading_id_account_meter"),
         CheckConstraint(
@@ -1477,6 +1762,13 @@ class MeterReading(Base):
             "AND estimation_basis IS NOT NULL)",
             name="ck_meter_reading_estimate_basis",
         ),
+        CheckConstraint(
+            "supersedes_reading_id IS NULL OR "
+            "(reason = 'CORRECTION' AND confirmation_note IS NOT NULL "
+            "AND btrim(confirmation_note) <> '')",
+            name="ck_meter_reading_correction_link",
+        ),
+        UniqueConstraint("supersedes_reading_id", name="uq_meter_reading_direct_successor"),
         Index("ix_meter_reading_account", "account_id"),
         Index("ix_meter_reading_meter", "meter_id"),
         Index("ix_meter_reading_tenancy", "tenancy_id"),
@@ -1576,6 +1868,8 @@ class UviStationAssignment(Base):
     month: Mapped[date]
     station_id: Mapped[str]
     distance_km: Mapped[Decimal] = mapped_column(Numeric(9, 3))
+    centroid_dataset_identity: Mapped[str | None]
+    centroid_dataset_version: Mapped[str | None]
     source_type: Mapped[str]
     source_id: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -1735,6 +2029,8 @@ class BuildingUviConfiguration(Base):
     energy_reference: Mapped[str]
     explicit_hkv_allocator: Mapped[bool]
     calorific_factor: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    condition_number: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    warm_water_hot_temp_c: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
     valid_from: Mapped[date]
     valid_to: Mapped[date | None]
     source_type: Mapped[str]
@@ -1781,6 +2077,23 @@ class BuildingUviConfiguration(Base):
             "('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) AND "
             "calorific_factor > 0)",
             name="ck_building_uvi_configuration_calorific_factor",
+        ),
+        CheckConstraint(
+            "(calorific_factor IS NULL AND condition_number IS NULL) OR "
+            "(calorific_factor IS NOT NULL AND condition_number IS NULL AND "
+            "calorific_factor NOT IN "
+            "('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) AND "
+            "calorific_factor > 0) OR "
+            "(calorific_factor IS NOT NULL AND condition_number IS NOT NULL AND "
+            "calorific_factor NOT IN "
+            "('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) AND "
+            "condition_number NOT IN "
+            "('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) AND "
+            "calorific_factor > 0 AND condition_number > 0 AND "
+            "energy_source = 'Erdgas' AND energy_reference = 'HO' AND "
+            "source_type = 'SUPPLIER_INVOICE' AND rechtsstand = '08/2026' AND "
+            "verification_status = 'verify-before-production')",
+            name="ck_building_uvi_configuration_conversion_components",
         ),
         CheckConstraint(
             "valid_to IS NULL OR valid_to > valid_from",
@@ -2021,6 +2334,7 @@ class UviRun(Base):
     station_id: Mapped[str | None]
     station_distance_km: Mapped[Decimal | None] = mapped_column(Numeric(9, 3))
     sha256: Mapped[str]
+    support_code: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
@@ -2034,6 +2348,12 @@ class UviRun(Base):
             "tenancy_id",
             "unit_id",
             name="uq_uvi_run_delivery_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "tenancy_id",
+            "month",
+            name="uq_uvi_run_tenancy_month",
         ),
         CheckConstraint("EXTRACT(DAY FROM month) = 1", name="ck_uvi_run_month_start"),
         CheckConstraint("station_distance_km >= 0", name="ck_uvi_run_station_distance_km"),
@@ -2068,6 +2388,7 @@ class UviRun(Base):
         Index("ix_uvi_run_account", "account_id"),
         Index("ix_uvi_run_tenancy_month", "tenancy_id", "month"),
         Index("ix_uvi_run_unit_month", "unit_id", "month"),
+        UniqueConstraint("account_id", "support_code", name="uq_uvi_run_support_code"),
     )
 
 
@@ -2092,6 +2413,13 @@ class UviDeliveryEvent(Base):
         ),
         Index("ix_uvi_delivery_event_account", "account_id"),
         Index("ix_uvi_delivery_event_run", "uvi_run_id", "occurred_at"),
+        Index(
+            "uq_uvi_delivery_event_emailed_once",
+            "account_id",
+            "uvi_run_id",
+            unique=True,
+            postgresql_where=text("status = 'EMAILED'"),
+        ),
     )
 
 
@@ -2111,12 +2439,16 @@ class HeatingCostEntry(Base):
     id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
     building_id: Mapped[str]
+    category: Mapped[HeatingCostCategory]
     label: Mapped[str]
     amount_cents: Mapped[int]  # total, INCLUDING the CO₂ portion below
     period_from: Mapped[date]
     period_to: Mapped[date]  # exclusive
     co2_kg_x1000: Mapped[int | None] = mapped_column(BigInteger)
     co2_cost_cents: Mapped[int | None]
+    source_ref: Mapped[str | None]
+    voided_at: Mapped[datetime | None]
+    void_reason: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     building: Mapped["Building"] = relationship(
@@ -2127,8 +2459,66 @@ class HeatingCostEntry(Base):
 
     __table_args__ = (
         _scoped_fk("heating_cost_entry", "building_id", "building"),
+        CheckConstraint(
+            "(voided_at IS NULL AND void_reason IS NULL) OR "
+            "(voided_at IS NOT NULL AND void_reason IS NOT NULL AND btrim(void_reason) <> '')",
+            name="ck_heating_cost_void_reason",
+        ),
         Index("ix_heating_cost_account", "account_id"),
         Index("ix_heating_cost_building", "building_id"),
+    )
+
+
+class HeatingBillingModeVersion(Base):
+    """Append-only source selection for one building and billing period."""
+
+    __tablename__ = "heating_billing_mode_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    building_id: Mapped[str]
+    period_from: Mapped[date]
+    period_to: Mapped[date]
+    version: Mapped[int]
+    mode: Mapped[HeatingBillingMode]
+    provider_name: Mapped[str | None]
+    provider_reference: Mapped[str | None]
+    external_status: Mapped[ExternalHeatingStatus | None]
+    mdl_statement_id: Mapped[str | None]
+    note: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("heating_billing_mode_version", "building_id", "building"),
+        _scoped_fk("heating_billing_mode_version", "mdl_statement_id", "mdl_statement"),
+        _scoped_pair("heating_billing_mode_version"),
+        UniqueConstraint(
+            "building_id",
+            "period_from",
+            "period_to",
+            "version",
+            name="uq_heating_billing_mode_period_version",
+        ),
+        CheckConstraint("period_to > period_from", name="ck_heating_billing_mode_period"),
+        CheckConstraint("version >= 1", name="ck_heating_billing_mode_version"),
+        CheckConstraint(
+            "(mode = 'LOKARA' AND provider_name IS NULL AND provider_reference IS NULL "
+            "AND external_status IS NULL AND mdl_statement_id IS NULL) OR "
+            "(mode = 'EXTERNAL_PROVIDER' AND provider_name IS NOT NULL "
+            "AND btrim(provider_name) <> '' AND external_status IS NOT NULL)",
+            name="ck_heating_billing_mode_shape",
+        ),
+        CheckConstraint(
+            "external_status <> 'UEBERNOMMEN' OR mdl_statement_id IS NOT NULL",
+            name="ck_heating_billing_mode_adopted_statement",
+        ),
+        Index("ix_heating_billing_mode_account", "account_id"),
+        Index(
+            "ix_heating_billing_mode_building_period",
+            "building_id",
+            "period_from",
+            "period_to",
+        ),
     )
 
 
@@ -2209,6 +2599,38 @@ class BankTransaction(Base):
         ),
         Index("ix_bank_transaction_account", "account_id"),
         Index("ix_bank_transaction_booking", "account_id", "bank_booking_date"),
+    )
+
+
+class BankTransactionClassificationEvent(Base):
+    """Append-only ignore/restore history for one immutable bank movement."""
+
+    __tablename__ = "bank_transaction_classification_event"
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    bank_transaction_id: Mapped[str]
+    action: Mapped[str]
+    reason: Mapped[str | None]
+    actor_person_id: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk(
+            "bank_transaction_classification_event",
+            "bank_transaction_id",
+            "bank_transaction",
+        ),
+        _scoped_pair("bank_transaction_classification_event"),
+        CheckConstraint(
+            "action IN ('IGNORED', 'RESTORED')",
+            name="ck_bank_transaction_classification_action",
+        ),
+        Index("ix_bank_transaction_classification_account", "account_id"),
+        Index(
+            "ix_bank_transaction_classification_transaction",
+            "bank_transaction_id",
+            "created_at",
+        ),
     )
 
 
@@ -3554,8 +3976,12 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "renter",
     "building",
     "unit",
+    "unit_profile_version",
     "tenancy",
     "tenancy_party",
+    "tenancy_contract_version",
+    "tenancy_contract_position",
+    "tenancy_rent_change",
     "advance_payment_period",
     "advance_payment",
     "advance_allocation",
@@ -3576,6 +4002,7 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "operating_cost_agreement",
     "confirmed_cost_classification",
     "meter",
+    "meter_lifecycle_event",
     "meter_reading",
     "monthly_meter_reading",
     "monthly_meter_reading_source",
@@ -3588,8 +4015,10 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "uvi_run",
     "uvi_delivery_event",
     "heating_cost_entry",
+    "heating_billing_mode_version",
     "bank_account",
     "bank_transaction",
+    "bank_transaction_classification_event",
     "receivable",
     "renter_matching_profile",
     "iban_history",

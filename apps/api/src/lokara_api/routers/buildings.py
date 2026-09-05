@@ -14,16 +14,33 @@ from functools import lru_cache
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Response
-from lokara_adapters.geocoding import DisabledGeocodingGateway, GeocodingGateway
-from lokara_db import AdvancePaymentPeriod, Building, Renter, Tenancy, TenancyParty, Unit, new_id
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from lokara_adapters.geocoding import (
+    GeocodingGateway,
+    GeocodingResult,
+    PlzGeocodingGateway,
+    PlzGeocoordLookupError,
+)
+from lokara_db import (
+    AdvancePaymentPeriod,
+    Building,
+    Renter,
+    Tenancy,
+    TenancyContractPosition,
+    TenancyContractVersion,
+    TenancyParty,
+    TenancyRentChange,
+    Unit,
+    UnitProfileVersion,
+    new_id,
+)
 from lokara_domain import Period, cents, format_eur, periods_overlap
 from lokara_pdf import (
     building_overview_filename,
     building_overview_html,
     render_html_to_pdf,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..authorization import (
     portal_role,
@@ -43,33 +60,65 @@ from ..schemas import (
     BuildingListResponse,
     BuildingSummary,
     SelfUsePeriodOut,
+    TenancyContractPositionCreate,
+    TenancyContractVersionCreate,
     TenancyCreate,
     TenancyOut,
     TenancyPreviewChoice,
+    TenancyRentChangeCreate,
     UnitCreate,
+    UnitDashboardResponse,
+    UnitDashboardWriteResponse,
     UnitDetailResponse,
+    UnitProfileVersionCreate,
     UnitSummary,
 )
 from ..settings import ApiSettings
+from ..time import berlin_today
+from ..unit_dashboard import build_unit_dashboard
 
 router = APIRouter(prefix="/a/{account_id}")
 
 
 @lru_cache(maxsize=1)
 def get_geocoding_gateway() -> GeocodingGateway:
-    """Build the configured external-edge adapter once per API process."""
+    """Build the offline PLZ adapter, with optional address refinement."""
     settings = ApiSettings()
+    plz_gateway = PlzGeocodingGateway()
     if not settings.geocoding_enabled:
-        return DisabledGeocodingGateway()
-    return NominatimGeocodingGateway(
-        endpoint=settings.geocoding_endpoint,
-        contact_email=settings.geocoding_contact_email,
-        timeout_seconds=settings.geocoding_timeout_seconds,
+        return plz_gateway
+    return _PlzThenNominatimGateway(
+        plz_gateway,
+        NominatimGeocodingGateway(
+            endpoint=settings.geocoding_endpoint,
+            contact_email=settings.geocoding_contact_email,
+            timeout_seconds=settings.geocoding_timeout_seconds,
+        ),
     )
 
 
+class _PlzThenNominatimGateway:
+    """Resolve a PLZ offline before optionally refining it over HTTP."""
+
+    def __init__(self, plz: PlzGeocodingGateway, nominatim: GeocodingGateway) -> None:
+        self._plz = plz
+        self._nominatim = nominatim
+
+    def geocode(self, address: str) -> GeocodingResult:
+        # This call is deliberately outside the fallback handling: malformed or
+        # unknown PLZ values are input errors, never an invitation to geocode.
+        centroid = self._plz.geocode(address)
+        try:
+            refined = self._nominatim.geocode(address)
+        except Exception:
+            refined = None
+        if refined is not None:
+            return refined
+        return centroid
+
+
 def _is_active_today(valid_from: date, valid_to: date | None) -> bool:
-    today = date.today()
+    today = berlin_today()
     return valid_from <= today and (valid_to is None or today < valid_to)
 
 
@@ -118,6 +167,8 @@ def create_building(
         if coordinates is not None:
             latitude = coordinates.latitude
             longitude = coordinates.longitude
+    except PlzGeocoordLookupError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
         # Geocoding is enrichment only. Provider/network failures must never
         # prevent the account-scoped building write.
@@ -172,7 +223,10 @@ def building_detail(
 
 @router.get("/buildings/{building_id}/dashboard")
 def building_dashboard(
-    account_id: str, building_id: str, session: PathAccountSession
+    account_id: str,
+    building_id: str,
+    session: PathAccountSession,
+    as_of: Annotated[date | None, Query()] = None,
 ) -> BuildingDashboardResponse:
     """One server-owned read model for the Objektakte (04_Objekt-Dashboard.md OD1).
 
@@ -186,13 +240,16 @@ def building_dashboard(
         account_id=account_id,
         building=building,
         role=portal_role(session),
-        as_of=date.today(),
+        as_of=as_of or berlin_today(),
     )
 
 
 @router.get("/buildings/{building_id}/overview.pdf")
 def building_overview_pdf(
-    account_id: str, building_id: str, session: PathAccountSession
+    account_id: str,
+    building_id: str,
+    session: PathAccountSession,
+    as_of: Annotated[date | None, Query()] = None,
 ) -> Response:
     """Server-rendered object overview from the same snapshot the page shows.
 
@@ -206,7 +263,7 @@ def building_overview_pdf(
         account_id=account_id,
         building=building,
         role=portal_role(session),
-        as_of=date.today(),
+        as_of=as_of or berlin_today(),
     )
     document = building_overview_data(dashboard, generated_at=datetime.now(UTC))
     pdf = render_html_to_pdf(building_overview_html(document))
@@ -310,6 +367,160 @@ def unit_detail(account_id: str, unit_id: str, session: PathAccountSession) -> U
             for s in self_use
         ],
     )
+
+
+@router.get("/units/{unit_id}/dashboard")
+def unit_dashboard(
+    account_id: str,
+    unit_id: str,
+    session: PathAccountSession,
+    as_of: Annotated[date | None, Query()] = None,
+) -> UnitDashboardResponse:
+    unit = _get_unit(session, unit_id)
+    return build_unit_dashboard(
+        session,
+        account_id=account_id,
+        unit=unit,
+        role=portal_role(session),
+        as_of=as_of or berlin_today(),
+    )
+
+
+@router.post("/units/{unit_id}/profile-versions", status_code=201)
+def create_unit_profile_version(
+    account_id: str,
+    unit_id: str,
+    body: UnitProfileVersionCreate,
+    session: PathAccountSession,
+) -> UnitDashboardWriteResponse:
+    require_owner(session)
+    unit = _get_unit(session, unit_id)
+    next_version = (
+        session.scalar(
+            select(func.max(UnitProfileVersion.version)).where(
+                UnitProfileVersion.unit_id == unit.id
+            )
+        )
+        or 0
+    ) + 1
+    row = UnitProfileVersion(
+        id=new_id(),
+        account_id=account_id,
+        unit_id=unit.id,
+        version=next_version,
+        effective_from=body.effective_from,
+        usage_type=body.usage_type,
+        rooms_x100=body.rooms_x100,
+        amenities=list(dict.fromkeys(body.amenities)),
+        amenity_note=body.amenity_note,
+        evidence_ref=body.evidence_ref,
+    )
+    session.add(row)
+    session.flush()
+    return UnitDashboardWriteResponse(id=row.id)
+
+
+def _get_tenancy(session: PathAccountSession, tenancy_id: str) -> Tenancy:
+    tenancy = session.get(Tenancy, tenancy_id)
+    if tenancy is None:
+        raise HTTPException(status_code=404, detail="Tenancy not found")
+    _get_unit(session, tenancy.unit_id)
+    return tenancy
+
+
+def _require_tenancy_date(tenancy: Tenancy, value: date, field: str) -> None:
+    if value < tenancy.valid_from or (tenancy.valid_to is not None and value >= tenancy.valid_to):
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field} must fall within the tenancy period",
+        )
+
+
+@router.post("/tenancies/{tenancy_id}/contract-versions", status_code=201)
+def create_tenancy_contract_version(
+    account_id: str,
+    tenancy_id: str,
+    body: TenancyContractVersionCreate,
+    session: PathAccountSession,
+) -> UnitDashboardWriteResponse:
+    require_owner(session)
+    tenancy = _get_tenancy(session, tenancy_id)
+    _require_tenancy_date(tenancy, body.effective_from, "effective_from")
+    next_version = (
+        session.scalar(
+            select(func.max(TenancyContractVersion.version)).where(
+                TenancyContractVersion.tenancy_id == tenancy.id
+            )
+        )
+        or 0
+    ) + 1
+    row = TenancyContractVersion(
+        id=new_id(),
+        account_id=account_id,
+        tenancy_id=tenancy.id,
+        version=next_version,
+        effective_from=body.effective_from,
+        contract_type=body.contract_type,
+        evidence_ref=body.evidence_ref,
+    )
+    session.add(row)
+    session.flush()
+    return UnitDashboardWriteResponse(id=row.id)
+
+
+@router.post("/tenancies/{tenancy_id}/contract-positions", status_code=201)
+def create_tenancy_contract_position(
+    account_id: str,
+    tenancy_id: str,
+    body: TenancyContractPositionCreate,
+    session: PathAccountSession,
+) -> UnitDashboardWriteResponse:
+    require_owner(session)
+    tenancy = _get_tenancy(session, tenancy_id)
+    _require_tenancy_date(tenancy, body.valid_from, "valid_from")
+    if tenancy.valid_to is not None and (body.valid_to is None or body.valid_to > tenancy.valid_to):
+        raise HTTPException(
+            status_code=422,
+            detail="valid_to must not extend beyond the tenancy period",
+        )
+    row = TenancyContractPosition(
+        id=new_id(),
+        account_id=account_id,
+        tenancy_id=tenancy.id,
+        position_type=body.position_type,
+        inclusion_type=body.inclusion_type,
+        label=body.label,
+        monthly_amount_cents=body.monthly_amount_cents,
+        valid_from=body.valid_from,
+        valid_to=body.valid_to,
+        evidence_ref=body.evidence_ref,
+    )
+    session.add(row)
+    session.flush()
+    return UnitDashboardWriteResponse(id=row.id)
+
+
+@router.post("/tenancies/{tenancy_id}/rent-changes", status_code=201)
+def create_tenancy_rent_change(
+    account_id: str,
+    tenancy_id: str,
+    body: TenancyRentChangeCreate,
+    session: PathAccountSession,
+) -> UnitDashboardWriteResponse:
+    require_owner(session)
+    tenancy = _get_tenancy(session, tenancy_id)
+    _require_tenancy_date(tenancy, body.effective_from, "effective_from")
+    row = TenancyRentChange(
+        id=new_id(),
+        account_id=account_id,
+        tenancy_id=tenancy.id,
+        effective_from=body.effective_from,
+        new_base_rent_cents=body.new_base_rent_cents,
+        evidence_ref=body.evidence_ref,
+    )
+    session.add(row)
+    session.flush()
+    return UnitDashboardWriteResponse(id=row.id)
 
 
 @router.post("/units/{unit_id}/tenancies", status_code=201)

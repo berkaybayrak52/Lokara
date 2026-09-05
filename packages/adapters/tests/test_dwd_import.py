@@ -5,6 +5,7 @@ data-only oracle.  The annual PLZ climate factor is not the monthly ``hdd_3807``
 dataset; monthly parsing and station assignment belong to the next U3 sub-slice.
 """
 
+import socket
 from dataclasses import FrozenInstanceError, fields, replace
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -77,6 +78,7 @@ MONTHLY_ASSIGNMENT_TYPE: Any = getattr(dwd_adapter, "MonthlyStationAssignment", 
 PLZ_CENTROID_TYPE: Any = getattr(dwd_adapter, "PlzCentroid", object)
 PARSE_MONTHLY_ROWS: Any = getattr(dwd_adapter, "parse_monthly_degree_day_rows", None)
 ASSIGN_MONTHLY_STATION: Any = getattr(dwd_adapter, "assign_monthly_station", None)
+ASSIGN_MONTHLY_STATION_FOR_PLZ: Any = getattr(dwd_adapter, "assign_monthly_station_for_plz", None)
 MONTHLY_SOURCE_PATH_API: Any = getattr(dwd_adapter, "DWD_MONTHLY_SOURCE_PATH", None)
 MONTHLY_ATTRIBUTION_API: Any = getattr(dwd_adapter, "DWD_MONTHLY_ATTRIBUTION", None)
 
@@ -868,6 +870,56 @@ class TestU3bMonthlyStationAssignment:
         assert not hasattr(result, "label_de")
         with pytest.raises(FrozenInstanceError):
             result.station_id = "002"
+
+    def test_plz_entrypoint_uses_the_vendored_lookup_offline_and_preserves_explicit_compatibility(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        assert callable(ASSIGN_MONTHLY_STATION_FOR_PLZ), (
+            "U3 assign_monthly_station_for_plz entrypoint is missing"
+        )
+        target = self._records(
+            TARGET_MONTH,
+            _monthly_row(latitude="51.05754959999999", longitude="13.7170648"),
+        )
+        comparison = self._records(
+            COMPARISON_MONTH,
+            _monthly_row(
+                month=COMPARISON_MONTH,
+                latitude="51.05754959999999",
+                longitude="13.7170648",
+            ),
+        )
+        explicit_centroid = PLZ_CENTROID_TYPE(
+            plz="01067",
+            latitude=Decimal("51.05754959999999"),
+            longitude=Decimal("13.7170648"),
+            dataset_identity="WZBSocialScienceCenter/plz_geocoord",
+            dataset_version="2019-01",
+        )
+        explicit = ASSIGN_MONTHLY_STATION(
+            centroid=explicit_centroid,
+            target_month=TARGET_MONTH,
+            comparison_month=COMPARISON_MONTH,
+            target_records=target,
+            comparison_records=comparison,
+        )
+
+        def refuse_network(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("PLZ assignment must not open a network connection")
+
+        monkeypatch.setattr(socket, "create_connection", refuse_network)
+        resolved = ASSIGN_MONTHLY_STATION_FOR_PLZ(
+            plz="01067",
+            target_month=TARGET_MONTH,
+            comparison_month=COMPARISON_MONTH,
+            target_records=target,
+            comparison_records=comparison,
+        )
+
+        assert resolved == explicit
+        assert resolved.centroid_dataset_identity == "WZBSocialScienceCenter/plz_geocoord"
+        assert resolved.centroid_dataset_version == "2019-01"
 
     def test_nearest_station_invalid_in_comparison_month_walks_to_next_common_station(
         self,

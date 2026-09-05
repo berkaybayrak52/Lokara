@@ -165,14 +165,17 @@ die Implementierung gegen den dann aktuellen Repo-Stand.
   `calibration_valid_until = null` bedeutet pauschal „nicht eichpflichtig“ und kann fehlende Daten nicht
   abbilden.
 - **Soll:** Einen expliziten Gerätetyp als Backend-Stammdatum einführen: Wärmemengenzähler,
-  Heizkostenverteiler, Warmwasserzähler oder Kaltwasserzähler. Medium und erlaubte Maßeinheit werden
+  Heizkostenverteiler, Warmwasserzähler, Kaltwasserzähler oder Gaszähler. Medium und erlaubte Maßeinheit werden
   serverseitig aus diesem Typ validiert. Ergänzen: genauer Einbauort/Bezeichnung, Einbaudatum,
   Fernablesestatus `REMOTE_READABLE | NOT_REMOTE_READABLE | UNKNOWN`, Eichdatenzustand aus [Z9] und
   Lifecycle-Felder aus [Z6]. Bestehende Zähler migrationssicher anhand ihrer bisherigen Art und
   Maßeinheit zuordnen; mehrdeutige Bestandsdaten als prüfbedürftig kennzeichnen, nicht raten.
-- **Default:** Anzeigenamen „Wärmemengenzähler“, „Heizkostenverteiler“, „Warmwasserzähler“ und
-  „Kaltwasserzähler“. Zuordnung: Wärmemengenzähler → kWh; Heizkostenverteiler → Verbrauchseinheiten;
-  Warm-/Kaltwasserzähler → m³. Bewertungsfaktor nur für Heizkostenverteiler beziehungsweise fachlich
+- **Default:** Anzeigenamen „Wärmemengenzähler“, „Heizkostenverteiler“, „Warmwasserzähler“,
+  „Kaltwasserzähler“ und „Gaszähler“. Zuordnung: Wärmemengenzähler → kWh; Heizkostenverteiler →
+  Verbrauchseinheiten; Warm-/Kaltwasserzähler → m³; Gaszähler → Wärme in m³. Gaszähler sind
+  ausschließlich für Erdgas vorgesehen. Ihre Umrechnung in kWh verwendet den versionierten Brennwert
+  × die versionierte Zustandszahl aus der Versorgerabrechnung; beide Werte, Gültigkeitszeitraum und
+  Quelle bleiben in der UVI-Provenienz sichtbar. Bewertungsfaktor nur für Heizkostenverteiler beziehungsweise fachlich
   dafür freigegebene Wärmegeräte zulassen. API-Feldnamen folgen der vorhandenen snake_case/camelCase-
   Konvention.
 - **Erwartetes Ergebnis:** Das UI bezeichnet einen Heizkostenverteiler nie mehr nur als „Wärme“.
@@ -181,8 +184,9 @@ die Implementierung gegen den dann aktuellen Repo-Stand.
   eichpflichtig“ unterscheidbar.
 - **Akzeptanz:** Jeder neue Zähler besitzt einen expliziten Gerätetyp. Unzulässige Typ-/Einheiten-
   Kombinationen werden am API-Rand abgelehnt. Bestehende Demo-HKV erscheinen als
-  „Heizkostenverteiler“, der zentrale kWh-Zähler als „Wärmemengenzähler“. Migration und Downgrade sind
-  getestet.
+  „Heizkostenverteiler“, der zentrale kWh-Zähler als „Wärmemengenzähler“. Zusätzlich ist genau
+  `GAS_METER + HEAT + CUBIC_METRE` zulässig; Gaszähler mit Warm-/Kaltwasser oder kWh bleiben
+  unzulässig. Migration und Downgrade sind getestet.
 - **Nicht tun:** Bestehende Engine-Enums ungeprüft ersetzen; aus „fernablesbar“ einen Gerätetyp machen;
   unklare Bestandszeilen still als „nicht eichpflichtig“ einstufen.
 
@@ -204,11 +208,14 @@ die Implementierung gegen den dann aktuellen Repo-Stand.
   - **Zuordnung:** Objekt als Pflichtauswahl; `objektId` vorbelegen. Auswahl „Gebäude/Heizungsanlage“
     oder „Einheit“. Bei Einheit anschließend Pflichtauswahl der Einheit. Feld „Einbauort/Raum
     (optional)“, Beispiel „Wohnzimmer“ oder „Heizzentrale“.
-  - **Gerätetyp:** vier Auswahlkacheln aus [Z4], genau eine. Nach Wahl die feste Maßeinheit lesbar
+  - **Gerätetyp:** fünf Auswahlkacheln aus [Z4], genau eine. Nach Wahl die feste Maßeinheit lesbar
     anzeigen, aber nicht als frei kombinierbares Feld anbieten.
   - **Gerätedaten:** Zählernummer Pflicht; „Eigene Bezeichnung (optional)“; Hersteller und Modell
     optional; Einbaudatum Pflicht. Bewertungsfaktor nur zeigen, wenn der Gerätetyp ihn fachlich nutzt;
-    Hilfetext „Bitte vom Gerät oder Messdienstleister übernehmen.“
+    Hilfetext „Bitte vom Gerät oder Messdienstleister übernehmen."
+  - **Gasumrechnung:** Bei „Gaszähler“ Brennwert (kWh/m³), Zustandszahl, Gültigkeitsbeginn,
+    optionales Gültigkeitsende und die Beleg-/Rechnungsreferenz als Pflichtangaben zeigen. Kein Wert
+    wird hartkodiert oder geschätzt. Die Werte werden als append-only Gebäudekonfiguration versioniert.
   - **Fernablesbarkeit:** Pflichtauswahl „Fernablesbar“, „Nicht fernablesbar“, „Unbekannt“. Bei
     „Fernablesbar“ ausschließlich den ehrlichen Hinweis aus [Z10], keine Verbindungsfelder.
   - **Eichangaben:** Pflichtauswahl „Eichpflichtig – Eichdaten vorhanden“, „Eichpflichtig – Eichdaten
@@ -571,8 +578,8 @@ die Implementierung gegen den dann aktuellen Repo-Stand.
 - Neuimplementierung der Heizkosten-, CO₂- oder Statement-Engines und Änderung bestehender Goldenwerte.
 - Allgemeiner Objekt-Dashboard-Umbau, globale Reminder-Sidebar und der Desktop-App-Shell-Refactor aus
   `09_App-Shell-Desktop.md`.
-- Strom- und Gaszähler; das Datenmodell soll erweiterbar bleiben, aber diese Gerätetypen werden in
-  dieser Runde nicht angeboten.
+- Stromzähler. Gaszähler sind durch die Entscheidung vom 28.08.2026 als fünfter Typ aufgenommen;
+  Öl und Pellets bleiben Brennstofflieferungen und sind keine Gaszähler-Medien.
 
 ## Verifikation
 

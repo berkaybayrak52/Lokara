@@ -7,27 +7,37 @@ and the immutable payment-ledger list. The calculation lives in
 orchestration in `matching_service`; this router enforces the HTTP boundary and
 owner authorization without copying those rules.
 
-The C3b job entrypoints and C3c landlord Zahlungen screen remain future work.
+UI-07 adds the server-owned payment workspace and append-only ignore history on
+top of those shipped M6 contracts. Source-blocked manual-payment and recurring-
+receivable rules remain inactive.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from lokara_adapters import StubBankGateway
 from lokara_db import (
     BankAccount,
     BankTransaction,
+    BankTransactionClassificationEvent,
+    Building,
+    MatchConfirmation,
+    MatchProposal,
+    PaymentAllocation,
+    PaymentLedgerEntry,
     Receivable,
+    Renter,
     Statement,
     StatementSettlement,
     StatementStatus,
     Tenancy,
     TenancyParty,
+    Unit,
     new_id,
 )
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from ..auth import AuthContext, require_auth
 from ..authorization import require_owner
@@ -136,6 +146,80 @@ class MatchingDecisionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     outcome: Literal["confirmed", "rejected", "duplicate"]
+
+
+class ClassificationIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["ignored", "restored"]
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class BulkClassificationIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transaction_ids: list[str] = Field(min_length=1, max_length=50)
+    action: Literal["ignored", "restored"]
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class PaymentAccountOut(BaseModel):
+    id: str
+    display_name: str
+    masked_iban: str
+    provider_label: str
+    consent_status: Literal["active", "expiring", "reconnect"]
+    consent_expires_at: datetime | None
+    last_sync_at: datetime | None
+    sync_status: Literal["idle", "running", "failed"]
+
+
+class PaymentAccountListOut(BaseModel):
+    accounts: list[PaymentAccountOut]
+
+
+class PaymentWorkspaceHistoryOut(BaseModel):
+    kind: str
+    label: str
+    actor_person_id: str | None
+    created_at: datetime
+
+
+class PaymentWorkspaceRowOut(BaseModel):
+    id: str
+    bank_account_id: str
+    account_label: str
+    amount_cents: int
+    direction: Literal["incoming", "outgoing"]
+    booking_date: date
+    value_date: date
+    counterpart_name: str | None
+    counterpart_iban_masked: str | None
+    purpose: str | None
+    source_label: str
+    status: Literal["unassigned", "review", "assigned", "partial", "ignored"]
+    status_label: str
+    ignored: bool
+    assignment_label: str | None
+    receivable_id: str | None
+    tenancy_id: str | None
+    building_id: str | None
+    building_name: str | None
+    unit_label: str | None
+    renter_name: str | None
+    expected_cents: int | None
+    open_cents: int | None
+    confidence: int | None
+    match_reason_de: str | None
+    available_actions: list[str]
+    history: list[PaymentWorkspaceHistoryOut]
+
+
+class PaymentWorkspaceOut(BaseModel):
+    rows: list[PaymentWorkspaceRowOut]
+    next_cursor: str | None
+    counts: dict[str, int]
+    total: int
 
 
 def _matching_http_error(error: Exception) -> HTTPException:
@@ -376,6 +460,401 @@ def list_bank_transactions(session: PathAccountSession) -> BankTransactionListOu
             for r in rows
         ]
     )
+
+
+def _masked_iban(value: str | None) -> str | None:
+    if not value:
+        return None
+    compact = "".join(value.split())
+    return f"•••• {compact[-4:]}" if len(compact) >= 4 else "••••"
+
+
+@router.get("/payment-workspace/accounts")
+def payment_workspace_accounts(session: PathAccountSession) -> PaymentAccountListOut:
+    require_owner(session)
+    now = datetime.now(UTC)
+    accounts = session.scalars(select(BankAccount).order_by(BankAccount.display_name)).all()
+    return PaymentAccountListOut(
+        accounts=[
+            PaymentAccountOut(
+                id=row.id,
+                display_name=row.display_name,
+                masked_iban=_masked_iban(row.normalized_iban) or "••••",
+                provider_label="Demo-Bank" if row.provider.endswith("stub") else row.provider,
+                consent_status=(
+                    "reconnect"
+                    if row.consent_expires_at is None or row.consent_expires_at <= now
+                    else "expiring"
+                    if row.consent_expires_at <= now + timedelta(days=14)
+                    else "active"
+                ),
+                consent_expires_at=row.consent_expires_at,
+                # The current bank model has no persisted job-run projection.
+                # Absence remains null/idle instead of a fabricated timestamp.
+                last_sync_at=None,
+                sync_status="idle",
+            )
+            for row in accounts
+        ]
+    )
+
+
+def _workspace_rows(
+    session: PathAccountSession,
+    *,
+    bank_account_id: str | None,
+    direction: Literal["all", "incoming", "outgoing"],
+    search: str | None,
+    date_from: date,
+    date_to: date,
+) -> list[PaymentWorkspaceRowOut]:
+    query = select(BankTransaction).where(
+        BankTransaction.bank_booking_date >= date_from,
+        BankTransaction.bank_booking_date <= date_to,
+    )
+    if bank_account_id is not None:
+        query = query.where(BankTransaction.bank_account_id == bank_account_id)
+    if direction == "incoming":
+        query = query.where(BankTransaction.amount_cents >= 0)
+    elif direction == "outgoing":
+        query = query.where(BankTransaction.amount_cents < 0)
+    if search:
+        needle = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                BankTransaction.counterpart_name.ilike(needle),
+                BankTransaction.purpose.ilike(needle),
+            )
+        )
+    transactions = session.scalars(
+        query.order_by(BankTransaction.bank_booking_date.desc(), BankTransaction.id.desc())
+    ).all()
+    if not transactions:
+        return []
+
+    transaction_ids = [row.id for row in transactions]
+    accounts = {
+        row.id: row
+        for row in session.scalars(
+            select(BankAccount).where(
+                BankAccount.id.in_({row.bank_account_id for row in transactions})
+            )
+        ).all()
+    }
+    proposals = session.scalars(
+        select(MatchProposal)
+        .where(MatchProposal.bank_transaction_id.in_(transaction_ids))
+        .order_by(MatchProposal.bank_transaction_id, MatchProposal.rank)
+    ).all()
+    proposal_by_transaction: dict[str, MatchProposal] = {}
+    for proposal_row in proposals:
+        proposal_by_transaction.setdefault(proposal_row.bank_transaction_id, proposal_row)
+    proposal_ids = [row.id for row in proposals]
+    confirmations = {
+        row.match_proposal_id: row
+        for row in session.scalars(
+            select(MatchConfirmation).where(MatchConfirmation.match_proposal_id.in_(proposal_ids))
+        ).all()
+    }
+    ledger_rows = session.scalars(
+        select(PaymentLedgerEntry).where(
+            PaymentLedgerEntry.bank_transaction_id.in_(transaction_ids)
+        )
+    ).all()
+    ledger_by_transaction = {row.bank_transaction_id: row for row in ledger_rows}
+    ledger_ids = [row.id for row in ledger_rows]
+    allocations = session.scalars(
+        select(PaymentAllocation).where(PaymentAllocation.ledger_entry_id.in_(ledger_ids))
+    ).all()
+    allocation_by_ledger: dict[str, PaymentAllocation] = {}
+    for allocation_row in allocations:
+        allocation_by_ledger.setdefault(allocation_row.ledger_entry_id, allocation_row)
+
+    receivable_ids = {row.receivable_id for row in proposals if row.receivable_id is not None} | {
+        row.receivable_id for row in allocations
+    }
+    receivables = {
+        row.id: row
+        for row in session.scalars(
+            select(Receivable).where(Receivable.id.in_(receivable_ids))
+        ).all()
+    }
+    tenancy_ids = {row.tenancy_id for row in receivables.values()}
+    tenancy_context = {
+        tenancy.id: (tenancy, unit, building)
+        for tenancy, unit, building in session.execute(
+            select(Tenancy, Unit, Building)
+            .join(Unit, and_(Unit.id == Tenancy.unit_id, Unit.account_id == Tenancy.account_id))
+            .join(
+                Building,
+                and_(Building.id == Unit.building_id, Building.account_id == Unit.account_id),
+            )
+            .where(Tenancy.id.in_(tenancy_ids))
+        ).all()
+    }
+    renter_ids = {row.renter_id for row in receivables.values()}
+    renters = {
+        row.id: row
+        for row in session.scalars(select(Renter).where(Renter.id.in_(renter_ids))).all()
+    }
+    classification_rows = session.scalars(
+        select(BankTransactionClassificationEvent)
+        .where(BankTransactionClassificationEvent.bank_transaction_id.in_(transaction_ids))
+        .order_by(
+            BankTransactionClassificationEvent.created_at,
+            BankTransactionClassificationEvent.id,
+        )
+    ).all()
+    classification_by_transaction: dict[str, list[BankTransactionClassificationEvent]] = {}
+    for event in classification_rows:
+        classification_by_transaction.setdefault(event.bank_transaction_id, []).append(event)
+
+    result: list[PaymentWorkspaceRowOut] = []
+    for transaction in transactions:
+        proposal = proposal_by_transaction.get(transaction.id)
+        ledger = ledger_by_transaction.get(transaction.id)
+        allocation = allocation_by_ledger.get(ledger.id) if ledger is not None else None
+        receivable_id = (
+            allocation.receivable_id
+            if allocation is not None
+            else proposal.receivable_id
+            if proposal is not None
+            else None
+        )
+        receivable = receivables.get(receivable_id) if receivable_id is not None else None
+        events = classification_by_transaction.get(transaction.id, [])
+        ignored = bool(events and events[-1].action == "IGNORED")
+        if ignored:
+            status = "ignored"
+            status_label = "Ignoriert"
+        elif ledger is not None and allocation is not None and allocation.after_status == "partial":
+            status = "partial"
+            status_label = "Teilweise"
+        elif ledger is not None:
+            status = "assigned"
+            status_label = "Zugeordnet"
+        elif proposal is not None and proposal.decision == "NEEDS_REVIEW":
+            status = "review"
+            status_label = "Prüfen"
+        else:
+            status = "unassigned"
+            status_label = "Nicht zugeordnet"
+        context = tenancy_context.get(receivable.tenancy_id) if receivable is not None else None
+        renter = renters.get(receivable.renter_id) if receivable is not None else None
+        account = accounts.get(transaction.bank_account_id)
+        history = [
+            PaymentWorkspaceHistoryOut(
+                kind=event.action.lower(),
+                label=(
+                    f"Ignoriert · {event.reason}"
+                    if event.action == "IGNORED" and event.reason
+                    else "Ignoriert"
+                    if event.action == "IGNORED"
+                    else "Ignorieren aufgehoben"
+                ),
+                actor_person_id=event.actor_person_id,
+                created_at=event.created_at,
+            )
+            for event in events
+        ]
+        if proposal is not None:
+            confirmation = confirmations.get(proposal.id)
+            history.insert(
+                0,
+                PaymentWorkspaceHistoryOut(
+                    kind="matching",
+                    label=(
+                        f"Zuordnungsvorschlag · {proposal.reason_de}"
+                        if proposal.reason_de
+                        else "Zuordnungsvorschlag erstellt"
+                    ),
+                    actor_person_id=(confirmation.confirmed_by if confirmation else None),
+                    created_at=proposal.created_at,
+                ),
+            )
+        assignment_label = None
+        if receivable is not None:
+            assignment_label = " · ".join(
+                part
+                for part in (
+                    renter.legal_name if renter is not None else None,
+                    context[1].label if context is not None else None,
+                    receivable.period,
+                )
+                if part
+            )
+        result.append(
+            PaymentWorkspaceRowOut(
+                id=transaction.id,
+                bank_account_id=transaction.bank_account_id,
+                account_label=account.display_name if account else "Bankkonto",
+                amount_cents=transaction.amount_cents,
+                direction="incoming" if transaction.amount_cents >= 0 else "outgoing",
+                booking_date=transaction.bank_booking_date,
+                value_date=transaction.value_date,
+                counterpart_name=transaction.counterpart_name,
+                counterpart_iban_masked=_masked_iban(transaction.counterpart_iban),
+                purpose=transaction.purpose,
+                source_label=(
+                    "Demo-Bank" if account and account.provider.endswith("stub") else "Bank"
+                ),
+                status=status,  # type: ignore[arg-type]
+                status_label=status_label,
+                ignored=ignored,
+                assignment_label=assignment_label,
+                receivable_id=receivable.id if receivable else None,
+                tenancy_id=receivable.tenancy_id if receivable else None,
+                building_id=context[2].id if context else None,
+                building_name=context[2].name if context else None,
+                unit_label=context[1].label if context else None,
+                renter_name=renter.legal_name if renter else None,
+                expected_cents=receivable.expected_cents if receivable else None,
+                open_cents=receivable.open_cents if receivable else None,
+                confidence=proposal.confidence if proposal else None,
+                match_reason_de=proposal.reason_de if proposal else None,
+                available_actions=(
+                    ["restore"] if ignored else [] if ledger is not None else ["ignore", "assign"]
+                ),
+                history=history,
+            )
+        )
+    return result
+
+
+@router.get("/payment-workspace/transactions")
+def payment_workspace_transactions(
+    session: PathAccountSession,
+    cursor: Annotated[str | None, Query()] = None,
+    status: Annotated[
+        Literal["all", "unassigned", "review", "assigned", "partial", "ignored"], Query()
+    ] = "all",
+    bank_account_id: Annotated[str | None, Query()] = None,
+    direction: Annotated[Literal["all", "incoming", "outgoing"], Query()] = "all",
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 50,
+) -> PaymentWorkspaceOut:
+    require_owner(session)
+    today = date.today()
+    rows = _workspace_rows(
+        session,
+        bank_account_id=bank_account_id,
+        direction=direction,
+        search=search,
+        date_from=date_from or today - timedelta(days=100),
+        date_to=date_to or today,
+    )
+    counts = {key: 0 for key in ("all", "unassigned", "review", "assigned", "partial", "ignored")}
+    for row in rows:
+        counts["all"] += 1
+        counts[row.status] += 1
+    filtered = rows if status == "all" else [row for row in rows if row.status == status]
+    start = 0
+    if cursor is not None:
+        start = next((index + 1 for index, row in enumerate(filtered) if row.id == cursor), 0)
+    page = filtered[start : start + limit]
+    next_cursor = page[-1].id if start + limit < len(filtered) and page else None
+    return PaymentWorkspaceOut(
+        rows=page, next_cursor=next_cursor, counts=counts, total=len(filtered)
+    )
+
+
+@router.post("/bank-transactions/{transaction_id}/classification")
+def classify_bank_transaction(
+    transaction_id: str,
+    body: ClassificationIn,
+    session: PathAccountSession,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+) -> dict[str, object]:
+    require_owner(session)
+    return _append_classification(
+        session,
+        transaction_id=transaction_id,
+        action=body.action,
+        reason=body.reason,
+        actor_person_id=auth.person_id,
+    )
+
+
+def _append_classification(
+    session: PathAccountSession,
+    *,
+    transaction_id: str,
+    action: Literal["ignored", "restored"],
+    reason: str | None,
+    actor_person_id: str,
+) -> dict[str, object]:
+    transaction = session.get(BankTransaction, transaction_id)
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Bankumsatz nicht gefunden")
+    if (
+        session.scalar(
+            select(PaymentLedgerEntry.id).where(
+                PaymentLedgerEntry.bank_transaction_id == transaction_id
+            )
+        )
+        is not None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Ein bereits gebuchter Zahlungsnachweis kann nicht ignoriert werden.",
+        )
+    latest = session.scalar(
+        select(BankTransactionClassificationEvent)
+        .where(BankTransactionClassificationEvent.bank_transaction_id == transaction_id)
+        .order_by(
+            BankTransactionClassificationEvent.created_at.desc(),
+            BankTransactionClassificationEvent.id.desc(),
+        )
+        .limit(1)
+    )
+    requested = "IGNORED" if action == "ignored" else "RESTORED"
+    if latest is not None and latest.action == requested:
+        raise HTTPException(status_code=409, detail="Diese Klassifizierung ist bereits aktiv.")
+    if requested == "RESTORED" and (latest is None or latest.action != "IGNORED"):
+        raise HTTPException(status_code=409, detail="Dieser Umsatz ist nicht ignoriert.")
+    event = BankTransactionClassificationEvent(
+        id=new_id(),
+        account_id=transaction.account_id,
+        bank_transaction_id=transaction.id,
+        action=requested,
+        reason=reason,
+        actor_person_id=actor_person_id,
+    )
+    session.add(event)
+    session.flush()
+    return {"id": event.id, "transaction_id": transaction.id, "action": action}
+
+
+@router.post("/bank-transactions/classification/bulk")
+def bulk_classify_bank_transactions(
+    body: BulkClassificationIn,
+    session: PathAccountSession,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+) -> dict[str, object]:
+    require_owner(session)
+    results: list[dict[str, object]] = []
+    for transaction_id in dict.fromkeys(body.transaction_ids):
+        try:
+            result = _append_classification(
+                session,
+                transaction_id=transaction_id,
+                action=body.action,
+                reason=body.reason,
+                actor_person_id=auth.person_id,
+            )
+        except HTTPException as error:
+            results.append(
+                {
+                    "transaction_id": transaction_id,
+                    "ok": False,
+                    "detail": error.detail,
+                }
+            )
+        else:
+            results.append({**result, "ok": True, "detail": None})
+    return {"results": results}
 
 
 @router.put("/renters/{renter_id}/matching-profile")

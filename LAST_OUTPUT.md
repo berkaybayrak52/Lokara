@@ -1,16 +1,16 @@
-# Last output — Portfolio- und UI-05A-Checkpoints
+# Last output — M9 checkpoint commit authorized
 
-HEAD `b9ba8d1` on `development` · `27.08.2026`
-Status: Partial
+HEAD `edb7008` on `development` · `05.09.2026`
+Status: Complete
 
 ## Wanted
-Preserve the remaining portfolio work and stabilized UI-05A as separate local checkpoints.
+Create the approved local M9/UVI/portfolio checkpoint commit on `development`.
 
 ## Done
-The portfolio/demo support and UI-05A are separated. UI-05A includes migration `0028`, resumable drafts, readiness, previews, immutable archives and corrections. Finalization requires the current draft version, and M9 accepts only tenant statements as annual-statement sources. Ruff, strict mypy, web lint, typecheck and production build pass. Web/API run on ports 3000/3001.
+Full and non-fresh demo gates pass: 1967 Python tests, zero skips; 188 web tests. Database `0040`, RLS/FK checks and prior boundary/statement reviews are clean. Documentation drift is reconciled. Ordinary PDF unchanged: `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes.
 
 ## Not done
-No tests, gates, reviewer agents or interactive browser accessibility matrix ran under direct mode. Chrome browser control remains unavailable until its ChatGPT extension is installed or enabled. Nothing was pushed or promoted to `main`.
+Emir approved the local commit; commit creation is in progress. Production/legal blockers, partial UI-07 scope and the portfolio live-browser acceptance remain open.
 
 ## Optional next step
-Start UI-05B, the unit dashboard.
+None; promotion, push and M10 implementation require separate direction.

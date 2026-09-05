@@ -9,8 +9,14 @@ feeds the bytes back through `parse_nominatim_payload`.
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from typing import Final, Protocol, cast
+
+from lokara_rules_store import (
+    PlzGeocoordLookupError as PlzGeocoordLookupError,
+)
+from lokara_rules_store import lookup_plz_geocoord
 
 NOMINATIM_PUBLIC_ENDPOINT: Final = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_PUBLIC_HOST: Final = "nominatim.openstreetmap.org"
@@ -19,6 +25,7 @@ NOMINATIM_DEFAULT_CONTACT: Final = "kontakt@lokara.de"
 # instance, and a User-Agent that identifies the caller.
 NOMINATIM_MIN_SECONDS_BETWEEN_REQUESTS: Final = 1.0
 NOMINATIM_MAX_RESPONSE_BYTES: Final = 65_536
+_GERMAN_PLZ_IN_ADDRESS: Final = re.compile(r"(?<![0-9])([0-9]{5})(?![0-9])")
 
 
 @dataclass(frozen=True)
@@ -39,6 +46,22 @@ class DisabledGeocodingGateway:
     def geocode(self, address: str) -> GeocodingResult | None:
         del address
         return None
+
+
+class PlzGeocodingGateway:
+    """Resolve exactly one German PLZ through the pinned offline centroid data."""
+
+    def geocode(self, address: str) -> GeocodingResult:
+        matches = _GERMAN_PLZ_IN_ADDRESS.findall(address)
+        if len(matches) != 1:
+            raise PlzGeocoordLookupError(
+                "invalid address: expected exactly one five-digit German PLZ"
+            )
+        coordinate = lookup_plz_geocoord(matches[0])
+        return GeocodingResult(
+            latitude=float(coordinate.latitude),
+            longitude=float(coordinate.longitude),
+        )
 
 
 def nominatim_query_params(address: str) -> dict[str, str]:

@@ -18,11 +18,14 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from lokara_adapters.geocoding import GeocodingResult
 from lokara_api import create_app
+from lokara_api.authorization import PortalScope
+from lokara_api.deps import account_session_for_path
 from lokara_api.routers import buildings as buildings_router
 from lokara_api.schemas import BuildingCreate, BuildingSummary
 from lokara_api.settings import ApiSettings
-from lokara_db import Account, DbSettings, Membership, Person, Role, create_db_engine
+from lokara_db import Account, Building, DbSettings, Membership, Person, Role, create_db_engine
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
 from pydantic import ValidationError
 from sqlalchemy import text
@@ -101,6 +104,42 @@ def _building_payload(**overrides: object) -> dict[str, object]:
     return payload
 
 
+class _RecordingBuildingSession:
+    """Small route-boundary double; these PLZ fixtures never open Postgres."""
+
+    def __init__(self) -> None:
+        self.info = {
+            "portal_scope": PortalScope(
+                role=Role.OWNER,
+                building_ids=frozenset(),
+                membership_id="mem_plz_fixture",
+            )
+        }
+        self.added: list[Building] = []
+
+    def add(self, building: Building) -> None:
+        self.added.append(building)
+
+    def flush(self) -> None:
+        pass
+
+
+@pytest.fixture
+def offline_building_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, FastAPI, _RecordingBuildingSession]]:
+    monkeypatch.setenv("GEOCODING_ENABLED", "false")
+    buildings_router.get_geocoding_gateway.cache_clear()
+    app = create_app()
+    session = _RecordingBuildingSession()
+    app.dependency_overrides[account_session_for_path] = lambda: session
+    try:
+        with TestClient(app) as test_client:
+            yield test_client, app, session
+    finally:
+        buildings_router.get_geocoding_gateway.cache_clear()
+
+
 class TestBuildingContracts:
     @pytest.mark.parametrize("missing", ["buildingType", "isResidential", "houseNumber"])
     def test_create_schema_requires_ui03_fields(self, missing: str) -> None:
@@ -158,8 +197,8 @@ class TestCreateChain:
         assert body["name"] == "Testgasse 5"
         assert body["street"] == "Testgasse 5"
         assert body["buildingType"] == "WOHNHAUS"
-        assert body["latitude"] is None
-        assert body["longitude"] is None
+        assert body["latitude"] == 50.11539440000001
+        assert body["longitude"] == 8.680582099999999
         assert body["unitCount"] == 0
         TestCreateChain.building_id = body["id"]
 
@@ -337,6 +376,81 @@ class TestIsolation:
             headers=_token(ISO_PERSON_ID),
         )
         assert response.status_code == 404
+
+
+class TestOfflinePlzBuildingBoundary:
+    def test_default_known_plz_stores_vendored_centroid_without_network(
+        self,
+        offline_building_client: tuple[TestClient, FastAPI, _RecordingBuildingSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        client, _app, session = offline_building_client
+
+        def reject_network(*args: object, **kwargs: object) -> None:
+            del args, kwargs
+            pytest.fail("default PLZ lookup must not call Nominatim")
+
+        monkeypatch.setattr("lokara_api.geocoding_http.urlopen", reject_network)
+        response = client.post(
+            f"{BASE}/buildings",
+            json=_building_payload(name="Offline-PLZ-Haus"),
+        )
+
+        assert response.status_code == 201, response.text
+        assert len(session.added) == 1
+        building = session.added[0]
+        expected = (50.11539440000001, 8.680582099999999)
+        assert (building.latitude, building.longitude) == expected
+        assert (response.json()["latitude"], response.json()["longitude"]) == expected
+
+    def test_default_unknown_five_digit_plz_is_422_and_writes_nothing(
+        self,
+        offline_building_client: tuple[TestClient, FastAPI, _RecordingBuildingSession],
+    ) -> None:
+        client, _app, session = offline_building_client
+        response = client.post(
+            f"{BASE}/buildings",
+            json=_building_payload(
+                name="Unbekannte PLZ",
+                postalCode="00000",
+            ),
+        )
+
+        assert response.status_code == 422, response.text
+        assert "00000" in response.json()["detail"]
+        assert session.added == []
+
+    def test_explicit_custom_geocoding_gateway_override_remains_compatible(
+        self,
+        offline_building_client: tuple[TestClient, FastAPI, _RecordingBuildingSession],
+    ) -> None:
+        client, app, session = offline_building_client
+
+        class CustomGateway:
+            address: str | None = None
+
+            def geocode(self, address: str) -> GeocodingResult:
+                self.address = address
+                return GeocodingResult(latitude=48.137154, longitude=11.576124)
+
+        custom_gateway = CustomGateway()
+        app.dependency_overrides[buildings_router.get_geocoding_gateway] = lambda: custom_gateway
+        response = client.post(
+            f"{BASE}/buildings",
+            json=_building_payload(
+                name="Explizites Gateway",
+                street="Gatewayweg",
+                houseNumber="9",
+            ),
+        )
+
+        assert response.status_code == 201, response.text
+        assert custom_gateway.address == ("Gatewayweg 9, 60313 Frankfurt am Main, Deutschland")
+        assert len(session.added) == 1
+        assert (session.added[0].latitude, session.added[0].longitude) == (
+            48.137154,
+            11.576124,
+        )
 
 
 class TestGeocodingBoundary:

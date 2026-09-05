@@ -23,6 +23,7 @@ members = [
 [dependency-groups]
 dev = [
   "pytest>=8.3",
+  "pypdf",
   "mypy>=1.14",
   "ruff>=0.9",
   "lokara-api",

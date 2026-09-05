@@ -58,6 +58,7 @@ from ..statement_service import (
     project_statement,
     to_pdf_data,
 )
+from ..time import berlin_today
 from .demo import summary_response
 
 router = APIRouter(prefix="/a/{account_id}")
@@ -74,7 +75,7 @@ def summary(account_id: str, session: PathAccountSession) -> DemoSummaryResponse
 
 @router.get("/portfolio/overview")
 def portfolio_overview(account_id: str, session: PathAccountSession) -> PortfolioOverviewResponse:
-    today = date.today()
+    today = berlin_today()
     active_tenancy = and_(
         Tenancy.account_id == Unit.account_id,
         Tenancy.unit_id == Unit.id,

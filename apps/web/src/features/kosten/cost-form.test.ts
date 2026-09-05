@@ -4,8 +4,10 @@ import { CostFormSchema, EMPTY_COST_FORM, toCostCreateInput } from './cost-form'
 
 const valid = {
   ...EMPTY_COST_FORM,
+  catalogueId: 'muellabfuhr',
   label: 'Müllabfuhr',
   amount: '1.200,00',
+  key: 'AREA' as const,
 };
 
 describe('CostFormSchema', () => {
@@ -25,8 +27,8 @@ describe('CostFormSchema', () => {
     expect(CostFormSchema.safeParse({ ...valid, amount: '' }).success).toBe(false);
   });
 
-  it('rejects an empty label', () => {
-    expect(CostFormSchema.safeParse({ ...valid, label: '' }).success).toBe(false);
+  it('accepts an empty optional label', () => {
+    expect(CostFormSchema.safeParse({ ...valid, label: '' }).success).toBe(true);
   });
 
   it('rejects a period that ends before it starts', () => {
@@ -56,6 +58,7 @@ describe('the Beleg review step and Kosten erfassen share one contract', () => {
     // could write something the manual form would have refused.
     const fromExtraction = {
       ...EMPTY_COST_FORM,
+      catalogueId: 'muellabfuhr',
       label: 'Müllabfuhr',
       amount: '1200,00',
       periodFrom: '2025-01-01',
@@ -64,11 +67,12 @@ describe('the Beleg review step and Kosten erfassen share one contract', () => {
     };
     expect(CostFormSchema.safeParse(fromExtraction).success).toBe(true);
     expect(toCostCreateInput(fromExtraction)).toEqual({
+      catalogueId: 'muellabfuhr',
       label: 'Müllabfuhr',
       amountCents: 120000,
       periodFrom: '2025-01-01',
       periodTo: '2026-01-01',
-      key: 'AREA',
+      keyOverride: undefined,
       directUnitId: undefined,
     });
   });

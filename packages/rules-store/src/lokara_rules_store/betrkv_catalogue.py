@@ -312,6 +312,15 @@ def resolve_rule(cost_type: str, as_of: date) -> ResolvedRule[CatalogueRule]:
     return get_rule(CATALOGUE.get(cost_type, CATALOGUE["sonstige"]), as_of)
 
 
+def list_catalogue(as_of: date) -> tuple[CatalogueRule, ...]:
+    """Return the server-owned catalogue as it applies on one date.
+
+    Clients may display these facts, but they never reconstruct or hard-code
+    the legal catalogue themselves.
+    """
+    return tuple(resolve_rule(cost_type, as_of).value for cost_type in sorted(CATALOGUE))
+
+
 def classify_position(position: CataloguePosition, contract: ContractFacts) -> ClassificationResult:
     # Credits are valid, but their declared non-allocable component still
     # cannot reverse past their absolute source amount.

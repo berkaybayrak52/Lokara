@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal, cast
 
 from lokara_db import (
     AdvancePaymentPeriod,
@@ -30,6 +31,7 @@ from lokara_db import (
     Tenancy,
     TenancyParty,
     Unit,
+    UnitProfileVersion,
 )
 from lokara_domain import cents, format_eur
 from lokara_pdf import (
@@ -53,6 +55,7 @@ from .schemas import (
     BuildingDashboardPermissions,
     BuildingDashboardResponse,
     BuildingDashboardUnit,
+    BuildingDashboardUsageKpi,
 )
 
 # OD7/OD9: how far ahead a move counts as something to know about today.
@@ -498,6 +501,26 @@ def build_dashboard(
     rented_area_sqm_x100 = 0
     occupancy = {"RENTED": 0, "VACANT": 0, "SELF_USE": 0, "GRATUITOUS": 0}
 
+    # OD5: usage is authoritative only when a versioned profile says so. Read
+    # the latest profile per unit in one query; never infer commercial use from
+    # labels, names or rent amounts.
+    profile_rows = session.scalars(
+        select(UnitProfileVersion)
+        .where(
+            UnitProfileVersion.unit_id.in_(unit_ids),
+            UnitProfileVersion.effective_from <= as_of,
+        )
+        .order_by(
+            UnitProfileVersion.unit_id,
+            UnitProfileVersion.effective_from.desc(),
+            UnitProfileVersion.version.desc(),
+        )
+    ).all()
+    profile_by_unit: dict[str, UnitProfileVersion] = {}
+    for profile_row in profile_rows:
+        profile_by_unit.setdefault(profile_row.unit_id, profile_row)
+    usage_totals: dict[Literal["RESIDENTIAL", "COMMERCIAL", "OTHER"], tuple[int, int]] = {}
+
     for row in rows:
         state = _unit_state(row)
         occupancy[state] += 1
@@ -509,6 +532,14 @@ def build_dashboard(
             unit_rent = sum(tenancy.base_rent_cents for tenancy in row.tenancies)
             cold_rent_cents += unit_rent
             rented_area_sqm_x100 += row.unit.area_sqm_x100
+            profile = profile_by_unit.get(row.unit.id)
+            if profile is not None:
+                usage_type = cast(Literal["RESIDENTIAL", "COMMERCIAL", "OTHER"], profile.usage_type)
+                area, rent = usage_totals.get(usage_type, (0, 0))
+                usage_totals[usage_type] = (
+                    area + row.unit.area_sqm_x100,
+                    rent + unit_rent,
+                )
 
         unit_rows.append(
             BuildingDashboardUnit(
@@ -550,6 +581,27 @@ def build_dashboard(
             self_use=occupancy["SELF_USE"] + occupancy["GRATUITOUS"],
             total=len(units),
         ),
+        usage_breakdown=[
+            BuildingDashboardUsageKpi(
+                usage_type=usage_type,
+                usage_label={
+                    "RESIDENTIAL": "Wohnen",
+                    "COMMERCIAL": "Gewerbe",
+                    "OTHER": "Sonstige Nutzung",
+                }[usage_type],
+                rented_area_sqm_x100=area,
+                rented_area_sqm=_sqm(area),
+                cold_rent_cents_monthly=rent,
+                cold_rent_eur_monthly=format_eur(cents(rent)),
+                avg_cold_rent_cents_per_sqm=_avg_cold_rent_cents_per_sqm(rent, area),
+                avg_cold_rent_eur_per_sqm=(
+                    format_eur(cents(usage_average))
+                    if (usage_average := _avg_cold_rent_cents_per_sqm(rent, area)) is not None
+                    else None
+                ),
+            )
+            for usage_type, (area, rent) in sorted(usage_totals.items())
+        ],
     )
 
     modules = _modules(

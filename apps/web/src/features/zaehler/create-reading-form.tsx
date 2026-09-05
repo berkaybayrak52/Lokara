@@ -2,43 +2,59 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Label, Select, StatusNote } from '@lokara/ui';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { FormField } from '@/features/objekte/form-field';
 import { ApiError } from '@/lib/api';
 import type { MeterOut } from '@/lib/contracts';
-import { READING_REASONS, READING_REASON_LABELS } from '@/lib/contracts';
+import { READING_REASON_LABELS } from '@/lib/contracts';
 import { useFormDraft } from '@/lib/form-draft';
 import { parseMeterValueToX1000 } from '@/lib/format';
 
-import { useCreateReading } from './queries';
+import type { ReadingCreateInput } from './queries';
+import { useCheckReading, useCreateReading } from './queries';
 
-const ReadingFormSchema = z.object({
-  readAt: z.string().min(1, 'Pflichtfeld'),
-  value: z
-    .string()
-    .min(1, 'Pflichtfeld')
-    .refine((v) => parseMeterValueToX1000(v) !== null, 'Zählerstand wie 1.800 oder 241,5 angeben'),
-  reason: z.enum(READING_REASONS),
-  note: z.string(),
-});
+const ALLOWED_REASONS = ['PERIODIC', 'INTERIM', 'TENANT_CHANGE', 'CORRECTION'] as const;
+
+function todayInput(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+const ReadingFormSchema = z
+  .object({
+    readAt: z.string().min(1, 'Pflichtfeld'),
+    value: z
+      .string()
+      .min(1, 'Pflichtfeld')
+      .refine((value) => parseMeterValueToX1000(value) !== null, 'Stand wie 1.800 oder 241,5'),
+    reason: z.enum(ALLOWED_REASONS),
+    note: z.string(),
+    correctionTargetId: z.string(),
+    correctionReason: z.string(),
+  })
+  .superRefine((value, context) => {
+    if (value.reason === 'CORRECTION' && !value.correctionTargetId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['correctionTargetId'],
+        message: 'Zu korrigierende Ablesung auswählen',
+      });
+    }
+    if (value.reason === 'CORRECTION' && !value.correctionReason.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['correctionReason'],
+        message: 'Begründung ist erforderlich',
+      });
+    }
+  });
 type ReadingForm = z.infer<typeof ReadingFormSchema>;
 
-const EMPTY: ReadingForm = {
-  readAt: '2025-12-31',
-  value: '',
-  reason: 'PERIODIC',
-  note: '',
-};
-
-/**
- * Ablesung erfassen — the only write path a reading has.
- *
- * There is no edit button anywhere for a reading, and that is the feature: to
- * fix a value you record a new one for the same date with Grund "Korrektur",
- * and it supersedes the old one for billing while both stay on file.
- */
 export function CreateReadingForm({
   accountId,
   buildingId,
@@ -48,40 +64,83 @@ export function CreateReadingForm({
   buildingId: string;
   meter: MeterOut;
 }) {
+  const check = useCheckReading(accountId);
   const create = useCreateReading(accountId, buildingId);
+  const [pending, setPending] = useState<ReadingCreateInput | null>(null);
   const form = useForm<ReadingForm>({
     resolver: zodResolver(ReadingFormSchema),
-    defaultValues: EMPTY,
+    defaultValues: {
+      readAt: todayInput(),
+      value: '',
+      reason: 'PERIODIC',
+      note: '',
+      correctionTargetId: '',
+      correctionReason: '',
+    },
   });
   const { draftRestored, clearDraft } = useFormDraft(
     `${accountId}.${meter.id}.reading-create`,
     form,
   );
+  const reason = form.watch('reason');
+
+  function save(input: ReadingCreateInput) {
+    create.mutate(input, {
+      onSuccess: () => {
+        clearDraft();
+        setPending(null);
+        check.reset();
+        form.reset({
+          readAt: todayInput(),
+          value: '',
+          reason: 'PERIODIC',
+          note: '',
+          correctionTargetId: '',
+          correctionReason: '',
+        });
+      },
+    });
+  }
 
   const onSubmit = form.handleSubmit((values) => {
     const valueX1000 = parseMeterValueToX1000(values.value);
-    if (valueX1000 === null) return; // zod already guards this
-    create.mutate(
-      {
-        meterId: meter.id,
-        readAt: values.readAt,
-        valueX1000,
-        reason: values.reason,
-        note: values.note.trim() || null,
+    if (valueX1000 === null) return;
+    const input: ReadingCreateInput = {
+      meterId: meter.id,
+      readAt: values.readAt,
+      valueX1000,
+      reason: values.reason,
+      note: values.note.trim() || null,
+      supersedesReadingId: values.reason === 'CORRECTION' ? values.correctionTargetId : null,
+      confirmationNote: values.reason === 'CORRECTION' ? values.correctionReason.trim() : null,
+    };
+    check.mutate(input, {
+      onSuccess: (result) => {
+        if (result.findings.some((finding) => finding.severity === 'BLOCKER')) return;
+        const confirmations = result.findings.filter((finding) => finding.requiresConfirmation);
+        if (confirmations.length > 0) {
+          setPending(input);
+          return;
+        }
+        save(input);
       },
-      {
-        onSuccess: () => {
-          clearDraft();
-          form.reset(EMPTY);
-        },
-      },
-    );
+    });
   });
 
-  const reasonId = `reason-${meter.id}`;
+  const effectiveReadings = meter.readings.filter((reading) => !reading.superseded);
+
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <h3 className="font-display text-base font-bold">Ablesung erfassen</h3>
+      <div>
+        <h3 className="font-display text-base font-bold">Ablesung erfassen</h3>
+        <p className="mt-1 text-sm text-slate">
+          {meter.deviceTypeLabel} · Nr. {meter.serial} · letzte wirksame Ablesung:{' '}
+          {effectiveReadings[0]
+            ? `${effectiveReadings[0].valueDisplay} ${meter.unitSymbol} am ${new Intl.DateTimeFormat('de-DE').format(new Date(`${effectiveReadings[0].readAt}T12:00:00`))}`
+            : 'noch keine'}
+        </p>
+        <p className="mt-1 text-xs text-slate">Quelle: Manuell erfasst</p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           id={`read-at-${meter.id}`}
@@ -100,19 +159,45 @@ export function CreateReadingForm({
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={reasonId}>Ablesegrund</Label>
-        <Select id={reasonId} {...form.register('reason')}>
-          {READING_REASONS.map((reason) => (
-            <option key={reason} value={reason}>
-              {READING_REASON_LABELS[reason]}
+        <Label htmlFor={`reason-${meter.id}`}>Ablesegrund</Label>
+        <Select id={`reason-${meter.id}`} {...form.register('reason')}>
+          {ALLOWED_REASONS.map((value) => (
+            <option key={value} value={value}>
+              {READING_REASON_LABELS[value]}
             </option>
           ))}
         </Select>
         <p className="text-sm text-slate">
-          Falscher Wert erfasst? Mit „Korrektur“ denselben Tag neu ablesen — der alte Eintrag bleibt
-          sichtbar und wird abgelöst.
+          Ein Gerätewechsel wird über „Zähler ersetzen“ durchgeführt, damit beide Geräte und Stände
+          verbunden bleiben.
         </p>
       </div>
+      {reason === 'CORRECTION' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`correction-target-${meter.id}`}>Zu korrigierende Ablesung</Label>
+            <Select id={`correction-target-${meter.id}`} {...form.register('correctionTargetId')}>
+              <option value="">Bitte auswählen</option>
+              {effectiveReadings.map((reading) => (
+                <option key={reading.id} value={reading.id}>
+                  {reading.readAt} · {reading.valueDisplay} {meter.unitSymbol}
+                </option>
+              ))}
+            </Select>
+            {form.formState.errors.correctionTargetId ? (
+              <p className="text-sm text-danger">
+                {form.formState.errors.correctionTargetId.message}
+              </p>
+            ) : null}
+          </div>
+          <FormField
+            id={`correction-reason-${meter.id}`}
+            label="Korrekturgrund"
+            error={form.formState.errors.correctionReason}
+            registration={form.register('correctionReason')}
+          />
+        </div>
+      ) : null}
       <FormField
         id={`note-${meter.id}`}
         label="Notiz (optional)"
@@ -120,8 +205,12 @@ export function CreateReadingForm({
         registration={form.register('note')}
       />
       <div>
-        <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? 'Wird erfasst…' : 'Ablesung erfassen'}
+        <Button type="submit" disabled={check.isPending || create.isPending}>
+          {check.isPending
+            ? 'Wird geprüft…'
+            : create.isPending
+              ? 'Wird erfasst…'
+              : 'Ablesung prüfen'}
         </Button>
       </div>
       {draftRestored ? (
@@ -129,18 +218,46 @@ export function CreateReadingForm({
           Ihre letzten Eingaben wurden automatisch gesichert.
         </StatusNote>
       ) : null}
-      {create.isError ? (
+      {check.data?.findings.map((finding) => (
+        <StatusNote
+          key={finding.code}
+          kind={finding.severity === 'BLOCKER' ? 'danger' : 'warning'}
+          label={finding.severity === 'BLOCKER' ? 'Speichern nicht möglich.' : 'Bitte prüfen.'}
+        >
+          {finding.message}
+        </StatusNote>
+      ))}
+      {pending ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning bg-warning-tint p-4">
+          <p className="text-sm text-ink">Die Hinweise wurden gelesen und der Stand ist korrekt.</p>
+          <Button
+            type="button"
+            size="sm"
+            disabled={create.isPending}
+            onClick={() =>
+              save({
+                ...pending,
+                confirmedFindingCodes:
+                  check.data?.findings
+                    .filter((finding) => finding.requiresConfirmation)
+                    .map((finding) => finding.code) ?? [],
+              })
+            }
+          >
+            Trotzdem speichern
+          </Button>
+        </div>
+      ) : null}
+      {check.isError || create.isError ? (
         <StatusNote kind="danger" label="Erfassen fehlgeschlagen.">
-          {create.error instanceof ApiError && create.error.status === 422
-            ? 'Bitte Datum und Zählerstand prüfen.'
-            : 'Bitte erneut versuchen.'}
+          {(check.error instanceof ApiError && check.error.detail) ||
+            (create.error instanceof ApiError && create.error.detail) ||
+            'Bitte erneut versuchen.'}
         </StatusNote>
       ) : null}
       {create.isSuccess ? (
         <StatusNote kind="success" label="Ablesung gespeichert.">
-          Verbrauch im Zeitraum:{' '}
-          {create.data.periodConsumptionDisplay ?? 'noch kein vollständiges Ablesepaar'}. Die
-          Abrechnung rechnet damit neu.
+          Die wirksame Historie und der Verbrauch wurden neu projiziert.
         </StatusNote>
       ) : null}
     </form>

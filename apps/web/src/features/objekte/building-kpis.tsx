@@ -55,6 +55,25 @@ export function BuildingKpis({ kpis }: { kpis: BuildingDashboardResponse['kpis']
         value={`${occupancy.rented} von ${occupancy.total} vermietet`}
         hint={occupancyDetails.length > 0 ? occupancyDetails.join(' · ') : 'Vollständig vermietet'}
       />
+      {kpis.usageBreakdown.length > 1 && (
+        <Card className="sm:col-span-2 border-l-4 border-l-blue">
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate">Kaltmiete nach dokumentierter Nutzung</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {kpis.usageBreakdown.map((usage) => (
+                <div key={usage.usageType} className="rounded-lg bg-mint/40 p-3">
+                  <p className="font-medium text-ink">{usage.usageLabel}</p>
+                  <p className="mt-1 tabular-nums text-ink">{usage.coldRentEurMonthly} / Monat</p>
+                  <p className="text-xs text-slate">
+                    {usage.avgColdRentEurPerSqm ?? '–'} / m² · {usage.rentedAreaSqm.toLocaleString('de-DE')} m²
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate">Nur für Einheiten mit gültigem Nutzungsprofil.</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

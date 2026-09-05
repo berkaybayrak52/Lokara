@@ -9,8 +9,114 @@ import {
   MatchDecisionResultSchema,
   MatchProposalListResponseSchema,
   PaymentLedgerListResponseSchema,
+  PaymentBulkClassificationResultSchema,
+  PaymentClassificationResultSchema,
+  PaymentWorkspaceAccountListSchema,
+  PaymentWorkspaceSchema,
   ReceivableListResponseSchema,
 } from '@/lib/contracts';
+
+export type PaymentWorkspaceStatus =
+  'all' | 'unassigned' | 'review' | 'assigned' | 'partial' | 'ignored';
+
+export interface PaymentWorkspaceFilters {
+  status: PaymentWorkspaceStatus;
+  bankAccountId?: string;
+  direction?: 'all' | 'incoming' | 'outgoing';
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  cursor?: string;
+}
+
+export function usePaymentWorkspaceAccounts(accountId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'payment-workspace-accounts'],
+    queryFn: () =>
+      api(`/a/${accountId}/payment-workspace/accounts`, PaymentWorkspaceAccountListSchema),
+    retry: false,
+  });
+}
+
+export function usePaymentWorkspace(accountId: string, filters: PaymentWorkspaceFilters) {
+  return useQuery({
+    queryKey: ['account', accountId, 'payment-workspace', filters],
+    queryFn: () => {
+      const params = new URLSearchParams({ status: filters.status });
+      if (filters.bankAccountId) params.set('bank_account_id', filters.bankAccountId);
+      if (filters.direction && filters.direction !== 'all') {
+        params.set('direction', filters.direction);
+      }
+      if (filters.search) params.set('search', filters.search);
+      if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+      if (filters.dateTo) params.set('date_to', filters.dateTo);
+      if (filters.cursor) params.set('cursor', filters.cursor);
+      return api(
+        `/a/${accountId}/payment-workspace/transactions?${params.toString()}`,
+        PaymentWorkspaceSchema,
+      );
+    },
+    retry: false,
+  });
+}
+
+export function useClassifyTransaction(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      action,
+      reason,
+    }: {
+      transactionId: string;
+      action: 'ignored' | 'restored';
+      reason?: string;
+    }) =>
+      api(
+        `/a/${accountId}/bank-transactions/${transactionId}/classification`,
+        PaymentClassificationResultSchema,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, reason: reason || null }),
+        },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'payment-workspace'] });
+    },
+  });
+}
+
+export function useBulkClassifyTransactions(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionIds,
+      action,
+      reason,
+    }: {
+      transactionIds: string[];
+      action: 'ignored' | 'restored';
+      reason?: string;
+    }) =>
+      api(
+        `/a/${accountId}/bank-transactions/classification/bulk`,
+        PaymentBulkClassificationResultSchema,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transaction_ids: transactionIds,
+            action,
+            reason: reason || null,
+          }),
+        },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['account', accountId, 'payment-workspace'] });
+    },
+  });
+}
 
 /**
  * The five existing payment routes behind React Query (docs/15).

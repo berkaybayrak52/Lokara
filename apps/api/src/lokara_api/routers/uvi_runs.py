@@ -6,18 +6,22 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from typing import Literal, cast
 
 from fastapi import APIRouter, HTTPException, Response
 from lokara_db import (
     BuildingUviConfiguration,
+    DeliveryAddress,
+    Landlord,
     Meter,
     MonthlyMeterReading,
     MonthlyMeterReadingSource,
+    Renter,
     Role,
     Tenancy,
+    TenancyParty,
     Unit,
     UviBuildingMonthlyEvidence,
     UviBuildingMonthlyEvidenceSource,
@@ -27,7 +31,14 @@ from lokara_db import (
     UviStationAssignment,
     new_id,
 )
-from lokara_domain import EnergyReference, MeasurementUnit, MeterKind, RuleConflict, RuleEvidence
+from lokara_domain import (
+    EnergyReference,
+    MeasurementUnit,
+    MeterKind,
+    RemoteReadability,
+    RuleConflict,
+    RuleEvidence,
+)
 from lokara_pdf import (
     DISCLAIMER,
     UviDocumentBlock,
@@ -36,7 +47,10 @@ from lokara_pdf import (
     uvi_document_html,
 )
 from lokara_rules_store.rules.heizspiegel import HEIZSPIEGEL_RULES, resolve_heizspiegel_row
+from lokara_rules_store.rules.warm_water import WARM_WATER_FORMULA
+from lokara_rules_store.store import get_rule
 from lokara_uvi_engine import (
+    MINIMUM_VALID_UNITS_INCLUDING_TARGET,
     BlockBInput,
     BlockCInput,
     BlockD2Input,
@@ -44,21 +58,43 @@ from lokara_uvi_engine import (
     ComparableUnit,
     NormalizedBlockAInput,
     UviRuleBundle,
+    WarmWaterBlockAInput,
+    WarmWaterBlockAResult,
+    WarmWaterBlockD2Input,
     evaluate_block_b,
     evaluate_block_c,
     evaluate_block_d,
     evaluate_block_d2,
     evaluate_normalized_block_a,
+    evaluate_warm_water_block_a,
+    evaluate_warm_water_block_c,
+    evaluate_warm_water_block_d2,
 )
 from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..authorization import require_building, require_owner
 from ..deps import PathAccountSession
 
 router = APIRouter(prefix="/a/{account_id}/buildings/{building_id}/uvi-runs")
+
+_MONTHS_DE = (
+    "Januar",
+    "Februar",
+    "März",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
+)
 
 
 class _ApiModel(BaseModel):
@@ -94,7 +130,13 @@ class ConfigurationResolution:
 def resolve_building_uvi_configuration(
     configurations: tuple[object, ...], target_month: date
 ) -> ConfigurationResolution:
-    """Pick the deepest eligible successor, then apply only its valid-to bound."""
+    """Pick the deepest eligible successor only when it covers the complete month."""
+
+    next_month = (
+        date(target_month.year + 1, 1, 1)
+        if target_month.month == 12
+        else date(target_month.year, target_month.month + 1, 1)
+    )
 
     eligible = tuple(
         row for row in configurations if cast(date, getattr(row, "valid_from")) <= target_month
@@ -115,8 +157,18 @@ def resolve_building_uvi_configuration(
 
     selected = max(eligible, key=lambda row: (depth(row), cast(date, getattr(row, "valid_from"))))
     valid_to = cast(date | None, getattr(selected, "valid_to"))
+    boundary_inside_month = any(
+        target_month < cast(date, getattr(row, "valid_from")) < next_month
+        or (
+            (row_valid_to := cast(date | None, getattr(row, "valid_to"))) is not None
+            and target_month < row_valid_to < next_month
+        )
+        for row in configurations
+    )
     status: Literal["ready", "blocked"] = (
-        "blocked" if valid_to is not None and target_month >= valid_to else "ready"
+        "blocked"
+        if boundary_inside_month or (valid_to is not None and valid_to < next_month)
+        else "ready"
     )
     return ConfigurationResolution(cast(str, getattr(selected, "id")), status, selected)
 
@@ -164,6 +216,8 @@ def _monthly_leaf(
     month: date,
     *,
     device_category: MeasurementUnit | None = None,
+    meter_kind: MeterKind = MeterKind.HEAT,
+    meter_id: str | None = None,
 ) -> tuple[MonthlyMeterReading, Meter, list[str]] | None:
     statement = (
         select(MonthlyMeterReading)
@@ -173,11 +227,13 @@ def _monthly_leaf(
             MonthlyMeterReading.tenancy_id == tenancy_id,
             MonthlyMeterReading.month == month,
             Meter.account_id == account_id,
-            Meter.kind == MeterKind.HEAT,
+            Meter.kind == meter_kind,
         )
     )
     if device_category is not None:
         statement = statement.where(Meter.measurement_unit == device_category)
+    if meter_id is not None:
+        statement = statement.where(MonthlyMeterReading.meter_id == meter_id)
     rows = list(session.scalars(statement))
     leaf = cast(
         MonthlyMeterReading | None,
@@ -198,6 +254,21 @@ def _monthly_leaf(
     if not raw_ids:
         raise HTTPException(status_code=422, detail="Quellablesungen zur Monatsablesung fehlen.")
     return leaf, meter, raw_ids
+
+
+def _central_remote_warm_water_meter(
+    session: Session, account_id: str, building_id: str
+) -> Meter | None:
+    """Return the building's eligible central, remotely-read WW meter."""
+    return session.scalar(
+        select(Meter).where(
+            Meter.account_id == account_id,
+            Meter.building_id == building_id,
+            Meter.unit_id.is_(None),
+            Meter.kind == MeterKind.WARM_WATER,
+            Meter.remote_readability == RemoteReadability.REMOTE_READABLE,
+        )
+    )
 
 
 def _degree_leaf(
@@ -255,12 +326,6 @@ def _rule_bundle(configuration: BuildingUviConfiguration) -> UviRuleBundle:
     )
     conflicts = (
         RuleConflict(
-            code="uvi_plz_geodataset_unresolved",
-            description="Der PLZ-Geodatensatz ist nicht gewählt.",
-            production_blocking=True,
-            applies_to_media=("uvi",),
-        ),
-        RuleConflict(
             code="uvi_register_rows_missing",
             description="Drei UVI-Registerzeilen fehlen.",
             production_blocking=True,
@@ -277,7 +342,19 @@ def _configuration_snapshot(configuration: BuildingUviConfiguration) -> dict[str
         "energy_reference": configuration.energy_reference,
         "explicit_hkv_allocator": configuration.explicit_hkv_allocator,
         "calorific_factor": (
-            None if configuration.calorific_factor is None else str(configuration.calorific_factor)
+            None
+            if configuration.calorific_factor is None
+            else _decimal_text(configuration.calorific_factor)
+        ),
+        "condition_number": (
+            None
+            if configuration.condition_number is None
+            else _decimal_text(configuration.condition_number)
+        ),
+        **(
+            {}
+            if configuration.warm_water_hot_temp_c is None
+            else {"warm_water_hot_temp_c": _decimal_text(configuration.warm_water_hot_temp_c)}
         ),
         "valid_from": configuration.valid_from.isoformat(),
         "valid_to": None if configuration.valid_to is None else configuration.valid_to.isoformat(),
@@ -287,6 +364,80 @@ def _configuration_snapshot(configuration: BuildingUviConfiguration) -> dict[str
         "verification_status": configuration.verification_status,
         "supersedes_configuration_id": configuration.supersedes_configuration_id,
     }
+
+
+def _gas_configuration_provenance_de(
+    label: str, configuration: BuildingUviConfiguration | None
+) -> tuple[str, ...]:
+    if (
+        configuration is None
+        or configuration.calorific_factor is None
+        or configuration.condition_number is None
+    ):
+        return ()
+    valid_from = configuration.valid_from.strftime("%d.%m.%Y")
+    valid_period = (
+        f"gültig ab {valid_from}"
+        if configuration.valid_to is None
+        else f"gültig ab {valid_from} bis vor {configuration.valid_to:%d.%m.%Y}"
+    )
+    return (
+        f"{label}: Brennwert {_decimal_text_de(configuration.calorific_factor)} kWh/m³ · "
+        f"Zustandszahl {_decimal_text_de(configuration.condition_number)} · "
+        f"{valid_period} · "
+        f"Versorgerrechnung {configuration.source_id}",
+    )
+
+
+def _weather_provenance_de(
+    label: str, assignment: UviStationAssignment, degree: UviMonthlyDegreeDay
+) -> str:
+    raw_distance_km = Decimal(assignment.distance_km)
+    distance_km = raw_distance_km.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    distance_text = _decimal_text_de(distance_km)
+    warning = (
+        " · Achtung: mehr als 50 km vom PLZ-Zentroid entfernt"
+        if raw_distance_km > Decimal("50")
+        else ""
+    )
+    if (
+        assignment.centroid_dataset_identity == "WZBSocialScienceCenter/plz_geocoord"
+        and assignment.centroid_dataset_version == "2019-01"
+    ):
+        centroid_source = "PLZ-Zentroid WZBSocialScienceCenter/plz_geocoord (2019-01)"
+    elif (
+        assignment.centroid_dataset_identity is not None
+        and assignment.centroid_dataset_version is not None
+    ):
+        centroid_source = (
+            "PLZ-Zentroid "
+            f"{assignment.centroid_dataset_identity} ({assignment.centroid_dataset_version}) · "
+            "PLZ-Zentroid-Datensatz nicht archiviert"
+        )
+    else:
+        centroid_source = "PLZ-Zentroid-Datensatz nicht archiviert"
+    return (
+        f"{label} {degree.month:%m/%Y}: "
+        f"{_decimal_text_de(degree.monthly_degree_days)} Kd · "
+        f"{centroid_source} · "
+        f"Station {assignment.station_id} · "
+        f"{distance_text} km{warning} · "
+        f"Quelldatei {degree.source_file} · Quellen-ID {degree.source_id} · "
+        f"Stationszuordnung {assignment.id} · "
+        f"Stationsquelle {assignment.source_type}: {assignment.source_id}"
+    )
+
+
+def _dwd_station_label(
+    assignment: UviStationAssignment | None, degree: UviMonthlyDegreeDay | None
+) -> str | None:
+    if assignment is None:
+        return None
+    provenance = {} if degree is None else degree.provenance
+    station_name = provenance.get("station_name") if isinstance(provenance, dict) else None
+    if isinstance(station_name, str) and station_name.strip():
+        return f"{station_name.strip()} ({assignment.station_id})"
+    return f"DWD-Station {assignment.station_id}"
 
 
 def _building_evidence_snapshot(
@@ -346,6 +497,14 @@ def _decimal_text_de(value: Decimal) -> str:
     return _decimal_text(value).replace(".", ",")
 
 
+def _comparison_percent(current: int, reference: int | None) -> Decimal | None:
+    if reference in (None, 0):
+        return None
+    return (Decimal(current - reference) / Decimal(reference) * Decimal(100)).quantize(
+        Decimal("0.1"), rounding=ROUND_HALF_UP
+    )
+
+
 def _canonical_run_hash(session: Session, payload: dict[str, object]) -> str:
     result = session.scalar(
         text(
@@ -357,7 +516,8 @@ def _canonical_run_hash(session: Session, payload: dict[str, object]) -> str:
               'source_type', CAST(:source_type AS text), 'source_id', CAST(:source_id AS text),
               'station_assignment_id', CAST(:station_assignment_id AS text),
               'station_id', CAST(:station_id AS text),
-              'station_distance_km', to_jsonb(CAST(:station_distance_km AS numeric))
+              'station_distance_km', to_jsonb(CAST(:station_distance_km AS numeric)),
+              'support_code', CAST(:support_code AS text)
             )::text, 'UTF8'), 'sha256'), 'hex')"""
         ),
         {
@@ -369,6 +529,7 @@ def _canonical_run_hash(session: Session, payload: dict[str, object]) -> str:
                 if payload["station_distance_km"] is None
                 else str(payload["station_distance_km"])
             ),
+            "support_code": payload.get("support_code"),
         },
     )
     if not isinstance(result, str):
@@ -410,6 +571,7 @@ def _document_block(
     status_code=201,
     response_model=UviRunCreated,
     responses={
+        200: {"description": "Bestehender UVI-Lauf (idempotente Wiederholung)"},
         403: {"description": "Nicht berechtigt"},
         404: {"description": "Nicht gefunden"},
         422: {"description": "UVI-Eingaben unvollständig"},
@@ -420,6 +582,7 @@ def create_uvi_run(
     building_id: str,
     body: UviRunCreate,
     session: PathAccountSession,
+    response: Response,
 ) -> UviRunCreated:
     # Keep the owner rejection first even for a directly invoked endpoint in a
     # focused boundary test; normal requests are then checked by the shared helper.
@@ -443,6 +606,54 @@ def create_uvi_run(
     unit = session.get(Unit, tenancy.unit_id)
     if unit is None or unit.building_id != building_id:
         raise HTTPException(status_code=404, detail="Mietverhältnis nicht gefunden.")
+
+    existing = session.scalar(
+        select(UviRun).where(
+            UviRun.account_id == account_id,
+            UviRun.tenancy_id == tenancy.id,
+            UviRun.unit_id == unit.id,
+            UviRun.month == body.target_month,
+        )
+    )
+    if existing is not None:
+        response.status_code = 200
+        existing_results = existing.results
+        unresolved = existing_results.get("unresolved_conflicts", ())
+        return UviRunCreated(
+            run_id=existing.id,
+            document_url=f"/a/{account_id}/buildings/{building_id}/uvi-runs/{existing.id}/document",
+            production_blocked=bool(existing_results.get("production_blocked", True)),
+            unresolved_conflicts=[str(item) for item in unresolved]
+            if isinstance(unresolved, list)
+            else [],
+        )
+
+    landlord = None
+    if building.landlord_id is not None:
+        landlord = session.scalar(
+            select(Landlord).where(
+                Landlord.id == building.landlord_id,
+                Landlord.account_id == account_id,
+            )
+        )
+    renter = session.scalar(
+        select(Renter)
+        .join(TenancyParty, TenancyParty.renter_id == Renter.id)
+        .where(
+            Renter.account_id == account_id,
+            TenancyParty.account_id == account_id,
+            TenancyParty.tenancy_id == tenancy.id,
+        )
+        .order_by(Renter.id)
+    )
+    delivery_address = session.scalar(
+        select(DeliveryAddress)
+        .where(
+            DeliveryAddress.account_id == account_id,
+            DeliveryAddress.tenancy_id == tenancy.id,
+        )
+        .order_by(DeliveryAddress.version.desc())
+    )
 
     configurations = tuple(
         session.scalars(
@@ -528,6 +739,7 @@ def create_uvi_run(
             measurement_unit=target_meter.measurement_unit,
             energy_reference=EnergyReference(configuration.energy_reference),
             calorific_factor_kwh_per_unit=configuration.calorific_factor,
+            condition_number=configuration.condition_number,
             explicit_hkv_allocator=configuration.explicit_hkv_allocator,
             measured_building_heat_kwh_x1000=(
                 None
@@ -566,6 +778,7 @@ def create_uvi_run(
                 measurement_unit=meter.measurement_unit,
                 energy_reference=EnergyReference(month_configuration.energy_reference),
                 calorific_factor_kwh_per_unit=month_configuration.calorific_factor,
+                condition_number=month_configuration.condition_number,
                 explicit_hkv_allocator=month_configuration.explicit_hkv_allocator,
                 measured_building_heat_kwh_x1000=(
                     None
@@ -586,6 +799,96 @@ def create_uvi_run(
         computed_heat[name] = result.heat_kwh
 
     block_b = evaluate_block_b(BlockBInput(block_a.heat_kwh, computed_heat["previous"]), rules)
+    warm_water_meter = _central_remote_warm_water_meter(session, account_id, building_id)
+    warm_water_readings: dict[str, tuple[MonthlyMeterReading, Meter, list[str]] | None] = {}
+    warm_water_results: dict[str, WarmWaterBlockAResult | None] = {}
+    warm_water_block_b = None
+    warm_water_block_c = None
+    warm_water_block_d2 = None
+    warm_water_rule = None
+    if warm_water_meter is not None:
+        warm_water_readings = {
+            name: _monthly_leaf(
+                session,
+                account_id,
+                tenancy.id,
+                month,
+                device_category=MeasurementUnit.CUBIC_METRE,
+                meter_kind=MeterKind.WARM_WATER,
+            )
+            for name, month in months.items()
+        }
+        if warm_water_readings["target"] is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Die Monatsablesung für den zentralen Warmwasserzähler fehlt.",
+            )
+        target_ww_meter = warm_water_readings["target"][1]
+        if (
+            target_ww_meter.unit_id != unit.id
+            or target_ww_meter.remote_readability != RemoteReadability.REMOTE_READABLE
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Der Warmwasserzähler der Nutzeinheit ist nicht fernablesbar.",
+            )
+        warm_water_readings = {
+            name: (
+                warm_water_readings[name]
+                if name == "target"
+                else _monthly_leaf(
+                    session,
+                    account_id,
+                    tenancy.id,
+                    month,
+                    device_category=MeasurementUnit.CUBIC_METRE,
+                    meter_kind=MeterKind.WARM_WATER,
+                    meter_id=target_ww_meter.id,
+                )
+            )
+            for name, month in months.items()
+        }
+        warm_water_rule = get_rule(WARM_WATER_FORMULA, body.target_month)
+        warm_water_hot_temp_c = configuration.warm_water_hot_temp_c
+        factor = (
+            None
+            if warm_water_hot_temp_c is None
+            else warm_water_rule.value.factor_kwh_per_m3_kelvin
+            * (warm_water_hot_temp_c - warm_water_rule.value.cold_temp_c)
+        )
+        for name, reading in warm_water_readings.items():
+            if reading is None:
+                warm_water_results[name] = None
+                continue
+            row, _meter, _raw = reading
+            ww_result = evaluate_warm_water_block_a(
+                WarmWaterBlockAInput(0, row.consumption_x1000, factor),
+                rules,
+                rule_source=warm_water_rule.source,
+            )
+            if ww_result.status != "ready" or ww_result.heat_kwh is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Die Warmwasserablesung kann nicht in kWh umgerechnet werden.",
+                )
+            warm_water_results[name] = ww_result
+        ww_target = warm_water_results["target"]
+        assert ww_target is not None
+        assert ww_target.heat_kwh is not None
+        ww_previous = warm_water_results["previous"]
+        ww_prior_year = warm_water_results["prior_year"]
+        warm_water_block_b = evaluate_block_b(
+            BlockBInput(
+                ww_target.heat_kwh,
+                None if ww_previous is None else ww_previous.heat_kwh,
+            ),
+            rules,
+        )
+        warm_water_block_c = evaluate_warm_water_block_c(
+            ww_target.heat_kwh,
+            None if ww_prior_year is None else ww_prior_year.heat_kwh,
+            rules,
+        )
     target_comparable = ComparableUnit(
         unit.id,
         Decimal(unit.area_sqm_x100) / Decimal(100),
@@ -638,6 +941,7 @@ def create_uvi_run(
                 measurement_unit=other_meter.measurement_unit,
                 energy_reference=EnergyReference(configuration.energy_reference),
                 calorific_factor_kwh_per_unit=configuration.calorific_factor,
+                condition_number=configuration.condition_number,
                 explicit_hkv_allocator=configuration.explicit_hkv_allocator,
                 measured_building_heat_kwh_x1000=(
                     None
@@ -705,7 +1009,7 @@ def create_uvi_run(
 
     resolved_heizspiegel = None
     block_d2 = None
-    if block_d.status == "use_d2":
+    if block_d.status == "use_d2" or warm_water_meter is not None:
         if target_degree is None:
             raise HTTPException(
                 status_code=422, detail="Die monatliche Gradtagszahl für den Zielmonat fehlt."
@@ -737,6 +1041,26 @@ def create_uvi_run(
             ),
             rules,
         )
+        if warm_water_meter is not None and warm_water_rule is not None:
+            if target_degree.monthly_annual_share is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Der belegte Monatsanteil der Jahres-Gradtagszahl fehlt.",
+                )
+            ww_target_result = warm_water_results["target"]
+            assert ww_target_result is not None
+            assert ww_target_result.heat_kwh is not None
+            warm_water_block_d2 = evaluate_warm_water_block_d2(
+                WarmWaterBlockD2Input(
+                    current_warm_water_kwh=ww_target_result.heat_kwh,
+                    target_area_sqm=Decimal(unit.area_sqm_x100) / Decimal(100),
+                    monthly_share=target_degree.monthly_annual_share,
+                    warm_water_deduction_kwh_m2a=resolved_heizspiegel.warm_water_deduction_kwh_m2a,
+                    heizspiegel_vintage=resolved_heizspiegel.heizspiegel_vintage,
+                    attribution_de="Quelle: co2online gGmbH (Heizspiegel)",
+                ),
+                rules,
+            )
 
     conflict_descriptions = tuple(conflict.description for conflict in rules.unresolved_conflicts)
     weather_provenance: list[str] = []
@@ -745,15 +1069,7 @@ def create_uvi_run(
         ("Vorjahresmonat", prior_assignment, prior_degree),
     ):
         if assignment is not None and degree is not None:
-            weather_provenance.append(
-                f"{label} {degree.month:%m/%Y}: "
-                f"{_decimal_text_de(degree.monthly_degree_days)} Kd · "
-                f"Station {assignment.station_id} · "
-                f"{_decimal_text_de(assignment.distance_km)} km · "
-                f"Quelldatei {degree.source_file} · Quellen-ID {degree.source_id} · "
-                f"Stationszuordnung {assignment.id} · "
-                f"Stationsquelle {assignment.source_type}: {assignment.source_id}"
-            )
+            weather_provenance.append(_weather_provenance_de(label, assignment, degree))
     d_document = _document_block(
         heading="Block D — Durchschnittsnutzer",
         status=block_d.status,
@@ -792,6 +1108,97 @@ def create_uvi_run(
             ),
             flag=block_d2.data_quality_flag,
         )
+    warm_water_document = None
+    warm_water_b_document = None
+    warm_water_c_document = None
+    warm_water_d2_document = None
+    warm_water_target_kwh: int | None = None
+    warm_water_prior_year_kwh: int | None = None
+    if (
+        warm_water_meter is not None
+        and warm_water_block_b is not None
+        and warm_water_block_c is not None
+    ):
+        ww_target_result = warm_water_results["target"]
+        assert ww_target_result is not None
+        target_ww_reading = warm_water_readings["target"]
+        assert target_ww_reading is not None
+        warm_water_target_kwh = ww_target_result.heat_kwh
+        prior_result = warm_water_results.get("prior_year")
+        warm_water_prior_year_kwh = None if prior_result is None else prior_result.heat_kwh
+        warm_water_document = _document_block(
+            heading="Warmwasser — Monatsverbrauch",
+            status="ready",
+            value=ww_target_result.heat_kwh,
+            reference=None,
+            delta=None,
+            percent=None,
+            provenance=(
+                f"Warmwasser-Regel: {warm_water_rule.source if warm_water_rule is not None else ''}",
+                *tuple(f"Zielablesung {reading_id}" for reading_id in target_ww_reading[2]),
+            ),
+        )
+        warm_water_b_document = _document_block(
+            heading="Warmwasser — Vormonat",
+            status=warm_water_block_b.status,
+            value=ww_target_result.heat_kwh,
+            reference=None if ww_previous is None else ww_previous.heat_kwh,
+            delta=warm_water_block_b.delta_kwh,
+            percent=warm_water_block_b.percent,
+            label=warm_water_block_b.label_de,
+            basis="Rohvergleich mit dem Vormonat",
+            attribution="Quelle: fernablesbarer Warmwasserzähler",
+            provenance=(
+                f"Warmwasser-Regel: {warm_water_rule.source if warm_water_rule is not None else ''}",
+                *(
+                    ()
+                    if warm_water_readings["previous"] is None
+                    else tuple(
+                        f"Vormonatsablesung {reading_id}"
+                        for reading_id in warm_water_readings["previous"][2]
+                    )
+                ),
+            ),
+        )
+        warm_water_c_document = _document_block(
+            heading="Warmwasser — Vorjahresmonat",
+            status=warm_water_block_c.status,
+            value=ww_target_result.heat_kwh,
+            reference=warm_water_prior_year_kwh,
+            delta=warm_water_block_c.delta_kwh,
+            percent=warm_water_block_c.percent,
+            label="nicht witterungsbereinigt",
+            basis="Rohvergleich mit dem Vorjahresmonat",
+            attribution="Quelle: fernablesbarer Warmwasserzähler",
+            provenance=(
+                f"Warmwasser-Regel: {warm_water_rule.source if warm_water_rule is not None else ''}",
+                *(
+                    ()
+                    if warm_water_readings["prior_year"] is None
+                    else tuple(
+                        f"Vorjahresablesung {reading_id}"
+                        for reading_id in warm_water_readings["prior_year"][2]
+                    )
+                ),
+            ),
+        )
+        if warm_water_block_d2 is not None:
+            warm_water_d2_document = _document_block(
+                heading="Warmwasser — Durchschnittsnutzer",
+                status=warm_water_block_d2.status,
+                value=ww_target_result.heat_kwh,
+                reference=warm_water_block_d2.norm_month_kwh,
+                delta=warm_water_block_d2.delta_kwh,
+                percent=warm_water_block_d2.percent,
+                basis="normierter Durchschnittsnutzer",
+                attribution=warm_water_block_d2.attribution_de,
+                provenance=(
+                    f"Heizspiegel {warm_water_block_d2.heizspiegel_vintage}",
+                    f"Warmwasser-Abzug: {_decimal_text_de(warm_water_block_d2.warm_water_deduction_kwh_m2a)} kWh/(m²·a)",
+                ),
+            )
+    run_id = new_id()
+    support_code = f"UVI-{run_id[:12].upper()}"
     document = UviDocumentData(
         title_de="Monatliche Verbrauchsinformation",
         target_month=body.target_month,
@@ -806,6 +1213,9 @@ def create_uvi_run(
             label=block_a.label_de,
             provenance=(
                 *tuple(f"Quellablesung {reading_id}" for reading_id in target_raw),
+                *_gas_configuration_provenance_de(
+                    "Gaskonfiguration Zielmonat", month_configurations["target"]
+                ),
                 *(
                     ("linear nach verstrichenen Tagen interpoliert",)
                     if target_reading.interpolation_method == "linear_by_elapsed_days"
@@ -822,6 +1232,20 @@ def create_uvi_run(
             delta=block_b.delta_kwh,
             percent=block_b.percent,
             label=block_b.label_de,
+            basis="Rohvergleich mit dem Vormonat",
+            attribution="Quelle: Monatsablesung der Nutzeinheit",
+            provenance=(
+                *(
+                    ()
+                    if readings["previous"] is None
+                    else tuple(
+                        f"Vormonatsablesung {reading_id}" for reading_id in readings["previous"][2]
+                    )
+                ),
+                *_gas_configuration_provenance_de(
+                    "Gaskonfiguration Vormonat", month_configurations["previous"]
+                ),
+            ),
         ),
         block_c=_document_block(
             heading="Block C — Vorjahresmonat",
@@ -831,14 +1255,68 @@ def create_uvi_run(
             delta=block_c.delta_kwh,
             percent=block_c.percent,
             label=block_c.label_de,
+            basis="Witterungsbereinigter Vorjahresmonat",
             attribution=block_c.attribution_de,
-            provenance=tuple(weather_provenance),
+            provenance=(
+                *tuple(weather_provenance),
+                *_gas_configuration_provenance_de(
+                    "Gaskonfiguration Vorjahresmonat", month_configurations["prior_year"]
+                ),
+            ),
         ),
         block_d_or_d2=d_document,
         legal_risks_de=(),
         unresolved_conflicts_de=conflict_descriptions,
         rechtsstand=configuration.rechtsstand,
         disclaimer=DISCLAIMER,
+        warm_water=warm_water_document,
+        warm_water_block_b=warm_water_b_document,
+        warm_water_block_c=warm_water_c_document,
+        warm_water_block_d2=warm_water_d2_document,
+        vermieter_name=None if landlord is None else landlord.legal_name,
+        vermieter_strasse=None if landlord is None else landlord.address,
+        vermieter_plz_ort=f"{building.postal_code} {building.city}",
+        vermieter_telefon=None if landlord is None else landlord.phone,
+        vermieter_email=None if landlord is None else landlord.email,
+        vermieter_logo=None if landlord is None else landlord.logo,
+        absenderzeile=None if landlord is None else f"{landlord.legal_name}, {landlord.address}",
+        mieter_name=None if renter is None else renter.legal_name,
+        mieter_strasse=None if delivery_address is None else delivery_address.street,
+        mieter_plz_ort=(
+            None
+            if delivery_address is None
+            else f"{delivery_address.postal_code} {delivery_address.city}"
+        ),
+        liegenschaft_nr=building.id,
+        nutzeinheit_nr=unit.label,
+        objekt_adresse=f"{building.street}, {building.postal_code} {building.city}",
+        naechster_monat=(
+            f"{_MONTHS_DE[body.target_month.month % 12]} "
+            f"{body.target_month.year + (1 if body.target_month.month == 12 else 0)}"
+        ),
+        gruss_ort=building.city,
+        support_code=support_code,
+        dwd_station=_dwd_station_label(target_assignment, target_degree),
+        heating_prior_year_raw_kwh=computed_heat["prior_year"],
+        heating_prior_year_raw_delta_kwh=(
+            None
+            if computed_heat["prior_year"] is None
+            else block_a.heat_kwh - computed_heat["prior_year"]
+        ),
+        heating_prior_year_raw_percent=_comparison_percent(
+            block_a.heat_kwh, computed_heat["prior_year"]
+        ),
+        warm_water_prior_year_raw_kwh=(warm_water_prior_year_kwh),
+        warm_water_prior_year_raw_delta_kwh=(
+            None
+            if warm_water_target_kwh is None or warm_water_prior_year_kwh is None
+            else warm_water_target_kwh - warm_water_prior_year_kwh
+        ),
+        warm_water_prior_year_raw_percent=(
+            None
+            if warm_water_target_kwh is None
+            else _comparison_percent(warm_water_target_kwh, warm_water_prior_year_kwh)
+        ),
     )
 
     degree_day_rows = {
@@ -874,7 +1352,12 @@ def create_uvi_run(
             "calorific_factor": (
                 None
                 if configuration.calorific_factor is None
-                else str(configuration.calorific_factor)
+                else _decimal_text(configuration.calorific_factor)
+            ),
+            "condition_number": (
+                None
+                if configuration.condition_number is None
+                else _decimal_text(configuration.condition_number)
             ),
             "explicit_hkv_allocator": configuration.explicit_hkv_allocator,
             "measured_building_heat_kwh_x1000": (
@@ -908,9 +1391,36 @@ def create_uvi_run(
             "comparable_reading_ids": [
                 snapshot["monthly_reading_id"] for snapshot in comparable_snapshots
             ],
-            "minimum_valid_units_including_target": 3,
+            "minimum_valid_units_including_target": MINIMUM_VALID_UNITS_INCLUDING_TARGET,
         },
     }
+    if warm_water_meter is not None:
+        normalized_block_inputs["warm_water"] = {
+            "meter_id": warm_water_meter.id,
+            "formula_source": None if warm_water_rule is None else warm_water_rule.source,
+            "factor_kwh_per_m3": (
+                None
+                if warm_water_rule is None or configuration.warm_water_hot_temp_c is None
+                else _decimal_text(
+                    warm_water_rule.value.factor_kwh_per_m3_kelvin
+                    * (configuration.warm_water_hot_temp_c - warm_water_rule.value.cold_temp_c)
+                )
+            ),
+            "hot_temp_c": (
+                None
+                if configuration.warm_water_hot_temp_c is None
+                else _decimal_text(configuration.warm_water_hot_temp_c)
+            ),
+            "monthly_reading_ids": {
+                name: None if value is None else value[0].id
+                for name, value in warm_water_readings.items()
+            },
+            "computed_warm_water_kwh": {
+                name: None if value is None else value.heat_kwh
+                for name, value in warm_water_results.items()
+            },
+            "previous_year_weather_adjusted": False,
+        }
     if (
         block_d.status == "use_d2"
         and target_degree is not None
@@ -1007,7 +1517,15 @@ def create_uvi_run(
             "explicit_hkv_allocator": configuration.explicit_hkv_allocator,
             "calorific_factor": None
             if configuration.calorific_factor is None
-            else str(configuration.calorific_factor),
+            else _decimal_text(configuration.calorific_factor),
+            "condition_number": None
+            if configuration.condition_number is None
+            else _decimal_text(configuration.condition_number),
+            **(
+                {}
+                if configuration.warm_water_hot_temp_c is None
+                else {"warm_water_hot_temp_c": _decimal_text(configuration.warm_water_hot_temp_c)}
+            ),
             "source_type": configuration.source_type,
             "source_id": configuration.source_id,
             "rechtsstand": configuration.rechtsstand,
@@ -1025,6 +1543,8 @@ def create_uvi_run(
                     "id": assignment.id,
                     "station_id": assignment.station_id,
                     "distance_km": _decimal_text(assignment.distance_km),
+                    "centroid_dataset_identity": assignment.centroid_dataset_identity,
+                    "centroid_dataset_version": assignment.centroid_dataset_version,
                     "source_type": assignment.source_type,
                     "source_id": assignment.source_id,
                 }
@@ -1116,6 +1636,14 @@ def create_uvi_run(
         "block_c": _snapshot(block_c),
         "block_d": _snapshot(block_d),
         "block_d2": block_d2_snapshot,
+        "warm_water_block_a": (
+            None
+            if warm_water_results.get("target") is None
+            else _snapshot(warm_water_results["target"])
+        ),
+        "warm_water_block_b": _snapshot(warm_water_block_b),
+        "warm_water_block_c": _snapshot(warm_water_block_c),
+        "warm_water_block_d2": _snapshot(warm_water_block_d2),
         "production_blocked": any(
             conflict.production_blocking for conflict in rules.unresolved_conflicts
         ),
@@ -1158,22 +1686,53 @@ def create_uvi_run(
         "station_assignment_id": station_assignment_id,
         "station_id": station_id,
         "station_distance_km": station_distance_km,
+        "support_code": support_code,
     }
-    run_id = new_id()
     run = UviRun(
-        id=run_id, account_id=account_id, sha256=_canonical_run_hash(session, payload), **payload
-    )
-    session.add(run)
-    session.flush()
-    event = UviDeliveryEvent(
-        id=new_id(),
+        id=run_id,
         account_id=account_id,
-        uvi_run_id=run_id,
-        status="GENERATED",
-        occurred_at=datetime.now(UTC),
+        sha256=_canonical_run_hash(session, payload),
+        **payload,
     )
-    session.add(event)
-    session.flush()
+    try:
+        # A savepoint lets a concurrent duplicate roll back only these inserts,
+        # preserving the account-scoped transaction and its RLS context.
+        with session.begin_nested():
+            session.add(run)
+            session.flush()
+            event = UviDeliveryEvent(
+                id=new_id(),
+                account_id=account_id,
+                uvi_run_id=run_id,
+                status="GENERATED",
+                occurred_at=datetime.now(UTC),
+            )
+            session.add(event)
+            session.flush()
+    except IntegrityError as exc:
+        if "uq_uvi_run_tenancy_month" not in str(exc.orig):
+            raise
+        existing = session.scalar(
+            select(UviRun).where(
+                UviRun.account_id == account_id,
+                UviRun.tenancy_id == tenancy.id,
+                UviRun.unit_id == unit.id,
+                UviRun.month == body.target_month,
+            )
+        )
+        if existing is None:
+            raise
+        response.status_code = 200
+        existing_results = existing.results
+        unresolved = existing_results.get("unresolved_conflicts", ())
+        return UviRunCreated(
+            run_id=existing.id,
+            document_url=f"/a/{account_id}/buildings/{building_id}/uvi-runs/{existing.id}/document",
+            production_blocked=bool(existing_results.get("production_blocked", True)),
+            unresolved_conflicts=[str(item) for item in unresolved]
+            if isinstance(unresolved, list)
+            else [],
+        )
     return UviRunCreated(
         run_id=run_id,
         document_url=f"/a/{account_id}/buildings/{building_id}/uvi-runs/{run_id}/document",
@@ -1182,12 +1741,49 @@ def create_uvi_run(
     )
 
 
+class UviSupportLookup(_ApiModel):
+    support_code: str
+    tenancy_id: str
+    target_month: date
+
+
+@router.get("/support/{support_code}", response_model=UviSupportLookup)
+def lookup_uvi_support_code(
+    account_id: str,
+    building_id: str,
+    support_code: str,
+    session: PathAccountSession,
+) -> UviSupportLookup:
+    require_owner(session)
+    require_building(session, building_id)
+    run = session.scalar(
+        select(UviRun)
+        .join(Tenancy, Tenancy.id == UviRun.tenancy_id)
+        .join(Unit, Unit.id == UviRun.unit_id)
+        .where(
+            UviRun.account_id == account_id,
+            UviRun.support_code == support_code,
+            Tenancy.account_id == account_id,
+            Tenancy.id == UviRun.tenancy_id,
+            Unit.account_id == account_id,
+            Unit.building_id == building_id,
+        )
+    )
+    if run is None or run.account_id != account_id or run.support_code is None:
+        raise HTTPException(status_code=404, detail="UVI-Support-Code nicht gefunden.")
+    return UviSupportLookup(
+        support_code=run.support_code,
+        tenancy_id=run.tenancy_id,
+        target_month=run.month,
+    )
+
+
 def _archived_document(value: object) -> UviDocumentData:
     if not isinstance(value, dict):
         raise HTTPException(
             status_code=422, detail="Das archivierte UVI-Dokument ist unvollständig."
         )
-    blocks = {}
+    blocks: dict[str, UviDocumentBlock] = {}
     for name in ("block_a", "block_b", "block_c", "block_d_or_d2"):
         block = value.get(name)
         if not isinstance(block, dict):
@@ -1199,15 +1795,84 @@ def _archived_document(value: object) -> UviDocumentData:
         values["percent"] = None if percent is None else Decimal(cast(str, percent))
         values["provenance_de"] = tuple(cast(list[str], values["provenance_de"]))
         blocks[name] = UviDocumentBlock(**values)
+    warm_water_value = value.get("warm_water")
+    warm_water = None
+    if warm_water_value is not None:
+        if not isinstance(warm_water_value, dict):
+            raise HTTPException(
+                status_code=422, detail="Das archivierte Warmwasser-Dokument ist unvollständig."
+            )
+        values = dict(warm_water_value)
+        percent = values.get("percent")
+        values["percent"] = None if percent is None else Decimal(cast(str, percent))
+        values["provenance_de"] = tuple(cast(list[str], values["provenance_de"]))
+        warm_water = UviDocumentBlock(**values)
+    warm_water_comparisons: dict[str, UviDocumentBlock | None] = {}
+    for name in ("warm_water_block_b", "warm_water_block_c", "warm_water_block_d2"):
+        block_value = value.get(name)
+        if block_value is None:
+            warm_water_comparisons[name] = None
+            continue
+        if not isinstance(block_value, dict):
+            raise HTTPException(
+                status_code=422, detail="Das archivierte Warmwasser-Dokument ist unvollständig."
+            )
+        values = dict(block_value)
+        percent = values.get("percent")
+        values["percent"] = None if percent is None else Decimal(cast(str, percent))
+        values["provenance_de"] = tuple(cast(list[str], values["provenance_de"]))
+        warm_water_comparisons[name] = UviDocumentBlock(**values)
     return UviDocumentData(
         title_de=cast(str, value["title_de"]),
         target_month=date.fromisoformat(cast(str, value["target_month"])),
         unit_label=cast(str, value["unit_label"]),
-        **blocks,
+        block_a=blocks["block_a"],
+        block_b=blocks["block_b"],
+        block_c=blocks["block_c"],
+        block_d_or_d2=blocks["block_d_or_d2"],
         legal_risks_de=tuple(cast(list[str], value["legal_risks_de"])),
         unresolved_conflicts_de=tuple(cast(list[str], value["unresolved_conflicts_de"])),
         rechtsstand=cast(str, value["rechtsstand"]),
         disclaimer=cast(str, value["disclaimer"]),
+        warm_water=warm_water,
+        warm_water_block_b=warm_water_comparisons["warm_water_block_b"],
+        warm_water_block_c=warm_water_comparisons["warm_water_block_c"],
+        warm_water_block_d2=warm_water_comparisons["warm_water_block_d2"],
+        vermieter_name=cast(str | None, value.get("vermieter_name")),
+        vermieter_strasse=cast(str | None, value.get("vermieter_strasse")),
+        vermieter_plz_ort=cast(str | None, value.get("vermieter_plz_ort")),
+        vermieter_telefon=cast(str | None, value.get("vermieter_telefon")),
+        vermieter_email=cast(str | None, value.get("vermieter_email")),
+        vermieter_logo=cast(str | None, value.get("vermieter_logo")),
+        absenderzeile=cast(str | None, value.get("absenderzeile")),
+        mieter_name=cast(str | None, value.get("mieter_name")),
+        mieter_strasse=cast(str | None, value.get("mieter_strasse")),
+        mieter_plz_ort=cast(str | None, value.get("mieter_plz_ort")),
+        liegenschaft_nr=cast(str | None, value.get("liegenschaft_nr")),
+        nutzeinheit_nr=cast(str | None, value.get("nutzeinheit_nr")),
+        objekt_adresse=cast(str | None, value.get("objekt_adresse")),
+        naechster_monat=cast(str | None, value.get("naechster_monat")),
+        support_code=cast(str | None, value.get("support_code")),
+        gruss_ort=cast(str | None, value.get("gruss_ort")),
+        dwd_station=cast(str | None, value.get("dwd_station")),
+        heating_prior_year_raw_kwh=cast(int | None, value.get("heating_prior_year_raw_kwh")),
+        heating_prior_year_raw_delta_kwh=cast(
+            int | None, value.get("heating_prior_year_raw_delta_kwh")
+        ),
+        heating_prior_year_raw_percent=(
+            None
+            if value.get("heating_prior_year_raw_percent") is None
+            else Decimal(cast(str, value["heating_prior_year_raw_percent"]))
+        ),
+        warm_water_prior_year_raw_kwh=cast(int | None, value.get("warm_water_prior_year_raw_kwh")),
+        warm_water_prior_year_raw_delta_kwh=cast(
+            int | None, value.get("warm_water_prior_year_raw_delta_kwh")
+        ),
+        warm_water_prior_year_raw_percent=(
+            None
+            if value.get("warm_water_prior_year_raw_percent") is None
+            else Decimal(cast(str, value["warm_water_prior_year_raw_percent"]))
+        ),
     )
 
 

@@ -46,9 +46,24 @@ class Page05G1GuardRules:
 
 
 @dataclass(frozen=True, slots=True)
+class Page05MeterCalibrationRules(Page05G1GuardRules):
+    years_by_medium: Mapping[str, int]
+    # Transitional periods remain data, not application constants. Applicability
+    # is intentionally unresolved until the competent legal source is confirmed.
+    legacy_years_by_medium: Mapping[str, int]
+    medium_labels_de: Mapping[str, str]
+    excluded_media: tuple[str, ...]
+    expiry_month: int
+    expiry_day: int
+    warning_de: str
+    channels_by_stage: Mapping[str, tuple[str, ...]]
+    resolution_event: str
+
+
+@dataclass(frozen=True, slots=True)
 class Page05G1Rules:
     w1: Page05G1GuardRules
-    w2: Page05G1GuardRules
+    w2: Page05MeterCalibrationRules
     w4: Page05G1GuardRules
 
 
@@ -177,7 +192,7 @@ PAGE_05_G1_RULES = RuleSet(
                         ),
                     ),
                 ),
-                w2=Page05G1GuardRules(
+                w2=Page05MeterCalibrationRules(
                     evidence=(
                         Page05Evidence(
                             source=REGISTER_SOURCE,
@@ -211,6 +226,41 @@ PAGE_05_G1_RULES = RuleSet(
                             ),
                         ),
                     ),
+                    years_by_medium={
+                        "cold_water": 6,
+                        "warm_water": 6,
+                        "heat_meter": 6,
+                        "heat_exchanger_hot_water": 6,
+                        "electricity": 8,
+                        "gas": 8,
+                    },
+                    legacy_years_by_medium={
+                        "warm_water": 5,
+                        "heat_meter": 5,
+                        "heat_exchanger_hot_water": 5,
+                    },
+                    medium_labels_de={
+                        "cold_water": "Kaltwasser",
+                        "warm_water": "Warmwasser",
+                        "heat_meter": "Wärmemengen",
+                        "heat_exchanger_hot_water": "Wärmetauscher-Warmwasser",
+                        "electricity": "Strom",
+                        "gas": "Gasbalgen",
+                    },
+                    excluded_media=("heat_cost_allocator",),
+                    expiry_month=12,
+                    expiry_day=31,
+                    warning_de=(
+                        "Der {medium_label}-Zähler in {unit_label} ist ab {boundary_date} "
+                        "nicht mehr geeicht. Werte aus ungeeichten Zählern können bei der "
+                        "Abrechnung angreifbar sein — bitte Austausch/Nacheichung veranlassen."
+                    ),
+                    channels_by_stage={
+                        "notice": ("in_app",),
+                        "expiry_month": ("in_app", "email"),
+                        "exceeded": ("email",),
+                    },
+                    resolution_event="meter_replaced",
                 ),
                 w4=Page05G1GuardRules(
                     evidence=(

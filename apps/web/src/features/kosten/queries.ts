@@ -1,17 +1,29 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
 
 import { api } from '@/lib/api';
 import type { AllocationKey } from '@/lib/contracts';
-import { CostEntryOutSchema, CostListResponseSchema } from '@/lib/contracts';
+import {
+  CostCatalogueResponseSchema,
+  CostEntryOutSchema,
+  CostListResponseSchema,
+  CostVoidOutSchema,
+} from '@/lib/contracts';
 
 export function useCosts(accountId: string, buildingId: string) {
   return useQuery({
     queryKey: ['account', accountId, 'buildings', buildingId, 'costs'],
-    queryFn: () =>
-      api(`/a/${accountId}/buildings/${buildingId}/costs`, CostListResponseSchema),
+    queryFn: () => api(`/a/${accountId}/buildings/${buildingId}/costs`, CostListResponseSchema),
+    retry: false,
+  });
+}
+
+export function useCostCatalogue(accountId: string) {
+  return useQuery({
+    queryKey: ['account', accountId, 'cost-catalogue'],
+    queryFn: () => api(`/a/${accountId}/cost-catalogue`, CostCatalogueResponseSchema),
+    staleTime: 60 * 60 * 1000,
     retry: false,
   });
 }
@@ -22,11 +34,14 @@ export interface KeyChoice {
   directTenancyId?: string | null;
 }
 
-export interface CostCreateInput extends KeyChoice {
+export interface CostCreateInput {
+  catalogueId: string;
   label: string;
   amountCents: number;
   periodFrom: string;
   periodTo: string;
+  keyOverride?: AllocationKey;
+  directUnitId?: string;
 }
 
 /** Invalidates costs AND the statement: a cost change re-runs the calculation. */
@@ -69,12 +84,15 @@ export function useReassignKey(accountId: string, buildingId: string) {
   });
 }
 
-export function useDeleteCost(accountId: string, buildingId: string) {
+export function useVoidCost(accountId: string, buildingId: string) {
   const invalidate = useCostInvalidation(accountId, buildingId);
   return useMutation({
-    // 204 No Content — nothing to parse, so the schema is the empty response.
-    mutationFn: (costId: string) =>
-      api(`/a/${accountId}/costs/${costId}`, z.undefined(), { method: 'DELETE' }),
+    mutationFn: ({ costId, reason }: { costId: string; reason: string }) =>
+      api(`/a/${accountId}/costs/${costId}/void`, CostVoidOutSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      }),
     onSuccess: invalidate,
   });
 }

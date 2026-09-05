@@ -62,8 +62,12 @@ const NAV_ITEMS: NavItem[] = [
     activePrefixes: ['/zahlungen'],
     visibleFor: (role) => role === 'OWNER',
   },
-  { href: (id) => `/a/${id}/kosten`, label: 'Kosten', icon: 'costs', activePrefixes: ['/kosten'] },
-  { href: (id) => `/a/${id}/beleg`, label: 'Belege', icon: 'receipts', activePrefixes: ['/beleg'] },
+  {
+    href: (id) => `/a/${id}/kosten`,
+    label: 'Kosten erfassen',
+    icon: 'costs',
+    activePrefixes: ['/kosten'],
+  },
   {
     href: (id) => `/a/${id}/zaehler`,
     label: 'Zähler',

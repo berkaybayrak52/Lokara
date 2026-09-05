@@ -30,6 +30,7 @@ from lokara_adapters import (
 from lokara_db import (
     Building,
     CostEntry,
+    HeatingBillingModeVersion,
     HeatingCostEntry,
     MdlStatement,
     OperatingCostAgreement,
@@ -40,6 +41,8 @@ from lokara_domain import (
     AllocationKey,
     Cents,
     Co2Table,
+    ExternalHeatingStatus,
+    HeatingBillingMode,
     Occupancy,
     Period,
     build_unit_segments,
@@ -368,6 +371,7 @@ def _heating_costs(
                 HeatingCostEntry.building_id == building_id,
                 HeatingCostEntry.period_from < window.valid_to,
                 HeatingCostEntry.period_to > window.valid_from,
+                HeatingCostEntry.voided_at.is_(None),
             )
             .order_by(HeatingCostEntry.created_at, HeatingCostEntry.id)
         ).all()
@@ -424,6 +428,24 @@ def _nk_costs(
         if agreement.id not in revised_ids:
             agreements_by_tenancy.setdefault(agreement.tenancy_id, []).append(agreement)
     for row in rows:
+        latest_classification = max(
+            row.classifications,
+            key=lambda candidate: (candidate.confirmed_at, candidate.id),
+            default=None,
+        )
+        if latest_classification is None:
+            findings.append(f"Page-02-Klassifizierung fehlt: {row.label}")
+            production_blocked = True
+            continue
+        if latest_classification.allocation_key_assignment_id is None:
+            production_blocked = production_blocked or latest_classification.production_blocked
+            if latest_classification.production_blocked:
+                findings.append(f"Page-02-Position gesperrt: {row.label}")
+            if latest_classification.non_allocable_cents:
+                non_allocable.append((row.label, latest_classification.non_allocable_cents))
+            # A documented non-allocable position has no key and never enters
+            # the renter allocation input.
+            continue
         assignment = current_assignment(row)
         classification = max(
             (
@@ -625,8 +647,25 @@ def compute_statement(
     # self-billing are different inputs", and `docs/03` H7 forbids recomputing
     # MDL amounts. If one exists for this building period, its figures are the
     # statement's figures and no §§ 7/8 calculation is performed at all.
+    mode = _heating_mode(session, building.id, window)
     mdl = _confirmed_mdl(session, building.id, window)
-    missing = None if mdl is not None else _heating_missing_reason(heating_costs, facts)
+    external_pending = False
+    if mode is not None:
+        if mode.mode is HeatingBillingMode.LOKARA:
+            mdl = None
+        elif (
+            mode.external_status is ExternalHeatingStatus.UEBERNOMMEN
+            and mode.mdl_statement_id is not None
+        ):
+            mdl = session.get(MdlStatement, mode.mdl_statement_id)
+        else:
+            mdl = None
+            external_pending = True
+    missing = (
+        "Die Messdienstleister-Abrechnung ist noch nicht geprüft und übernommen."
+        if external_pending
+        else (None if mdl is not None else _heating_missing_reason(heating_costs, facts))
+    )
     if mdl is not None:
         page01b_input = mdl_statement_input(mdl, co2_table, window)
         page01b_result = calculate_page01b_statement(page01b_input)
@@ -974,6 +1013,25 @@ def _confirmed_mdl(session: Session, building_id: str, window: Period) -> MdlSta
             MdlStatement.period_to == window.valid_to,
         )
         .order_by(MdlStatement.version.desc(), MdlStatement.id.desc())
+    ).first()
+
+
+def _heating_mode(
+    session: Session, building_id: str, window: Period
+) -> HeatingBillingModeVersion | None:
+    """Latest append-only source decision for this exact billing period."""
+
+    return session.scalars(
+        select(HeatingBillingModeVersion)
+        .where(
+            HeatingBillingModeVersion.building_id == building_id,
+            HeatingBillingModeVersion.period_from == window.valid_from,
+            HeatingBillingModeVersion.period_to == window.valid_to,
+        )
+        .order_by(
+            HeatingBillingModeVersion.version.desc(),
+            HeatingBillingModeVersion.id.desc(),
+        )
     ).first()
 
 

@@ -72,11 +72,14 @@ def test_u4b_normalized_input_has_no_fake_cumulative_endpoints() -> None:
         "measurement_unit",
         "energy_reference",
         "calorific_factor_kwh_per_unit",
+        "condition_number",
         "explicit_hkv_allocator",
         "measured_building_heat_kwh_x1000",
         "building_hkv_movement_x1000",
     } <= fields
     assert get_type_hints(input_type)["measured_building_heat_kwh_x1000"] == int | None
+    assert get_type_hints(input_type)["calorific_factor_kwh_per_unit"] == Decimal | None
+    assert get_type_hints(input_type)["condition_number"] == Decimal | None
 
 
 def test_u4b_source_named_kwh_month_executes_without_rebased_endpoints() -> None:
@@ -104,8 +107,47 @@ def test_u4b_source_named_kwh_month_executes_without_rebased_endpoints() -> None
     _assert_rules(result, rules)
 
 
-def test_u4b_cubic_month_blocks_without_a_versioned_calorific_factor() -> None:
-    """U4b-A03: no factor is inferred from energy source, meter unit or invoice text."""
+def test_u4b_cubic_month_multiplies_both_versioned_supplier_components() -> None:
+    """U4b-A03: m³ × Brennwert × Zustandszahl is exact before display rounding."""
+    input_type, evaluate = _api()
+    rules = _rules()
+
+    result = cast(
+        _Result,
+        evaluate(
+            input_type(
+                monthly_movement_x1000=2_000,
+                measurement_unit=MeasurementUnit.CUBIC_METRE,
+                energy_reference=EnergyReference.HO,
+                # Synthetic exact components: product 2, not supplier defaults.
+                calorific_factor_kwh_per_unit=Decimal("4"),
+                condition_number=Decimal("0.5"),
+            ),
+            rules,
+        ),
+    )
+
+    assert result.status == "ready"
+    assert result.heat_kwh == 4
+    assert result.data_quality_flag is None
+    assert result.label_de is None
+    _assert_rules(result, rules)
+
+
+@pytest.mark.parametrize(
+    ("calorific_factor", "condition_number", "expected_flag"),
+    (
+        (None, Decimal("1"), "missing_calorific_factor"),
+        (Decimal("4"), None, "missing_condition_number"),
+    ),
+    ids=("missing-calorific-factor", "missing-condition-number"),
+)
+def test_u4b_cubic_month_blocks_when_either_supplier_component_is_missing(
+    calorific_factor: Decimal | None,
+    condition_number: Decimal | None,
+    expected_flag: str,
+) -> None:
+    """U4b-A03b: neither half of the supplier conversion may be guessed."""
     input_type, evaluate = _api()
     case = UVI_EXAMPLES["emir_spec_block_a_kwh"]
     rules = _rules()
@@ -118,7 +160,8 @@ def test_u4b_cubic_month_blocks_without_a_versioned_calorific_factor() -> None:
                 monthly_movement_x1000=monthly_x1000,
                 measurement_unit=MeasurementUnit.CUBIC_METRE,
                 energy_reference=EnergyReference.HO,
-                calorific_factor_kwh_per_unit=None,
+                calorific_factor_kwh_per_unit=calorific_factor,
+                condition_number=condition_number,
             ),
             rules,
         ),
@@ -126,7 +169,7 @@ def test_u4b_cubic_month_blocks_without_a_versioned_calorific_factor() -> None:
 
     assert result.status == "blocked"
     assert result.heat_kwh is None
-    assert result.data_quality_flag == "missing_calorific_factor"
+    assert result.data_quality_flag == expected_flag
     assert result.label_de is None
     _assert_rules(result, rules)
 

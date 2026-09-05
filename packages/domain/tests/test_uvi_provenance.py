@@ -8,6 +8,34 @@ from types import ModuleType
 import pytest
 
 
+def test_gas_meter_has_exactly_the_approved_heat_volume_facts() -> None:
+    """28.08.2026 decision: the fifth type opens one tuple, never warm water."""
+    from lokara_domain.meter import (
+        DEVICE_TYPE_FACTS,
+        MeasurementUnit,
+        MeterDeviceType,
+        MeterKind,
+    )
+
+    assert DEVICE_TYPE_FACTS == {
+        MeterDeviceType.HEAT_METER: (MeterKind.HEAT, MeasurementUnit.KWH),
+        MeterDeviceType.HEAT_COST_ALLOCATOR: (MeterKind.HEAT, MeasurementUnit.HKV_UNITS),
+        MeterDeviceType.WARM_WATER_METER: (
+            MeterKind.WARM_WATER,
+            MeasurementUnit.CUBIC_METRE,
+        ),
+        MeterDeviceType.COLD_WATER_METER: (
+            MeterKind.COLD_WATER,
+            MeasurementUnit.CUBIC_METRE,
+        ),
+        MeterDeviceType.GAS_METER: (MeterKind.HEAT, MeasurementUnit.CUBIC_METRE),
+    }
+    assert DEVICE_TYPE_FACTS[MeterDeviceType.GAS_METER] != (
+        MeterKind.WARM_WATER,
+        MeasurementUnit.CUBIC_METRE,
+    )
+
+
 def _provenance_module() -> ModuleType:
     spec = find_spec("lokara_domain.provenance")
     assert spec is not None, "U1b requires lokara_domain.provenance"

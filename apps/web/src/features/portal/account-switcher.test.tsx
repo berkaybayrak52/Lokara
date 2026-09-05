@@ -104,9 +104,7 @@ describe('M5 account contexts', () => {
 
     expect(html).toContain('alt="Lokara"');
     expect(APP_SHELL_SOURCE).toContain('src="/lokara-logo.png"');
-    // Container-Deckel bewusst über den 00-A3-Default (1440) angehoben (lokale
-    // Demo-Fassung: weniger Totraum auf breiten Monitoren).
-    expect(APP_SHELL_SOURCE).toContain('max-w-[1800px]');
+    expect(APP_SHELL_SOURCE).toContain('max-w-[1440px]');
     expect(APP_SHELL_SOURCE).not.toContain('max-w-[1100px]');
     expect(APP_SHELL_SOURCE).not.toContain('grid size-8 shrink-0 grid-cols-2');
   });

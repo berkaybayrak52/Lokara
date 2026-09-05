@@ -45,16 +45,23 @@ if [[ $FRESH -eq 1 ]]; then
 fi
 
 step "Starting Postgres"
-docker compose up -d
+# The long-lived local stack may have been created under an earlier Compose
+# project name while retaining the locked `lokara-db` container name. Reuse
+# that exact preserved container when it exists; creating another one would
+# only fail on the name/port collision. `--fresh` still takes the explicit
+# destructive Compose path above.
+if ! docker start lokara-db >/dev/null 2>&1; then
+  docker compose up -d
+fi
 
 printf 'waiting for pg_isready'
 for _ in $(seq 1 40); do
-  if docker compose exec -T db pg_isready -U lokara -d lokara >/dev/null 2>&1; then
+  if docker exec lokara-db pg_isready -U lokara -d lokara >/dev/null 2>&1; then
     printf ' ok\n'; break
   fi
   printf '.'; sleep 1
 done
-docker compose exec -T db pg_isready -U lokara -d lokara >/dev/null 2>&1 \
+docker exec lokara-db pg_isready -U lokara -d lokara >/dev/null 2>&1 \
   || fail "Postgres did not become ready"
 
 # --- 2. schema ---------------------------------------------------------------------

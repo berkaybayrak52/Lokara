@@ -45,6 +45,7 @@ from .dwd import (
     PlzCentroid,
     StubAnnualClimateFactorGateway,
     assign_monthly_station,
+    assign_monthly_station_for_plz,
     merge_annual_climate_factors,
     parse_annual_climate_factor_csv,
     parse_annual_climate_factor_xml,
@@ -64,6 +65,8 @@ from .geocoding import (
     DisabledGeocodingGateway,
     GeocodingGateway,
     GeocodingResult,
+    PlzGeocodingGateway,
+    PlzGeocoordLookupError,
 )
 from .meter import (
     MeasurementUnit,
@@ -135,6 +138,8 @@ __all__ = [
     "MonthlyStationAssignment",
     "OutgoingEmail",
     "PlzCentroid",
+    "PlzGeocodingGateway",
+    "PlzGeocoordLookupError",
     "PriceIndexGateway",
     "PriceIndexValue",
     "ReadingReason",
@@ -153,6 +158,7 @@ __all__ = [
     "StubVisionGateway",
     "VisionGateway",
     "assign_monthly_station",
+    "assign_monthly_station_for_plz",
     "cents_from_provider_amount",
     "consumption_by_meter",
     "device_reading_segments",

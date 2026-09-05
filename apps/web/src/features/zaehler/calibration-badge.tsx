@@ -31,10 +31,20 @@ const STYLES: Record<
     glyph: '✓',
     text: (date) => `Geeicht bis ${date}`,
   },
+  MISSING_DATA: {
+    className: 'bg-warning-tint text-warning',
+    glyph: '?',
+    text: () => 'Eichdaten fehlen',
+  },
   NOT_APPLICABLE: {
     className: 'bg-mint text-forest',
     glyph: '–',
     text: () => 'Nicht eichpflichtig (Heizkostenverteiler)',
+  },
+  REVIEW_REQUIRED: {
+    className: 'bg-warning-tint text-warning',
+    glyph: '!',
+    text: () => 'Eichpflicht prüfen',
   },
 };
 

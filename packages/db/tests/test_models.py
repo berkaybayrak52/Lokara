@@ -15,6 +15,19 @@ from sqlalchemy.sql.schema import DefaultClause, Table
 
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent
 _UI03_MIGRATION = _DB_PACKAGE_DIR / "alembic" / "versions" / "0026_ui03_building_metadata.py"
+_GAS_METER_MIGRATION = _DB_PACKAGE_DIR / "alembic" / "versions" / "0033_add_gas_meter_type.py"
+
+METER_DEVICE_FACTS = {
+    ("HEAT_METER", "HEAT", "KWH"),
+    ("HEAT_COST_ALLOCATOR", "HEAT", "HKV_UNITS"),
+    ("WARM_WATER_METER", "WARM_WATER", "CUBIC_METRE"),
+    ("COLD_WATER_METER", "COLD_WATER", "CUBIC_METRE"),
+    ("GAS_METER", "HEAT", "CUBIC_METRE"),
+}
+_DEVICE_FACT_PATTERN = re.compile(
+    r"device_type\s*=\s*'([^']+)'\s+AND\s+kind\s*=\s*'([^']+)'\s+"
+    r"AND\s+measurement_unit\s*=\s*'([^']+)'"
+)
 
 
 def _server_default_text(table: Table, column: str) -> str:
@@ -40,8 +53,12 @@ EXPECTED_TABLES = {
     "renter",
     "building",
     "unit",
+    "unit_profile_version",
     "tenancy",
     "tenancy_party",
+    "tenancy_contract_version",
+    "tenancy_contract_position",
+    "tenancy_rent_change",
     "advance_payment_period",
     "advance_payment",
     "advance_allocation",
@@ -52,6 +69,7 @@ EXPECTED_TABLES = {
     "mdl_statement_position",
     "self_use_period",
     "statement",
+    "statement_draft",
     "statement_document_archive",
     "statement_settlement",
     "tenancy_delivery_address",
@@ -61,11 +79,14 @@ EXPECTED_TABLES = {
     "operating_cost_agreement",
     "confirmed_cost_classification",
     "meter",
+    "meter_lifecycle_event",
     "meter_reading",
     "heating_cost_entry",
+    "heating_billing_mode_version",
     # M6-C2 bank matching (docs/15, docs/02 § 6, migration 0017).
     "bank_account",
     "bank_transaction",
+    "bank_transaction_classification_event",
     "receivable",
     "renter_matching_profile",
     "iban_history",
@@ -402,3 +423,84 @@ class TestUi03BuildingMetadataMigration:
             "latitude",
             "longitude",
         }
+
+
+class TestGasMeterMigration:
+    def _source_and_tree(self) -> tuple[str, ast.Module]:
+        assert _GAS_METER_MIGRATION.exists(), (
+            "approved GAS_METER slice requires new migration 0033_add_gas_meter_type.py"
+        )
+        source = _GAS_METER_MIGRATION.read_text()
+        return source, ast.parse(source)
+
+    @staticmethod
+    def _function_source(source: str, tree: ast.Module, name: str) -> str:
+        function = next(
+            node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name
+        )
+        assert function.end_lineno is not None
+        return "\n".join(source.splitlines()[function.lineno - 1 : function.end_lineno])
+
+    def test_0033_is_new_history_directly_after_ui08(self) -> None:
+        source, _ = self._source_and_tree()
+        assert 'revision = "0033"' in source
+        assert 'down_revision = "0032"' in source
+
+    def test_0033_upgrade_opens_exactly_one_new_device_tuple(self) -> None:
+        source, tree = self._source_and_tree()
+        upgrade = self._function_source(source, tree, "upgrade")
+        assert set(_DEVICE_FACT_PATTERN.findall(upgrade)) == METER_DEVICE_FACTS
+
+    def test_0033_downgrade_restores_exactly_the_four_ui08_tuples(self) -> None:
+        source, tree = self._source_and_tree()
+        downgrade = self._function_source(source, tree, "downgrade")
+        assert set(_DEVICE_FACT_PATTERN.findall(downgrade)) == METER_DEVICE_FACTS - {
+            ("GAS_METER", "HEAT", "CUBIC_METRE")
+        }
+
+    def test_0034_repairs_legacy_combined_factors_without_relabelling_evidence(self) -> None:
+        """GAS-MIGRATION-01: schema changes never rewrite immutable legacy evidence."""
+        source_0033, tree_0033 = self._source_and_tree()
+        upgrade_0033 = self._function_source(source_0033, tree_0033, "upgrade")
+        repairs = list((_DB_PACKAGE_DIR / "alembic" / "versions").glob("0034_*.py"))
+        assert len(repairs) == 1, "legacy gas evidence requires one forward migration 0034"
+        source_0034 = repairs[0].read_text()
+        tree_0034 = ast.parse(source_0034)
+        upgrade_0034 = self._function_source(source_0034, tree_0034, "upgrade")
+
+        assert 'revision = "0034"' in source_0034
+        assert 'down_revision = "0033"' in source_0034
+        assert re.search(
+            r"op\.add_column\(\s*[\"']building_uvi_configuration[\"']\s*,\s*"
+            r"sa\.Column\(\s*[\"']condition_number[\"'].*?nullable=True",
+            upgrade_0033,
+            re.DOTALL,
+        )
+        for upgrade in (upgrade_0033, upgrade_0034):
+            assert not re.search(
+                r"UPDATE\s+(?:public\.)?building_uvi_configuration\b",
+                upgrade,
+                re.IGNORECASE,
+            )
+            assert not re.search(
+                r"SET\s+condition_number\s*=",
+                upgrade,
+                re.IGNORECASE,
+            )
+
+        assert "calorific_factor IS NOT NULL AND condition_number IS NULL" in upgrade_0034
+        paired_branch = re.search(
+            r"calorific_factor IS NOT NULL AND condition_number IS NOT NULL(?P<body>.*?)"
+            r"name=\"ck_building_uvi_configuration_conversion_components\"",
+            upgrade_0034,
+            re.DOTALL,
+        )
+        assert paired_branch is not None
+        for required_fact in (
+            "energy_source = 'Erdgas'",
+            "energy_reference = 'HO'",
+            "source_type = 'SUPPLIER_INVOICE'",
+            "rechtsstand = '08/2026'",
+            "verification_status = 'verify-before-production'",
+        ):
+            assert required_fact in paired_branch.group("body")

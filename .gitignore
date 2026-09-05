@@ -53,3 +53,5 @@ LAST_OUTPUT.md
 # so they carry a full tree that would otherwise show up as untracked noise.
 .claude/worktrees/
 visualization
+# local dev stack runtime state (scripts/dev.sh) -- pids and logs, never history
+.dev/

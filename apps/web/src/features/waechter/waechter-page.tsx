@@ -144,25 +144,45 @@ const guardTitles: Record<string, string> = {
 const guardBlockerLabels: Record<string, string> = {
   'W1-RENTER-DELIVERY-CONTEXT-MISSING': 'Zustellkontext für die Betriebskostenabrechnung fehlt.',
   'W2-APPROVED-RULE-BUNDLE-MISSING': 'Freigegebenes Regelwerk für die Eichfrist fehlt.',
+  'missing_warning_copy:last_day':
+    'Der verbindliche Warntext für den letzten Tag der Abrechnungsfrist fehlt.',
+  'missing_warning_copy:reminder_90_days':
+    'Der verbindliche Warntext für die 90-Tage-Erinnerung fehlt.',
+  missing_post_retrofit_rule:
+    'Die Regel für nicht fernablesbare Geräte nach Ablauf der Nachrüstfrist fehlt.',
+  missing_uvi_cadence_start:
+    'Der Startpunkt für den Versandrhythmus der Verbrauchsinformation fehlt.',
+  basis_year_mismatch:
+    'Die Indexwerte haben unterschiedliche Basisjahre und müssen vor der Berechnung angeglichen werden.',
 };
-const GUARD_BLOCKER_FALLBACK =
+const GUARD_AUTHORITY_BLOCKER_FALLBACK =
   'Die Rechts- oder Regelgrundlage muss vor dem Produktiveinsatz geprüft werden.';
+const GUARD_INTERNAL_BLOCKER_FALLBACK =
+  'Diese Auswertung enthält eine interne Produktionssperre. Die Ursache muss vor dem Produktiveinsatz geklärt werden.';
 const DELIVERY_BLOCKER_FALLBACK =
   'Zustellung gesperrt: Das Dokument ist noch nicht für den Versand freigegeben.';
 const internalCodePattern = /\b[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)+\b/;
+const lowercaseInternalKeyPattern = /^[a-z][a-z0-9]*(?:[_:][a-z0-9_]+)+$/;
 const verificationMarkerPattern = /verify-before-production|unsicher/i;
+const safeDeliveryDetails = new Set([
+  'Der SHA-256-Wert stimmt nicht mit den exakten Dokumentbytes überein.',
+]);
 
 function guardTitle(code: string): string {
   return guardTitles[code] ?? 'Unbekannter Wächter';
 }
 
 function guardBlockerLabel(blocker: string): string {
-  return (
-    guardBlockerLabels[blocker] ??
-    (verificationMarkerPattern.test(blocker) || internalCodePattern.test(blocker)
-      ? GUARD_BLOCKER_FALLBACK
-      : blocker)
-  );
+  const knownLabel = guardBlockerLabels[blocker];
+  if (knownLabel) return knownLabel;
+  if (verificationMarkerPattern.test(blocker)) return GUARD_AUTHORITY_BLOCKER_FALLBACK;
+  if (internalCodePattern.test(blocker) || lowercaseInternalKeyPattern.test(blocker))
+    return GUARD_INTERNAL_BLOCKER_FALLBACK;
+  return blocker;
+}
+
+function uniqueGuardBlockerLabels(blockers: string[]): string[] {
+  return [...new Set(blockers.map(guardBlockerLabel))];
 }
 
 function reminderChannelLabel(channel: string): string {
@@ -178,6 +198,7 @@ function suppressionReasonLabel(reason: string): string {
 }
 
 function deliveryBlockerLabel(blocker: string): string {
+  if (safeDeliveryDetails.has(blocker)) return blocker;
   return verificationMarkerPattern.test(blocker) || internalCodePattern.test(blocker)
     ? DELIVERY_BLOCKER_FALLBACK
     : blocker;
@@ -401,6 +422,10 @@ export function WaechterWorkspace(props: WaechterWorkspaceProps) {
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {guards.map((guard) => {
             const status = guardPresentation(guard.stage);
+            const warningLabel = guard.warningDe ? guardBlockerLabel(guard.warningDe) : null;
+            const blockerLabels = uniqueGuardBlockerLabels(guard.productionBlockers).filter(
+              (blocker) => blocker !== warningLabel,
+            );
             return (
               <Card key={guard.id} className="min-w-0 border-mint">
                 <CardHeader className="gap-2">
@@ -418,8 +443,8 @@ export function WaechterWorkspace(props: WaechterWorkspaceProps) {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {guard.warningDe ? (
-                    <p className="font-semibold text-ink">{guardBlockerLabel(guard.warningDe)}</p>
+                  {warningLabel ? (
+                    <p className="font-semibold text-ink">{warningLabel}</p>
                   ) : null}
                   <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                     <div>
@@ -437,14 +462,14 @@ export function WaechterWorkspace(props: WaechterWorkspaceProps) {
                     <div>
                       <dt className="text-sm font-semibold text-forest">Produktionssperre</dt>
                       <dd className="mt-1 text-ink">
-                        {guard.productionBlockers.length ? (
+                        {blockerLabels.length ? (
                           <ul className="list-disc space-y-1 pl-5">
-                            {guard.productionBlockers.map((blocker, index) => (
-                              <li key={`${guard.id}-blocker-${index}`}>
-                                {guardBlockerLabel(blocker)}
-                              </li>
+                            {blockerLabels.map((blocker) => (
+                              <li key={`${guard.id}-blocker-${blocker}`}>{blocker}</li>
                             ))}
                           </ul>
+                        ) : guard.productionBlockers.length && warningLabel ? (
+                          'Sperrgrund: siehe Hinweis oben.'
                         ) : (
                           'Keine in dieser Auswertung.'
                         )}

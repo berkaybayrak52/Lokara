@@ -5,7 +5,7 @@ The key is never stored on the cost row: choosing (or changing) it INSERTs an
 **deletes no entered data** — the old assignment stays as history (docs/03).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, HTTPException
 from lokara_db import (
@@ -19,12 +19,14 @@ from lokara_db import (
     new_id,
 )
 from lokara_domain import AllocationKey, cents, format_eur
-from lokara_rules_store import CataloguePosition, ContractFacts, classify_position
+from lokara_rules_store import CataloguePosition, ContractFacts, classify_position, list_catalogue
 from sqlalchemy import select
 
 from ..authorization import require_building, require_resource_building
 from ..deps import PathAccountSession
 from ..schemas import (
+    CostCataloguePositionOut,
+    CostCatalogueResponse,
     CostCreate,
     CostEntryOut,
     CostListResponse,
@@ -55,8 +57,8 @@ def _get_building(session: PathAccountSession, building_id: str) -> Building:
 def current_assignment(cost: CostEntry) -> AllocationKeyAssignment:
     """The newest assignment wins; ties broken by id so the order is total.
 
-    A cost always has at least one — creation writes it in the same
-    transaction, so a missing one is a bug, not a user-facing state.
+    Allocable costs always have at least one. Documented non-allocable costs
+    deliberately have none and must be handled before calling this helper.
     """
     if not cost.key_assignments:
         raise HTTPException(
@@ -66,7 +68,11 @@ def current_assignment(cost: CostEntry) -> AllocationKeyAssignment:
 
 
 def _cost_out(cost: CostEntry) -> CostEntryOut:
-    assignment = current_assignment(cost)
+    assignment = (
+        max(cost.key_assignments, key=lambda a: (a.created_at, a.id))
+        if cost.key_assignments
+        else None
+    )
     classification = max(
         cost.classifications, key=lambda row: (row.confirmed_at, row.id), default=None
     )
@@ -77,10 +83,10 @@ def _cost_out(cost: CostEntry) -> CostEntryOut:
         amount_eur=format_eur(cents(cost.amount_cents)),
         period_from=cost.period_from,
         period_to=cost.period_to,
-        key=assignment.key,
-        key_label=ALLOCATION_KEY_LABELS[assignment.key],
-        direct_unit_id=assignment.direct_unit_id,
-        direct_tenancy_id=assignment.direct_tenancy_id,
+        key=None if assignment is None else assignment.key,
+        key_label=None if assignment is None else ALLOCATION_KEY_LABELS[assignment.key],
+        direct_unit_id=None if assignment is None else assignment.direct_unit_id,
+        direct_tenancy_id=None if assignment is None else assignment.direct_tenancy_id,
         assignment_count=len(cost.key_assignments),
         catalogue_id=None if classification is None else classification.catalogue_id,
         classification_findings=[] if classification is None else classification.findings,
@@ -88,6 +94,25 @@ def _cost_out(cost: CostEntry) -> CostEntryOut:
         voided_at=cost.voided_at,
         void_reason=cost.void_reason,
         replaces_cost_id=cost.replaces_cost_entry_id,
+    )
+
+
+@router.get("/cost-catalogue")
+def get_cost_catalogue(account_id: str, session: PathAccountSession) -> CostCatalogueResponse:
+    """Expose display facts from the versioned server-owned BetrKV catalogue."""
+    del account_id, session  # account context is established by the dependency
+    return CostCatalogueResponse(
+        positions=[
+            CostCataloguePositionOut(
+                catalogue_id=rule.cost_type,
+                label=rule.label,
+                betrkv_number=rule.betrkv_number,
+                default_key=rule.default_key,
+                naming_required=rule.naming_required,
+                allocable=rule.allocable,
+            )
+            for rule in list_catalogue(date.today())
+        ]
     )
 
 
@@ -151,14 +176,19 @@ def create_cost(
             mehrbelastung_clause=True,
         ),
     )
-    if result.key is None:
-        raise HTTPException(status_code=422, detail="Kostenart ist nicht umlagefähig")
-    choice = KeyChoice(
-        key=result.key,
-        direct_unit_id=body.direct_unit_id,
-        direct_tenancy_id=body.direct_tenancy_id,
-    )
-    _validate_direct_target(session, building_id, choice)
+    choice = None
+    if result.key is not None:
+        choice = KeyChoice(
+            key=result.key,
+            direct_unit_id=body.direct_unit_id,
+            direct_tenancy_id=body.direct_tenancy_id,
+        )
+        _validate_direct_target(session, building_id, choice)
+    elif body.key_override is not None or body.direct_unit_id is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Nicht umlagefähige Kosten haben keinen Umlageschlüssel",
+        )
     if body.replaces_cost_id is not None:
         replaced = session.get(CostEntry, body.replaces_cost_id)
         if replaced is None or replaced.building_id != building_id or replaced.voided_at is None:
@@ -177,19 +207,23 @@ def create_cost(
         replaces_cost_entry_id=body.replaces_cost_id,
         new_cost=body.new_cost,
     )
-    assignment = AllocationKeyAssignment(
-        id=new_id(),
-        account_id=account_id,
-        cost_entry_id=cost.id,
-        key=choice.key,
-        direct_unit_id=choice.direct_unit_id,
-        direct_tenancy_id=choice.direct_tenancy_id,
+    assignment = (
+        AllocationKeyAssignment(
+            id=new_id(),
+            account_id=account_id,
+            cost_entry_id=cost.id,
+            key=choice.key,
+            direct_unit_id=choice.direct_unit_id,
+            direct_tenancy_id=choice.direct_tenancy_id,
+        )
+        if choice is not None
+        else None
     )
     classification = ConfirmedCostClassification(
         id=new_id(),
         account_id=account_id,
         cost_entry_id=cost.id,
-        allocation_key_assignment_id=assignment.id,
+        allocation_key_assignment_id=None if assignment is None else assignment.id,
         catalogue_id=result.rule_id,
         rule_source=result.resolved_rule.source,
         rule_rechtsstand=result.resolved_rule.rechtsstand,
@@ -203,7 +237,10 @@ def create_cost(
         special_rule_evidence=body.special_rule_evidence,
         production_blocked=result.production_blocked,
     )
-    session.add_all([cost, assignment, classification])
+    session.add(cost)
+    if assignment is not None:
+        session.add(assignment)
+    session.add(classification)
     session.flush()
     session.refresh(cost)
     return _cost_out(cost)
@@ -246,6 +283,12 @@ def reassign_key(
     if cost is None:  # unknown OR invisible under RLS — same answer
         raise HTTPException(status_code=404, detail="Cost entry not found")
     require_resource_building(session, cost.building_id)
+    previous = max(cost.classifications, key=lambda row: (row.confirmed_at, row.id), default=None)
+    if previous is not None and previous.key is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Nicht umlagefähige Kosten haben keinen Umlageschlüssel",
+        )
     _validate_direct_target(session, cost.building_id, body)
     assignment = AllocationKeyAssignment(
         id=new_id(),
@@ -256,7 +299,6 @@ def reassign_key(
         direct_tenancy_id=body.direct_tenancy_id,
     )
     session.add(assignment)
-    previous = max(cost.classifications, key=lambda row: (row.confirmed_at, row.id), default=None)
     if previous is not None:
         session.add(
             ConfirmedCostClassification(

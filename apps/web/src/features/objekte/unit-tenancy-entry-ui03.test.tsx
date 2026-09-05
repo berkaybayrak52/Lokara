@@ -9,7 +9,7 @@ import { UnitDetailPage } from './unit-detail-page';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
-const mocks = vi.hoisted(() => ({ useUnitDetail: vi.fn() }));
+const mocks = vi.hoisted(() => ({ useUnitDashboard: vi.fn() }));
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -21,8 +21,10 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/form-draft', () => ({
   useFormDraft: () => ({ draftRestored: false, clearDraft: vi.fn() }),
 }));
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
 vi.mock('./queries', () => ({
-  useUnitDetail: mocks.useUnitDetail,
+  useUnitDashboard: mocks.useUnitDashboard,
+  useCreateUnitProfileVersion: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateTenancy: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -47,17 +49,47 @@ describe('UI-03 tenancy entry on UnitDetailPage', () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    mocks.useUnitDetail.mockReturnValue({
+    mocks.useUnitDashboard.mockReturnValue({
       isPending: false,
       isError: false,
       data: {
+        asOf: '2026-08-28',
         id: 'unit-1',
         label: 'Wohnung 1 (EG links)',
-        areaSqm: 64.5,
+        areaSqmX100: 6450,
+        areaSqmDisplay: '64,50',
         buildingId: 'building-1',
         buildingName: 'Musterstraße 12',
-        tenancies: [],
-        selfUsePeriods: [],
+        buildingAddress: 'Musterstraße 12, 60311 Frankfurt am Main',
+        state: 'VACANT',
+        stateLabel: 'Leerstand',
+        profile: {
+          version: null,
+          usageType: null,
+          usageLabel: 'Nicht dokumentiert',
+          roomsX100: null,
+          roomsDisplay: null,
+          amenities: [],
+          amenityLabels: [],
+          amenityNote: null,
+          evidenceRef: null,
+        },
+        currentTenancy: null,
+        history: [],
+        historyTotal: 0,
+        historyHasMore: false,
+        documents: [],
+        modules: [],
+        primaryAction: {
+          key: 'CREATE_TENANCY',
+          label: 'Jetzt Mietverhältnis erstellen',
+          href: '#aktuelles-mietverhaeltnis',
+        },
+        permissions: {
+          canEditProfile: false,
+          canCreateTenancy: true,
+          canRecordContractFacts: false,
+        },
       },
     });
   });

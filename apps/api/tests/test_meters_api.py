@@ -29,19 +29,23 @@ visible and the statement follows the correction.
 import os
 import time
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jwt
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from lokara_api import create_app
+from lokara_api import create_app, statement_service
+from lokara_api.schemas import MeterCreate
 from lokara_api.settings import ApiSettings
-from lokara_db import DbSettings, create_db_engine
+from lokara_db import DbSettings, create_db_engine, new_id
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
+from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -75,25 +79,12 @@ def client() -> Iterator[TestClient]:
     command.upgrade(Config(str(_DB_PACKAGE_DIR / "alembic.ini")), "head")
     with Session(owner) as session, session.begin():
         seed_demo(session)
-        # Deterministic start: exactly the seeded meters, readings and heating
-        # invoice. Leftovers from an interrupted run (an extra reading, a second
-        # heating cost) would break the exact golden assertions below.
-        session.execute(
-            text("DELETE FROM meter_reading WHERE account_id = :a AND id NOT LIKE 'mr_met_demo_%'"),
-            {"a": DEMO_ACCOUNT_ID},
-        )
-        session.execute(
-            text("DELETE FROM meter WHERE account_id = :a AND id NOT LIKE 'met_demo_%'"),
-            {"a": DEMO_ACCOUNT_ID},
-        )
-        session.execute(
-            text(
-                "DELETE FROM heating_cost_entry WHERE account_id = :a AND id <> 'hcost_demo_2025'"
-            ),
-            {"a": DEMO_ACCOUNT_ID},
-        )
     owner.dispose()
-    yield TestClient(create_app())
+    test_client = TestClient(create_app())
+    try:
+        yield test_client
+    finally:
+        test_client.close()
 
 
 def _token(person_id: str) -> dict[str, str]:
@@ -132,6 +123,16 @@ def _statement(client: TestClient) -> dict[str, Any]:
     return body
 
 
+def _retire_meter(client: TestClient, meter_id: str, effective_on: date) -> None:
+    response = client.post(
+        f"{BASE}/meters/{meter_id}/remove",
+        headers=DEMO,
+        json={"effectiveOn": effective_on.isoformat(), "reason": "Testgerät ausgebaut"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["lifecycleStatus"] == "REMOVED"
+
+
 # `docs/08` → "Die Eigentümerzeile" (14.08.2026). The landlord side of a
 # Liegenschaft is **one** row — the residual `Gesamtkosten abzüglich Σ Mieteranteile` —
 # so it is labelled `Eigentümeranteil` and no longer
@@ -164,7 +165,7 @@ class TestSeededMeters:
     def test_building_and_unit_meters_are_both_present(self, client: TestClient) -> None:
         meters = _meters(client)
         building_level = [m for m in meters if m["unitId"] is None]
-        assert {m["serial"] for m in building_level} == {
+        assert {m["serial"] for m in building_level} >= {
             "WMZ-2022-004711",
             "WWZ-2022-118342",
         }
@@ -174,7 +175,17 @@ class TestSeededMeters:
         heat = {m["serial"]: m["measurementUnit"] for m in meters if m["kind"] == "HEAT"}
         assert heat["WMZ-2022-004711"] == "KWH"
         assert heat["HKV-A-100231"] == "HKV_UNITS"
-        assert {m["valuationFactorX1000"] for m in meters if m["kind"] == "HEAT"} == {1000}
+        canonical_heat_serials = {
+            "WMZ-2022-004711",
+            "HKV-A-100231",
+            "HKV-B-100232",
+            "HKV-C-100233",
+        }
+        assert {
+            m["serial"]: m["valuationFactorX1000"]
+            for m in meters
+            if m["serial"] in canonical_heat_serials
+        } == {serial: 1000 for serial in canonical_heat_serials}
         assert all(m["valuationFactorX1000"] is None for m in meters if m["kind"] != "HEAT")
 
     def test_period_consumption_matches_the_engine_inputs(self, client: TestClient) -> None:
@@ -188,7 +199,7 @@ class TestSeededMeters:
 
     def test_german_labels_and_unit_symbols(self, client: TestClient) -> None:
         meter = _meter(client, "met_demo_ww_main")
-        assert meter["kindLabel"] == "Warmwasser"
+        assert meter["kindLabel"] == "Warmwasserzähler"
         assert meter["unitSymbol"] == "m³"
         assert meter["unitLabel"] is None  # building-level
 
@@ -198,10 +209,13 @@ class TestSeededMeters:
             headers=DEMO,
             json={
                 "unitId": "unit_demo_a",
+                "deviceType": "HEAT_COST_ALLOCATOR",
                 "kind": "HEAT",
                 "measurementUnit": "HKV_UNITS",
-                "serial": "HKV-A-PAGE01B",
+                "serial": f"HKV-A-PAGE01B-{new_id()}",
                 "label": "Arbeitszimmer",
+                "installedOn": "2025-01-01",
+                "calibrationDataState": "NOT_APPLICABLE",
                 "valuationFactorX1000": 1250,
             },
         )
@@ -228,7 +242,7 @@ class TestSeededMeters:
         assert reading["estimatedConsumptionX1000"] == 30000
         assert reading["estimationBasis"] == "Vorjahreswert 2024"
         assert reading["provenanceRef"] == "MDL-Datei Zeile 17"
-        assert client.delete(f"{BASE}/meters/{meter_id}", headers=DEMO).status_code == 204
+        _retire_meter(client, meter_id, date(2025, 12, 31))
 
 
 class TestEichfrist:
@@ -252,20 +266,25 @@ class TestEichfrist:
     def test_status_is_computed_not_stored(self, client: TestClient) -> None:
         """A meter created with an Eichfrist just inside the warning window
         reports EXPIRING_SOON — derived on read, so it can never go stale."""
-        soon = date.today() + timedelta(days=30)
+        today = date.today()
         created = client.post(
             f"{BASE}/buildings/{DEMO_BUILDING_ID}/meters",
             headers=DEMO,
             json={
+                "unitId": "unit_demo_c",
+                "deviceType": "COLD_WATER_METER",
                 "kind": "COLD_WATER",
                 "measurementUnit": "CUBIC_METRE",
-                "serial": "KWZ-SOON-1",
-                "calibrationValidUntil": soon.isoformat(),
+                "serial": f"KWZ-SOON-{new_id()}",
+                "installedOn": "2025-01-01",
+                "calibrationDataState": "DATA_AVAILABLE",
+                "calibrationDate": f"{today.year - 6}-01-01",
+                "calibrationEvidenceRef": "Test-Gerätekennzeichnung",
             },
         )
         assert created.status_code == 201
         assert created.json()["calibrationStatus"] == "EXPIRING_SOON"
-        client.delete(f"{BASE}/meters/{created.json()['id']}", headers=DEMO)
+        _retire_meter(client, created.json()["id"], today)
 
 
 class TestHeatingStatementFromRealReadings:
@@ -336,23 +355,30 @@ class TestReadingsAreCreateOnly:
         """Not a style preference: without an edit path, a billed reading can
         never be rewritten after the fact (GoBD / § 147 AO)."""
         paths: dict[str, dict[str, Any]] = create_app().openapi()["paths"]
-        reading_routes = {
+        destructive_reading_routes = {
             (path, method.upper())
             for path, methods in paths.items()
             if "readings" in path
             for method in methods
+            if method.upper() in {"PUT", "PATCH", "DELETE"}
         }
-        assert reading_routes == {("/a/{account_id}/meters/{meter_id}/readings", "POST")}
+        assert destructive_reading_routes == set()
+        assert "post" in paths["/a/{account_id}/meters/{meter_id}/readings"]
 
     def test_a_correction_supersedes_without_deleting_and_moves_the_statement(
         self, client: TestClient
     ) -> None:
         """The full loop: append a wrong closing reading, watch the statement
         follow it, append a correction, watch the goldens come back — with all
-        three rows still on file."""
+        prior rows still on file."""
         before = _meter(client, "met_demo_heat_b")
         readings_before = len(before["readings"])
         assert before["periodConsumptionDisplay"] == "250 Einheiten"
+        effective_before = next(
+            reading
+            for reading in before["readings"]
+            if not reading["superseded"] and reading["readAt"] == "2025-12-31"
+        )
 
         # ── a typo: 3.850 instead of 3.650 on the closing date ──────────────
         typo = client.post(
@@ -361,11 +387,18 @@ class TestReadingsAreCreateOnly:
             json={
                 "readAt": "2025-12-31",
                 "valueX1000": 3_850_000,
-                "reason": "PERIODIC",
+                "reason": "CORRECTION",
+                "supersedesReadingId": effective_before["id"],
+                "confirmationNote": "Zahlendreher im Testfall",
             },
         )
         assert typo.status_code == 201
         assert typo.json()["periodConsumptionDisplay"] == "450 Einheiten"
+        effective_typo = next(
+            reading
+            for reading in typo.json()["readings"]
+            if not reading["superseded"] and reading["readAt"] == "2025-12-31"
+        )
         # The statement really recomputed — B's consumption share moved.
         assert _unit_b_heating(client)[0]["heatingConsumptionEur"] != f"776,39{NBSP}€"
 
@@ -378,6 +411,8 @@ class TestReadingsAreCreateOnly:
                 "valueX1000": 3_650_000,
                 "reason": "CORRECTION",
                 "note": "Zahlendreher korrigiert",
+                "supersedesReadingId": effective_typo["id"],
+                "confirmationNote": "Zahlendreher korrigiert",
             },
         )
         assert fixed.status_code == 201
@@ -400,42 +435,213 @@ class TestReadingsAreCreateOnly:
         assert renter["heatingConsumptionEur"] == f"776,39{NBSP}€"
         assert landlord["heatingConsumptionEur"] == f"554,87{NBSP}€"
 
-        # Clean up so the module's other tests keep their exact fixture.
-        with Session(create_db_engine(DbSettings().direct_url)) as session, session.begin():
-            session.execute(
-                text(
-                    "DELETE FROM meter_reading WHERE account_id = :a "
-                    "AND id NOT LIKE 'mr_met_demo_%'"
-                ),
-                {"a": DEMO_ACCOUNT_ID},
-            )
-
 
 class TestMissingInputsRefuseRatherThanGuess:
     def test_without_the_building_heat_meter_the_statement_says_so(
-        self, client: TestClient
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A Heizkostenabrechnung on a guessed energy total is not
         "approximately right", it is wrong — so the API refuses and explains,
         while the Betriebskosten still compute."""
-        engine = create_db_engine(DbSettings().direct_url)
-        with Session(engine) as session, session.begin():
-            session.execute(text("DELETE FROM meter_reading WHERE meter_id = 'met_demo_heat_main'"))
-        try:
+        original_meter_facts = statement_service._meter_facts
+
+        def without_total_energy(*args: Any, **kwargs: Any) -> statement_service.MeterFacts:
+            return replace(original_meter_facts(*args, **kwargs), total_energy_kwh=None)
+
+        with monkeypatch.context() as scoped:
+            scoped.setattr(statement_service, "_meter_facts", without_total_energy)
             body = _statement(client)
             assert body["heatingLines"] == []
             assert body["co2"] is None
             assert "Wärmemengenzähler" in body["heatingMissingReason"]
             # The NK half is untouched — one missing meter must not block it.
             assert body["nkTotalCents"] == 120000
-        finally:
-            with Session(engine) as session, session.begin():
-                seed_demo(session)
-            engine.dispose()
         assert _statement(client)["heatingMissingReason"] is None
 
 
 class TestMeterValidation:
+    @staticmethod
+    def _gas_payload(
+        *, serial: str, valid_from: date, supplier_reference: str
+    ) -> dict[str, object]:
+        return {
+            "deviceType": "GAS_METER",
+            "serial": serial,
+            "installedOn": valid_from.isoformat(),
+            "calibrationDataState": "REVIEW_REQUIRED",
+            "gasConversion": {
+                "calorificFactorKwhPerM3": "10.2500",
+                "conditionNumber": "0.9500",
+                "validFrom": valid_from.isoformat(),
+                "validTo": None,
+                "supplierInvoiceReference": supplier_reference,
+            },
+        }
+
+    def test_gas_conversion_schema_is_required_exclusive_exact_and_server_derived(self) -> None:
+        payload = self._gas_payload(
+            serial="GAS-SCHEMA-01",
+            valid_from=date(2027, 1, 1),
+            supplier_reference="supplier-invoice-schema-01",
+        )
+        parsed = MeterCreate.model_validate(payload)
+        assert parsed.kind is not None
+        assert parsed.measurement_unit is not None
+        assert parsed.kind.value == "HEAT"
+        assert parsed.measurement_unit.value == "CUBIC_METRE"
+        assert parsed.gas_conversion is not None
+        assert parsed.gas_conversion.calorific_factor_kwh_per_m3 == Decimal("10.2500")
+        assert parsed.gas_conversion.condition_number == Decimal("0.9500")
+
+        rejected = (
+            ({key: value for key, value in payload.items() if key != "gasConversion"},),
+            (
+                {
+                    **payload,
+                    "gasConversion": {
+                        key: value
+                        for key, value in cast(dict[str, object], payload["gasConversion"]).items()
+                        if key != "conditionNumber"
+                    },
+                },
+            ),
+            (
+                {
+                    **payload,
+                    "deviceType": "HEAT_METER",
+                    "gasConversion": cast(dict[str, object], payload["gasConversion"]),
+                },
+            ),
+        )
+        for (invalid,) in rejected:
+            with pytest.raises(ValidationError) as error:
+                MeterCreate.model_validate(invalid)
+            assert any(
+                "gas" in ".".join(str(part) for part in detail["loc"]).lower()
+                or "gas" in detail["msg"].lower()
+                for detail in error.value.errors()
+            )
+
+    def test_gas_meter_creation_appends_exact_supplier_configuration_and_exposes_it(
+        self, client: TestClient
+    ) -> None:
+        engine = create_db_engine(DbSettings().direct_url)
+        try:
+            with engine.connect() as connection:
+                latest = connection.scalar(
+                    text(
+                        "SELECT max(valid_from) FROM building_uvi_configuration"
+                        " WHERE building_id = :building_id"
+                    ),
+                    {"building_id": DEMO_BUILDING_ID},
+                )
+            first_valid_from = (latest or date(2025, 1, 1)) + timedelta(days=1)
+            second_valid_from = first_valid_from + timedelta(days=1)
+            first_reference = f"supplier-invoice-{new_id()}"
+            second_reference = f"supplier-invoice-{new_id()}"
+
+            first = client.post(
+                f"{BASE}/buildings/{DEMO_BUILDING_ID}/meters",
+                headers=DEMO,
+                json=self._gas_payload(
+                    serial=f"GAS-{new_id()}",
+                    valid_from=first_valid_from,
+                    supplier_reference=first_reference,
+                ),
+            )
+            assert first.status_code == 201, first.text
+            assert first.json()["kind"] == "HEAT"
+            assert first.json()["measurementUnit"] == "CUBIC_METRE"
+            assert first.json()["deviceTypeLabel"] == "Gaszähler"
+            assert first.json()["gasConversion"] == {
+                "calorificFactorKwhPerM3": "10.2500",
+                "conditionNumber": "0.9500",
+                "validFrom": first_valid_from.isoformat(),
+                "validTo": None,
+                "supplierInvoiceReference": first_reference,
+                "sourceType": "SUPPLIER_INVOICE",
+                "sourceId": first_reference,
+                "rechtsstand": "08/2026",
+                "verificationStatus": "verify-before-production",
+                "configurationId": first.json()["gasConversion"]["configurationId"],
+                "supersedesConfigurationId": first.json()["gasConversion"][
+                    "supersedesConfigurationId"
+                ],
+            }
+
+            with engine.connect() as connection:
+                first_before = (
+                    connection.execute(
+                        text(
+                            "SELECT id, calorific_factor, condition_number, valid_from, valid_to,"
+                            " source_type, source_id, rechtsstand, verification_status,"
+                            " supersedes_configuration_id FROM building_uvi_configuration"
+                            " WHERE source_id = :source_id"
+                        ),
+                        {"source_id": first_reference},
+                    )
+                    .mappings()
+                    .one()
+                )
+
+            second_payload = self._gas_payload(
+                serial=f"GAS-{new_id()}",
+                valid_from=second_valid_from,
+                supplier_reference=second_reference,
+            )
+            cast(dict[str, object], second_payload["gasConversion"])["calorificFactorKwhPerM3"] = (
+                "11.1250"
+            )
+            cast(dict[str, object], second_payload["gasConversion"])["conditionNumber"] = "0.9750"
+            second = client.post(
+                f"{BASE}/buildings/{DEMO_BUILDING_ID}/meters",
+                headers=DEMO,
+                json=second_payload,
+            )
+            assert second.status_code == 201, second.text
+
+            with engine.connect() as connection:
+                first_after = (
+                    connection.execute(
+                        text(
+                            "SELECT id, calorific_factor, condition_number, valid_from, valid_to,"
+                            " source_type, source_id, rechtsstand, verification_status,"
+                            " supersedes_configuration_id FROM building_uvi_configuration"
+                            " WHERE source_id = :source_id"
+                        ),
+                        {"source_id": first_reference},
+                    )
+                    .mappings()
+                    .one()
+                )
+                second_row = (
+                    connection.execute(
+                        text(
+                            "SELECT id, calorific_factor, condition_number, valid_from, valid_to,"
+                            " source_type, source_id, rechtsstand, verification_status,"
+                            " supersedes_configuration_id FROM building_uvi_configuration"
+                            " WHERE source_id = :source_id"
+                        ),
+                        {"source_id": second_reference},
+                    )
+                    .mappings()
+                    .one()
+                )
+
+            assert dict(first_after) == dict(first_before)
+            assert first_before["calorific_factor"] == Decimal("10.2500")
+            assert first_before["condition_number"] == Decimal("0.9500")
+            assert first_before["valid_from"] == first_valid_from
+            assert first_before["valid_to"] is None
+            assert first_before["source_type"] == "SUPPLIER_INVOICE"
+            assert first_before["verification_status"] == "verify-before-production"
+            assert second_row["supersedes_configuration_id"] == first_before["id"]
+            assert second_row["calorific_factor"] == Decimal("11.1250")
+            assert second_row["condition_number"] == Decimal("0.9750")
+            assert second.json()["gasConversion"]["supersedesConfigurationId"] == first_before["id"]
+        finally:
+            engine.dispose()
+
     def test_a_water_meter_cannot_be_created_in_kwh(self, client: TestClient) -> None:
         """A Kaltwasserzähler counting kWh would silently corrupt the § 9
         denominator, so the boundary rejects it."""
@@ -443,9 +649,12 @@ class TestMeterValidation:
             f"{BASE}/buildings/{DEMO_BUILDING_ID}/meters",
             headers=DEMO,
             json={
+                "deviceType": "COLD_WATER_METER",
                 "kind": "COLD_WATER",
                 "measurementUnit": "KWH",
-                "serial": "KWZ-BOGUS-1",
+                "serial": f"KWZ-BOGUS-{new_id()}",
+                "installedOn": "2025-01-01",
+                "calibrationDataState": "MISSING_DATA",
             },
         )
         assert response.status_code == 422
@@ -455,9 +664,12 @@ class TestMeterValidation:
             f"{BASE}/buildings/{DEMO_BUILDING_ID}/meters",
             headers=DEMO,
             json={
+                "deviceType": "WARM_WATER_METER",
                 "kind": "WARM_WATER",
                 "measurementUnit": "CUBIC_METRE",
                 "serial": "WWZ-2022-118342",
+                "installedOn": "2025-01-01",
+                "calibrationDataState": "MISSING_DATA",
             },
         )
         assert response.status_code == 422
@@ -474,9 +686,6 @@ class TestMeterValidation:
                 "houseNumber": "3",
                 "postalCode": "60313",
                 "city": "Frankfurt am Main",
-                "houseNumber": "1",
-                "buildingType": "WOHNHAUS",
-                "isResidential": True,
             },
         ).json()
         response = client.post(
@@ -484,9 +693,12 @@ class TestMeterValidation:
             headers=DEMO,
             json={
                 "unitId": "unit_demo_a",  # belongs to the demo building
+                "deviceType": "HEAT_COST_ALLOCATOR",
                 "kind": "HEAT",
                 "measurementUnit": "HKV_UNITS",
-                "serial": "HKV-X-1",
+                "serial": f"HKV-X-{new_id()}",
+                "installedOn": "2025-01-01",
+                "calibrationDataState": "NOT_APPLICABLE",
             },
         )
         assert response.status_code == 422

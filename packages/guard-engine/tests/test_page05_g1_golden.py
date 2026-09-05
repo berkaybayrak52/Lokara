@@ -118,6 +118,11 @@ W2_RULES = MeterCalibrationRuleBundle(
         "electricity": 8,
         "gas": 8,
     },
+    legacy_years_by_medium={
+        "warm_water": 5,
+        "heat_meter": 5,
+        "heat_exchanger_hot_water": 5,
+    },
     medium_labels_de={
         "cold_water": "Kaltwasser",
         "warm_water": "Warmwasser",

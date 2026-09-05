@@ -5,6 +5,10 @@ calculation and provenance, versioned Heizspiegel rules, annual/monthly DWD norm
 account-scoped UVI persistence, owner-side generation, immutable run archives and a separate
 German renter document downloadable by the owner. This engineering status is not production
 clearance, renter publication, scheduled delivery, email delivery or legal approval.
+The later `GAS_METER` extension approved on 28.08.2026 is implemented on `development`, including
+migrations `0033`/`0034`, period-specific split conversion evidence and API regressions. The central,
+remotely-read warm-water extension in § 8.3 also has engine, API and PDF implementation and golden
+coverage. Their applicability and content authority remain production-blocking under § 12.
 
 **Rechtsstand:** 07/2026 unless a row below carries its own date. `geprüft` means that the
 primary text was read, not that a lawyer approved the rule. Every `verify-before-production` flag
@@ -21,6 +25,7 @@ remains effective.
 - `berkay-work/Spec-Seiten/05 · Wächter Fristen 3a95fd42073181038246e579777508f9.md`
 - `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`
 - `Antwort-an-Emir_04.md` § 7
+- Berkay's decision record `10_UVI-CUBIC-METRE-vs-Zaehler_ANTWORT.md`, 28.08.2026
 
 The structured register controls values and production flags. Approved supersessions in this
 document control explicit method corrections. The data-only oracle is
@@ -61,10 +66,18 @@ The later sources settle these corrections:
     units, carries a provisional label, and blocks if that measured building total is missing.
 11. Missing monthly weather data produces a raw comparison labelled
     “nicht witterungsbereinigt”. It never inserts an implicit factor of `1.00`.
+12. Berkay's 28.08.2026 decision extends UI-08 Z4 by exactly one device combination:
+    `GAS_METER + HEAT + CUBIC_METRE`. It supersedes the earlier four-type list and the UI-08
+    non-goal that excluded gas meters from that round; it does not open any other combination.
+13. Gas volume becomes heat only through the supplier-invoice facts Brennwert and Zustandszahl.
+    A single hard-coded, guessed or provenance-free conversion factor is superseded.
+14. The UVI duty is governed by § 6a HeizkostenV, not § 5. Whether it applies to the landlord
+    in a direct renter gas-supply setup remains setup-dependent and `verify-before-production`.
 
 Round 4 specifies the monthly DWD degree-day dataset and Lokara's station-to-PLZ assignment rule.
-Production Blocks C and D2 remain blocked by the unchosen PLZ geodataset and the three missing UVI
-register rows requested in `FRAGEN-an-Berkay-05.md`. The transcription itself is not blocked.
+The production PLZ-centroid default is now selected in § 7.2. Production Blocks C and D2 remain
+blocked by the three missing UVI register rows requested in `FRAGEN-an-Berkay-05.md` and the other
+authority limits in § 12. The transcription itself is not blocked.
 
 ## 2. Legal and register inventory
 
@@ -123,7 +136,7 @@ Normalized computation inputs are:
 - `area_sqm_x100` and the chosen comparable device category;
 - ordered readings and meter unit `KWH | CUBIC_METRE | HKV_UNITS`;
 - explicit allocator marker; do not infer HKV solely from the measurement unit;
-- versioned calorific factors when a physical volume must become kWh;
+- versioned supplier-invoice Brennwert and Zustandszahl when gas volume must become kWh;
 - measured rolling building heat total for the HKV provisional path;
 - current/prior monthly heat kWh, current/prior-month heat kWh;
 - location/year/month-specific degree days for Block C and D2;
@@ -151,9 +164,11 @@ is the unique leaf of that correction chain. The predecessor is never updated.
 
 `building_uvi_configuration` is effective-dated and append-only. Each account-scoped version binds
 a building to one U2 canonical energy-source identifier, `EnergyReference`, the explicit HKV
-allocator marker, an optional exact `Decimal` calorific factor, the complete source identity pair
-`source_type` plus `source_id`, `Rechtsstand` and verification status. A changed configuration
-inserts a row with `supersedes_configuration_id`; it
+allocator marker, optional exact `Decimal` `calorific_factor` (the Brennwert in kWh/m³) and
+`condition_number` components, the complete source identity pair `source_type` plus `source_id`,
+`Rechtsstand` and verification status. New evidence has both components together or neither;
+neither may be zero or negative. The bounded pre-0033 legacy exception is specified in § 3.2. A
+changed configuration inserts a row with `supersedes_configuration_id`; it
 does not close or update the predecessor. The predecessor must belong to the same account and
 building, one row has at most one direct successor, and self-reference, branching and cycles are
 refused. A successor's `valid_from` is strictly later than its predecessor's. For month M,
@@ -164,6 +179,11 @@ open-ended predecessor may therefore be superseded by INSERT without mutation. N
 `HeatingCostEntry.label` nor `MeasurementUnit` determines any configuration fact. The
 whole-building size class remains derived from the sum of the building's unit areas; it is not
 duplicated here.
+
+One selected configuration must cover the complete half-open calendar month `[M, next M)`. A
+`valid_from`, `valid_to` or successor boundary strictly inside that month blocks the month; Lokara
+never applies one component pair to consumption on both sides of a boundary. A boundary exactly at
+`M` or `next M` is valid for the adjoining month.
 
 `uvi_building_monthly_evidence` is the immutable building-side counterpart to a unit's normalized
 month. It carries account, building, calendar month, the selected building-level main meter and
@@ -196,11 +216,82 @@ cross-context predecessors are refused. Existing evidence and source links are n
 deleted.
 
 The pure normalized-month Block A boundary consumes the persisted monthly movement plus its
-measurement unit, energy reference and optional calorific factor. It never fabricates cumulative
+measurement unit, energy reference and optional Brennwert and Zustandszahl. It multiplies the two
+components only at this boundary and never persists or invents a replacement source fact. It never
+fabricates cumulative
 start/end readings. HKV additionally requires the explicit allocator, the same-month measured
 building-level heat total × 1000 and the unit/building HKV movements from the current
 `uvi_building_monthly_evidence` leaf. The existing raw-reading links remain the audit evidence
 behind the normalized unit movement.
+
+### 3.2 GAS_METER volume conversion (decision 28.08.2026, Rechtsstand 08/2026)
+
+This is a product/domain decision transcribed from Berkay's
+`10_UVI-CUBIC-METRE-vs-Zaehler_ANTWORT.md`. Its source context is UI-08 Z4. It deliberately
+supersedes that Page's former four-type list and its Z16 gas-meter non-goal without changing the
+other four combinations:
+
+| Device type | Medium | Unit |
+| --- | --- | --- |
+| `HEAT_METER` | `HEAT` | `KWH` |
+| `HEAT_COST_ALLOCATOR` | `HEAT` | `HKV_UNITS` |
+| `WARM_WATER_METER` | `WARM_WATER` | `CUBIC_METRE` |
+| `COLD_WATER_METER` | `COLD_WATER` | `CUBIC_METRE` |
+| `GAS_METER` | `HEAT` | `CUBIC_METRE` |
+
+`GAS_METER` is Erdgas-only. Oil and pellets are delivery evidence measured in litre/kg and do not
+enter this meter type. `GAS_METER + WARM_WATER`, `GAS_METER + COLD_WATER`, `GAS_METER + KWH`, and
+every other unlisted tuple are invalid at the domain, API and database boundaries.
+
+For an effective gas configuration and monthly gas movement:
+
+```text
+heat_kwh = gas_movement_m3
+           * calorific_factor_kwh_per_m3
+           * condition_number
+```
+
+`calorific_factor` is the supplier-invoice Brennwert, not a pre-multiplied system constant.
+`condition_number` is the supplier-invoice Zustandszahl. The two exact `Decimal` components live
+on the same append-only effective-dated `building_uvi_configuration` version. Its `valid_from`,
+optional `valid_to`, `source_type`, `source_id`, `Rechtsstand` and verification status apply to
+both. A persisted row carrying both components has exactly `energy_source = Erdgas`,
+`energy_reference = HO`, `source_type = SUPPLIER_INVOICE`, `Rechtsstand = 08/2026` and
+`verification_status = verify-before-production`; the two numbers are supplier facts, not legal
+rates or defaults. A successor is resolved separately for the target, previous and prior-year
+comparison months. Missing, half-present, non-positive or out-of-period components block conversion; the
+system never guesses the other component. Any default may exist only as separately versioned,
+overridable evidence and must remain visibly identified as such; it is never an engine constant.
+
+Migrations `0033` and `0034` are included in the verified checkpoint. Migration `0033` adds nullable
+`condition_number` without an `UPDATE` or backfill, so every preexisting append-only row keeps its
+combined `calorific_factor`, original source and stamps unchanged. Migration `0034` applies the
+final constraint without mutating existing configuration evidence or inferring legacy status from
+supplier or legal metadata. A legacy combined factor with `condition_number = NULL` remains valid
+persisted evidence, but its missing Zustandszahl blocks new gas conversion until a source-backed
+successor supplies both components in the exact shape above. This design supersedes the former
+statement that “Migration `0033` has already been applied and must not be edited”; that statement
+must not be restored.
+
+The immutable UVI archive and renter-visible provenance retain, for every compared month, both
+component values, their effective period and the supplier-invoice source identity used. A source
+or factor change creates a successor configuration and changes the run hash; it never rewrites an
+older run.
+
+Once any `MeterReading` exists, the referenced meter cannot be deleted and its historical identity
+or calculation meaning cannot be changed in place. This freezes `id`, account/building/unit scope,
+`device_type`, `kind`, `measurement_unit`, `serial`, `installed_on` and
+`valuation_factor_x1000`. A physical or calculation change uses the existing replacement lifecycle
+and a new meter; old readings retain the old meter facts.
+
+The MVP reuses the generic meter lifecycle, installation, calibration and remote-readability
+fields. A gas meter's differing calibration period is a known simplification; no gas-specific
+deadline, legal consequence or lifecycle calculation is invented in this slice.
+
+Legal limit: § 6a HeizkostenV is the UVI provision; § 5 governs equipment. In a gas-floor-heating
+setup with a direct renter/supplier contract, whether the landlord owes UVI is fact-dependent.
+That trigger, and whether the first supplier invoice exposes both inputs as expected, must be
+checked on the real first case before Lokara presents this path as compliant.
 
 ## 4. Shared calculation and output rules
 
@@ -243,6 +334,7 @@ For consecutive compatible readings:
 movement = (end.value_x1000 - start.value_x1000) / 1000
 KWH:          heat_kwh = movement
 CUBIC_METRE:  heat_kwh = movement * versioned_calorific_factor
+                                      * versioned_condition_number
 HKV_UNITS:    heat_kwh = measured_rolling_building_heat_kwh
                          * unit_hkv_units / building_hkv_units
 ```
@@ -252,9 +344,11 @@ The HKV branch is provisional and must print
 total covering the same elapsed period. A fuel purchase, annual estimate or missing building total
 does not qualify. Without it, Block A and downstream comparisons block for that unit.
 
+The `CUBIC_METRE` branch is valid only for `GAS_METER + HEAT`; water meters never enter Block A.
 Missing boundary readings produce no month. Zero movement is valid. A negative movement is accepted
 only as a correctly segmented device change; otherwise it is an error and no UVI is rendered. Gas
-or oil conversion factors are as-of-dated rules values, never engine constants. The source Block A
+conversion components are versioned supplier-invoice facts with visible provenance, never engine
+constants. Oil and pellets remain delivery evidence outside this meter path. The source Block A
 example is `12,340,000 → 13,240,000`, producing **900 kWh**.
 
 ## 6. Block B — previous-month comparison
@@ -332,19 +426,36 @@ is no official PLZ-to-degree-day dataset. Lokara therefore uses its own determin
 - **Carry the distance and display it when large.** Distance is part of the quality evidence.
 - **Use the DWD file's own coordinates.** Do not maintain a second station-coordinate source.
 
-`[UNSICHER]` The PLZ geodataset is not chosen. Candidates are OpenStreetMap-based PLZ centroids or
-a commercial dataset. Large rural-area centroids may sit several kilometres from the building;
-geocoding the building address would be cleaner. For V1, the centroid is sufficient only when
-labelled as a convention.
+The production default is the PLZ centroid from
+[`WZBSocialScienceCenter/plz_geocoord`](https://github.com/WZBSocialScienceCenter/plz_geocoord),
+dataset version `2019-01` (January 2019), pinned at upstream commit
+[`927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`](https://github.com/WZBSocialScienceCenter/plz_geocoord/commit/927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2).
+The exact raw source is
+`https://raw.githubusercontent.com/WZBSocialScienceCenter/plz_geocoord/927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2/plz_geocoord.csv`.
+It contains exactly **8,298 data rows** excluding the header and has SHA-256
+`d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`. The upstream dataset
+identifies WGS84 latitude/longitude centres for German postal codes. Lokara vendors those exact
+bytes and resolves them offline; assignment never fetches the repository or a geocoding service at
+runtime. Rules-store metadata exports the dataset identity
+`WZBSocialScienceCenter/plz_geocoord`, version, commit, digest, row count and exact source URLs;
+lookup rows retain the licence `Apache-2.0` and attribution “Markus Konrad / Wissenschaftszentrum
+Berlin für Sozialforschung (WZB), Januar 2019”. Unknown or malformed PLZ fail explicitly; they never
+fall back to another coordinate.
 
-Dataset nature: external source (DWD, GeoNutzV). Assignment nature: `Konvention`. Both carry
-Rechtsstand 08/2026 and `verify-before-production`. Production Blocks C and D2 remain blocked by
-the open PLZ-geodataset choice and the three missing UVI register rows, not by a missing monthly
-dataset.
+The source row for `01067` is latitude `51.05754959999999` and longitude `13.7170648`; both enter
+the lookup as exact `Decimal` values. Large rural-area centroids may still sit several kilometres
+from a building. Address geocoding may be considered as a later, separately sourced version, but it
+is not the production default for DWD nearest-station assignment.
+
+Dataset nature: external source (`WZBSocialScienceCenter/plz_geocoord`, Apache-2.0). Assignment
+nature: `Konvention`. Both carry Rechtsstand 08/2026. The dataset choice, vendored implementation
+and production-centroid default are closed and green, so the former PLZ-geodataset
+`verify-before-production` flag is cleared. The three missing UVI register rows and the other § 12
+authority limits continue to block production Blocks C and D2.
 
 U4b persists the selected station's normalized monthly Kd beside the assignment as specified in
-§ 3.1. Persisting the value does not resolve the open PLZ-geodataset choice or clear either
-production flag.
+§ 3.1. Persisting the value or selecting the centroid dataset does not clear the remaining
+production flags.
 
 Generation resolves Block D before demanding weather or Heizspiegel inputs. If three valid
 same-category building units make Block D ready, a missing target or prior-year degree-day row does
@@ -467,6 +578,75 @@ Round 4 does **not** confirm the heat-pump `8 kWh/(m²·a)` deduction. It remain
 `24 / JAZ 3`, visibly labelled as an assumption and `verify-before-production`; the co2online reply
 is outstanding, and the published heat-pump value Berkay found is euro-based rather than kWh-based.
 
+### 8.3 — Warmwasser stream in one UVI (Rechtsstand 08/2026)
+
+For a building with central warm water and a remotely readable unit warm-water meter, one UVI
+contains a conditional warm-water stream in addition to the unchanged heating stream. The meter
+medium is `WARM_WATER` and its canonical unit is `CUBIC_METRE`; the stream is included only when
+both central supply and the unit meter are present. The monthly reading movement is derived from
+the append-only meter readings using the same calendar-month interpolation and provenance rules as
+the heat stream. It is then converted to kWh at the Block-A boundary using the versioned
+`WARM_WATER_FORMULA` in `packages/rules-store/src/lokara_rules_store/rules/warm_water.py`:
+
+```text
+warm_water_kwh = volume_m3 × 2.5 kWh/(m³·K) × (tw − 10 °C)
+```
+
+The formula is the § 9 Abs. 2 HeizkostenV replacement-energy rule. `tw` is a required,
+building-effective `BuildingUviConfiguration.warm_water_hot_temp_c` value (measured or estimated
+under § 9 Abs. 2), not a rules-store default. A missing temperature or unresolved conversion rule
+blocks loudly; no generic water-to-energy factor may be invented.
+
+Warm water reuses Block B for the previous calendar month. Block C's prior-year comparison is
+raw only: no DWD factor or degree-day adjustment is applied because warm water is not weather
+dependent. The displayed warm-water comparison therefore carries the raw prior-year value, delta
+and percentage, without a weather-adjusted row. Missing prior-year readings remain an explicit
+unavailable result.
+
+Warm-water D2 uses the resolved Heizspiegel warm-water component, not the heat-only figure:
+
+```text
+ww_norm_month = warm_water_deduction_kwh_m2a × unit_area_sqm × monthly_share
+ww_delta      = current_ww_kwh − ww_norm_month
+ww_percent    = ww_delta / ww_norm_month × 100
+```
+
+The deduction is selected from the same vintage-resolved `HeizspiegelVintage` as heating. For the
+2025 vintage, gas uses `24 kWh/(m²·a)` and a unit of 80 m² with a source-backed monthly share of
+`0.19` yields `365 kWh` after the engine's half-up whole-kWh rounding (`24 × 80 × 0.19 = 364.8`).
+The resolved vintage, source attribution and `verify-before-production` evidence remain visible in
+the archive/document.
+
+`UviDocumentData` gains a nullable warm-water block. `uvi_document_html` renders it conditionally;
+absence of central warm water or of a unit warm-water meter renders no warm-water block. The
+heating blocks and their fields are unchanged. The warm-water block uses the same value/reference/
+delta/percentage carrier as the existing PDF block, with provenance identifying the meter reading,
+the § 9 conversion rule and the Heizspiegel warm-water deduction.
+
+The renter letter header is archived with the run: landlord/building fields are account-scoped,
+the renter and latest append-only delivery address are resolved through the account-scoped
+`TenancyParty`/`Renter`/`DeliveryAddress` chain, and the next month is derived from the target
+month. Landlord contact/logo (`Landlord.phone`, `.email`, `.logo`) are explicit nullable
+landlord configuration fields (migration 0037). The support code is generated once per immutable
+`UviRun`, stored with that run (migration 0038), and resolves only inside the owner’s
+account/building-scoped RLS session to its tenancy and target month. Generation is idempotent on
+`(account_id, tenancy_id, month)` (migration 0039): a repeated request returns the existing run
+and never creates another PDF/support code or `GENERATED` event. Future email delivery claims are
+also one-shot per run: at most one `EMAILED` evidence event is allowed for an account/run pair.
+
+### Engineering conventions pending legal decision
+
+The UVI engine names two non-statutory conventions explicitly: the comparison sample requires
+`3` valid units including the target, and the station-distance warning is strict `> 50 km`.
+They are not presented as legal thresholds; their authority and any replacement remain open in
+`adjustment/M9-Risk-Decisions.md`.
+
+The engineering slice remains blocked from production use until the applicable § 6a register rows
+(including row 45's heat-plus-hot-water comparison interpretation), the exact monthly content
+authority and the warm-water measurement/remote-read applicability are verified. These flags do not
+permit a fallback to heating-only output for a building whose central remotely read warm water is
+in scope.
+
 ## 9. DWD rolling 12-month climate-factor import
 
 This importer serves Page 01b's annual comparison. It does not provide Block C monthly degree days;
@@ -548,8 +728,9 @@ normalized reading head and its raw source ids; and, for Block D, each comparabl
 meter identity/category/unit, normalized head, raw source ids and computed heat. It also retains
 the normalized inputs to Blocks A–D/D2, the selected degree-day row identities and their complete
 source/provenance status, station-assignment identity when a degree-day value was selected, the
-building-configuration identity, and the resolved U2/Heizspiegel row and evidence when D2 was
-used. These identities participate in the canonical run hash, so replacing even a numerically
+building-configuration identity, its effective period, both gas-conversion components and
+supplier-invoice source identity when applicable, and the resolved U2/Heizspiegel row and evidence
+when D2 was used. These identities participate in the canonical run hash, so replacing even a numerically
 equivalent comparable or source changes the hash without mutating an older run.
 
 Applicable `RuleEvidence` and `RuleConflict` remain structured archive data. This includes the
@@ -586,8 +767,9 @@ The implemented technical path is complete only while:
 - every source-named calculation and fallback fixture is executable against production code;
 - annual DWD import guards cover headers, leading zeroes, completeness, duplicates, range,
   idempotency, missing PLZ and factor direction;
-- the monthly dataset and station-assignment contracts in § 7 execute without silently choosing a
-  PLZ geodataset or clearing their production flags;
+- the monthly dataset and station-assignment contracts in § 7 execute offline against the pinned
+  PLZ dataset identity/version; the implemented dataset choice is closed and its former production
+  flag is cleared without clearing any remaining UVI authority flag;
 - all 18 Heizspiegel rows, deductions, heat-pump exception, non-positive guard, over-500 fallback
   and attribution are versioned and tested;
 - renter isolation has a negative cross-unit test and every new tenant table has composite account
@@ -599,12 +781,15 @@ The implemented technical path is complete only while:
   deterministic append-only correction chains for every month used;
 - normalized Block A consumes a monthly movement directly, preserves rule evidence/conflicts and
   blocks missing conversion or HKV prerequisites without fake cumulative readings;
+- `GAS_METER` admits only `HEAT + CUBIC_METRE`; gas conversion resolves and archives both effective
+  supplier-invoice components independently for every compared month;
 - strict typing, lint, pure-package tests and the required statement/UI review pass.
 
 ### Additional production clearance
 
-Technical U1–U5 completion does not clear production use. Production Blocks C and D2 remain blocked
-until Emir chooses the versioned PLZ geodataset and the three requested UVI register rows exist.
+Technical U1–U5 completion does not clear production use. The versioned PLZ dataset choice is
+closed, its vendored path is green and its production flag is cleared; this does not supply the
+three requested UVI register rows, which remain production-blocking.
 The exact monthly § 6a/EED content list must be confirmed, versioned and dated. The intended legal
 identity of the notice published under GEG § 82, the year-round versus heating-season cadence, the
 flagged § 12 reduction risks, the heat-pump deduction convention and every remaining
@@ -613,7 +798,9 @@ their recorded status. None is cleared by a green technical path.
 
 No engine, adapter, schema, API, UI, PDF, scheduler or delivery implementation is part of the U0
 round-4 transcription slice. After that historical U0 boundary, U1–U5 implemented the bounded
-engineering path described above; M9 delivery and M10 renter publication remain separate work.
+engineering path described above. The 28.08.2026 `GAS_METER` extension and § 8.3 warm-water
+extension are now implemented and regression-covered on `development`. M9 delivery and M10
+renter publication remain separate boundaries; UVI delivery still lacks a frozen PDF artifact.
 
 ## 13. Source-named fixture map
 
@@ -627,10 +814,19 @@ engineering path described above; M9 delivery and M10 renter publication remain 
 | `approved_hkv_provisional` | measured rolling building total, visible provisional label, missing-total block |
 | `approved_block_c_raw_weather_fallback` | raw `-100, -10.0%`, visibly not weather-adjusted |
 | `approved_linear_mid_month_interpolation` | elapsed-day boundaries and provenance; February `280 kWh` |
+| `test_gas_meter_has_exactly_the_approved_heat_volume_facts` | exact fifth device tuple and no gas/warm-water tuple |
+| `TestGasMeterMigration` | migration `0033` keeps the old four tuples, admits the fifth and restores four on downgrade |
+| `U5-BOUNDARY-02` gas extension | synthetic factor pairs preserve the existing boundary arithmetic while proving period-specific Brennwert × Zustandszahl and supplier provenance for all three compared months |
+| `GAS-BOUNDARY-01` | any configuration boundary inside a calendar month blocks that month |
+| `GAS-DB-01…03` | exact split evidence, legacy repair and meter-history immutability |
+| `CENTRAL_REMOTE_WARM_WATER_GOLDEN` in `packages/uvi-engine/tests/test_uvi_warm_water_golden.py` | central remote warm water, versioned volumetric conversion, previous-month Block B, raw prior-year comparison and D2 deduction × area × monthly share |
+| Warm-water cases in `apps/api/tests/test_u5_uvi_generation.py` | persisted configuration/readings resolve the golden result and archive separate previous-month, raw prior-year and D2 values with their own source evidence |
+| Comparison/provenance and real-render cases in `packages/pdf/tests/test_uvi_document.py` | each comparison retains its own basis and provenance; raw fallback has no false DWD/Heizspiegel attribution; warm-water and fallback documents retain the complete legal/footer tail on one unclipped A4 page |
 | `DWD_ANNUAL_CLIMATE_FACTOR_PLZ_FIXTURES` | all nine PLZ values including leading zero |
 | `DWD_ANNUAL_IMPORT_CONTRACT` | headers, range, completeness, duplicate, idempotency and direction guards |
 | `DWD_MONTHLY_DEGREE_DAY_CONTRACT` | monthly VDI 3807 dataset, thresholds, structure and attribution |
-| `DWD_STATION_ASSIGNMENT_CONTRACT` | deterministic persisted station assignment and open PLZ-geodataset choice |
+| `PLZ-GEOCOORD-01…03` | exact offline `01067` lookup, immutable WZB source/licence metadata and loud unknown/malformed failure |
+| `DWD_STATION_ASSIGNMENT_CONTRACT` | deterministic persisted station assignment using the pinned WZB PLZ centroid by default |
 | `UVI_DISPLAY_ROUNDING_RULE` | displayed-value rule, four-block re-verification and superseded D2 row |
 | `HEIZSPIEGEL_VINTAGE_MAINTENANCE` | annual 1 October check, six maintenance steps and vintage-at-M invariant |
 | `HEIZSPIEGEL_2025_ROWS` | all 18 source rows exactly |
@@ -676,6 +872,8 @@ are also outside this document.
 | README-for-Emir | introduction, §§ 2, 12 | arithmetic evidence retained; no red flag cleared |
 | Historical correspondence | `docs/03` Appendix D | single retirement ledger; all UVI corrections above remain durable |
 | `Antwort-an-Emir_04.md` § 7 | §§ 4, 7.1, 7.2, 8.2 and oracle | monthly dataset, assignment convention, display rounding and K13 vintage maintenance transcribed |
+| `WZBSocialScienceCenter/plz_geocoord`, January 2019, commit `927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`, Apache-2.0 | §§ 7.2, 12 and `PLZ-GEOCOORD-01…03` | commit-addressed source/raw URL, SHA-256 `d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`, 8,298 data rows and WZB attribution pinned; offline lookup and PLZ-driven station assignment are green; dataset choice closed and its production flag cleared; only the three missing UVI register rows and other § 12 authority blockers remain |
+| Berkay decision `10_UVI-CUBIC-METRE-vs-Zaehler_ANTWORT.md`, 28.08.2026 | §§ 1, 3.1–3.2, 5, 10, 12–13, 16 | UI-08 conflict explicitly superseded; fifth tuple, two-component conversion, provenance, MVP lifecycle limit and setup-dependent § 6a trigger transcribed |
 
 ## 16. Compact supersession and unresolved ledger
 
@@ -693,21 +891,27 @@ are also outside this document.
 | W4 month-end means settled year-round duty | not settled; retain year-round/heating-season uncertainty |
 | exact monthly DWD dataset and station-to-PLZ rule | resolved by round 4; hdd_3807 plus the persisted nearest-valid-station convention |
 | Block C exact-value instruction versus printed `-52 / 952 = -5.5%` | resolved by round 4; displayed values win, so `-5.5%` remains |
-| PLZ geodataset and three requested UVI register rows | unresolved; `verify-before-production` and blocks production C/D2 |
+| PLZ geodataset | resolved to `WZBSocialScienceCenter/plz_geocoord`, version `2019-01`, commit `927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`, SHA-256 `d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`, 8,298 data rows, Apache-2.0; offline implementation is green, its production flag is cleared and the PLZ centroid is the production assignment default |
+| three requested UVI register rows | unresolved; `verify-before-production` and blocks production C/D2 |
 | Wärmepumpe deduction 8 | unconfirmed convention; co2online reply remains open and `verify-before-production` |
 | W4 year-round/heating-season flag | unresolved |
 | exact monthly § 6a content list | unresolved; versioned source required before production |
 | BAnz notice under GEG § 82 is legally the intended § 6a notice | pre-legal; specialist review remains open |
+| UI-08 four device types and Z16 gas-meter exclusion | superseded by Berkay's 28.08.2026 decision; add only `GAS_METER + HEAT + CUBIC_METRE` |
+| one combined calorific conversion factor | superseded for gas volume; archive Brennwert and Zustandszahl separately and multiply only at the normalized boundary |
+| landlord always owes UVI for gas-floor heating | not established; direct renter supply may change the § 6a trigger and remains `verify-before-production` |
 
 ## 17. Approval and implementation boundary
 
 U0 is documentation plus data-only fixtures and changes no production, schema, migration, API,
 engine, adapter, UI, PDF, scheduler or delivery code. G1 supplies only the pure W4 cadence evaluator;
 it adds no UVI reading, calculation, document, scheduling, delivery or portal consumer. Passing the
-oracle or G1 tests does not demonstrate a working UVI, choose the PLZ geodataset, create the missing
-UVI register rows or authorize production use. After that historical U0 boundary, U1–U5 technically
+oracle or G1 tests does not demonstrate a working UVI, create the missing UVI register rows or
+authorize production use. After that historical U0 boundary, U1–U5 technically
 implement the engine/provenance channel, versioned Heizspiegel resolution, annual/monthly DWD
 normalization, account-scoped persistence, owner-side generation, immutable archive and separate
-German renter document downloadable by the owner. This does not clear the production blockers in
+German renter document downloadable by the owner. The subsequent `GAS_METER` and central remote
+warm-water extensions are implemented and covered by engine/API/PDF regressions on `development`.
+This does not clear the production blockers in
 § 12, schedule or email delivery under M9, publish to the renter portal under M10, or establish legal
 approval.

@@ -54,7 +54,13 @@ from lokara_db import (
     create_db_engine,
     new_id,
 )
-from lokara_domain import MeasurementUnit, MeterKind
+from lokara_domain import (
+    CalibrationDataState,
+    MeasurementUnit,
+    MeterDeviceType,
+    MeterKind,
+    RemoteReadability,
+)
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -163,7 +169,11 @@ class TestBuildingLevelMeterMapping:
                 unit=None,  # building-level Hauptzähler — § 9 HeizkostenV denominator
                 kind=MeterKind.HEAT,
                 measurement_unit=MeasurementUnit.KWH,
+                device_type=MeterDeviceType.HEAT_METER,
                 serial="WMZ-HAUPT-1",
+                installed_on=date(2024, 1, 1),
+                remote_readability=RemoteReadability.UNKNOWN,
+                calibration_data_state=CalibrationDataState.REVIEW_REQUIRED,
                 calibration_valid_until=date(2029, 12, 31),
             )
             session.add(meter)
@@ -194,7 +204,11 @@ class TestBuildingLevelMeterMapping:
                     unit_id=None,
                     kind=MeterKind.HEAT,
                     measurement_unit=MeasurementUnit.KWH,
+                    device_type=MeterDeviceType.HEAT_METER,
                     serial="WMZ-HAUPT-2",
+                    installed_on=date(2024, 1, 1),
+                    remote_readability=RemoteReadability.UNKNOWN,
+                    calibration_data_state=CalibrationDataState.REVIEW_REQUIRED,
                     calibration_valid_until=date(2029, 12, 31),
                 )
             )
@@ -228,7 +242,11 @@ class TestBuildingLevelMeterMapping:
                 # `unit` deliberately not mentioned at all
                 kind=MeterKind.HEAT,
                 measurement_unit=MeasurementUnit.KWH,
+                device_type=MeterDeviceType.HEAT_METER,
                 serial="WMZ-HAUPT-3",
+                installed_on=date(2024, 1, 1),
+                remote_readability=RemoteReadability.UNKNOWN,
+                calibration_data_state=CalibrationDataState.REVIEW_REQUIRED,
                 calibration_valid_until=date(2029, 12, 31),
             )
             session.add(meter)
@@ -267,7 +285,11 @@ class TestBuildingLevelMeterMapping:
                     unit_id=fx.unit,
                     kind=MeterKind.COLD_WATER,
                     measurement_unit=MeasurementUnit.CUBIC_METRE,
+                    device_type=MeterDeviceType.COLD_WATER_METER,
                     serial="KWZ-1",
+                    installed_on=date(2024, 1, 1),
+                    remote_readability=RemoteReadability.UNKNOWN,
+                    calibration_data_state=CalibrationDataState.REVIEW_REQUIRED,
                     calibration_valid_until=date(2030, 12, 31),
                 )
             )

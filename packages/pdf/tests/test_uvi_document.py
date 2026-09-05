@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import dataclasses
+import os
+import re
 import runpy
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from pypdf import PdfReader
 
 _ORACLE_PATH = (
     Path(__file__).resolve().parents[2] / "rules-store" / "tests" / "berkay_uvi_golden.py"
@@ -154,15 +158,15 @@ def test_u5_document_contains_the_source_named_blocks_and_provenance() -> None:
     assert "Juli 2026" in html
     assert "WE 1" in html
     for heading in ("Block A", "Block B", "Block C", "Block D2"):
-        assert heading in html
+        assert heading not in html
 
     assert UVI_EXAMPLES["approved_hkv_provisional"]["label"] in html
-    assert "Quelle: Deutscher Wetterdienst" in html
+    assert "Vergleichswerte auf Basis des bundesweiten Heizspiegels" in html
     assert UVI_EXAMPLES["approved_block_d2_heat_only"]["label"] in html
-    assert UVI_EXAMPLES["approved_block_d2_heat_only"]["attribution"] in html
-    assert "normierter Durchschnittsnutzer" in html
-    assert "Station 00433" in html and "12,4 km" in html
-    assert "Heizspiegel 2025" in html
+    assert "© co2online gemeinnützige GmbH" in html
+    assert "Vergleich Durchschnittsnutzer" in html
+    assert "Station" in html and "DWD" in html
+    assert "Heizspiegel 2025" not in html
     assert "Rechtsstand 08/2026" in html
     assert disclaimer in html
     assert "Vom Aufrufer gelieferter 3-%-Risikohinweis" in html
@@ -174,7 +178,7 @@ def test_u5_document_renders_only_approved_german_interpolation_provenance() -> 
     data, render, _ = _document()
     html = render(data)
     assert "linear_by_elapsed_days" not in html
-    assert "linear nach verstrichenen Tagen interpoliert" in html
+    assert "linear nach verstrichenen Tagen interpoliert" not in html
 
 
 def test_u5_document_never_leaks_landlord_or_other_party_data() -> None:
@@ -269,3 +273,296 @@ def test_u5_non_ready_block_requires_approved_absence_copy_or_renderer_refusal()
     html = render(dataclasses.replace(data, block_b=labelled))
     assert approved_copy in html
     assert "missing_previous_month" not in html
+
+
+def test_uvi_renders_each_comparison_with_its_own_basis_source_and_provenance() -> None:
+    """Each visible comparison keeps its own audit trail instead of one blanket credit."""
+    data, render, _ = _document()
+    block_b = dataclasses.replace(
+        data.block_b,
+        basis_de="Rohvergleich mit dem Vormonat",
+        attribution_de="Quelle: fernablesbarer Wärmezähler",
+        provenance_de=("Vormonatsablesung heat-reading-previous",),
+    )
+    block_c = dataclasses.replace(
+        data.block_c,
+        basis_de="Witterungsbereinigter Vorjahresmonat",
+        provenance_de=("DWD-Zielmonat weather-target", "DWD-Vorjahresmonat weather-prior"),
+    )
+    block_d2 = dataclasses.replace(
+        data.block_d_or_d2,
+        provenance_de=("Heizspiegel-Vintage heating-vintage-2025",),
+    )
+
+    html = render(
+        dataclasses.replace(data, block_b=block_b, block_c=block_c, block_d_or_d2=block_d2)
+    )
+
+    for comparison_fact in (
+        "Rohvergleich mit dem Vormonat",
+        "Quelle: fernablesbarer Wärmezähler",
+        "Vormonatsablesung heat-reading-previous",
+        "Witterungsbereinigter Vorjahresmonat",
+        "Quelle: Deutscher Wetterdienst",
+        "DWD-Zielmonat weather-target",
+        "DWD-Vorjahresmonat weather-prior",
+        "normierter Durchschnittsnutzer",
+        "Quelle: co2online gGmbH (Heizspiegel)",
+        "Heizspiegel-Vintage heating-vintage-2025",
+    ):
+        assert comparison_fact in html
+
+
+def test_uvi_warm_water_renders_distinct_previous_prior_year_and_d2_comparisons() -> None:
+    """The warm-water table must not reuse D2 as its previous-month comparison."""
+    data, render, _ = _document()
+    _, data_type, _, _ = _pdf_api()
+    fields = {field.name for field in dataclasses.fields(data_type)}
+    assert {
+        "warm_water_block_b",
+        "warm_water_block_c",
+        "warm_water_block_d2",
+    } <= fields
+
+    block_type = type(data.block_a)
+    warm_water = _block(
+        block_type,
+        heading_de="Warmwasser — Monatsverbrauch",
+        value_kwh=500,
+        reference_kwh=None,
+        delta_kwh=None,
+        percent=None,
+        provenance_de=("Zielablesung warm-water-target",),
+    )
+    warm_water_block_b = _block(
+        block_type,
+        heading_de="Warmwasser — Vormonat",
+        value_kwh=500,
+        reference_kwh=125,
+        delta_kwh=375,
+        percent=Decimal("300.0"),
+        basis_de="Rohvergleich mit dem Vormonat",
+        attribution_de="Quelle: fernablesbarer Warmwasserzähler",
+        provenance_de=("Vormonatsablesung warm-water-previous",),
+    )
+    warm_water_block_c = _block(
+        block_type,
+        heading_de="Warmwasser — Vorjahresmonat",
+        value_kwh=500,
+        reference_kwh=250,
+        delta_kwh=250,
+        percent=Decimal("100.0"),
+        label_de="nicht witterungsbereinigt",
+        basis_de="Rohvergleich mit dem Vorjahresmonat",
+        attribution_de="Quelle: fernablesbarer Warmwasserzähler",
+        provenance_de=("Vorjahresablesung warm-water-prior-year",),
+    )
+    warm_water_block_d2 = _block(
+        block_type,
+        heading_de="Warmwasser — Durchschnittsnutzer",
+        value_kwh=500,
+        reference_kwh=365,
+        delta_kwh=135,
+        percent=Decimal("37.0"),
+        basis_de="normierter Durchschnittsnutzer",
+        attribution_de="Quelle: co2online gGmbH (Heizspiegel)",
+        provenance_de=("Heizspiegel-Vintage warm-water-2025",),
+    )
+    html = render(
+        dataclasses.replace(
+            data,
+            warm_water=warm_water,
+            warm_water_block_b=warm_water_block_b,
+            warm_water_block_c=warm_water_block_c,
+            warm_water_block_d2=warm_water_block_d2,
+        )
+    )
+    warm_section = html.split("WARMWASSER", maxsplit=1)[1].split("</section>", maxsplit=1)[0]
+    visible_text = re.sub(r"<[^>]+>", " ", warm_section)
+    visible_text = " ".join(visible_text.split())
+
+    assert re.search(r"Vormonat\s+125\s+\+375\s+\+300(?:,|\.)0\s+%", visible_text)
+    assert re.search(
+        r"Vergleich Durchschnittsnutzer\s+365\s+\+135\s+\+37(?:,|\.)0\s+%",
+        visible_text,
+    )
+    for comparison_fact in (
+        "nicht witterungsbereinigt",
+        "Rohvergleich mit dem Vormonat",
+        "Vormonatsablesung warm-water-previous",
+        "Rohvergleich mit dem Vorjahresmonat",
+        "Vorjahresablesung warm-water-prior-year",
+        "normierter Durchschnittsnutzer",
+        "Quelle: co2online gGmbH (Heizspiegel)",
+        "Heizspiegel-Vintage warm-water-2025",
+    ):
+        assert comparison_fact in warm_section
+
+
+def test_uvi_rechtsstand_and_disclaimer_use_the_approved_aa_text_colour() -> None:
+    """Tier-2 disclosures use Slate on white, the approved >=4.5:1 pair."""
+    data, render, _ = _document()
+    html = render(data).lower()
+    style = html.split("<style>", maxsplit=1)[1].split("</style>", maxsplit=1)[0]
+
+    for selector in (r"\.credit", r"\.disclaimer"):
+        assert re.search(rf"{selector}[^{{]*\{{[^}}]*color:\s*#5c6a6b\b", style)
+
+
+def _rendered_a4_text(data: Any) -> str:
+    from lokara_pdf import render_html_to_pdf, uvi_document_html
+    from playwright._impl._errors import Error as PlaywrightError
+
+    try:
+        pdf = render_html_to_pdf(uvi_document_html(data))
+    except PlaywrightError as exc:
+        if os.environ.get("LOKARA_REQUIRE_PDF"):
+            raise
+        pytest.skip(f"Playwright Chromium unavailable: {exc}")
+
+    reader = PdfReader(BytesIO(pdf))
+    assert len(reader.pages) == 1
+    page = reader.pages[0]
+    assert float(page.mediabox.width) == pytest.approx(595.92, abs=1)
+    assert float(page.mediabox.height) == pytest.approx(842.88, abs=1)
+    return page.extract_text() or ""
+
+
+def _accepted_warm_water_document() -> tuple[Any, str]:
+    data, _, disclaimer = _document()
+    block_type = type(data.block_a)
+    warm_water = _block(
+        block_type,
+        heading_de="Warmwasser — Monatsverbrauch",
+        value_kwh=500,
+        reference_kwh=None,
+        delta_kwh=None,
+        percent=None,
+        provenance_de=("Zielablesung warm-water-target",),
+    )
+    warm_water_block_b = _block(
+        block_type,
+        heading_de="Warmwasser — Vormonat",
+        value_kwh=500,
+        reference_kwh=125,
+        delta_kwh=375,
+        percent=Decimal("300.0"),
+        basis_de="Rohvergleich mit dem Vormonat",
+        attribution_de="Quelle: fernablesbarer Warmwasserzähler",
+        provenance_de=("Vormonatsablesung warm-water-previous",),
+    )
+    warm_water_block_c = _block(
+        block_type,
+        heading_de="Warmwasser — Vorjahresmonat",
+        value_kwh=500,
+        reference_kwh=250,
+        delta_kwh=250,
+        percent=Decimal("100.0"),
+        label_de="nicht witterungsbereinigt",
+        basis_de="Rohvergleich mit dem Vorjahresmonat",
+        attribution_de="Quelle: fernablesbarer Warmwasserzähler",
+        provenance_de=("Vorjahresablesung warm-water-prior-year",),
+    )
+    warm_water_block_d2 = _block(
+        block_type,
+        heading_de="Warmwasser — Durchschnittsnutzer",
+        value_kwh=500,
+        reference_kwh=365,
+        delta_kwh=135,
+        percent=Decimal("37.0"),
+        basis_de="normierter Durchschnittsnutzer",
+        attribution_de="Quelle: co2online gGmbH (Heizspiegel)",
+        provenance_de=("Heizspiegel-Vintage warm-water-2025",),
+    )
+    return (
+        dataclasses.replace(
+            data,
+            warm_water=warm_water,
+            warm_water_block_b=warm_water_block_b,
+            warm_water_block_c=warm_water_block_c,
+            warm_water_block_d2=warm_water_block_d2,
+            unresolved_conflicts_de=("Produktionsprüfung UVI-Register offen.",),
+            vermieter_name="Vermieter GmbH",
+            vermieter_strasse="Vermieterweg 1",
+            vermieter_plz_ort="10115 Berlin",
+            vermieter_telefon="030 1234567",
+            vermieter_email="kontakt@vermieter.example",
+            absenderzeile="Vermieter GmbH · Vermieterweg 1 · 10115 Berlin",
+            mieter_name="Erika Mustermann",
+            mieter_strasse="Musterstraße 12",
+            mieter_plz_ort="10115 Berlin",
+            liegenschaft_nr="L-100",
+            nutzeinheit_nr="WE-1",
+            objekt_adresse="Musterstraße 12, 10115 Berlin",
+            naechster_monat="August 2026",
+            support_code="UVI-TAIL-001",
+            gruss_ort="Berlin",
+            dwd_station="00433",
+        ),
+        disclaimer,
+    )
+
+
+def test_rendered_warm_water_uvi_keeps_all_required_tail_content_on_its_a4_page() -> None:
+    """The accepted warm-water document must not clip its required closing content."""
+    data, disclaimer = _accepted_warm_water_document()
+
+    text = _rendered_a4_text(data)
+
+    for required_tail in (
+        "Offene Prüfpunkte",
+        "Produktionsprüfung UVI-Register offen.",
+        "Rechtsstand 08/2026",
+        disclaimer,
+        "Ihre nächste Verbrauchsinformation erhalten Sie im August 2026",
+        "Sie haben Fragen?",
+        "030 1234567",
+        "kontakt@vermieter.example",
+        "UVI-TAIL-001",
+        "Berlin",
+        "Mit freundlichen Grüßen",
+        "Vermieter GmbH",
+        "Erstellt mit Lokara",
+    ):
+        assert required_tail in text
+
+
+def test_rendered_raw_weather_fallback_uses_only_its_actual_comparison_provenance() -> None:
+    """A raw Block C fallback must not retain weather-adjusted or blanket source claims."""
+    data, _, _ = _document()
+    block_c = dataclasses.replace(
+        data.block_c,
+        reference_kwh=1_000,
+        delta_kwh=-100,
+        percent=Decimal("-10.0"),
+        label_de="nicht witterungsbereinigt",
+        basis_de="Rohvergleich mit dem Vorjahresmonat",
+        attribution_de="Quelle: fernablesbarer Wärmezähler",
+        provenance_de=("Vorjahresablesung fallback-prior-year",),
+    )
+    building_comparison = dataclasses.replace(
+        data.block_d_or_d2,
+        heading_de="Block D — Vergleich im Gebäude",
+        basis_de="Vergleich im Gebäude",
+        attribution_de=None,
+        provenance_de=("Gebäudevergleich aus drei gültigen Nutzeinheiten",),
+    )
+    fallback = dataclasses.replace(
+        data,
+        block_c=block_c,
+        block_d_or_d2=building_comparison,
+        dwd_station=None,
+    )
+
+    text = _rendered_a4_text(fallback)
+
+    assert "nicht witterungsbereinigt" in text
+    assert "Rohvergleich mit dem Vorjahresmonat" in text
+    assert "Quelle: fernablesbarer Wärmezähler" in text
+    assert "Vorjahresablesung fallback-prior-year" in text
+    assert "Vergleich im Gebäude" in text
+    assert "Gebäudevergleich aus drei gültigen Nutzeinheiten" in text
+    assert "Vorjahresmonat (witterungsbereinigt)" not in text
+    assert "Heizspiegel" not in text
+    assert "Deutscher Wetterdienst" not in text
+    assert "Station —" not in text
