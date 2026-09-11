@@ -2,8 +2,8 @@
 
 ## M10-R3 closure — 11.09.2026
 
-M10-R3 is technically complete on `slice/m10-r3-renter-publication` at parent HEAD `e011540`.
-Nothing from this slice is committed, merged or pushed. The named `.lokara-red` window is closed.
+M10-R3 is technically complete and locally merged into `main` as source commit `2ba245d`. Nothing
+was pushed. The named `.lokara-red` window is closed.
 
 - `M10-PUB-F01`–`F07` specify and cover migration `0043`, immutable tenancy-scoped publication,
   source eligibility, exact archived-byte copying, owner-only publication, renter-only listing and
@@ -24,7 +24,7 @@ Nothing from this slice is committed, merged or pushed. The named `.lokara-red` 
   mypy, purity, parity and pre-context checks pass.
 - Preserve all five unrelated untracked `adjustment/` files. They remain untouched.
 
-Only Emir's commit, merge and push decisions remain. Never push without separate approval.
+No implementation or review work remains in M10-R3. Push remains a separate decision.
 
 ## Previous checkpoint — M10-R2 technically complete
 
