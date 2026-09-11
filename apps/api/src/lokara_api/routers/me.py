@@ -7,18 +7,23 @@ laden" in that case), so this returns an empty list instead of 403.
 """
 
 from fastapi import APIRouter, HTTPException
-from lokara_db import bootstrap_contexts
+from lokara_db import BootstrapContext, bootstrap_contexts
 
-from ..auth import RequireAuth
+from ..auth import AuthContext, RequireAuth
 from ..deps import _engine
 from ..schemas import MeAccount, MeResponse
 
 router = APIRouter()
 
 
+def resolve_bootstrap_subject(auth: AuthContext) -> tuple[BootstrapContext, ...]:
+    """Use the sole bounded pre-account identity read for one verified subject."""
+    return bootstrap_contexts(_engine(), auth.person_id)
+
+
 @router.get("/me")
 def me(auth: RequireAuth) -> MeResponse:
-    rows = bootstrap_contexts(_engine(), auth.person_id)
+    rows = resolve_bootstrap_subject(auth)
     if not rows:
         raise HTTPException(status_code=401, detail="Authenticated subject has no Person")
 

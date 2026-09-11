@@ -1,4 +1,34 @@
-# Lokara handoff — verified local checkpoint
+# Lokara handoff — M10-R1 technically complete
+
+## Current slice — 11.09.2026
+
+M10-R1 is technically complete on `slice/m10-r1-activation-codes`, created from local `main` at
+`a82023a`. The resulting local slice commit is recorded in `LAST_OUTPUT.md`; it is not merged or
+pushed.
+
+- Migration `0041` and the ORM define account-scoped activation codes, immutable redemption
+  evidence and immutable attributable-refusal evidence. Direct non-null `renter.person_id` INSERTs
+  and writes without matching redemption evidence are blocked for runtime and owner roles.
+- Owner-only issuance stores only the SHA-256 digest. Redemption uses the non-secret account
+  locator only to open an RLS-scoped session, links exactly the authenticated Person and appends one
+  spend under concurrency.
+- All refusal cases, including missing/null/non-string request shapes, use the same timed HTTP 400
+  `M10-COPY-03` response. Safely attributable refusals append `renter_activation_attempt`; malformed
+  or nonexistent locators remain structured operational logs without raw values.
+- `resolve_bootstrap_subject` consumers are checked exactly to `me.py` and
+  `renter_activation.py`. `.lokara-red` is removed.
+- Focused verification: DB/RLS `116 passed`; activation API/M5 guard `39 passed`; pre-context
+  `48 passed`; schema inventory `26 passed`.
+- Boundary re-audit is clean. RLS covers `76` tenant tables and FK isolation covers `152`
+  account-scoped edges; the live pre-context checker is clean.
+- Closing `scripts/gate.sh full` is green: `2003` Python tests and `210` web tests; Ruff,
+  formatting, strict mypy, purity, parity, ESLint and TypeScript pass.
+- Preserve the five untracked `adjustment/` reference files; they remain untouched.
+
+The remaining decision is whether to merge this slice into local `main`. Do not merge or push
+without Emir's authorization.
+
+## Earlier verified checkpoint
 
 ## Owner UVI UI — verified local completion, 11.09.2026
 

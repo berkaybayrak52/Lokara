@@ -264,8 +264,15 @@ def _write_clean_api(api_src: Path) -> None:
     (routers / "me.py").write_text(
         "from somewhere import bootstrap_contexts\n"
         "from somewhere_else import _engine\n"
-        "def me(auth):\n"
+        "def resolve_bootstrap_subject(auth):\n"
         "    return bootstrap_contexts(_engine(), auth.person_id)\n"
+        "def me(auth):\n"
+        "    return resolve_bootstrap_subject(auth)\n"
+    )
+    (routers / "renter_activation.py").write_text(
+        "from .me import resolve_bootstrap_subject\n"
+        "def redeem(auth):\n"
+        "    return resolve_bootstrap_subject(auth)\n"
     )
     (routers / "demo.py").write_text(
         "from somewhere import DEMO_ACCOUNT_ID, unmembered_account_session\n"
@@ -488,6 +495,20 @@ class TestCatalogMutations:
 
 
 class TestSourceMutations:
+    def test_bootstrap_wrapper_rejects_an_unallowlisted_consumer(self, tmp_path: Path) -> None:
+        api_src = tmp_path / "apps" / "api" / "src"
+        _write_clean_api(api_src)
+        extra = api_src / "lokara_api" / "routers" / "extra.py"
+        extra.write_text(
+            "from .me import resolve_bootstrap_subject\n"
+            "def extra(auth):\n"
+            "    return resolve_bootstrap_subject(auth)\n"
+        )
+
+        report = _joined(_source_problems(api_src))
+        assert "resolve_bootstrap_subject" in report
+        assert "extra.py" in report
+
     @pytest.mark.parametrize("symbol", ["bootstrap_contexts", "unmembered_account_session"])
     def test_an_extra_helper_call_site_is_red(self, tmp_path: Path, symbol: str) -> None:
         api_src = tmp_path / "apps" / "api" / "src"

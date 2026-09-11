@@ -969,6 +969,147 @@ class TenancyParty(Base):
     )
 
 
+# ── M10: per-renter, tenancy-bound activation and immutable spend evidence. ──
+
+
+class RenterActivationCode(Base):
+    """One hashed, single-use portal activation secret.
+
+    The raw ``<account_id>.<secret>`` value exists only in the issuance response.
+    This row keeps its digest and the exact renter/tenancy party it authorizes.
+    """
+
+    __tablename__ = "renter_activation_code"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    renter_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    code_hash: Mapped[str]
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    issued_by_membership_id: Mapped[str]
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        _scoped_fk("renter_activation_code", "renter_id", "renter"),
+        _scoped_fk("renter_activation_code", "tenancy_id", "tenancy"),
+        _scoped_fk("renter_activation_code", "issued_by_membership_id", "membership"),
+        ForeignKeyConstraint(
+            ["tenancy_id", "renter_id", "account_id"],
+            [
+                "tenancy_party.tenancy_id",
+                "tenancy_party.renter_id",
+                "tenancy_party.account_id",
+            ],
+            name="renter_activation_code_tenancy_party_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("renter_activation_code"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "renter_id",
+            "tenancy_id",
+            name="uq_renter_activation_code_redemption_context",
+        ),
+        UniqueConstraint("account_id", "code_hash", name="uq_renter_activation_code_account_hash"),
+        CheckConstraint("code_hash ~ '^[0-9a-f]{64}$'", name="ck_renter_activation_code_sha256"),
+        Index("ix_renter_activation_code_account", "account_id"),
+        Index(
+            "ix_renter_activation_code_target",
+            "account_id",
+            "tenancy_id",
+            "renter_id",
+        ),
+    )
+
+
+class RenterActivationRedemption(Base):
+    """Immutable proof that one activation code linked one authenticated Person."""
+
+    __tablename__ = "renter_activation_redemption"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    activation_code_id: Mapped[str]
+    renter_id: Mapped[str]
+    tenancy_id: Mapped[str]
+    person_id: Mapped[str] = mapped_column(ForeignKey("person.id"))
+    redeemed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["activation_code_id", "account_id", "renter_id", "tenancy_id"],
+            [
+                "renter_activation_code.id",
+                "renter_activation_code.account_id",
+                "renter_activation_code.renter_id",
+                "renter_activation_code.tenancy_id",
+            ],
+            name="renter_activation_redemption_activation_code_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_fk("renter_activation_redemption", "renter_id", "renter"),
+        _scoped_fk("renter_activation_redemption", "tenancy_id", "tenancy"),
+        _scoped_pair("renter_activation_redemption"),
+        UniqueConstraint(
+            "activation_code_id", name="uq_renter_activation_redemption_activation_code"
+        ),
+        Index("ix_renter_activation_redemption_account", "account_id"),
+        Index(
+            "ix_renter_activation_redemption_target",
+            "account_id",
+            "tenancy_id",
+            "renter_id",
+        ),
+    )
+
+
+class RenterActivationAttempt(Base):
+    """Immutable owner-side evidence for an attributable activation refusal.
+
+    The requested tenancy and verified JWT subject remain opaque identifiers:
+    either may legitimately have no row visible in this account.
+    """
+
+    __tablename__ = "renter_activation_attempt"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    activation_code_id: Mapped[str | None]
+    requested_tenancy_id: Mapped[str]
+    subject_id: Mapped[str]
+    outcome: Mapped[str]
+    code_digest: Mapped[str]
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["activation_code_id", "account_id"],
+            ["renter_activation_code.id", "renter_activation_code.account_id"],
+            name="renter_activation_attempt_activation_code_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("renter_activation_attempt"),
+        CheckConstraint(
+            "outcome IN ('ACTIVATION_CODE_SPENT', 'ACTIVATION_CODE_EXPIRED', "
+            "'ACTIVATION_TENANCY_MISMATCH', 'ACTIVATION_ACCOUNT_MISMATCH', "
+            "'RENTER_ALREADY_LINKED', 'ACTIVATION_PERSON_UNKNOWN', "
+            "'ACTIVATION_CODE_UNKNOWN')",
+            name="ck_renter_activation_attempt_outcome",
+        ),
+        CheckConstraint(
+            "code_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_renter_activation_attempt_sha256",
+        ),
+        Index("ix_renter_activation_attempt_account", "account_id"),
+    )
+
+
 # ── Messdienstleister: a confirmed third-party statement, passed through. ──
 
 
@@ -3979,6 +4120,9 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "unit_profile_version",
     "tenancy",
     "tenancy_party",
+    "renter_activation_code",
+    "renter_activation_redemption",
+    "renter_activation_attempt",
     "tenancy_contract_version",
     "tenancy_contract_position",
     "tenancy_rent_change",

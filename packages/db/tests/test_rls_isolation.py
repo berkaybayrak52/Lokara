@@ -491,6 +491,217 @@ class TestCrossAccountIsolation:
             session.flush()
 
 
+class TestM10ActivationCrossAccountWrites:
+    def test_runtime_same_account_cannot_insert_a_prelinked_renter(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(IntegrityError, match="activation"),
+            account_scoped_session(app, seed.account_a) as session,
+        ):
+            session.add(
+                Renter(
+                    account_id=seed.account_a,
+                    legal_name="Unzulässiger Direktlink",
+                    person_id=seed.person_a,
+                )
+            )
+            session.flush()
+
+    def test_owner_role_cannot_insert_a_prelinked_renter(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        owner, _ = engines
+        with (
+            pytest.raises(IntegrityError, match="activation"),
+            Session(owner) as session,
+            session.begin(),
+        ):
+            session.add(
+                Renter(
+                    account_id=seed.account_a,
+                    legal_name="Owner darf nicht umgehen",
+                    person_id=seed.person_a,
+                )
+            )
+            session.flush()
+
+    def test_renter_activation_code_rejects_cross_account_insert(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO renter_activation_code "
+                    "(id, account_id, renter_id, tenancy_id, code_hash, expires_at, "
+                    "issued_by_membership_id) VALUES "
+                    "(:id, :account_a, :renter, :tenancy, :hash, :expires, :membership)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "renter": seed.renter_a,
+                    "tenancy": seed.tenancy_a,
+                    "hash": sha256(new_id().encode()).hexdigest(),
+                    "expires": datetime(2026, 10, 1, tzinfo=UTC),
+                    "membership": seed.membership_a,
+                },
+            )
+
+    def test_renter_activation_redemption_rejects_cross_account_insert(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO renter_activation_redemption "
+                    "(id, account_id, activation_code_id, renter_id, tenancy_id, person_id) "
+                    "VALUES (:id, :account_a, :code, :renter, :tenancy, :person)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "code": new_id(),
+                    "renter": seed.renter_a,
+                    "tenancy": seed.tenancy_a,
+                    "person": seed.person_a,
+                },
+            )
+
+    def test_renter_activation_attempt_rejects_cross_account_insert(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO renter_activation_attempt "
+                    "(id, account_id, activation_code_id, requested_tenancy_id, subject_id, "
+                    "outcome, code_digest, attempted_at) VALUES "
+                    "(:id, :account_a, NULL, :tenancy, :subject, 'ACTIVATION_CODE_UNKNOWN', "
+                    ":digest, :attempted)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "tenancy": seed.tenancy_a,
+                    "subject": seed.person_a,
+                    "digest": sha256(new_id().encode()).hexdigest(),
+                    "attempted": datetime(2026, 9, 11, tzinfo=UTC),
+                },
+            )
+
+
+class _M10ActivationRows(NamedTuple):
+    code_id: str
+    redemption_id: str
+    attempt_id: str
+
+
+@pytest.fixture(scope="module")
+def m10_activation_rows(
+    engines: tuple[Engine, Engine], seed: _Seed
+) -> Iterator[_M10ActivationRows]:
+    owner, _ = engines
+    rows = _M10ActivationRows(new_id(), new_id(), new_id())
+    digest = sha256(new_id().encode()).hexdigest()
+    with Session(owner) as session, session.begin():
+        session.execute(
+            text(
+                "INSERT INTO renter_activation_code "
+                "(id, account_id, renter_id, tenancy_id, code_hash, expires_at, "
+                "issued_by_membership_id) VALUES "
+                "(:id, :account, :renter, :tenancy, :digest, :expires, :membership)"
+            ),
+            {
+                "id": rows.code_id,
+                "account": seed.account_a,
+                "renter": seed.renter_a,
+                "tenancy": seed.tenancy_a,
+                "digest": digest,
+                "expires": datetime(2026, 10, 1, tzinfo=UTC),
+                "membership": seed.membership_a,
+            },
+        )
+        session.execute(
+            text(
+                "INSERT INTO renter_activation_redemption "
+                "(id, account_id, activation_code_id, renter_id, tenancy_id, person_id) "
+                "VALUES (:id, :account, :code, :renter, :tenancy, :person)"
+            ),
+            {
+                "id": rows.redemption_id,
+                "account": seed.account_a,
+                "code": rows.code_id,
+                "renter": seed.renter_a,
+                "tenancy": seed.tenancy_a,
+                "person": seed.person_a,
+            },
+        )
+        session.execute(
+            text(
+                "INSERT INTO renter_activation_attempt "
+                "(id, account_id, activation_code_id, requested_tenancy_id, subject_id, "
+                "outcome, code_digest) VALUES "
+                "(:id, :account, :code, :tenancy, :subject, 'ACTIVATION_CODE_SPENT', :digest)"
+            ),
+            {
+                "id": rows.attempt_id,
+                "account": seed.account_a,
+                "code": rows.code_id,
+                "tenancy": seed.tenancy_a,
+                "subject": seed.person_a,
+                "digest": digest,
+            },
+        )
+    yield rows
+
+
+class TestM10ActivationReadIsolation:
+    def test_wrong_account_cannot_read_any_activation_table(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m10_activation_rows: _M10ActivationRows,
+    ) -> None:
+        del m10_activation_rows
+        _, app = engines
+        with account_scoped_session(app, seed.account_b) as session:
+            assert session.execute(text("SELECT id FROM renter_activation_code")).all() == []
+            assert session.execute(text("SELECT id FROM renter_activation_redemption")).all() == []
+            assert session.execute(text("SELECT id FROM renter_activation_attempt")).all() == []
+
+    def test_same_account_can_read_its_activation_evidence(
+        self,
+        engines: tuple[Engine, Engine],
+        seed: _Seed,
+        m10_activation_rows: _M10ActivationRows,
+    ) -> None:
+        _, app = engines
+        with account_scoped_session(app, seed.account_a) as session:
+            assert session.execute(
+                text("SELECT id FROM renter_activation_code")
+            ).scalars().all() == [m10_activation_rows.code_id]
+            assert session.execute(
+                text("SELECT id FROM renter_activation_redemption")
+            ).scalars().all() == [m10_activation_rows.redemption_id]
+            assert session.execute(
+                text("SELECT id FROM renter_activation_attempt")
+            ).scalars().all() == [m10_activation_rows.attempt_id]
+
+
 class TestM9CrossAccountIsolation:
     """Every migration-0025 evidence table proves refused reads and writes."""
 

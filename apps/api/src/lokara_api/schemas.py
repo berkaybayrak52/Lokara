@@ -175,6 +175,24 @@ class MeResponse(ApiModel):
     accounts: list[MeAccount]
 
 
+class RenterActivationCodeOut(ApiModel):
+    activation_code_id: str
+    activation_code: str
+    expires_at: datetime
+
+
+class RenterActivationRedeemIn(ApiModel):
+    # The route normalizes every JSON shape itself so FastAPI cannot expose its
+    # usual field-specific 422 validation oracle for this public secret.
+    activation_code: object | None = None
+
+
+class RenterActivationRedeemOut(ApiModel):
+    ok: Literal[True]
+    tenancy_id: str
+    renter_id: str
+
+
 class DemoLoadResponse(ApiModel):
     ok: Literal[True]
     account_id: str

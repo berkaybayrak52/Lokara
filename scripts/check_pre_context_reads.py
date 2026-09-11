@@ -100,6 +100,13 @@ EXPECTED_CALLERS = {
     "bootstrap_contexts": "lokara_api/routers/me.py",
     "unmembered_account_session": "lokara_api/routers/demo.py",
 }
+BOOTSTRAP_WRAPPER = "resolve_bootstrap_subject"
+EXPECTED_BOOTSTRAP_WRAPPER_CALLERS = frozenset(
+    {
+        "lokara_api/routers/me.py",
+        "lokara_api/routers/renter_activation.py",
+    }
+)
 RETIRED_HELPERS = ("raw_account_scoped_session", "AccountSession")
 
 Q_SECURITY_DEFINERS = text(
@@ -404,6 +411,7 @@ def _source_invariant(api_src: Path = API_SRC) -> list[str]:
     problems: list[str] = []
     files = sorted(api_src.rglob("*.py"))
     calls_by_symbol: dict[str, set[str]] = {symbol: set() for symbol in EXPECTED_CALLERS}
+    bootstrap_wrapper_callers: set[str] = set()
     bootstrap_calls: list[tuple[str, ast.Call]] = []
     unmembered_calls: list[tuple[str, ast.Call]] = []
 
@@ -415,6 +423,8 @@ def _source_invariant(api_src: Path = API_SRC) -> list[str]:
         for symbol in calls_by_symbol:
             if symbol in called:
                 calls_by_symbol[symbol].add(relative)
+        if BOOTSTRAP_WRAPPER in called:
+            bootstrap_wrapper_callers.add(relative)
         bootstrap_calls.extend(
             (relative, node) for symbol, node in calls if symbol == "bootstrap_contexts"
         )
@@ -472,6 +482,12 @@ def _source_invariant(api_src: Path = API_SRC) -> list[str]:
             problems.append(
                 f"{symbol} call sites are {sorted(callers)}, expected only [{expected_module}]"
             )
+
+    if bootstrap_wrapper_callers != EXPECTED_BOOTSTRAP_WRAPPER_CALLERS:
+        problems.append(
+            f"{BOOTSTRAP_WRAPPER} call sites are {sorted(bootstrap_wrapper_callers)}, "
+            f"expected exactly {sorted(EXPECTED_BOOTSTRAP_WRAPPER_CALLERS)}"
+        )
 
     for relative, call in bootstrap_calls:
         if relative != EXPECTED_CALLERS["bootstrap_contexts"]:

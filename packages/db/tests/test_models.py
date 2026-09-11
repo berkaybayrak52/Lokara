@@ -125,6 +125,10 @@ EXPECTED_TABLES = {
     "recipient_suppression_event",
     "checklist_instance",
     "checklist_item_event",
+    # M10-R1 renter activation (docs/02; migration 0041).
+    "renter_activation_code",
+    "renter_activation_redemption",
+    "renter_activation_attempt",
 }
 
 

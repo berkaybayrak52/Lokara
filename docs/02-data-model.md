@@ -180,6 +180,12 @@ link is immutable: it cannot be overwritten or cleared. A genuine correction mus
 correction evidence and supersede the earlier link through a separately approved flow; activation
 redemption is not a correction route.
 
+The database enforces that ordering for every role, including the table owner and migration role:
+a `Renter` may only be inserted with `person_id = NULL`, and the only permitted `NULL → Person`
+update is one backed by matching immutable activation-redemption evidence in the same account,
+Renter, tenancy and Person context. Application permissions are not the boundary; an owner-role
+connection cannot seed or repair a non-null link around the evidence rule.
+
 ### M10 renter context — binding design, not yet implemented
 
 The renter URL is `/renter/{tenancyId}/...`. The client never supplies or receives the landlord's
@@ -235,9 +241,19 @@ the source row at request time.
 
 One activation code belongs to exactly one account-scoped `Renter` and one tenancy in which that
 Renter is a `TenancyParty`. It is not a tenancy-wide shared secret. Issuance is owner-only. The raw
-code is returned only at issuance; persistence and logs contain only its one-way hash. The record
+code is returned only at issuance and has the wire shape `<account_id>.<secret>`, where
+`account_id` is an explicitly non-secret locator and `secret` is at least 256 random bits from a
+cryptographically secure generator. Persistence and logs contain only the SHA-256 hash of the
+complete raw value; neither the locator nor the secret is stored as a second code field. The record
 has a fixed server-generated expiry instant. It is usable only while `now < expires_at` and no
 spend evidence exists.
+
+Redemption parses the locator only to open the existing `account_scoped_session`; it is not
+authorization and is never accepted as evidence that the URL tenancy, Renter or caller belongs to
+that account. The hash lookup then runs behind forced RLS in that one account. A global hash lookup,
+a second `SECURITY DEFINER` function and any other pre-context bypass are forbidden. A malformed,
+unknown or foreign locator still performs the bounded hash/minimum-duration work and returns the
+same public refusal as every other failure; it never receives a format-specific response.
 
 Redemption is one atomic transaction. It locks the code, verifies every binding, writes the
 authenticated Person to the still-null `renter.person_id`, and appends spend-once evidence naming
@@ -245,6 +261,24 @@ the code, Renter, tenancy, Person and server redemption time. Concurrent or repe
 produce only one successful link and one spend record. A failed redemption changes neither the
 Renter link nor the code evidence. The clock is an explicit service/fixture input; domain logic does
 not read a framework or system clock.
+
+Refusals attributable to a real locator account append a separate immutable
+`renter_activation_attempt` row after the state-changing redemption transaction refuses. It carries
+`id`, `account_id`, optional `activation_code_id`, opaque `requested_tenancy_id`, verified JWT
+`subject_id`, `outcome`, `code_digest` and server `attempted_at`. `subject_id` deliberately has no
+Person FK because `M10-ACT-F06` records a verified subject that has no Person. The requested tenancy
+is non-authoritative text, not an FK: a guessed, foreign or nonexistent URL id must be recordable
+without creating a cross-account edge. A present `activation_code_id` uses a composite FK with
+`account_id`. The table has forced RLS with `WITH CHECK`, is append-only, and is never renter-visible.
+
+Known/attributable `F01`, `F02`, `F03`, `F05` and `F06` rows retain their exact internal outcome.
+`F04` and `F07` with a syntactically valid locator for an existing account append
+`ACTIVATION_CODE_UNKNOWN`; they do not cross RLS to discover whether another account owns the hash.
+A malformed locator or one naming no existing account cannot safely be attributed to an owner and
+therefore creates no account row; only structured operational logging retains that refusal. Neither
+durable evidence nor logs contain the submitted raw value. Thus “no row changes” in the refusal
+oracle means no Renter/code/spend mutation; the required attempt evidence is an intentional
+append-only audit write where attribution is safe.
 
 These identifiers are the complete R1 refusal oracle after Berkay's round-five answer of
 11.09.2026. They define internal domain outcomes; the public response below deliberately collapses
@@ -255,17 +289,25 @@ them:
 | `M10-ACT-F01` | Spend evidence already exists. | `ACTIVATION_CODE_SPENT`; no row changes. |
 | `M10-ACT-F02` | `now >= expires_at`. | `ACTIVATION_CODE_EXPIRED`; no row changes. |
 | `M10-ACT-F03` | The requested tenancy differs from the code's tenancy or the Renter is not its party. | `ACTIVATION_TENANCY_MISMATCH`; no row changes. |
-| `M10-ACT-F04` | Account evidence from the code, Renter and tenancy does not agree. | `ACTIVATION_ACCOUNT_MISMATCH`; no row changes. |
+| `M10-ACT-F04` | The raw code carries a foreign account locator, or already-loaded synthetic evidence has inconsistent code/Renter/tenancy accounts. | Public live-DB path: uniform refusal and no row changes; forced RLS/composite FKs safely collapse it with an unknown code. Defensive validation of already-loaded inconsistent evidence: `ACTIVATION_ACCOUNT_MISMATCH`. |
 | `M10-ACT-F05` | The target `renter.person_id` is already non-null, including when it names the caller. | `RENTER_ALREADY_LINKED`; the existing link remains unchanged and the code is not spent. |
 | `M10-ACT-F06` | The verified authentication subject resolves to no `Person`. | `ACTIVATION_PERSON_UNKNOWN`; no row changes. |
 | `M10-ACT-F07` | No activation-code row matches the submitted value. | `ACTIVATION_CODE_UNKNOWN`; no row changes. |
 
-Every refusal returns the same non-success HTTP status and the same public body. The endpoint does
-not expose format-specific validation, does not distinguish a missing row from a row that fails a
-later check and equalizes the externally observable response time by doing the same verification
-work or applying one fixed minimum-duration policy. Internal owner-visible audit evidence retains
-the actual reason, timestamp and a non-secret code identifier. The exact numeric HTTP status is an
-R1 API-contract decision; it must be one value for all seven cases.
+Every refusal returns HTTP `400` and the same public body. This includes a missing
+`activationCode`, JSON `null`, numbers, lists and objects: request-schema validation must not return
+its usual differentiated `422`. The endpoint normalizes every shape into the same minimum-duration
+path, does not expose format-specific validation, and does not distinguish a missing row from a row
+that fails a later check. Internal owner-visible attempt evidence retains the actual reason,
+timestamp and non-secret digest only where a real locator account permits safe attribution; the
+remaining refusal is retained only in structured operational logs under the same no-raw-value rule.
+
+The live database cannot contain mismatched code/Renter/tenancy account evidence once the composite
+foreign keys are active. It also cannot inspect another account's hash through forced RLS. Therefore
+a foreign locator is intentionally logged and returned through the same `ACTIVATION_CODE_UNKNOWN`
+live path as an unknown code. `ACTIVATION_ACCOUNT_MISMATCH` remains a defensive service outcome for
+synthetic/already-loaded evidence only; implementing it must not add a global lookup or widen the
+pre-context boundary.
 
 The public German body (`M10-COPY-03`) is verbatim:
 

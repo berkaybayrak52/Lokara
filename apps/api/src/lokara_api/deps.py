@@ -48,6 +48,15 @@ def unmembered_account_session(account_id: str) -> AbstractContextManager[Sessio
     return account_scoped_session(_engine(), account_id)
 
 
+def activation_account_session(account_id: str) -> AbstractContextManager[Session]:
+    """RLS scope selected by an activation code's non-secret account locator.
+
+    This helper grants no account authority. The activation route must prove the
+    submitted hash, URL tenancy and renter-party binding inside this session.
+    """
+    return account_scoped_session(_engine(), account_id)
+
+
 @contextmanager
 def job_account_session(engine: Engine, account_id: str) -> Iterator[Session]:
     """An RLS-scoped session for one M6-C3b scheduled job run (`docs/15` § 5.6).

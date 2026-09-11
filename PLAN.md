@@ -1781,6 +1781,16 @@ immutability decision without an open choice, and the refusal cases are enumerab
 **Agent:** `spec-scribe` (RED fixtures) then `engine-implementer`. Migration `0041` — the next
 revision after the consolidated `0040_ui08_workspace_invariants.py` head.
 
+**Technically complete and review-clean (11.09.2026):** migration `0041`, ORM and API implement
+owner-only hash-at-rest issuance, atomic spend-once redemption and all `M10-ACT-F01…F07` outcomes.
+Direct non-null `renter.person_id` INSERTs and writes without matching redemption evidence are
+blocked for runtime and owner roles. Missing/null/non-string shapes use the same timed HTTP `400`
+path; safely attributable refusals append forced-RLS, append-only `renter_activation_attempt`
+evidence. All three activation tables have positive/negative RLS read and refused cross-account
+write coverage. `resolve_bootstrap_subject` consumers are allowlisted exactly to `me.py` and
+`renter_activation.py`; `.lokara-red` is absent. The boundary re-audit is clean. Closing full gate
+passes `2003` Python and `210` web tests; RLS covers `76` tables and FK isolation `152` edges.
+
 - Add the account-scoped, composite-FK-protected activation-code table with `FORCE ROW LEVEL
 SECURITY`, a `WITH CHECK` policy and a refused cross-account **write** assertion, or
   `scripts/check_rls_coverage.py` rejects it.
