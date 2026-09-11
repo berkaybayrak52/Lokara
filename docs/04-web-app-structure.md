@@ -377,6 +377,48 @@ switcher; no account is stored in the token or client session. M5 account switch
 `development`, but remain unverified and production-blocked. `docs/02-data-model.md` owns the
 detailed function, role, policy, privilege and call-site contract.
 
+## Specified M10 renter entry — not implemented
+
+M10-R0 fixes the future renter boundary; `docs/02-data-model.md` owns the full data and refusal
+contract. There is still no renter route, activation endpoint, renter RLS context or portal UI.
+
+- `/me` will keep membership contexts and add only renter/tenancy witnesses returned by the same
+  bounded `app_bootstrap_contexts(text)` function. A second pre-context identity read is forbidden.
+- Renter pages live under `/renter/{tenancyId}/...`, never `/a/{accountId}`. The API proves the
+  authenticated Person → Renter → TenancyParty → exact URL tenancy chain before deriving the
+  account internally and setting transaction-local `app.account_id` plus `app.tenancy_id`.
+- The owner/staff/tax session helper and every `/a/{accountId}` route remain unchanged. The context
+  switcher lists renter destinations only when the authenticated Person has them; a link itself
+  grants no access.
+- The portal exposes only an own-tenancy overview and append-only published document entries.
+  Overview projection is limited to the tenancy period, unit label and building display
+  name/postal address. It exposes no Person/Renter party list, rent/payment, cost, meter, bank,
+  guard, owner finding or tax record.
+- Publication copies already archived bytes, hash, MIME type and filename into one append-only
+  tenancy-scoped portal record. Statement sources are `TENANT` cover-letter or tenant-statement
+  archives; UVI sources must be blocker-free frozen artifacts. A download reads and verifies only
+  the publication bytes. Nothing is recalculated, re-rendered or selected from source rows or raw
+  `uvi_run` JSON for a renter.
+- Drafts, merely generated or emailed artifacts, production-blocked artifacts, owner overviews,
+  other parties and every other tenancy remain invisible in both application authorization and
+  RLS. The landlord's all-party calculation view is never a portal source.
+- `renter.person_id` has one positive writer: successful single-use activation redemption. After
+  activation it is immutable; a genuine correction appends separately approved evidence rather
+  than updating or clearing the link.
+
+The activation service contract has seven enumerated refusal fixtures in `docs/02`: spent, expired,
+wrong tenancy, wrong account, already-linked Renter, unknown Person and unknown code. Every refusal
+uses one non-success HTTP status, externally equalized processing and the same public text; there is
+no format-specific prevalidation that reveals code existence. The real reason is owner-audit
+evidence only.
+
+Berkay approved `M10-COPY-01…06` on 11.09.2026. The exact activation, success, generic-refusal,
+context-switcher, navigation, heading, PDF-action, loading, empty and error strings are owned by
+`docs/02`. The UI uses them verbatim, keeps the **Sie** form, names
+„Vermieterin oder Vermieter“, uses no gender punctuation or Anglicisms and shows no amount,
+co-renter name or unrelated object data in navigation. M10-R4 is no longer copy-blocked; its schema,
+API and UI remain unimplemented.
+
 ## M7 tax workspace
 
 Merged M7 adds `/a/{accountId}/steuern`, a minimized tax-building list, normalized AfA inputs,
@@ -582,7 +624,7 @@ production-blocking.
 ## Future architecture
 
 - M10 renter activation, `/renter/{tenancyId}`, renter-portal isolation and account-safe portal
-  access are **Future**. Adviser profile, account mapping and tax functions exist, while deferred
+  access are **Specified by M10-R0 but not implemented**. Adviser profile, account mapping and tax functions exist, while deferred
   M7-F repairs on `development` remain unverified and production-blocked.
 - `apps/mobile` is **Future** at M11: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile

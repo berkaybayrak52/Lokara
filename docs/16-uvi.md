@@ -75,9 +75,11 @@ The later sources settle these corrections:
     in a direct renter gas-supply setup remains setup-dependent and `verify-before-production`.
 
 Round 4 specifies the monthly DWD degree-day dataset and Lokara's station-to-PLZ assignment rule.
-The production PLZ-centroid default is now selected in § 7.2. Production Blocks C and D2 remain
-blocked by the three missing UVI register rows requested in `FRAGEN-an-Berkay-05.md` and the other
-authority limits in § 12. The transcription itself is not blocked.
+The production PLZ-centroid default is now selected in § 7.2. Berkay's round-five answer supplies
+the exact future register rows `R-UVI-01` and `R-UVI-02`, and confirms `plz_geocoord` as the sole
+repository-wide PLZ-coordinate source. The authoritative workspace CSV has not yet received those
+rows, so Blocks C and D2 remain production-blocked by register synchronization and the other
+authority limits in § 12. The display-rounding convention needs no additional register row.
 
 ## 2. Legal and register inventory
 
@@ -127,8 +129,22 @@ boundaries from the surrounding spans, subtract the boundary values and attach t
 IDs, dates, interpolation method and any tenancy/device split. Never call a six-week movement one
 month.
 
-The internal interpolation method `linear_by_elapsed_days` is rendered to renters only as
-“linear nach verstrichenen Tagen interpoliert”. The internal identifier never appears in a UVI.
+The internal interpolation method `linear_by_elapsed_days` never appears in a UVI. A value derived
+this way carries this label:
+
+```text
+Vorjahreswert rechnerisch ermittelt
+```
+
+The document prints this footnote once whenever the label occurs:
+
+```text
+Für den Vergleichsmonat des Vorjahres liegt keine Ablesung zum Monatsende vor. Der Wert wurde aus
+den vorhandenen Ableseständen zeitanteilig berechnet.
+```
+
+The notice follows the value through every downstream comparison. A weather-adjusted comparison
+based on an interpolated prior-year value carries both the interpolation and weather notices.
 
 Normalized computation inputs are:
 
@@ -320,7 +336,14 @@ Block C is the only divergent path, and its approved example already uses the di
 Berkay's round-4 verification row for D2 used the superseded `467 / 1733 = +27.0%` figures; the
 current approved `1368 / +132 / +9.6%` figures above remain unchanged and follow the same rule. A
 missing value is absent, not zero. A zero denominator suppresses only the percentage and keeps the
-absolute value.
+absolute value. The percentage slot is never blank; use these exact labels, without a full stop:
+
+| Block | Zero divisor | Label instead of percentage |
+| --- | --- | --- |
+| B | previous-month consumption | `kein Vormonatsverbrauch` |
+| C | `prior_adjusted` | `kein Vorjahresverbrauch` |
+| D | unit comparison value | `kein Vergleichsverbrauch` |
+| D2 | `norm_month` | `kein normierter Vergleichswert` |
 
 Blocks A–D2 are heat-consumption comparisons. They allocate no cents. Any required price/cost
 information is normalized factual content from its source; no UVI module redistributes the annual
@@ -380,10 +403,17 @@ The former exact-value wording would instead yield `-5.4%`; round 4 resolves the
 of the reproducible displayed result. The two degree-day inputs remain an arithmetic fixture, not
 production DWD rows.
 
-Missing prior-year consumption prints “liegt im ersten Bezugsjahr noch nicht vor”. Missing or zero
-prior-year monthly degree days falls back to `current / prior` and visibly prints
+Missing prior-year consumption uses one mechanical tenancy-date rule:
+
+- if `tenancy.start` is after the beginning of the prior-year comparison month, print
+  “liegt im ersten Bezugsjahr noch nicht vor”;
+- otherwise print “für den Vergleichsmonat des Vorjahres liegt kein Verbrauchswert vor”.
+
+The neutral second sentence does not speculate about data gaps, device changes or renter changes.
+Where the cause is known, it belongs only in the landlord-facing finding. Missing or zero prior-year
+monthly degree days falls back to `current / prior` and visibly prints
 “nicht witterungsbereinigt”. It never supplies `1.00`. Interpolated prior-year consumption retains
-its interpolation notice.
+the label and footnote defined in § 3.
 
 ### 7.1 Round 4 — monthly degree-day dataset (source: `Antwort-an-Emir_04.md` § 7.1, Rechtsstand 08/2026)
 
@@ -450,8 +480,9 @@ is not the production default for DWD nearest-station assignment.
 Dataset nature: external source (`WZBSocialScienceCenter/plz_geocoord`, Apache-2.0). Assignment
 nature: `Konvention`. Both carry Rechtsstand 08/2026. The dataset choice, vendored implementation
 and production-centroid default are closed and green, so the former PLZ-geodataset
-`verify-before-production` flag is cleared. The three missing UVI register rows and the other § 12
-authority limits continue to block production Blocks C and D2.
+`verify-before-production` flag is cleared. The pending authoritative CSV synchronization for
+`R-UVI-01`/`R-UVI-02` and the other § 12 authority limits continue to block production Blocks C
+and D2.
 
 U4b persists the selected station's normalized monthly Kd beside the assignment as specified in
 § 3.1. Persisting the value or selecting the centroid dataset does not clear the remaining
@@ -549,8 +580,10 @@ The source has 18 rows:
 
 The values are kWh/(m²·a), Heizspiegel 2025, billing year 2024, as of 09/2025, and originally
 include heat plus hot water. For over-500 m² Wärmepumpe and Holzpellets only, use the 250–500 row
-and print: “Vergleichswert der Größenklasse 250–500 m²; für über 500 m² liegt für diesen
-Energieträger noch kein Wert vor.” This fallback is not guaranteed conservative.
+and print exactly, including the final full stop: “Vergleichswert der Größenklasse 250–500 m²; für
+über 500 m² liegt für diesen Energieträger noch kein Wert vor.” This fallback is not guaranteed
+conservative. The approved oracle row currently omits that final character and must be corrected
+without recalculation.
 
 #### Round 4 — K13 Heizspiegel vintage maintenance (source: `Antwort-an-Emir_04.md` § 7.3, Rechtsstand 08/2026)
 
@@ -788,8 +821,9 @@ The implemented technical path is complete only while:
 ### Additional production clearance
 
 Technical U1–U5 completion does not clear production use. The versioned PLZ dataset choice is
-closed, its vendored path is green and its production flag is cleared; this does not supply the
-three requested UVI register rows, which remain production-blocking.
+closed, its vendored path is green and its production flag is cleared. Round five supplies the
+content of the two new UVI register rows, but they remain production-blocking until Berkay writes
+them to the authoritative CSV.
 The exact monthly § 6a/EED content list must be confirmed, versioned and dated. The intended legal
 identity of the notice published under GEG § 82, the year-round versus heating-season cadence, the
 flagged § 12 reduction risks, the heat-pump deduction convention and every remaining
@@ -872,8 +906,9 @@ are also outside this document.
 | README-for-Emir | introduction, §§ 2, 12 | arithmetic evidence retained; no red flag cleared |
 | Historical correspondence | `docs/03` Appendix D | single retirement ledger; all UVI corrections above remain durable |
 | `Antwort-an-Emir_04.md` § 7 | §§ 4, 7.1, 7.2, 8.2 and oracle | monthly dataset, assignment convention, display rounding and K13 vintage maintenance transcribed |
-| `WZBSocialScienceCenter/plz_geocoord`, January 2019, commit `927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`, Apache-2.0 | §§ 7.2, 12 and `PLZ-GEOCOORD-01…03` | commit-addressed source/raw URL, SHA-256 `d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`, 8,298 data rows and WZB attribution pinned; offline lookup and PLZ-driven station assignment are green; dataset choice closed and its production flag cleared; only the three missing UVI register rows and other § 12 authority blockers remain |
+| `WZBSocialScienceCenter/plz_geocoord`, January 2019, commit `927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`, Apache-2.0 | §§ 7.2, 12 and `PLZ-GEOCOORD-01…03` | commit-addressed source/raw URL, SHA-256 `d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`, 8,298 data rows and WZB attribution pinned; offline lookup and PLZ-driven assignment are green; dataset choice is closed; `R-UVI-01`/`R-UVI-02` still await authoritative CSV sync |
 | Berkay decision `10_UVI-CUBIC-METRE-vs-Zaehler_ANTWORT.md`, 28.08.2026 | §§ 1, 3.1–3.2, 5, 10, 12–13, 16 | UI-08 conflict explicitly superseded; fifth tuple, two-component conversion, provenance, MVP lifecycle limit and setup-dependent § 6a trigger transcribed |
+| Berkay round-five answer, 11.09.2026, §§ 6–7 | §§ 1, 3–4, 7–8, 12–13 and 16 | exact two UVI register rows supplied pending CSV sync; punctuation, zero-divisor labels, interpolation copy and neutral missing-prior rule approved; fixtures and implementation pending |
 
 ## 16. Compact supersession and unresolved ledger
 
@@ -892,7 +927,8 @@ are also outside this document.
 | exact monthly DWD dataset and station-to-PLZ rule | resolved by round 4; hdd_3807 plus the persisted nearest-valid-station convention |
 | Block C exact-value instruction versus printed `-52 / 952 = -5.5%` | resolved by round 4; displayed values win, so `-5.5%` remains |
 | PLZ geodataset | resolved to `WZBSocialScienceCenter/plz_geocoord`, version `2019-01`, commit `927da8a86e9b6e5ebb499cd9259cd1afd3e3c6d2`, SHA-256 `d427a6687a7cb286b3a9b4091831a06aaf0a0da40bd7c76cab7a82ac96e0d9a2`, 8,298 data rows, Apache-2.0; offline implementation is green, its production flag is cleared and the PLZ centroid is the production assignment default |
-| three requested UVI register rows | unresolved; `verify-before-production` and blocks production C/D2 |
+| UVI register rows `R-UVI-01` and `R-UVI-02` | content supplied in round five; authoritative CSV sync still pending and blocks production C/D2 |
+| Block-C display-rounding register request | no new row supplied or required by round five; the approved convention remains in § 4 |
 | Wärmepumpe deduction 8 | unconfirmed convention; co2online reply remains open and `verify-before-production` |
 | W4 year-round/heating-season flag | unresolved |
 | exact monthly § 6a content list | unresolved; versioned source required before production |

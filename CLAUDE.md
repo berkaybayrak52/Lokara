@@ -107,7 +107,9 @@ Rules:
   `berkay-work/Rechtsstand-Register/Rechtsstand-Register.csv`.
 - The matching Notion pages remain under `Rechtsstand-Register/Eintraege/` for explanatory notes.
 - For structured values and flags, the CSV wins.
-- The authoritative CSV contains 180 rows: 130 `verify-before-production` and 50 `geprüft`.
+- Do not duplicate a register-size total in prose. The authoritative count is the current CSV data
+  record count as returned by a CSV parser. Physical line counts are invalid because the file may
+  contain a header and embedded newlines. Ignore historical prose totals such as “51 → 62”.
 - Preserve every row's value, source, legal basis, `Rechtsnatur`, `Rechtsstand` and verification flag.
 - `geprüft` means the primary statutory text was checked. It does not mean lawyer-approved.
 - Never present a flagged value, uncertain citation or Lokara convention as settled law.

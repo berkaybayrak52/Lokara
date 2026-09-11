@@ -785,6 +785,7 @@ filenames appear nowhere else in the live repository except the retirement check
 | `berkay-work/Spec-Seiten/Antworten/Antwort-an-Emir_03.md` summary | approved owning docs | Historical build checklist; every settled rule above has a durable owner |
 | `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` context and E12 amendment | `docs/15` §§ 1, 4 and 8 | Current correction: potential duplicate requires Review; identical provider ID dedupes before scoring |
 | `berkay-work/Spec-Seiten/Antworten/08_BankMatching_F03_Patch.md` `BANKMATCH-F03` | `docs/15` § 7 and `packages/rules-store/tests/berkay_15_golden.py` | Exact executable F03 inputs, outcomes and summation checks preserved |
+| Berkay round-five reply, 11.09.2026, §§ 1–10 | `docs/02`, `docs/12`, `docs/15`, `docs/16`, `PLAN.md` and `FRAGEN-an-Berkay-05.md` | Partial self-use, W2, bank-matching, UVI and M10 copy decisions transcribed; register/file delivery gaps and unimplemented fixtures remain explicit |
 
 ## Appendix E — compact supersession ledger
 

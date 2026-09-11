@@ -52,9 +52,9 @@ Two W2 gaps that this document used to carry are **closed**, both at Rechtsstand
 and 7.1/7.2 give six years for cold water, warm water, heat meters and heat-exchanger hot water from
 04.11.2021, so the five-year value is superseded Rechtsstand rather than a source conflict. The
 31 December expiry convention: § 34 Abs. 2 MessEV ends a period of one year or longer with the end
-of the calendar year in which it falls due. Page 05 line 55 and line 68, and CSV rows 128 and 129,
-still carry the older readings; § 5.2 records why neither may be restored, and the register rows for
-Anlage 7 and § 34 are still to be added.
+of the calendar year in which it falls due. Berkay's round-five answer of 11.09.2026 directs that
+the existing register rows 128 and 129 be corrected in place, not supplemented. The workspace CSV
+still contains their older readings; Berkay owns that pending update and Lokara does not edit it.
 
 The following authority gaps remain explicit and block production use of their affected paths:
 
@@ -215,21 +215,23 @@ else:
 
 The years table is versioned rules data. From 04.11.2021 the Dritte Verordnung zur Änderung der
 MessEV unified the period: cold-water, warm-water, heat and heat-exchanger hot-water meters all use
-**six years** (MessEV Anlage 7 Nr. 5.5.1/5.5.2 and 7.1/7.2); § 34 Abs. 2 MessEV ends the period on
-31 December of the calculated expiry year. This is `geprüft`, Rechtsstand 08/2026. Electric meters
-and bellows gas meters stay at **eight years** under authoritative CSV row 129, which is untouched
-by the unification.
+**six years** (MessEV Anlage 7 Nr. 5.5.1/5.5.2 and 7.1/7.2); electronic auxiliary devices use eight
+years. Heizkostenverteiler have no Eichfrist. Section 34 Abs. 2 MessEV ends every period of at least
+one year on 31 December of the calculated expiry year:
 
-The five-year Warmwasser/WMZ value is **superseded Rechtsstand, not a source conflict**: every
-source naming five years predates November 2021 or copies one that does. Page 05 line 68 and CSV
-row 129 still print it, and Page 05's `12-F05` worked example is calculated from it. Do not restore
-it. The register rows for Anlage 7 and § 34 are still to be added; until then this document carries
-the citation.
+```text
+valid_until = 31.12.(calibration_year + years_for_medium)
+```
 
-One uncertainty survives and is labelled, not blocking: that the six-year period also covers devices
-whose five-year period was still running rests on consistent Messdienstleister communication, and no
-transition clause was found in the ordinance text. It attaches to warm-water, heat-meter and
-heat-exchanger hot-water results only.
+It is not `calibration_date + years_for_medium`. These rules are `geprüft`, Rechtsstand 08/2026.
+The corrected row 129 supplied in round five no longer states an electricity-meter or bellows-gas
+period, so their old eight-year values remain production-blocked until separately sourced; they
+must not be presented as part of the verified water/heat correction.
+
+The five-year Warmwasser/WMZ value is **superseded Rechtsstand, not a source conflict**: it predates
+the amendment effective 04.11.2021. Page 05 line 68, workspace CSV row 129 and the historical
+`12-F05` worked example still print it. Do not restore or execute that result as current behavior;
+Berkay will overwrite rows 128/129 in the authoritative register.
 
 The correction changes what `12-F05` demonstrates. Page 05 prints Warmwasser 5 Jahre, expiry
 31.12.2025 and the Hinweis stage for `eichdatum=06.2020 · heute=08.2025`. Under six years the
@@ -388,7 +390,7 @@ The amount is product framing, not a legal loss calculation.
 | E2 | W1 expired without delivery shows exclusion and continuing-credit warning | `12-F03` |
 | E3 | on-time delivery resolves W1 and starts the objection deadline | `12-F04` |
 | E4 | missing calibration date produces a special warning and no calculation | `12-F06` |
-| E5 | W2 5-year/6-year meter conflict remains visible and production-blocking | `12-F05` |
+| E5 | The historical five-year `12-F05` result is superseded; the current six-year result is silent at 16 months before 31.12.2026 | replacement round-five fixture pending |
 | E6 | arrears exactly one monthly rent do not trigger 3a | `12-F08` |
 | E7 | two dates at two monthly rents trigger 3a but not 3b | `12-F07` |
 | E8 | a grace-period payment can downgrade the stage without fully resolving it | `12-F10` |
@@ -416,7 +418,7 @@ source arithmetic, not current application behavior.
 | `12-F02` | leap-day clip to 28.02.2025; 44 days; no stage |
 | `12-F03` | −15 days; expired; renter credit still payable |
 | `12-F04` | delivery 20.12.2026 resolves; objection deadline 20.12.2027 |
-| `12-F05` | warm-water 5-year path expires 31.12.2025; 4 months; conflicting 6-year path retained |
+| `12-F05` | historical Page-05 oracle only: its five-year result is superseded and must be replaced by a round-five six-year fixture before the source oracle is treated as current |
 | `12-F06` | no calibration date; no calculation; “Eichdatum erfassen” |
 | `12-F07` | 170,000 cents, two dates: 3a true, 3b false |
 | `12-F08` | exactly 85,000 cents: strict 3a false |
@@ -453,6 +455,7 @@ source arithmetic, not current application behavior.
 | Non-Goals V1, Page 05 | § 9 and oracle metadata | all ten exclusions preserved |
 | `Anlagen/README-for-Emir.md` | §§ 1, 7 | 24-case exact arithmetic evidence retained; does not clear red flags |
 | Historical correspondence | `docs/03` Appendix D | single retirement ledger; no Page-05 correction |
+| Berkay round-five answer, 11.09.2026, § 6.2 | §§ 1, 2 and 5.2–8 | rows 128/129 are in-place corrections; six-year water/heat periods, calendar-year end and no Heizkostenverteiler Eichfrist confirmed; authoritative CSV sync pending |
 
 ## 9. Explicit non-goals and dependencies
 

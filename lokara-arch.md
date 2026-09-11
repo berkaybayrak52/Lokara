@@ -98,11 +98,12 @@ For calculation and legal rules, original Pages/annexes and the Rechtsstand regi
   production bank/Vision/email/DATEV/Destatis providers and native mobile apps are not wired.
 - Source-backed `docs/10`–`docs/14` precede their remaining implementation. `docs/16` is
   technically implemented through U5 as described above. Production clearance remains blocked by
-  the unchosen PLZ geodataset, three missing UVI register rows, the exact monthly § 6a content list,
-  unresolved legal/convention checks and the other `verify-before-production` items recorded
-  there. M9 delivery is integrated on `development` but paused, unverified and default-off/blocked;
-  M10 renter publication remains future.
-  `docs/15` is implemented through M6; `PLAN.md` owns the later sequence.
+  the pending authoritative CSV sync for `R-UVI-01`/`R-UVI-02`, the exact monthly § 6a content
+  list, unresolved legal/convention checks and the other `verify-before-production` items recorded
+  there. `plz_geocoord` is the sole repository-wide PLZ-coordinate source and its vendored UVI path
+  is green. M9 delivery is integrated but default-off/blocked; M10 renter publication remains
+  future. The original `docs/15` scope is implemented through M6; its round-five tenancy,
+  reference, tie-break, credit and identity supplement is specified but not implemented.
 
 ## Runtime topology
 

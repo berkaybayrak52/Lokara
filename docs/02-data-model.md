@@ -79,7 +79,7 @@ account-scoped tables carries the same `account_id`; section 3 records the enfor
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
 | Guards, reminders, delivery and checklists | W1–W8 evaluations plus immutable reminders/resolutions, versioned schedules, exact-byte artifacts, email/status/suppression evidence and checklist events | **Technically closed 29.08.2026** on `development` in M9 migration `0025`; production blockers remain; later checkpoint verification is separate |
 | AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Integrated on `development`** with deferred M7-F repairs; closure reviews and runtime authority remain blocked |
-| Renter activation and renter portal context | Activation-code redemption writes `renter.person_id` | **Future**, M10 |
+| Renter activation and renter portal context | Activation-code redemption writes `renter.person_id`; `/renter/{tenancyId}` uses a separate renter context | **Specified** by M10-R0; no schema, API or UI implementation yet |
 
 These principles decide ambiguous additions:
 
@@ -160,20 +160,193 @@ The two shipped foreign keys to the global identity table have different meaning
 The write invariant cannot be “the person already belongs to this account.” A legitimate renter may
 have no earlier relationship to the landlord's account, and may simultaneously own another account.
 `Membership` would reject that valid case; the new `Renter` row cannot witness itself before it
-exists. The actual invariant is consent: the nullable link starts empty and exactly one future M10
-flow may fill it after redeeming a tenancy-bound, per-person, single-use activation code.
+exists. The actual invariant is consent: the nullable link starts empty and exactly one M10
+activation flow may fill it after redeeming a tenancy-bound, per-person activation code. One code
+targets one `Renter` party record; it is never shared across the tenancy.
 
 `app_bootstrap_contexts(text)` and migration `0014_bootstrap_contexts_read.py` are **shipped** on
 `main`. The design uses one bounded `SECURITY DEFINER` function, a dedicated
 `NOLOGIN`/`NOBYPASSRLS` owner with read access only to `person`, `membership` and `account`, and one
 checked API call site. M5 also ships the live `/me` contexts, role and nested-route authorization,
-and the URL-based account chooser/switcher. It does not create a renter portal.
+and the URL-based account chooser/switcher. It does not create a renter portal. M10 must extend
+this same function and its checked privilege boundary to return renter/tenancy witnesses for the
+authenticated Person. A second pre-context identity function is forbidden.
 
 `renter.person_id` is nullable and has no default. Current create APIs leave it `NULL`; no current
 API route is authorized to write it. M5 owns a negative OpenAPI guard proving that absence. M10 owns
 the only positive writer: redemption of a tenancy-bound, per-person, single-use activation code.
-The link proves consent and intended identity, not shared account membership. M10 also owns renter
-URL authorization and the decision whether the link becomes immutable after activation.
+The link proves consent and intended identity, not shared account membership. Once non-null, the
+link is immutable: it cannot be overwritten or cleared. A genuine correction must append immutable
+correction evidence and supersede the earlier link through a separately approved flow; activation
+redemption is not a correction route.
+
+### M10 renter context — binding design, not yet implemented
+
+The renter URL is `/renter/{tenancyId}/...`. The client never supplies or receives the landlord's
+account id as its authority. For every request, the API first proves that the authenticated
+`Person` is linked through `renter.person_id` and `tenancy_party` to the exact tenancy named in the
+URL. Only then does it derive the account internally and set both transaction-local values:
+`app.account_id` for account partitioning and `app.tenancy_id` for the narrower renter boundary.
+Neither value is taken from a token claim or trusted request body.
+
+Application authorization and Postgres RLS must each enforce the same relationship. Removing the
+application check in a rolled-back test must still leave a renter unable to read another tenancy in
+the same account. Owner/staff/tax routes continue to use only their existing account-scoped helper;
+`PathAccountSession` is not widened. A person who has both membership and renter contexts sees both
+from `/me`, but each destination re-authorizes its own URL independently.
+
+The renter database surface is an allowlist. M10 may add renter `FOR SELECT` policies only for the
+rows below; every other account table remains invisible. API responses project only the fields
+needed for the stated screen even where a row is RLS-visible.
+
+| Table | Rows visible in one `app.tenancy_id` context | Explicit exclusion |
+| --- | --- | --- |
+| `tenancy` | Exactly the tenancy named by `app.tenancy_id`, after the Person/Renter/party witness succeeds. | Earlier, later or parallel tenancies in the same unit or account. |
+| `unit` | Exactly the unit referenced by the context tenancy. | Other units in the building. |
+| `building` | Exactly the building referenced by that unit; the API may project only its display name and postal address. | Other buildings and owner-only building facts or findings. |
+| `renter_portal_publication` | Every append-only publication row for the context tenancy, including preserved superseded versions. | Drafts, source artifacts not explicitly published and every other tenancy. |
+| `person`, `renter`, `tenancy_party` | No direct renter-context rows; the bounded bootstrap witness already proved the relationship. | Co-renter identity and relationship enumeration. |
+
+Raw source, calculation and evidence rows are not renter-visible. In particular,
+`statement_document_archive`, `renter_delivery_artifact`, `statement`, `uvi_run`,
+`uvi_delivery_event`, costs, allocation rows, meters/readings, bank/ledger rows, delivery attempts,
+guards and owner/tax records receive no renter `SELECT` policy. When `app.tenancy_id` is set, the
+existing account-based `person` policy must not make account Persons visible. A renter downloads
+only immutable bytes stored on the matching publication row. This prevents the `uvi_run`
+input/result JSON, building-wide comparison evidence and the landlord's all-party statement
+projection from crossing the portal boundary.
+
+`renter_portal_publication` is a specified M10 record, not shipped schema. It must identify exactly
+one account, one tenancy and one source document; copy the already archived bytes, hash, MIME type
+and filename without re-rendering; store the publishing owner Membership and publication time; be
+append-only; and preserve a correction/supersession chain instead of delete or update. Its source is
+either a `TENANT` `COVER_LETTER`/`TENANT_STATEMENT` archive for the same tenancy or a blocker-free
+frozen `UVI` delivery artifact for that tenancy. A UVI publication also appends the existing
+owner-side `uvi_delivery_event(status = 'PUBLISHED')` in the same transaction, but that event is not
+renter-readable. UVI publication remains blocked until M9 has produced the immutable PDF artifact
+with an empty production-blocker snapshot.
+
+R1/R3 must implement the publication record's composite foreign keys, forced RLS, `WITH CHECK`
+policy and refused cross-account write proof before any portal document route is enabled. Stored
+bytes must reproduce the source digest; retrieval verifies the publication digest and never follows
+the source row at request time.
+
+### Activation-code contract and refusal fixtures
+
+One activation code belongs to exactly one account-scoped `Renter` and one tenancy in which that
+Renter is a `TenancyParty`. It is not a tenancy-wide shared secret. Issuance is owner-only. The raw
+code is returned only at issuance; persistence and logs contain only its one-way hash. The record
+has a fixed server-generated expiry instant. It is usable only while `now < expires_at` and no
+spend evidence exists.
+
+Redemption is one atomic transaction. It locks the code, verifies every binding, writes the
+authenticated Person to the still-null `renter.person_id`, and appends spend-once evidence naming
+the code, Renter, tenancy, Person and server redemption time. Concurrent or repeated redemption can
+produce only one successful link and one spend record. A failed redemption changes neither the
+Renter link nor the code evidence. The clock is an explicit service/fixture input; domain logic does
+not read a framework or system clock.
+
+These identifiers are the complete R1 refusal oracle after Berkay's round-five answer of
+11.09.2026. They define internal domain outcomes; the public response below deliberately collapses
+them:
+
+| Fixture ID | Refusal condition | Required result |
+| --- | --- | --- |
+| `M10-ACT-F01` | Spend evidence already exists. | `ACTIVATION_CODE_SPENT`; no row changes. |
+| `M10-ACT-F02` | `now >= expires_at`. | `ACTIVATION_CODE_EXPIRED`; no row changes. |
+| `M10-ACT-F03` | The requested tenancy differs from the code's tenancy or the Renter is not its party. | `ACTIVATION_TENANCY_MISMATCH`; no row changes. |
+| `M10-ACT-F04` | Account evidence from the code, Renter and tenancy does not agree. | `ACTIVATION_ACCOUNT_MISMATCH`; no row changes. |
+| `M10-ACT-F05` | The target `renter.person_id` is already non-null, including when it names the caller. | `RENTER_ALREADY_LINKED`; the existing link remains unchanged and the code is not spent. |
+| `M10-ACT-F06` | The verified authentication subject resolves to no `Person`. | `ACTIVATION_PERSON_UNKNOWN`; no row changes. |
+| `M10-ACT-F07` | No activation-code row matches the submitted value. | `ACTIVATION_CODE_UNKNOWN`; no row changes. |
+
+Every refusal returns the same non-success HTTP status and the same public body. The endpoint does
+not expose format-specific validation, does not distinguish a missing row from a row that fails a
+later check and equalizes the externally observable response time by doing the same verification
+work or applying one fixed minimum-duration policy. Internal owner-visible audit evidence retains
+the actual reason, timestamp and a non-secret code identifier. The exact numeric HTTP status is an
+R1 API-contract decision; it must be one value for all seven cases.
+
+The public German body (`M10-COPY-03`) is verbatim:
+
+```text
+Die Aktivierung war nicht möglich. Bitte prüfen Sie den Code oder wenden Sie sich an Ihre
+Vermieterin oder Ihren Vermieter.
+```
+
+### Renter-facing copy boundary
+
+The frozen `Mieter-Einzelabrechnung`/cover-letter wording in `docs/08`, the UVI document content in
+`docs/16`, the UVI basis labels **„Vergleich im Gebäude“** and
+**„normierter Durchschnittsnutzer“**, and the approved disclaimer/Rechtsstand rules remain
+unchanged. Portal code displays those archived bytes without rewriting their legal or financial
+wording.
+
+Berkay's round-five answer of 11.09.2026 approves `M10-COPY-01…06` as `Konvention`, Rechtsstand
+09/2026, `geprüft`. All portal copy uses the **Sie** form, names both
+„Vermieterin oder Vermieter“, uses no gender punctuation and avoids Anglicisms. Navigation contains
+no money, other-renter names or object data beyond the current unit named in the context entry.
+
+Activation entry (`M10-COPY-01`):
+
+```text
+Seitentitel:      Mieterzugang aktivieren
+Feldbezeichnung:  Aktivierungscode
+Anleitung:        Geben Sie den Aktivierungscode ein, den Sie von Ihrer Vermieterin oder Ihrem
+                  Vermieter erhalten haben. Der Code gilt einmalig.
+Schaltfläche:     Zugang aktivieren
+```
+
+Activation success (`M10-COPY-02`):
+
+```text
+Überschrift:      Ihr Zugang ist aktiviert.
+Text:             Sie sehen hier künftig Ihre Abrechnungen und Ihre monatlichen
+                  Verbrauchsinformationen, sobald Ihre Vermieterin oder Ihr Vermieter sie
+                  bereitstellt.
+Schaltfläche:     Zu meinen Unterlagen
+```
+
+Context and navigation (`M10-COPY-04`):
+
+```text
+Kontextwechsler (Eintrag): Mietverhältnis — <Straße Hausnummer>, <Einheitsbezeichnung>
+Kontextwechsler (Gruppe):  Als Mieter
+Portalnavigation (Titel):  Meine Unterlagen
+Navigationspunkte:         Mein Mietverhältnis · Abrechnungen · Verbrauchsinformationen
+```
+
+Headings and actions (`M10-COPY-05`):
+
+```text
+Mietverhältnis:              Mein Mietverhältnis
+Abrechnungsdokumente:        Abrechnungen
+UVI-Dokumente:               Verbrauchsinformationen
+UVI-Einzeldokument:          Verbrauchsinformation <Monat JJJJ>
+Abrechnungs-Einzeldokument:  Abrechnung <Zeitraum>
+Download-Aktion:             Als PDF speichern
+```
+
+Loading, empty and error states (`M10-COPY-06`):
+
+```text
+Laden (alle drei Ansichten):
+  Wird geladen …
+
+Leer:
+  Mietverhältnis          Zu Ihrem Zugang ist derzeit kein Mietverhältnis hinterlegt.
+                          Bitte wenden Sie sich an Ihre Vermieterin oder Ihren Vermieter.
+  Abrechnungen            Es liegen noch keine Abrechnungen für Sie bereit.
+  Verbrauchsinformationen Es liegen noch keine Verbrauchsinformationen für Sie bereit.
+
+Fehler (alle drei Ansichten, identisch):
+  Die Daten konnten nicht geladen werden. Bitte versuchen Sie es später erneut.
+  Schaltfläche: Erneut versuchen
+```
+
+The tenancy empty state is defensive: a successful activation should make it unreachable, but the
+screen must still provide the stated instruction if the invariant is broken. These six copy slots
+remove the M10-R4 copy blocker; they do not approve any schema, endpoint or UI implementation.
 
 ## 3. Account isolation and composite-FK rules
 
@@ -616,40 +789,41 @@ Persistence: `person_count` rows are per tenancy. The D0 landlord rows are **der
 never stored**, which is what "the adapter derives" means. A unit vacant for the whole period still
 resolves, because the tenancy that ended before the period keeps its `person_count` rows.
 
-##### Assumption, not a transcribed rule: self-use overlapping a vacancy
+##### Round-five convention: partial self-use overlapping a vacancy
 
 `SelfUsePeriod` stores an **area** (`sqm_x100`), not unit-level occupancy, so a self-use row can
-cover part of a unit. Original Page 01 § 3.5, § 4 D0 and edge cases E17–E19 contain **no rule** for
-a partial self-use overlapping a vacancy, and the register has no row for it. What ships is
-therefore a **Lokara assumption**, `Rechtsnatur: Annahme`, status `verify-before-production`,
-awaiting source confirmation. It has no legal source of its own: it inherits the surrounding D0
-convention's **Rechtsstand 07/2026** and was recorded in 08/2026. It is not settled law, it is not
-a transcribed source rule, and no output may present it as either.
+cover part of a unit. Original Page 01 § 3.5, § 4 D0 and edge cases E17–E19 contain **no source
+rule** for a partial self-use overlapping a vacancy. Berkay's round-five answer of 11.09.2026
+confirms the shipped direction as a deliberate Lokara **Konvention**, Rechtsstand 09/2026,
+`geprüft` for production safety. It is not settled law and has no legal source of its own. The
+safety argument is asymmetric: leaving the fiction in place can only allocate more of the
+person-keyed fixed cost to the owner; removing or apportioning it could charge renters on an
+unsupported basis. BGH VIII ZR 159/05 and LG Krefeld 2 S 56/09 support that direction, but do not
+source the product rule itself.
 
 Source trace: derived from `docs/02` § 4, which defines `VACANT` as "neither rented nor self-used",
 read together with original Page 01 § 4 D0, which runs "for each Leerstandsperiode". Shipped in
-`apps/api/src/lokara_api/person_counts.py`. Raised as an open source question in
-`FRAGEN-an-Berkay-05.md` → "Seite 01 — Fiktivbelegung und Eigennutzung". Round 4 settled its
-other listed items; this source question was not answered and remains open.
+`apps/api/src/lokara_api/person_counts.py`; confirmed by Berkay's round-five answer, § 1. The new
+register row `R-01-D0-02` remains pending in Berkay's authoritative CSV and is not written by
+Lokara.
 
 | Constellation | Shipped behavior | Why this direction |
 | --- | --- | --- |
 | **Full-unit** self-use (`sqm_x100 >= unit.area_sqm_x100`) | Those days are removed from the derived D0 vacancy: a self-used day is not a vacancy day and receives no fictional occupancy. | Follows directly from the two cited definitions; unambiguous, and the only inference in it is that the areas are comparable. |
-| **Partial** self-use (`sqm_x100 < unit.area_sqm_x100`) | The day stays a vacancy day, so the fiction still applies to it, and the document carries a German finding saying the partial self-use was not separated out. | The conservative direction, deliberately chosen: dropping the fiction would hand the renters the whole person-keyed fixed cost, which is the constellation BGH VIII ZR 159/05 and LG Krefeld 2 S 56/09 reject. Apportioning it would invent an area-weighted person count that no source defines. |
+| **Partial** self-use (`sqm_x100 < unit.area_sqm_x100`) | The day stays a vacancy day, so the fiction still applies to it, and the document carries the approved German finding below. | The conservative product convention: dropping the fiction would hand renters the whole person-keyed fixed cost; apportioning it would invent an area-weighted person count. Any uncertainty therefore burdens only the owner. |
 
 The finding is landlord-facing copy and stays in German. Fixed parts verbatim, interpolated parts in
 angle brackets:
 
 ```text
-<Einheit>: Teil-Eigennutzung (<Fläche> m² von <Gesamtfläche> m²) vom <TT.MM.JJJJ> bis <TT.MM.JJJJ>. Leerstandstage in diesem Zeitraum werden mit Fiktivbelegung gerechnet; die anteilige Eigennutzung ist nicht abgegrenzt.
+<Einheit>: Teil-Eigennutzung (<Fläche> m² von <Gesamtfläche> m²) vom <TT.MM.JJJJ> bis <TT.MM.JJJJ>. Die Leerstandstage in diesem Zeitraum werden vollständig mit Fiktivbelegung gerechnet; die anteilige Eigennutzung wird nicht gesondert abgegrenzt. Der darauf entfallende Anteil trägt der Eigentümer.
 ```
 
 An open-ended self-use row (`valid_to IS NULL`) is clipped to the billing window rather than treated
 as infinite. That part is the ordinary half-open temporal rule of § 4, not an assumption.
 
-What a confirmed source rule would have to settle: whether a partial self-use suppresses the fiction
-pro rata, suppresses it entirely, or leaves it untouched as shipped. Until then the assumption
-stands and the finding is the disclosure that it was applied.
+This decision does not change full-unit self-use: those days remain outside `VACANT` by definition.
+The open lawyer bundle may still review the convention, but it no longer blocks production.
 
 The landlord overview displays one aggregate owner line, but the immutable data retains why it
 exists:
@@ -705,8 +879,7 @@ One normalized calculation must produce one immutable result and explicit audien
 | Calculation identity | Account, building, inclusive period and calculation/version identity. Basic persisted fields exist; the exact Page 01 input is not complete. |
 | Property header | Legal landlord, object address, total area, unit count, creation date, engine/rule versions and every applicable register `Rechtsstand`. |
 | Covered tenancy | `tenancy_id`, renters/addressee, delivery address, unit, clipped usage dates and days, person/area/consumption inputs. M6-B freezes the selected address and isolated archive; renter delivery remains incomplete. |
-| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; locally merged C3a books accepted matches into the ledger. Automatic later use of renter credit remains open; C3b's job wiring is technically complete and
-locally merged. Confirmed zero is valid. |
+| Actual advances | Paid cents for the period, distinct from contractual Soll. M6-A/B confirm/freeze them for final archives; locally merged C3a books accepted matches into the ledger. Round five specifies that tenancy credit remains until an explicit owner offset and suppresses covered reminder amounts; implementation is pending. C3b's job wiring is technically complete and locally merged. Confirmed zero is valid. |
 | Operating-cost result | Cost identity/classification, total, key, numerator, denominator, measurement unit, rounded renter share, § 35a inputs/result, warnings and provenance. |
 | Heating and CO₂ result | Every required block, ratio, numerator/denominator, device evidence, CO₂ figures, warnings and provenance defined in `docs/03`. |
 | Vacancy result | Origin unit/dates, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c) and evidence. The residual contract is settled; the full annex is not implemented. |
@@ -925,15 +1098,16 @@ counts and all 68 legacy Auto confirmations are unchanged.
   `nk_nachzahlung` principal deliberately carries zero in all four named components, preventing a
   statement balance from being misreported as a paid advance.
 
-The Largest-Remainder tie authority remains missing. Tests prove refusal and atomic rollback; no
-tie-break is invented.
+The shipped Largest-Remainder tie still refuses and rolls back atomically. Round five now specifies
+the versioned order `base_rent`, `nk_advance`, `heating_advance`, `garage`; implementation and its
+equal-remainder fixture remain pending.
 
-**`Receivable.stored_reference` is a placeholder, not a contract.** `docs/15` § 4 awards 15 points
-when a transaction's E2E or mandate reference matches a "stored reference", but §§ 3.2–3.3 define
-no such field. The column exists so the field has a home the moment the source answers; nothing
-writes it, and `_end_to_end_signal` returns 0. The open question is in `FRAGEN-an-Berkay-05.md`.
-Binding the signal to a guessed field is the invented convention M6-C1 removed, and re-enabling it
-without the answer restores it.
+**`Receivable.stored_reference` is now a legacy placeholder, not the approved target.** Round five
+replaces it with nullable `RenterMatchingProfile.sepa_mandate_reference` and
+`Receivable.e2e_reference`. The first is unique within the account; the second exists only for a
+Lokara-generated collection. Either match contributes the same single 15-point structured-reference
+signal, never 30, and it remains additive to a purpose payment code. Until the migration, fixtures
+and engine update land, nothing writes these fields and `_end_to_end_signal` correctly returns 0.
 
 #### Closed on `0020`: six invariants the second audit re-run found
 
@@ -1013,8 +1187,8 @@ with M7-F's read-only reviews still open.
 | Landlord *Zahlungen* screen | **UI-07 demo core implemented on `development`; partial, with automated and focused review evidence**. Unified server read model, account/consent status, filters, pagination, proposal confirmation and append-only single/bulk ignore are live. Manual payment/assignment, anomaly engine, complete shared aggregates and the live-browser matrix remain unfinished or source-blocked. | UI-07 / M6-C3c |
 | W1–W8 guards, reminders, email delivery and checklists | **Technically closed 29.08.2026 on `development`** with migration `0025`, account-scoped jobs/API and `/waechter`; delivery defaults off and real execution remains blocked | M9 / `docs/12` |
 | U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**, including later GAS/warm-water extensions; M9 scheduling on `development` refuses UVI delivery because immutable PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
-| Renter portal publication | **Future** | M10 |
-| Renter activation-code redemption, renter context and portal isolation | **Future** | M10 |
+| Renter portal publication | **Specified by M10-R0; not implemented** | M10-R3/R4 |
+| Renter activation-code redemption, renter context and portal isolation | **Specified by M10-R0; not implemented** | M10-R1/R2 |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Pure engine, rules, schema, web and the server-generated artifact/API adapter are locally merged and green; runtime output stays blocked while its register values remain `verify-before-production` | M7 / `docs/11-tax-export.md` |
 | Page 06 clause selection, risk and workflow-routing contract | Complete transcription approved and merged 21.08.2026; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |

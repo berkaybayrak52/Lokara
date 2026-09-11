@@ -1,6 +1,7 @@
 # Bank matching — deterministic proposals and immutable settlement
 
-**Status:** complete D2 transcription; approved and merged 20.08.2026
+**Status:** approved Page-08 base merged 20.08.2026; Berkay's round-five decisions of 11.09.2026
+are specified below but not yet implemented or fixture-covered
 
 **Authoritative sources:**
 
@@ -17,9 +18,10 @@ database invariants in migration `0020`. M6-C3a's matching service, final migrat
 exactly five owner APIs are technically complete, development-synchronized and locally merged into
 `main`. C3b's scheduler port and three job entrypoints are technically complete and
 locally merged into `main`, and so is C3c's landlord *Zahlungen* screen, which completes M6.
-The § 4 E2E
-signal is deliberately inert; see § 4 below — the C3c screen therefore renders it as *noch nicht
-ausgewertet* rather than as an unmet criterion.
+The shipped § 4 E2E signal is deliberately inert; see § 4 below. Berkay's round-five answer now
+defines its two source fields, but the migration, engine fixture and screen change remain future
+work. The C3c screen therefore still renders it as *noch nicht ausgewertet* rather than as an unmet
+criterion.
 
 This document owns the deterministic normalization, candidate scoring, decision and settlement
 contract for incoming renter payments. Matching is a proposal mechanism. It does not create a
@@ -142,12 +144,14 @@ scoring. Zero is retained for import audit but ignored by matching.
 
 ### 3.2 Receivable
 
-The source calls its renter field `tenant_id`; Lokara normalizes that name to `renter_id` and also
-retains the tenancy that produced the debt:
+Berkay's round-five answer supersedes the earlier per-Renter debt shape. A receivable belongs to
+the **tenancy**, because multiple parties to one residential tenancy are jointly and severally
+liable in the default case under §§ 421, 427 BGB: the creditor may demand the whole performance
+from any one party, but only once overall. The target contract is:
 
 ```text
 Receivable
-  id, account_id, renter_id, tenancy_id
+  id, account_id, tenancy_id
   source_type, source_id?      recurring rent, Page 01 statement, or guard handoff
   period                      YYYY-MM, or the statement period for NK-Nachzahlung
   due_date
@@ -157,6 +161,7 @@ Receivable
   category                    rent | nk_nachzahlung
   principal_components        base_rent, nk_advance, heating_advance, garage
   open_costs_cents, open_interest_cents, open_principal_cents
+  e2e_reference?              only when Lokara generated the collection
 ```
 
 The nominal components sum to `expected_cents`. The Page 01 handoff creates an
@@ -164,12 +169,23 @@ The nominal components sum to `expected_cents`. The Page 01 handoff creates an
 `F12` copies 24,500 cents. A purpose that names a period for which no receivable exists does not
 invent one: the amount becomes renter credit after other valid allocation, as in `F08`.
 
+Candidate identity is formed by joining every `TenancyParty` of the receivable's tenancy. In
+Lokara's schema, the legal debtor party is the account-scoped `Renter`; `Person` is only the
+optional global login identity. Berkay's phrase “IBAN history remains per person” therefore
+normalizes to the existing `IbanHistory.renter_id`, not `person_id`, so bank matching never depends
+on M10 portal activation. Payments from different joint Renter parties can settle the same debt.
+One party's payment reduces the single receivable for all parties. The current schema still carries
+`receivable.renter_id`; the existing 409 refusal for multi-party statement handoff remains mandatory
+until a migration removes that edge. Do not add a uniqueness or check constraint that would make an
+expressly agreed partial-debt model impossible later; § 427 applies only “im Zweifel”.
+
 ### 3.3 Renter matching profile and IBAN history
 
 ```text
 RenterMatchingProfile
   account_id, renter_id
   payment_code?
+  sepa_mandate_reference?     unique within the account; stable for the tenancy
   normalized_surname
   known_ibans[]               derived from active IbanHistory rows
 
@@ -182,14 +198,20 @@ IbanHistory
 ```
 
 An IBAN is optional. A non-null IBAN is learned only after a user confirms a Review proposal.
-Null is never learned (`F09`). History is versioned rather than overwritten. Auto eligibility is
-computed inside the account: the IBAN must have exactly one active renter mapping. If two active
-renters share it, each receives the ambiguous signal and the result is Review (`F07`).
+Null is never learned (`F09`). History is versioned rather than overwritten and belongs to the
+paying Renter party. Auto eligibility is computed inside the account: the IBAN must have exactly
+one active Renter mapping. If two active parties share it, each receives the ambiguous signal and
+the result is Review (`F07`). This deliberately preserves the current account-scoped Renter foreign
+key while `Receivable` moves from one Renter to the tenancy.
+
+The mandate reference is set by the creditor through Lokara and proves identity. The receivable
+E2E reference proves identity plus debt only when Lokara generated the debit. A payer-supplied E2E
+value such as `NOTPROVIDED` is not stored as trusted receivable evidence.
 
 ## 4. Candidate, score and decision contract
 
-Candidates are only open or partial receivables belonging to renters in the transaction's
-`account_id`. No query, learned IBAN or confirmation may cross the account boundary.
+Candidates are only open or partial receivables whose tenancy and all joined parties belong to the
+transaction's `account_id`. No query, learned IBAN or confirmation may cross the account boundary.
 
 For each `(transaction, renter, receivable)` candidate, normalize comparison text to lowercase,
 remove spaces and special characters, and test codes as substrings. Then calculate:
@@ -201,21 +223,23 @@ remove spaces and special characters, and test codes as substrings. Then calcula
 | `amount_cents == open_cents` | 30 |
 | purpose contains payment code | 15 |
 | otherwise purpose contains surname | 10 |
-| E2E or mandate reference matches stored reference | 15 — **inert, see below** |
+| E2E matches `Receivable.e2e_reference`, or mandate reference matches `RenterMatchingProfile.sepa_mandate_reference` | 15 |
 | purpose contains the receivable period token | 5 |
 
 Code and surname are mutually exclusive; take 15 or 10, not both. Confidence is
 `min(100, sum(signals))`. There is no amount tolerance.
 
-The "stored reference" this table scores against is **named here and defined nowhere in § 3**:
-neither `Receivable` (§ 3.2) nor `RenterMatchingProfile` (§ 3.3) carries such a field. No fixture
-exercises the signal — index 3 is 0 in all thirteen cases — so the oracle cannot settle it either.
-Binding it to any existing field would be an invented matching convention, and +15 is not
-cosmetic: it lifts a candidate from 25 to 40, which is Unmatched to Review. The implemented engine
-therefore returns 0 for this signal. The question is open in `FRAGEN-an-Berkay-05.md`; M6-C2 adds
-the real field with the `receivable` table and makes the signal live. This does not affect the
-§ 5.3 reversal lookup, which resolves an original match by E2E/mandate reference and is
-source-backed and fixture-covered.
+The two structured-reference checks are mutually exclusive: together they contribute at most 15,
+never 30, because they prove the same identity fact. A mandate match alone earns 15. The structured
+reference signal is additive to a payment code found in the purpose because those are independent
+pieces of evidence. Code and surname remain mutually exclusive. Missing reference fields contribute
+zero and are the normal legacy state.
+
+This is a Lokara `Konvention`, Rechtsstand 09/2026, `verify-before-production`, like the other
+matching weights. The thresholds 40/79 and all other weights remain unchanged. The shipped engine
+still returns zero for this signal until one new fixture per reference field and the two persistence
+fields exist. This does not affect the § 5.3 reversal lookup, which resolves an original match by
+E2E/mandate reference and is already source-backed and fixture-covered.
 
 Decision order:
 
@@ -264,9 +288,24 @@ reconcile the cent remainder by Largest Remainder
 
 The reconciled components must sum exactly to `P`; the paid NK-advance component feeds the annual
 actual-advance total used by Page 01. `F11` yields 78,704 / 13,889 / 7,407 cents and needs no final
-cent redistribution. Page 08 does not specify the tie-break between equal fractional remainders.
-The engine and persisted service tests prove refusal and full rollback for that branch; no
-tie-break is invented. The source gap remains unresolved.
+cent redistribution. Berkay's round-five answer fixes this versioned convention for equal
+remainders:
+
+```text
+TIE_BREAK_ORDER = [base_rent, nk_advance, heating_advance, garage]
+```
+
+Assign each remaining cent to the earliest tied component in this order; if more than one cent
+remains, traverse again from the start. `TieBreakUnspecifiedError` remains only for an unknown
+component absent from the list. The shipped engine still refuses an ordinary equal-remainder tie;
+a new fixture with two equal nominal components and an odd partial payment must reach this branch
+before implementation changes.
+
+This order is a `geprüft` Lokara `Konvention`, Rechtsstand 09/2026. `base_rent` comes first because
+an avoidable residual there is the least renter-friendly direction in arrears handling; § 543 Abs.
+2 BGB supports only that direction, not the cent order itself. `nk_advance` precedes
+`heating_advance` because it feeds the Page-01 annual total, and `garage` is last because it has no
+follow-on annual calculation. Table or contract-column order never decides a tie.
 
 ### 5.3 Immutable events and reversal
 
@@ -280,6 +319,58 @@ mandate reference; only then use the Page fallback `(IBAN, amount, date)`, withi
 Append compensating entries that reverse the original allocations exactly, restore the receivable
 projection and emit `payment_returned` for the Page 05 guard. Do not rescore or create a replacement
 positive payment. `F06` restores 108,000 cents and nets the payment ledger to zero.
+
+### 5.3a Round-five credit, rejection and identity decisions — specified, not implemented
+
+An overpayment remainder is an unused credit of the same tenancy. It remains immutable ledger
+evidence until the owner either pays it outside V1 or expressly offsets it. Lokara never offsets it
+automatically: §§ 387, 388 BGB require an eligible counterclaim and an offset declaration. When a
+new receivable becomes due, the *Zahlungen* screen offers exactly this owner action:
+
+```text
+Guthaben verrechnen (<Betrag>)
+```
+
+The action is never preselected or automatic. One click is the owner's declaration and appends a
+separate ledger entry with actor and time. It never rewrites the original payment or credit.
+
+The reminder path must account for unused credit even before that action. A receivable fully
+covered by unused credit of the same tenancy produces no reminder and instead shows:
+
+```text
+offenes Guthaben deckt diese Forderung — bitte verrechnen oder auszahlen
+```
+
+For partial coverage, only the uncovered remainder may enter reminder output and the available
+credit is stated in the reminder text. This reminder suppression is a Lokara `Konvention`,
+Rechtsstand 09/2026, `verify-before-production`; the declaration requirement is law and `geprüft`.
+Payout remains outside V1; credit neither expires nor is written off.
+
+A final rejection stays append-only, settles nothing and leaves the receivable unchanged. It may be
+evaluated again only after one actual input event: a receivable is created or becomes due, an IBAN
+is learned through another confirmed assignment, a matching profile changes, or a tenancy is
+created or changes. Each re-evaluation is a new proposal run with its own ranks; the rejected run is
+never overwritten or deleted. There is no user-triggered rerun on unchanged inputs.
+
+The owner never chooses a receivable. Under § 366 Abs. 1 BGB, the debtor makes a payment
+designation; without one the statutory § 366 Abs. 2 order applies, followed by § 367. The decision
+endpoint may instead accept these two optional input corrections:
+
+```text
+identity_correction: { tenancy_id, reason }
+  A factual correction identifying the tenancy that made the payment. The tenancy must belong to
+  the URL account. Append as MANUAL_IDENTITY with actor, time and mandatory reason.
+
+debtor_designation: { text, quelle, datum }
+  Evidence of a designation the debtor communicated outside the purpose, for example by telephone,
+  e-mail or letter. All three fields are mandatory. Append with visible provenance as a debtor
+  designation under § 366 Abs. 1 BGB.
+```
+
+After either input, the unchanged § 366/§ 367 engine chooses the debt and component allocation. A
+free-form owner assignment to a selected receivable is forbidden. The statutory restriction is
+`geprüft`; the identity-correction and external-designation evidence shapes are Lokara
+`Konvention`, Rechtsstand 09/2026.
 
 ### 5.4 M6-C3a persistence and service boundary
 
@@ -299,6 +390,11 @@ ranked evidence row whose receivable and renter are null. Existing proposal rows
 deterministically when migration `0021` adds the rank. Before future-only triggers are installed,
 the migration validates every backfilled transaction group and fails rather than rewriting evidence
 if ranks are not contiguous from 1 or decision, German reason or convention version differs.
+
+That paragraph describes the shipped C3a model. The round-five target permits multiple immutable
+runs for one transaction only after an input event listed in § 5.3a. The migration must give each
+run its own identity and rank scope while preserving the complete old run; it must not loosen
+idempotency for unchanged inputs.
 
 Candidate selection joins only `open` or `partial` receivables to a matching profile in the same
 account. Active IBAN ownership comes only from `IbanHistory.valid_to IS NULL`. The database keeps
@@ -334,7 +430,8 @@ A negative movement uses the engine reversal path and appends one compensating l
 restores the recorded projections and emits `payment_returned`. The complete operation is refused
 and rolled back for an ambiguous original, a partial return, missing or incomplete legacy
 snapshots, or a later allocation that makes the stored after-snapshot no longer equal the current
-projection. A Largest-Remainder tie likewise raises a conflict and rolls back the whole operation.
+projection. The currently shipped Largest-Remainder tie likewise raises a conflict and rolls back
+the whole operation; the round-five `TIE_BREAK_ORDER` is specified but not yet implemented.
 Zero-value movements stay as imported evidence and create neither a proposal nor a ledger row.
 
 ### 5.5 M6-C3a owner API
@@ -347,7 +444,8 @@ C3a adds exactly five owner-scoped capabilities under `/a/{account_id}`:
 3. `GET /match-proposals` returns transaction-grouped German reasons, lowercase decisions, ranked
    candidates, signals, confidence, confirmation and ledger reference.
 4. `POST /bank-transactions/{transaction_id}/decision` records the final `confirmed`, `rejected`
-   or `duplicate` outcome. The client cannot choose a receivable.
+   or `duplicate` outcome. The round-five target request also permits `identity_correction` and
+   `debtor_designation` exactly as specified in § 5.3a; it never accepts a receivable choice.
 5. `GET /payment-ledger` returns immutable payments, reversals, credit and before/after allocation
    snapshots newest first.
 
@@ -491,8 +589,8 @@ is chosen, not so a queue can be smuggled in.
 - A provider transaction ID is unique only together with its account and bank-account identity.
 - Legal/money events are immutable. Corrections and reversals append new linked entries; learned
   IBAN facts use `valid_from`/`valid_to` history.
-- A match never moves money between renters. One confirmed transaction belongs to exactly one
-  renter; no cross-renter current account exists.
+- A match never moves money between tenancies. One confirmed transaction belongs to exactly one
+  tenancy; multiple parties may supply identity evidence for that one tenancy debt.
 
 ## 7. Edge cases and exact fixture coverage
 
@@ -520,6 +618,12 @@ Page 08 edge cases E1–E12 map to the named fixtures above. The approved F03 co
 transaction that requires Review, while the same provider transaction `id` is the already processed
 movement and is silently deduplicated before channel selection or scoring.
 
+Round five requires additional executable coverage without rewriting `BANKMATCH-F01…F13`: one
+equal-remainder case that proves `TIE_BREAK_ORDER`, one mandate-reference case, one Lokara-issued
+E2E-reference case, tenancy-wide joint-debtor settlement, explicit credit offset, full/partial
+reminder suppression, event-triggered re-evaluation, identity correction and documented debtor
+designation. Those fixtures do not exist yet, so none of these target rules is claimed as shipped.
+
 ## 8. Source coverage ledger
 
 | Source | Destination | Disposition |
@@ -527,7 +631,7 @@ movement and is silently deduplicated before channel selection or scoring.
 | Page 08 metadata and § 1 | §§ 0–1 | current; optional M6 sub-scope preserved |
 | Page 08 § 2 | §§ 2, 5 | matching convention separated from §§ 362/366/367 settlement law |
 | Page 08 § 3 transaction fields | § 3.1 | complete provider-to-normalized field mapping |
-| Page 08 § 3 receivable/profile fields | §§ 3.2–3.3 | complete; `tenant_id` normalized to Lokara `renter_id` |
+| Page 08 § 3 receivable/profile fields | §§ 3.2–3.3 | original per-Renter shape preserved historically; round five supersedes the target with `Receivable.tenancy_id` and adds mandate/E2E fields |
 | Page 08 § 4 steps 1–5 | § 4 | channel, candidates, signals, confidence and decision |
 | Page 08 § 4 step 6 | § 5 | designation, FIFO, § 367 order, status, overpayment and split |
 | Page 08 reversal paragraph | § 5.3 | immutable compensating-event form |
@@ -539,14 +643,16 @@ movement and is silently deduplicated before channel selection or scoring.
 | Non-Goals V1, Page 08 | § 9 | all six Page 08 exclusions preserved |
 | `Anlagen/README-for-Emir.md` | §§ 1, 7 | arithmetic evidence for the twelve original cases retained; approved correction closes F03 |
 | Historical correspondence | `docs/03` Appendix D | single retirement ledger; exact F03 correction disposition preserved |
+| Berkay round-five answer, 11.09.2026, §§ 4–5 | §§ 2–7 and § 11 | tie-break, stored references, tenancy debt, credit handling, event-triggered re-evaluation and identity/designation evidence specified; implementation and new fixtures pending |
 
 ## 9. Explicit non-goals
 
 V1 does not pay out renter credit through PIS, execute SEPA direct debits, calculate late interest
-or reminder fees, create a receivable for a nonexistent named period, net balances between renters,
-categorize outgoing bank transactions/invoices, decide tax treatment or infer object identity from
-the movement. Page 05 creates costs/interest that this contract may consume. Object context comes
-from the confirmed renter/tenancy relationship. V1 is AIS-only; the renter pushes the payment.
+or reminder fees, create a receivable for a nonexistent named period, net balances between
+tenancies, let an owner freely choose a debt, categorize outgoing bank transactions/invoices,
+decide tax treatment or infer object identity without recorded evidence. Page 05 creates
+costs/interest that this contract may consume. Object context comes from the confirmed tenancy
+relationship. V1 is AIS-only; the renter pushes the payment.
 
 ## 10. Adapter and model status
 
@@ -641,6 +747,9 @@ C3b technically verifies the scheduler port, the three job entrypoints and the P
 precondition on local `main`; that is a technical result, not approval of the 180-day
 convention or of production bank matching. C3c technically completes the landlord *Zahlungen* screen on local `main`; that too is a
 technical result, and the § 4 weights it displays stay `Konvention`, `verify-before-production`,
-`Rechtsstand 07/2026`, presented as a decision aid and never as legal support for a match. finAPI,
-manual assignment, automatic later use of renter credit and renter delivery remain unshipped. The § 4 stored-reference signal stays inert
-until its source gap is answered. The separate `docs/16` D2 transcription is approved and merged.
+presented as a decision aid and never as legal support for a match. finAPI and renter delivery
+remain unshipped. Round five resolves the former source gaps but does not implement them: the
+tenancy-bound receivable migration, both reference fields/signals, tie-break fixture, explicit
+credit offset and reminder suppression, event-triggered re-evaluation, identity correction and
+documented debtor designation are all pending. Free owner selection of a receivable remains
+forbidden. The separate `docs/16` D2 transcription is approved and merged.
