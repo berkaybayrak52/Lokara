@@ -1,4 +1,32 @@
-# Lokara handoff — M10-R2 technically complete
+# Lokara handoff — M10-R3 verified
+
+## M10-R3 closure — 11.09.2026
+
+M10-R3 is technically complete on `slice/m10-r3-renter-publication` at parent HEAD `e011540`.
+Nothing from this slice is committed, merged or pushed. The named `.lokara-red` window is closed.
+
+- `M10-PUB-F01`–`F07` specify and cover migration `0043`, immutable tenancy-scoped publication,
+  source eligibility, exact archived-byte copying, owner-only publication, renter-only listing and
+  download, digest verification and the required cross-account write refusal.
+- `RenterPortalPublication`, its account-safe composite foreign keys, forced RLS, append-only guard,
+  source uniqueness and UVI `PUBLISHED` uniqueness are implemented. A real
+  `0043 → 0042 → 0043` migration cycle passed.
+- The owner API copies and verifies existing statement/UVI artifacts, enforces production blockers,
+  is idempotent for the same source request and appends the UVI `PUBLISHED` event in the same
+  transaction. The renter API reads only stored publication rows and verifies the stored digest
+  before returning bytes.
+- Focused DB/API/RLS verification passes `132` tests. RLS covers `77` tenant tables, FK isolation
+  covers `157` tenant-to-tenant edges and pre-context checks are clean.
+- The mandatory boundary audit found no confirmed or suspected issue. Its only verification limit
+  is that concurrent duplicate requests were reviewed through indexes/savepoints rather than a live
+  stress test.
+- `scripts/gate.sh full` is green with `2045` Python and `210` web tests. Ruff, formatting, strict
+  mypy, purity, parity and pre-context checks pass.
+- Preserve all five unrelated untracked `adjustment/` files. They remain untouched.
+
+Only Emir's commit, merge and push decisions remain. Never push without separate approval.
+
+## Previous checkpoint — M10-R2 technically complete
 
 ## M10-R2 closure — 11.09.2026
 

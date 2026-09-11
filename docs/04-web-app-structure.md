@@ -429,6 +429,42 @@ context-switcher, navigation, heading, PDF-action, loading, empty and error stri
 co-renter name or unrelated object data in navigation. M10-R4 is no longer copy-blocked; its schema,
 API and UI remain unimplemented.
 
+### M10-R3 publication API — exact wire contract
+
+The owner action is `POST /a/{accountId}/renter-portal-publications` (`M10-PUB-F05`). Its body has
+exactly `tenancyId`, `statementArchiveId`, `renterDeliveryArtifactId` and
+`supersedesPublicationId`; the three ids after `tenancyId` are nullable, exactly one source id is
+non-null, and supersession is optional. The route is restricted to an accepted, non-revoked
+`OWNER` Membership. Employee, tax-adviser, renter-only, wrong-account and unlinked callers receive
+no publication. Account, tenancy, source and predecessor are derived and cross-checked on the
+server; client bytes, digest, filename, MIME type, document type, publisher or time are never
+accepted. A body with zero or two source ids, an ineligible source or a production blocker is
+`422`; a source outside the URL account or body tenancy is `404`.
+
+Success returns exactly `id`, `tenancyId`, `sourceKind`, `documentType`, `filename`, `mimeType`,
+`sha256`, `publishedAt`, `supersedesPublicationId` and `downloadUrl`. `sourceKind` is
+`STATEMENT_ARCHIVE | UVI_ARTIFACT`, and `downloadUrl` is
+`/renter/{tenancyId}/documents/{id}/download`. The first insert returns `201`. Repeating the exact
+source request is idempotent and returns `200` with the identical body, even when the caller repeats
+the same predecessor id. A request for an already-published source with a different tenancy or
+predecessor is refused with `409`; it never changes the existing row.
+
+The renter list is `GET /renter/{tenancyId}/documents` (`M10-PUB-F06`). After the same URL-tenancy
+witness as the overview route, it returns exactly `{ "documents": [...] }`, ordered by
+`publishedAt` ascending and then `id` ascending. Each item has exactly the same ten response fields
+as owner publication success. The list includes superseded and successor rows; an empty list is
+`200`. Drafts and source rows with no publication never appear. Another tenancy in the same account,
+a cross-account tenancy and an unlinked caller are all `404`.
+
+The renter download is
+`GET /renter/{tenancyId}/documents/{publicationId}/download` (`M10-PUB-F07`). It reads only the
+publication row selected through renter RLS, recomputes SHA-256 over its stored `content_bytes`, and
+compares it with its stored digest using a constant-time comparison. A mismatch is `409` with no
+bytes. Success returns the stored bytes, stored MIME type, `Content-Disposition: attachment` with
+the stored filename and `X-Content-SHA256` with the verified digest. Another tenancy's publication,
+an unpublished source id and an unlinked caller are `404`. Retrieval never queries or follows the
+statement archive, delivery artifact, statement, UVI run or UVI event.
+
 ## M7 tax workspace
 
 Merged M7 adds `/a/{accountId}/steuern`, a minimized tax-building list, normalized AfA inputs,

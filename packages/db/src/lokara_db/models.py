@@ -2561,6 +2561,13 @@ class UviDeliveryEvent(Base):
             unique=True,
             postgresql_where=text("status = 'EMAILED'"),
         ),
+        Index(
+            "uq_uvi_delivery_event_published_once",
+            "account_id",
+            "uvi_run_id",
+            unique=True,
+            postgresql_where=text("status = 'PUBLISHED'"),
+        ),
     )
 
 
@@ -3854,6 +3861,12 @@ class RenterDeliveryArtifact(Base):
             name="uq_renter_delivery_artifact_email_context",
         ),
         UniqueConstraint(
+            "id",
+            "account_id",
+            "tenancy_id",
+            name="uq_renter_delivery_artifact_publication_context",
+        ),
+        UniqueConstraint(
             "account_id",
             "renter_id",
             "artifact_kind",
@@ -3884,6 +3897,134 @@ class RenterDeliveryArtifact(Base):
         ),
         Index("ix_renter_delivery_artifact_account", "account_id"),
         Index("ix_renter_delivery_artifact_renter", "account_id", "renter_id"),
+    )
+
+
+class RenterPortalPublication(Base):
+    """Immutable bytes explicitly published to one tenancy's renter portal."""
+
+    __tablename__ = "renter_portal_publication"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    tenancy_id: Mapped[str]
+    source_kind: Mapped[str]
+    statement_archive_id: Mapped[str | None]
+    renter_delivery_artifact_id: Mapped[str | None]
+    document_type: Mapped[str]
+    content_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    sha256: Mapped[str]
+    mime_type: Mapped[str]
+    filename: Mapped[str]
+    published_by_membership_id: Mapped[str]
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    supersedes_publication_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenancy_id", "account_id"],
+            ["tenancy.id", "tenancy.account_id"],
+            name="renter_portal_publication_tenancy_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["statement_archive_id", "account_id", "tenancy_id"],
+            [
+                "statement_document_archive.id",
+                "statement_document_archive.account_id",
+                "statement_document_archive.tenancy_id",
+            ],
+            name="renter_portal_publication_statement_archive_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["renter_delivery_artifact_id", "account_id", "tenancy_id"],
+            [
+                "renter_delivery_artifact.id",
+                "renter_delivery_artifact.account_id",
+                "renter_delivery_artifact.tenancy_id",
+            ],
+            name="renter_portal_publication_renter_delivery_artifact_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["published_by_membership_id", "account_id"],
+            ["membership.id", "membership.account_id"],
+            name="renter_portal_publication_published_by_membership_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["supersedes_publication_id", "account_id", "tenancy_id", "document_type"],
+            [
+                "renter_portal_publication.id",
+                "renter_portal_publication.account_id",
+                "renter_portal_publication.tenancy_id",
+                "renter_portal_publication.document_type",
+            ],
+            name="renter_portal_publication_supersedes_publication_id_fkey",
+            match="SIMPLE",
+        ),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "tenancy_id",
+            "document_type",
+            name="uq_renter_portal_publication_supersession_context",
+        ),
+        CheckConstraint(
+            "source_kind IN ('STATEMENT_ARCHIVE', 'UVI_ARTIFACT')",
+            name="ck_renter_portal_publication_source_kind",
+        ),
+        CheckConstraint(
+            "document_type IN ('COVER_LETTER', 'TENANT_STATEMENT', 'UVI')",
+            name="ck_renter_portal_publication_document_type",
+        ),
+        CheckConstraint(
+            "((source_kind = 'STATEMENT_ARCHIVE' AND statement_archive_id IS NOT NULL "
+            "AND renter_delivery_artifact_id IS NULL "
+            "AND document_type IN ('COVER_LETTER', 'TENANT_STATEMENT')) OR "
+            "(source_kind = 'UVI_ARTIFACT' AND statement_archive_id IS NULL "
+            "AND renter_delivery_artifact_id IS NOT NULL AND document_type = 'UVI'))",
+            name="ck_renter_portal_publication_source_document",
+        ),
+        CheckConstraint(
+            "octet_length(content_bytes) > 0",
+            name="ck_renter_portal_publication_content_nonempty",
+        ),
+        CheckConstraint(
+            "sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_renter_portal_publication_sha256",
+        ),
+        CheckConstraint(
+            "btrim(mime_type, E' \\t\\n\\r') <> '' AND btrim(filename, E' \\t\\n\\r') <> ''",
+            name="ck_renter_portal_publication_metadata_nonblank",
+        ),
+        CheckConstraint(
+            "id <> supersedes_publication_id",
+            name="ck_renter_portal_publication_not_self_superseding",
+        ),
+        Index(
+            "uq_renter_portal_publication_statement_source",
+            "account_id",
+            "statement_archive_id",
+            unique=True,
+            postgresql_where=text("statement_archive_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_renter_portal_publication_uvi_source",
+            "account_id",
+            "renter_delivery_artifact_id",
+            unique=True,
+            postgresql_where=text("renter_delivery_artifact_id IS NOT NULL"),
+        ),
+        Index("ix_renter_portal_publication_account", "account_id"),
+        Index(
+            "ix_renter_portal_publication_tenancy",
+            "account_id",
+            "tenancy_id",
+            "published_at",
+        ),
     )
 
 
@@ -4182,6 +4323,7 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "guard_resolution_event",
     "delivery_schedule_version",
     "renter_delivery_artifact",
+    "renter_portal_publication",
     "email_attempt",
     "email_delivery_status_event",
     "recipient_suppression_event",

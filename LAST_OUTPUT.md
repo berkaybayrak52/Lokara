@@ -1,16 +1,16 @@
-# Last output — Local app restarted
+# Last output — M10-R3 verified
 
-HEAD `5a1ee8b` on `slice/uvi-owner-ui` · `11.09.2026`
+HEAD `e011540` on `slice/m10-r3-renter-publication` · `11.09.2026`
 Status: Complete
 
 ## Wanted
-Restore the local Lokara app after Chrome showed a missing Next.js chunk.
+Complete and verify M10-R3 renter document publication.
 
 ## Done
-Stopped the stale web process, moved its generated `.next` cache to `/tmp/lokara-next-cache-before-restart-20260911`, and started a clean Next development server. Root, UVI preview and API health now return HTTP 200. Source files and database were untouched.
+Implemented migration `0043`, immutable renter publications, owner publication and renter list/download APIs. A real `0043 → 0042 → 0043` cycle and 132 focused tests pass. RLS covers 77 tables, FK isolation covers 157 edges and the boundary audit is clean. The red window is closed. The full gate passes 2045 Python and 210 web tests.
 
 ## Not done
-None. The web server remains running on port 3000; the API remains on port 3001. No source commit, merge or push.
+Commit, merge and push were not authorized and remain undone. The five unrelated `adjustment/` files remain untouched.
 
 ## Optional next step
-None.
+Commit the verified M10-R3 slice if Emir authorizes it.

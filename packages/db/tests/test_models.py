@@ -129,6 +129,8 @@ EXPECTED_TABLES = {
     "renter_activation_code",
     "renter_activation_redemption",
     "renter_activation_attempt",
+    # M10-R3 immutable renter document publication (docs/02; migration 0043).
+    "renter_portal_publication",
 }
 
 

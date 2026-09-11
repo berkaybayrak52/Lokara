@@ -1846,6 +1846,15 @@ account with the app check disabled in a rolled-back probe; no owner route chang
 **Agent:** `spec-scribe` (RED fixtures), then `engine-implementer` for
 `0043_m10_renter_portal_publication.py`, then `app-implementer`.
 
+**Status (11.09.2026):** technically complete and verified on
+`slice/m10-r3-renter-publication`; not yet committed or merged. `M10-PUB-F01`–`F07`, migration
+`0043`, the ORM model, owner publication and renter list/download routes are green. The named red
+window is closed. A real `0043 → 0042 → 0043` cycle passed; focused DB/API/RLS verification passes
+`132` tests; RLS covers `77` tenant tables, FK isolation covers `157` tenant-to-tenant edges and the
+pre-context checker is clean. The mandatory boundary audit found no confirmed or suspected issue.
+The full gate passes `2045` Python and `210` web tests. No rendered document changed, and no e-mail,
+scheduling or reminder behavior was added.
+
 - Publication is an append-only owner action over artifacts that already exist: the M6-B tenant
   archives in `statement_document_archive` (which already carries `audience` and `tenancy_id`) and
   a blocker-free frozen UVI artifact from M9. It copies and hashes the archived bytes into the

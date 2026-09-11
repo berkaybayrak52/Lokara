@@ -282,6 +282,59 @@ policy and refused cross-account write proof before any portal document route is
 bytes must reproduce the source digest; retrieval verifies the publication digest and never follows
 the source row at request time.
 
+### M10-R3 publication record — exact fixture contract
+
+`M10-PUB-F01` fixes migration `0043_m10_renter_portal_publication.py` and the SQLAlchemy model.
+`renter_portal_publication` has exactly these domain columns in addition to its primary key:
+`account_id`, `tenancy_id`, `source_kind`, `statement_archive_id`,
+`renter_delivery_artifact_id`, `document_type`, `content_bytes`, `sha256`, `mime_type`, `filename`,
+`published_by_membership_id`, `published_at`, `supersedes_publication_id` and `created_at`. It has no
+`updated_at`, `deleted_at` or external storage pointer. `source_kind` is exactly
+`STATEMENT_ARCHIVE | UVI_ARTIFACT`; `document_type` is exactly
+`COVER_LETTER | TENANT_STATEMENT | UVI`. Bytes are non-empty, the digest is a lower-case 64-character
+SHA-256 hex value and MIME type and filename are non-blank.
+
+Exactly one source column is populated. `STATEMENT_ARCHIVE` requires `statement_archive_id`, forbids
+`renter_delivery_artifact_id` and permits only `COVER_LETTER` or `TENANT_STATEMENT`.
+`UVI_ARTIFACT` requires `renter_delivery_artifact_id`, forbids `statement_archive_id` and requires
+`UVI`. The statement foreign key binds `(statement_archive_id, account_id, tenancy_id)` to the same
+three columns in `statement_document_archive`. The UVI foreign key binds
+`(renter_delivery_artifact_id, account_id, tenancy_id)` to the same three columns in
+`renter_delivery_artifact`; migration `0043` adds the required source-side uniqueness. The publisher
+foreign key binds `(published_by_membership_id, account_id)` to `(membership.id,
+membership.account_id)`. The supersession foreign key binds `(supersedes_publication_id, account_id,
+tenancy_id, document_type)` to the predecessor's same four columns. A predecessor therefore cannot
+cross an account, tenancy or document stream. Self-supersession is forbidden.
+
+`M10-PUB-F02` makes publication append-only. `UPDATE` and `DELETE` are refused by a database trigger.
+Corrections insert another row with `supersedes_publication_id`; the predecessor remains renter
+readable. Two partial unique indexes allow one publication per statement archive and one per UVI
+artifact: `uq_renter_portal_publication_statement_source` and
+`uq_renter_portal_publication_uvi_source`. `uq_uvi_delivery_event_published_once` permits one
+`PUBLISHED` event per UVI run. Repeating the same publish request returns that existing row and
+creates no second publication or delivery event.
+
+`M10-PUB-F03` fixes source eligibility and the byte copy. A statement source must have
+`audience = TENANT`, the same tenancy, `document_type = COVER_LETTER | TENANT_STATEMENT`, and an
+underlying finalized statement whose frozen `production_blockers` array is empty. `OWNER_OVERVIEW`,
+another tenancy, an absent/non-array blocker envelope and every non-empty blocker list are refused.
+A UVI source must be a same-tenancy `renter_delivery_artifact` with `artifact_kind = UVI`, a non-null
+`uvi_run_id` and an empty `production_blockers_snapshot` array. Annual-statement artifacts and
+blocked UVI artifacts are refused. The service copies `content_bytes`, `sha256`, `mime_type` and
+`filename` exactly from the eligible source, verifies that the source bytes hash to the source
+digest before inserting, and never renders or recalculates. UVI publication appends exactly one
+`uvi_delivery_event(status = PUBLISHED)` for the source run in the same transaction. A failed
+publication leaves neither row behind.
+
+`M10-PUB-F04` fixes database access. The table has enabled and forced RLS. The existing account
+owner context may `SELECT` and `INSERT` only while `app.tenancy_id` is unset and `account_id` equals
+`app.account_id`; its insert policy has the same `WITH CHECK`. A renter context may `SELECT` every
+preserved row only when both account and tenancy equal `app.account_id` and `app.tenancy_id`.
+Renters can never insert, update or delete. A cross-account owner insert is refused. The application
+role still reads zero rows from `statement_document_archive`, `renter_delivery_artifact`,
+`statement`, `uvi_run` and `uvi_delivery_event` while renter context is set. Every adversarial
+fixture performs its probes in an explicit transaction and rolls it back.
+
 ### Activation-code contract and refusal fixtures
 
 One activation code belongs to exactly one account-scoped `Renter` and one tenancy in which that

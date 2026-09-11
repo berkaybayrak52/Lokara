@@ -300,7 +300,7 @@ def test_m10_ctx_f05_renter_session_derives_and_sets_both_local_contexts(
         assert session.scalar(text("SELECT current_setting('app.tenancy_id', true)")) == ids.tenancy
 
 
-def test_m10_ctx_f05_catalog_allows_renter_select_on_exactly_three_tables(
+def test_m10_ctx_f05_catalog_allows_renter_select_on_exactly_four_tables(
     setup: tuple[Engine, Engine, _Ids],
 ) -> None:
     owner, _, _ = setup
@@ -318,6 +318,12 @@ def test_m10_ctx_f05_catalog_allows_renter_select_on_exactly_three_tables(
         ("tenancy", "tenancy_renter_select", "SELECT", "{lokara_app}"),
         ("unit", "unit_renter_select", "SELECT", "{lokara_app}"),
         ("building", "building_renter_select", "SELECT", "{lokara_app}"),
+        (
+            "renter_portal_publication",
+            "renter_portal_publication_renter_select",
+            "SELECT",
+            "{lokara_app}",
+        ),
     }
     assert all("app.account_id" in str(policy.qual) for policy in policies)
 

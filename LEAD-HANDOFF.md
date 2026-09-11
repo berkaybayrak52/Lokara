@@ -1,13 +1,16 @@
-# Lead handoff — M10-R2 technically complete
+# Lead handoff — M10-R3 verified and ready for commit
 
 ## Current state — 11.09.2026
 
-Source commit `92e18d5` is locally merged into `main`. Migration `0042`, typed
-six-table bootstrap rows, renter-scoped sessions, minimal `/me.renterContexts`, the exact renter
-overview and the RLS read/write boundary are implemented. The red sentinel is removed.
+Branch `slice/m10-r3-renter-publication` remains based on `e011540`. M10-R3 is technically complete,
+but nothing from the slice is committed, merged or pushed. `.lokara-red` is removed.
 
-Main focused verification passes `116`; RLS covers `76` tables, FK isolation covers `152` edges,
-and the pre-context checker is clean. The mandatory boundary audit found no issue and used only
-rollback-only probes. The full gate passes `2021` Python and `210` web tests after repair of one
-test-only mypy/format defect. Preserve the five untracked `adjustment/` files. No push is authorized;
-M10-R3 publication is next.
+Migration `0043`, the immutable publication model, owner publication route and renter list/download
+routes satisfy `M10-PUB-F01`–`F07`. A real `0043 → 0042 → 0043` cycle passed. Focused verification is
+`132 passed`; RLS covers `77` tenant tables, FK isolation covers `157` edges and pre-context checks
+are clean. The mandatory boundary audit reports no confirmed or suspected finding; its only limit is
+that concurrent duplicate requests were reviewed structurally rather than load-stressed. The full
+gate is green with `2045` Python and `210` web tests.
+
+The slice is ready for Emir's commit decision. Preserve all five unrelated untracked `adjustment/`
+files. Do not commit, merge or push without Emir's explicit decision.

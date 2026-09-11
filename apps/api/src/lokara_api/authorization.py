@@ -38,6 +38,12 @@ def portal_role(session: PathAccountSession) -> Role:
     return _scope(session).role
 
 
+def portal_membership_id(session: PathAccountSession) -> str:
+    """Return the live Membership that authorized this account request."""
+
+    return _scope(session).membership_id
+
+
 def require_building(session: PathAccountSession, building_id: str) -> Building:
     """Return a visible active building, otherwise use the anti-enumeration 404."""
     scope = _scope(session)

@@ -191,6 +191,49 @@ class RenterOverviewResponse(ApiModel):
     city: str
 
 
+class RenterPortalPublicationCreate(ApiModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra="forbid",
+    )
+
+    tenancy_id: str = Field(min_length=1)
+    statement_archive_id: str | None = None
+    renter_delivery_artifact_id: str | None = None
+    supersedes_publication_id: str | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_source(self) -> "RenterPortalPublicationCreate":
+        source_count = sum(
+            source_id is not None
+            for source_id in (
+                self.statement_archive_id,
+                self.renter_delivery_artifact_id,
+            )
+        )
+        if source_count != 1:
+            raise ValueError("Genau eine Dokumentquelle muss angegeben werden.")
+        return self
+
+
+class RenterPortalPublicationOut(ApiModel):
+    id: str
+    tenancy_id: str
+    source_kind: Literal["STATEMENT_ARCHIVE", "UVI_ARTIFACT"]
+    document_type: Literal["COVER_LETTER", "TENANT_STATEMENT", "UVI"]
+    filename: str
+    mime_type: str
+    sha256: str
+    published_at: datetime
+    supersedes_publication_id: str | None
+    download_url: str
+
+
+class RenterPortalPublicationList(ApiModel):
+    documents: list[RenterPortalPublicationOut]
+
+
 class RenterActivationCodeOut(ApiModel):
     activation_code_id: str
     activation_code: str

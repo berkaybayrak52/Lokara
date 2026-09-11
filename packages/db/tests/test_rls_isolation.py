@@ -604,6 +604,41 @@ class TestM10ActivationCrossAccountWrites:
             )
 
 
+class TestM10PublicationCrossAccountWrites:
+    def test_renter_portal_publication_rejects_cross_account_insert_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """RenterPortalPublication WITH CHECK rejects A rows from B's context."""
+        _, app = engines
+        content = b"cross-account publication probe"
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO renter_portal_publication "
+                    "(id, account_id, tenancy_id, source_kind, statement_archive_id, "
+                    "renter_delivery_artifact_id, document_type, content_bytes, sha256, "
+                    "mime_type, filename, published_by_membership_id, published_at, "
+                    "supersedes_publication_id) VALUES "
+                    "(:id, :account_a, :tenancy, 'STATEMENT_ARCHIVE', :archive, NULL, "
+                    "'TENANT_STATEMENT', :content, :digest, 'application/pdf', "
+                    "'cross-account.pdf', :membership, :published_at, NULL)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "tenancy": seed.tenancy_a,
+                    "archive": new_id(),
+                    "content": content,
+                    "digest": sha256(content).hexdigest(),
+                    "membership": seed.membership_a,
+                    "published_at": datetime(2026, 9, 11, tzinfo=UTC),
+                },
+            )
+
+
 class _M10ActivationRows(NamedTuple):
     code_id: str
     redemption_id: str
