@@ -2,7 +2,7 @@
 
 ## Current state — 12.09.2026
 
-`slice/m10-r4-renter-portal` is technically complete and review-clean. Migration `0044`, the
+M10-R4 is technically complete, review-clean and locally merged into `main` as `ed28f55`. Migration `0044`, the
 source-derived publication metadata/API and renter portal UI are green. Focused DB/API/web tests
 pass `6 + 20 + 28`; RLS covers `77` tables, FK isolation `157` edges and the pre-context checker is
 clean. Both required reviews are clean; the full gate passes `2048` Python and `238` web tests.

@@ -2,8 +2,8 @@
 
 ## M10-R4 closure — 12.09.2026
 
-`slice/m10-r4-renter-portal` is technically complete and ready for local consolidation. Nothing is
-pushed. The five unrelated untracked `adjustment/` files remain untouched.
+M10-R4 is technically complete and locally merged into `main` as `ed28f55`. Nothing is pushed. The
+five unrelated untracked `adjustment/` files remain untouched.
 
 - Migration `0044`, ORM and API copy immutable statement periods/UVI months from their sources.
 - The renter route group provides activation, own-tenancy, statement and UVI screens with exact

@@ -11,12 +11,12 @@ before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
-- **M10-R4 technically complete and verified (`12.09.2026`).** Additive migration `0044` stores
+- **M10-R4 technically complete, verified and locally merged (`ed28f55`, 12.09.2026).** Additive migration `0044` stores
   source-derived immutable publication periods/months; the owner/list API projects them and the
   new `/renter/{tenancyId}` web route group provides activation, own-tenancy, statement and UVI
   screens with the approved copy. Focused DB/API/web tests pass `6 + 20 + 28`; RLS covers `77`
   tables, FK isolation `157` edges, both required reviews are clean and the full gate passes `2048`
-  Python and `238` web tests. The slice is ready for local consolidation; Lane I remains pending.
+  Python and `238` web tests. Lane I remains pending.
 - **Owner UVI UI technically complete locally (`slice/uvi-owner-ui`, 11.09.2026).**
   Owner-only `/uvi` exposes live object/unit/tenancy/month selection, generation/reopen, scoped
   PDF access, visible production conflicts and preview write protection under `docs/04`.
@@ -1875,7 +1875,8 @@ carrying an unresolved production blocker is publishable.
 `0044_m10_renter_publication_display_period.py`, then `app-implementer`, then
 `statement-reviewer` (required — a renter reads this).
 
-**Status (12.09.2026):** technically complete and verified. `M10-PUB-F08`, migration `0044`, the
+**Status (12.09.2026):** technically complete, verified and locally merged as `ed28f55`.
+`M10-PUB-F08`, migration `0044`, the
 ORM/API projection and the renter route group are green. Statement titles use only the immutable
 source period; UVI titles use only the immutable source month. Activation, overview, both document
 lists, exact copy, renter-aware entry and context switching are covered by `28` web fixtures. The
