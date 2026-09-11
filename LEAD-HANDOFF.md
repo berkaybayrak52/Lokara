@@ -2,8 +2,8 @@
 
 ## Owner UVI slice complete locally — 11.09.2026
 
-HEAD `5a1ee8b` on `slice/uvi-owner-ui`; no commit, merge or push. Owner UVI UI and preview
-write protection are implemented and verified. Full gate passes 1967 Python/210 web tests;
+Source commit `f576a50` is locally merged into `main`; no push. Owner UVI UI and preview write
+protection are implemented and verified. Full gate passes 1967 Python/210 web tests;
 production build and separate non-fresh demo path pass, with unchanged ordinary PDF fingerprint.
 Mobile/desktop, keyboard and 200% CSS scaling checks pass; statement/UI and boundary reviews are
 clean. The live demo correctly reports missing UVI configuration; successful browser results used
@@ -14,8 +14,9 @@ Emir's latest quota update was 28% remaining; the stop-and-handoff threshold rem
 ## Current branch and authority
 
 The verified checkpoint is on `development`, prepared from parent `edb7008`.
-Local `main` was fast-forwarded to `5a1ee8b` on 06.09.2026 with Emir's authorization.
-The uncommitted Zähler preview fix remains in the `development` worktree. Push remains separate.
+Local `main` was fast-forwarded to `f576a50` on 11.09.2026 with Emir's authorization.
+`development` remains at `5a1ee8b`; the Zähler preview fix is included in `f576a50`.
+Push remains separate.
 Preserve local reference artifacts outside the checkpoint; `LAST_OUTPUT.md` records current HEAD.
 
 Normal agent/reviewer rules are active: the former direct-mode subsection has been removed

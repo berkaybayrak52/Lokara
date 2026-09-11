@@ -2,9 +2,9 @@
 
 ## Owner UVI UI — verified local completion, 11.09.2026
 
-Current HEAD is `5a1ee8b` on `slice/uvi-owner-ui`. Implementation and bounded verification are
-complete; all changes remain uncommitted. No commit, merge or push was performed or authorized.
-This section supersedes the older checkpoint continuation below for the UVI task.
+The verified source commit is `f576a50`, locally merged into `main` on 11.09.2026. Implementation
+and bounded verification are complete. No push was performed or authorized. This section
+supersedes the older checkpoint continuation below for the UVI task.
 
 ### Result
 
@@ -55,8 +55,8 @@ This section supersedes the older checkpoint continuation below for the UVI task
 
 ### Continuation and retained evidence
 
-No implementation remains in this slice. Commit/merge/push await Emir's separate decision.
-Preserve the uncommitted Zähler preview fix and all existing `adjustment/` reference artifacts.
+No implementation remains in this slice. Commit and local merge are complete; push awaits Emir's
+separate decision. Preserve all existing uncommitted `adjustment/` reference artifacts.
 The two supported local services remain on ports 3000/3001; existing `lokara-db` is healthy.
 Temporary evidence can be regenerated if cleaned:
 `/tmp/lokara-uvi-browser-matrix.py`, `/tmp/lokara-uvi-browser-check.py`, and screenshots in
@@ -71,8 +71,8 @@ use visible quota information or Emir's warning, never elapsed wall time as a qu
 
 - Validation parent `edb7008` on `development`. `LAST_OUTPUT.md` records current HEAD after commit.
 - Pre-commit inventory: 93 tracked changes and 31 untracked entries. Preserve local reference artifacts.
-- Local `main` was fast-forwarded to `5a1ee8b` on 06.09.2026 with Emir's authorization.
-  `development` points to the same commit; its uncommitted preview fix remains separate.
+- Local `main` was fast-forwarded to `f576a50` on 11.09.2026 with Emir's authorization.
+  `development` remains at `5a1ee8b`; the Zähler preview fix is included in `f576a50`.
 - No `.lokara-red` sentinel exists.
 - The existing local Postgres container is healthy and Alembic is applied at `0040 (head)`.
 - Emir authorized the local checkpoint commit on 05.09.2026 and its merge on 06.09.2026.
@@ -152,9 +152,10 @@ browser difference; its actual storage was not inspected.
 
 The shared preview meter factory now explicitly returns `gasConversion: null` for its non-gas
 meters. `apps/web/src/lib/demo-preview.test.ts` proved the defect red and now verifies the
-complete workspace contract. All 189 web tests, ESLint and TypeScript pass; the scoped
-statement review is clean. This small follow-up
-is uncommitted and must be preserved; the earlier full/demo evidence belongs to `5a1ee8b`.
+complete workspace contract. The focused 189 web tests, ESLint and TypeScript passed before the
+UVI slice; the later full gate passes 210 web tests and includes this repair. The scoped statement
+review is clean. This follow-up is included in `f576a50`; the earlier checkpoint evidence belongs
+to `5a1ee8b`.
 Chrome visual confirmation remains with Emir because no browser connection is available.
 
 ### Checkpoint continuation

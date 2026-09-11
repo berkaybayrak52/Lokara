@@ -20,8 +20,8 @@ before UI. Dates are communication events, not planning inputs.
   are clean; keyboard, 320–1920px responsive checks and 200% CSS scaling pass.
   Live demo generation correctly returns missing-configuration 422; successful browser results
   used intercepted responses, with backend generation/archive and PDF-render coverage in the
-  existing suites. No monthly facts were invented. All changes remain uncommitted; nothing was
-  merged or pushed. `HANDOFF.md` records evidence and limits. No delivery, portal, legal/calculation
+  existing suites. No monthly facts were invented. The slice is committed and locally merged into
+  `main` as `f576a50`; nothing was pushed. `HANDOFF.md` records evidence and limits. No delivery, portal, legal/calculation
   or backend-schema expansion is included; every `docs/16` and M9 production blocker remains.
 - M0 is complete. M1–M4 are built and green under their original scope, but are not yet fully
   verified against all Berkay specifications.
@@ -71,8 +71,9 @@ before UI. Dates are communication events, not planning inputs.
   M6-C and with it M6.**
 - **G1 is technically complete and locally merged (`6c257f8`).** U1–U5 and M7-0 through M7-E are
   also locally merged. Local `main` is now at the consolidated checkpoint `5a1ee8b`,
-  fast-forwarded from `development` with Emir's approval on 06.09.2026. The subsequent
-  Zähler preview-data correction remains an uncommitted local follow-up; nothing was pushed.
+  fast-forwarded from `development` with Emir's approval on 06.09.2026. The subsequent Zähler
+  preview-data correction and owner UVI UI are included in local `main` commit `f576a50`; nothing
+  was pushed.
   The long-lived local `development` branch integrates UI-04, deferred M7-F repairs and M9
   work, including all W1–W8 projections, migration `0025`, account-scoped jobs/API, immutable
   delivery evidence and `/waechter`. Integration alone does not close the other workstreams.

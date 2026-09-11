@@ -89,8 +89,8 @@ entered automatically.
 
 ## Owner UVI workspace — technically complete locally
 
-The contract below is implemented and technically verified on `slice/uvi-owner-ui` as of
-11.09.2026, but remains uncommitted. Full checks, production build, the non-fresh demo path and
+The contract below was implemented and technically verified on `slice/uvi-owner-ui` as of
+11.09.2026 and is locally merged into `main` as `f576a50`. Full checks, production build, the non-fresh demo path and
 bounded UI/boundary reviews pass. Responsive/keyboard and 200% CSS scaling checks pass. Live
 metadata and missing-configuration handling are verified; browser success states use intercepted
 responses, while backend/PDF suites cover generation, archives and rendering. The existing demo
