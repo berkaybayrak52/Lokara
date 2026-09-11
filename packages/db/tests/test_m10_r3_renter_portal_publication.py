@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import lokara_db
 import pytest
@@ -39,6 +39,13 @@ from sqlalchemy.orm import Session
 
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent
 _MIGRATIONS = _DB_PACKAGE_DIR / "alembic" / "versions"
+
+
+class _UseSourceDate:
+    pass
+
+
+_USE_SOURCE_DATE = _UseSourceDate()
 
 
 @dataclass(frozen=True)
@@ -440,6 +447,9 @@ def _insert_publication(
     supersedes_id: str | None = None,
     account_id: str | None = None,
     membership_id: str | None = None,
+    period_start: date | _UseSourceDate | None = _USE_SOURCE_DATE,
+    period_end: date | _UseSourceDate | None = _USE_SOURCE_DATE,
+    document_month: date | _UseSourceDate | None = _USE_SOURCE_DATE,
 ) -> None:
     account = account_id or ids.account_a
     tenancy = tenancy_id or ids.tenancy_a
@@ -462,15 +472,48 @@ def _insert_publication(
     else:
         source_content = b"tenant-a"
         source_filename = "tenant-a.pdf"
+    source_period_start = (
+        date(2024, 1, 1) if archive_id == ids.archive_a_other else date(2025, 1, 1)
+    )
+    source_period_end = (
+        date(2024, 12, 31) if archive_id == ids.archive_a_other else date(2025, 12, 31)
+    )
+    resolved_period_start = (
+        (None if artifact_id else source_period_start)
+        if isinstance(period_start, _UseSourceDate)
+        else period_start
+    )
+    resolved_period_end = (
+        (None if artifact_id else source_period_end)
+        if isinstance(period_end, _UseSourceDate)
+        else period_end
+    )
+    resolved_document_month = (
+        (date(2026, 8, 1) if artifact_id else None)
+        if isinstance(document_month, _UseSourceDate)
+        else document_month
+    )
+    has_display_columns = bool(
+        connection.scalar(
+            text(
+                "SELECT count(*) = 3 FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'renter_portal_publication' "
+                "AND column_name IN ('period_start', 'period_end', 'document_month')"
+            )
+        )
+    )
+    display_columns = ", period_start, period_end, document_month" if has_display_columns else ""
+    display_values = ", :period_start, :period_end, :document_month" if has_display_columns else ""
     connection.execute(
         text(
             "INSERT INTO renter_portal_publication "
             "(id, account_id, tenancy_id, source_kind, statement_archive_id, "
             "renter_delivery_artifact_id, document_type, content_bytes, sha256, mime_type, "
-            "filename, published_by_membership_id, published_at, supersedes_publication_id) "
+            "filename, published_by_membership_id, published_at, supersedes_publication_id"
+            f"{display_columns}) "
             "VALUES (:id, :account, :tenancy, :source_kind, :archive, :artifact, :document_type, "
             ":content, :digest, 'application/pdf', :filename, :membership, "
-            ":published_at, :supersedes)"
+            f":published_at, :supersedes{display_values})"
         ),
         {
             "id": publication_id,
@@ -486,6 +529,9 @@ def _insert_publication(
             "membership": membership_id or ids.membership_a,
             "published_at": datetime(2026, 9, 11, 13, 0, tzinfo=UTC),
             "supersedes": supersedes_id,
+            "period_start": resolved_period_start,
+            "period_end": resolved_period_end,
+            "document_month": resolved_document_month,
         },
     )
 
@@ -532,6 +578,9 @@ def test_m10_pub_f01_migration_and_model_pin_exact_schema() -> None:
         "published_by_membership_id",
         "published_at",
         "supersedes_publication_id",
+        "period_start",
+        "period_end",
+        "document_month",
         "created_at",
     }
     foreign_keys = {
@@ -578,11 +627,19 @@ def test_m10_pub_f01_migration_and_model_pin_exact_schema() -> None:
         "uvi_artifact",
         "cover_letter",
         "tenant_statement",
+        "period_start",
+        "period_end",
+        "document_month",
         "octet_length",
         "sha256",
         "supersedes_publication_id",
     ):
         assert marker in checks
+    assert "ck_renter_portal_publication_display_period" in {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
     assert {
         "uq_renter_portal_publication_statement_source",
         "uq_renter_portal_publication_uvi_source",
@@ -591,6 +648,172 @@ def test_m10_pub_f01_migration_and_model_pin_exact_schema() -> None:
     assert "uq_uvi_delivery_event_published_once" in {
         index.name for index in uvi_delivery_event_table.indexes
     }
+
+
+def test_m10_pub_f08_migration_pins_safe_source_backfill_before_constraint() -> None:
+    migrations = sorted(_MIGRATIONS.glob("0044_*.py"))
+    assert len(migrations) == 1, "M10-R4 display metadata migration 0044 is not implemented"
+    migration_source = migrations[0].read_text()
+    tree = ast.parse(migration_source)
+    assignments = {
+        node.targets[0].id: node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Constant)
+    }
+    assert migrations[0].name == "0044_m10_renter_publication_display_period.py"
+    assert assignments["revision"] == "0044"
+    assert assignments["down_revision"] == "0043"
+
+    upgrade_source = migration_source.split("def downgrade", maxsplit=1)[0].lower()
+    for marker in (
+        "period_start",
+        "period_end",
+        "document_month",
+        "update public.renter_portal_publication",
+        "statement_document_archive",
+        "set period_start = statement.period_start",
+        "period_end = statement.period_end",
+        "renter_delivery_artifact",
+        "set document_month = uvi_run.month",
+        "ck_renter_portal_publication_display_period",
+        "enforce_renter_portal_publication_source_m10",
+    ):
+        assert marker in upgrade_source
+    last_source_backfill = max(
+        upgrade_source.index("set period_start = statement.period_start"),
+        upgrade_source.index("set document_month = uvi_run.month"),
+    )
+    constraint_position = upgrade_source.index("ck_renter_portal_publication_display_period")
+    assert last_source_backfill < constraint_position
+    assert "coalesce" not in upgrade_source, "0044 must not invent fallback display dates"
+
+
+def test_m10_pub_f08_conditional_shape_and_source_dates_are_database_enforced(
+    setup: tuple[Engine, Engine, _Ids],
+) -> None:
+    owner, _, ids = setup
+    with owner.connect() as connection:
+        transaction = connection.begin()
+        try:
+            columns = {
+                str(value)
+                for value in connection.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = 'public' "
+                        "AND table_name = 'renter_portal_publication'"
+                    )
+                ).scalars()
+            }
+            assert {"period_start", "period_end", "document_month"} <= columns, (
+                "M10-R4 publication display metadata columns are not implemented"
+            )
+            constraint = connection.scalar(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conrelid = 'public.renter_portal_publication'::regclass "
+                    "AND conname = 'ck_renter_portal_publication_display_period'"
+                )
+            )
+            assert constraint is not None
+            normalized_constraint = str(constraint).lower()
+            for marker in (
+                "period_start",
+                "period_end",
+                "document_month",
+                "source_kind",
+                "statement_archive",
+                "uvi_artifact",
+            ):
+                assert marker in normalized_constraint
+
+            statement_publication = new_id()
+            _insert_publication(
+                connection,
+                ids,
+                publication_id=statement_publication,
+                archive_id=ids.archive_a,
+            )
+            assert tuple(
+                connection.execute(
+                    text(
+                        "SELECT period_start, period_end, document_month "
+                        "FROM renter_portal_publication WHERE id = :id"
+                    ),
+                    {"id": statement_publication},
+                ).one()
+            ) == (date(2025, 1, 1), date(2025, 12, 31), None)
+
+            uvi_nested = connection.begin_nested()
+            uvi_publication = new_id()
+            _insert_publication(
+                connection,
+                ids,
+                publication_id=uvi_publication,
+                artifact_id=ids.uvi_artifact_a,
+                document_type="UVI",
+            )
+            assert tuple(
+                connection.execute(
+                    text(
+                        "SELECT period_start, period_end, document_month "
+                        "FROM renter_portal_publication WHERE id = :id"
+                    ),
+                    {"id": uvi_publication},
+                ).one()
+            ) == (None, None, date(2026, 8, 1))
+            uvi_nested.rollback()
+
+            cases: tuple[dict[str, Any], ...] = (
+                {
+                    "archive_id": ids.archive_a_cover,
+                    "document_type": "COVER_LETTER",
+                    "period_start": date(2024, 1, 1),
+                    "period_end": date(2024, 12, 31),
+                },
+                {
+                    "archive_id": ids.archive_a_cover,
+                    "document_type": "COVER_LETTER",
+                    "period_start": date(2025, 12, 31),
+                    "period_end": date(2025, 1, 1),
+                },
+                {
+                    "archive_id": ids.archive_a_cover,
+                    "document_type": "COVER_LETTER",
+                    "document_month": date(2026, 8, 1),
+                },
+                {
+                    "artifact_id": ids.uvi_artifact_a,
+                    "document_type": "UVI",
+                    "document_month": date(2026, 7, 1),
+                },
+                {
+                    "artifact_id": ids.uvi_artifact_a,
+                    "document_type": "UVI",
+                    "document_month": date(2026, 8, 2),
+                },
+                {
+                    "artifact_id": ids.uvi_artifact_a,
+                    "document_type": "UVI",
+                    "period_start": date(2026, 8, 1),
+                    "period_end": date(2026, 8, 31),
+                },
+            )
+            for case in cases:
+                nested = connection.begin_nested()
+                with pytest.raises(DBAPIError):
+                    _insert_publication(
+                        connection,
+                        ids,
+                        publication_id=new_id(),
+                        **case,
+                    )
+                nested.rollback()
+        finally:
+            transaction.rollback()
 
 
 def test_m10_pub_f02_append_only_unique_sources_and_preserved_supersession(
@@ -645,7 +868,7 @@ def test_m10_pub_f03_composite_source_publisher_and_supersession_refusals_are_ro
     setup: tuple[Engine, Engine, _Ids],
 ) -> None:
     owner, _, ids = setup
-    cases = (
+    cases: tuple[dict[str, Any], ...] = (
         {"archive_id": ids.archive_b},
         {"archive_id": ids.archive_a_other},
         {"archive_id": ids.archive_a, "membership_id": ids.membership_b},

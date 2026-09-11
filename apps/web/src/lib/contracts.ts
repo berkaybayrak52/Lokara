@@ -50,12 +50,85 @@ export const MeAccountSchema = z.object({
 });
 export type MeAccount = z.infer<typeof MeAccountSchema>;
 
-export const MeResponseSchema = z.object({
-  personId: z.string(),
-  email: z.string(),
-  accounts: z.array(MeAccountSchema),
-});
+export const RenterContextSchema = z.object({ tenancyId: z.string() }).strict();
+export type RenterContext = z.infer<typeof RenterContextSchema>;
+
+export const MeResponseSchema = z
+  .object({
+    personId: z.string(),
+    email: z.string(),
+    accounts: z.array(MeAccountSchema),
+    renterContexts: z.array(RenterContextSchema).default([]),
+  })
+  .strict();
 export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+export const RenterOverviewResponseSchema = z
+  .object({
+    tenancyId: z.string(),
+    validFrom: z.string(),
+    validTo: z.string().nullable(),
+    unitLabel: z.string(),
+    buildingName: z.string(),
+    street: z.string(),
+    postalCode: z.string(),
+    city: z.string(),
+  })
+  .strict();
+export type RenterOverviewResponse = z.infer<typeof RenterOverviewResponseSchema>;
+
+export const RenterPortalPublicationSchema = z
+  .object({
+    id: z.string(),
+    tenancyId: z.string(),
+    sourceKind: z.enum(['STATEMENT_ARCHIVE', 'UVI_ARTIFACT']),
+    documentType: z.enum(['COVER_LETTER', 'TENANT_STATEMENT', 'UVI']),
+    filename: z.string(),
+    mimeType: z.string(),
+    sha256: z.string(),
+    publishedAt: z.string(),
+    supersedesPublicationId: z.string().nullable(),
+    periodStart: z.string().nullable(),
+    periodEnd: z.string().nullable(),
+    documentMonth: z.string().nullable(),
+    downloadUrl: z.string(),
+  })
+  .strict()
+  .superRefine((publication, context) => {
+    const isStatement = publication.sourceKind === 'STATEMENT_ARCHIVE';
+    const hasExactStatementMetadata =
+      publication.periodStart !== null &&
+      publication.periodEnd !== null &&
+      publication.documentMonth === null &&
+      publication.documentType !== 'UVI';
+    const hasExactUviMetadata =
+      publication.periodStart === null &&
+      publication.periodEnd === null &&
+      publication.documentMonth !== null &&
+      /^\d{4}-\d{2}-01$/.test(publication.documentMonth) &&
+      publication.documentType === 'UVI';
+    if ((isStatement && !hasExactStatementMetadata) || (!isStatement && !hasExactUviMetadata)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ungültige Dokumentmetadaten.',
+      });
+    }
+  });
+export type RenterPortalPublication = z.infer<typeof RenterPortalPublicationSchema>;
+
+export const RenterPublicationListResponseSchema = z
+  .object({ documents: z.array(RenterPortalPublicationSchema) })
+  .strict();
+export type RenterPublicationListResponse = z.infer<typeof RenterPublicationListResponseSchema>;
+
+export const RenterActivationResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    tenancyId: z.string(),
+    renterId: z.string(),
+  })
+  .strict();
+export type RenterActivationResponse = z.infer<typeof RenterActivationResponseSchema>;
 
 export const DemoLoadResponseSchema = z.object({
   ok: z.literal(true),

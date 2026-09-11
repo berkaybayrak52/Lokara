@@ -227,6 +227,9 @@ class RenterPortalPublicationOut(ApiModel):
     sha256: str
     published_at: datetime
     supersedes_publication_id: str | None
+    period_start: date | None
+    period_end: date | None
+    document_month: date | None
     download_url: str
 
 

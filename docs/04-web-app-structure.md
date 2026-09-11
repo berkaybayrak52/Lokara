@@ -377,15 +377,13 @@ switcher; no account is stored in the token or client session. M5 account switch
 `development`, but remain unverified and production-blocked. `docs/02-data-model.md` owns the
 detailed function, role, policy, privilege and call-site contract.
 
-## M10-R2 renter entry — implemented and verified
+## M10-R2–R4 renter entry, publication and portal — implemented and verified
 
 M10-R0 fixes the renter boundary; `docs/02-data-model.md` owns the full data and refusal contract.
 M10-R1 activation is shipped. Migration `0042`, the R2 overview route and the renter RLS context
-are implemented and verified on `slice/m10-r2-renter-context`; the M10-R3 publication boundary and
-M10-R4 portal UI remain pending. All `116` focused DB/API/checker tests pass; RLS covers `76`
-tables, FK isolation covers `152` edges and the pre-context checker is clean. The mandatory
-boundary audit is clean with rollback-only probes, and the full gate passes `2021` Python and `210`
-web tests. No `.lokara-red` sentinel remains; migration `0043` remains pending.
+are implemented and verified. M10-R3 migration `0043` and the publication API are technically
+complete and locally merged. M10-R4 migration `0044`, immutable display metadata and the separate
+`/renter/{tenancyId}` portal route group are technically complete and review-clean.
 
 - `/me` keeps its existing `accounts` list unchanged and adds `renterContexts`; each item contains
   only `tenancyId`. A dual-role Person receives both. The same bounded
@@ -442,7 +440,8 @@ accepted. A body with zero or two source ids, an ineligible source or a producti
 `422`; a source outside the URL account or body tenancy is `404`.
 
 Success returns exactly `id`, `tenancyId`, `sourceKind`, `documentType`, `filename`, `mimeType`,
-`sha256`, `publishedAt`, `supersedesPublicationId` and `downloadUrl`. `sourceKind` is
+`sha256`, `publishedAt`, `supersedesPublicationId`, `periodStart`, `periodEnd`, `documentMonth` and
+`downloadUrl`. `sourceKind` is
 `STATEMENT_ARCHIVE | UVI_ARTIFACT`, and `downloadUrl` is
 `/renter/{tenancyId}/documents/{id}/download`. The first insert returns `201`. Repeating the exact
 source request is idempotent and returns `200` with the identical body, even when the caller repeats
@@ -451,10 +450,10 @@ predecessor is refused with `409`; it never changes the existing row.
 
 The renter list is `GET /renter/{tenancyId}/documents` (`M10-PUB-F06`). After the same URL-tenancy
 witness as the overview route, it returns exactly `{ "documents": [...] }`, ordered by
-`publishedAt` ascending and then `id` ascending. Each item has exactly the same ten response fields
-as owner publication success. The list includes superseded and successor rows; an empty list is
-`200`. Drafts and source rows with no publication never appear. Another tenancy in the same account,
-a cross-account tenancy and an unlinked caller are all `404`.
+`publishedAt` ascending and then `id` ascending. Each item has exactly the same thirteen response
+fields as owner publication success. The list includes superseded and successor rows; an empty
+list is `200`. Drafts and source rows with no publication never appear. Another tenancy in the same
+account, a cross-account tenancy and an unlinked caller are all `404`.
 
 The renter download is
 `GET /renter/{tenancyId}/documents/{publicationId}/download` (`M10-PUB-F07`). It reads only the
@@ -464,6 +463,23 @@ bytes. Success returns the stored bytes, stored MIME type, `Content-Disposition:
 the stored filename and `X-Content-SHA256` with the verified digest. Another tenancy's publication,
 an unpublished source id and an unlinked caller are `404`. Retrieval never queries or follows the
 statement archive, delivery artifact, statement, UVI run or UVI event.
+
+### M10-R4 publication display metadata prerequisite
+
+The owner request remains exactly the four-field body above; clients never submit a statement
+period or UVI month. Additive migration `0044_m10_renter_publication_display_period.py` stores
+`period_start`, `period_end` and canonical first-of-month `document_month` on the immutable
+publication. The publication service derives and copies them server-side from the bound
+`Statement` or `UviRun`. A statement response has `periodStart` and `periodEnd` with null
+`documentMonth`; a UVI response has null period fields and its exact `documentMonth`. Idempotent
+owner responses and renter list items use these stored values without following hidden source rows.
+
+Migration `0044` safely backfills any existing publications from their immutable sources before
+the conditional shape constraint is installed. It has no guessed fallback. The database source
+guard also rejects semantic dates that do not equal the bound source. Existing publication,
+listing, authorization, digest and download semantics do not change. This metadata is the sole
+input for the approved `Abrechnung <Zeitraum>` and `Verbrauchsinformation <Monat JJJJ>` titles in
+M10-R4.
 
 ## M7 tax workspace
 
@@ -669,10 +685,10 @@ production-blocking.
 
 ## Future architecture
 
-- M10 renter activation, `/renter/{tenancyId}` and renter-context isolation are implemented and
-  verified through M10-R2. Renter document publication and portal screens remain pending in
-  M10-R3/R4. Adviser profile, account mapping and tax functions exist, while deferred M7-F repairs
-  on `development` remain unverified and production-blocked.
+- M10 renter activation, `/renter/{tenancyId}`, renter-context isolation, document publication,
+  immutable display metadata and portal screens are implemented and verified through M10-R4.
+  Adviser profile, account mapping and tax functions exist, while deferred
+  M7-F repairs on `development` remain unverified and production-blocked.
 - `apps/mobile` is **Future** at M11: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.

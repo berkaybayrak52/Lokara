@@ -586,6 +586,9 @@ def _assert_publication_shape(body: dict[str, object], ids: _Ids) -> None:
         "sha256",
         "publishedAt",
         "supersedesPublicationId",
+        "periodStart",
+        "periodEnd",
+        "documentMonth",
         "downloadUrl",
     }
     assert body["tenancyId"] == ids.tenancy_a
@@ -648,16 +651,26 @@ def test_m10_pub_f02_f03_f05_owner_publication_is_exact_idempotent_copy(
     assert statement["filename"] == "statement-a.pdf"
     assert statement["sha256"] == sha256(b"statement-a").hexdigest()
     assert statement["supersedesPublicationId"] is None
+    assert statement["periodStart"] == "2025-01-01"
+    assert statement["periodEnd"] == "2025-12-31"
+    assert statement["documentMonth"] is None
     _assert_publication_shape(correction, ids)
     assert correction["supersedesPublicationId"] == statement["id"]
+    assert correction["periodStart"] == "2025-01-01"
+    assert correction["periodEnd"] == "2025-12-31"
+    assert correction["documentMonth"] is None
     _assert_publication_shape(uvi, ids)
     assert uvi["sourceKind"] == "UVI_ARTIFACT"
     assert uvi["documentType"] == "UVI"
     assert uvi["sha256"] == sha256(b"uvi-a").hexdigest()
+    assert uvi["periodStart"] is None
+    assert uvi["periodEnd"] is None
+    assert uvi["documentMonth"] == "2026-08-01"
     with setup.owner.connect() as connection:
         row = connection.execute(
             text(
-                "SELECT content_bytes, sha256, mime_type, filename FROM renter_portal_publication "
+                "SELECT content_bytes, sha256, mime_type, filename, period_start, period_end, "
+                "document_month FROM renter_portal_publication "
                 "WHERE id = :id"
             ),
             {"id": statement["id"]},
@@ -667,6 +680,9 @@ def test_m10_pub_f02_f03_f05_owner_publication_is_exact_idempotent_copy(
             sha256(b"statement-a").hexdigest(),
             "application/pdf",
             "statement-a.pdf",
+            date(2025, 1, 1),
+            date(2025, 12, 31),
+            None,
         )
         assert (
             connection.scalar(
@@ -678,6 +694,18 @@ def test_m10_pub_f02_f03_f05_owner_publication_is_exact_idempotent_copy(
             )
             == 1
         )
+
+
+def test_m10_pub_f08_display_metadata_is_server_derived_not_client_input(setup: _Setup) -> None:
+    ids = setup.ids
+    request = _publication_request(ids, archive_id=ids.archive_a_cover)
+    request["periodStart"] = "2025-01-01"
+    response = setup.client.post(
+        f"/a/{ids.account_a}/renter-portal-publications",
+        headers=_token(ids.owner_a),
+        json=request,
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -770,6 +798,18 @@ def test_m10_pub_f06_renter_list_is_exact_ordered_and_preserves_superseded_versi
         published[2]["id"],
     }
     assert documents == sorted(documents, key=lambda row: (row["publishedAt"], row["id"]))
+    documents_by_id = {row["id"]: row for row in documents}
+    for expected in published:
+        listed = documents_by_id[expected["id"]]
+        assert (
+            listed["periodStart"],
+            listed["periodEnd"],
+            listed["documentMonth"],
+        ) == (
+            expected["periodStart"],
+            expected["periodEnd"],
+            expected["documentMonth"],
+        )
     for row in documents:
         _assert_publication_shape(row, ids)
 
@@ -838,10 +878,10 @@ def test_m10_pub_f07_digest_mismatch_is_409_and_probe_is_rolled_back(setup: _Set
                     "(id, account_id, tenancy_id, source_kind, statement_archive_id, "
                     "renter_delivery_artifact_id, document_type, content_bytes, sha256, mime_type, "
                     "filename, published_by_membership_id, published_at, "
-                    "supersedes_publication_id) "
+                    "period_start, period_end, document_month, supersedes_publication_id) "
                     "VALUES (:id, :account, :tenancy, 'STATEMENT_ARCHIVE', :archive, NULL, "
                     "'COVER_LETTER', :content, :digest, 'application/pdf', 'corrupt.pdf', "
-                    ":membership, :now, NULL)"
+                    ":membership, :now, :period_start, :period_end, NULL, NULL)"
                 ),
                 {
                     "id": publication_id,
@@ -852,6 +892,8 @@ def test_m10_pub_f07_digest_mismatch_is_409_and_probe_is_rolled_back(setup: _Set
                     "digest": sha256(b"cover-a").hexdigest(),
                     "membership": ids.membership_owner_a,
                     "now": datetime.now(UTC),
+                    "period_start": date(2025, 1, 1),
+                    "period_end": date(2025, 12, 31),
                 },
             )
 

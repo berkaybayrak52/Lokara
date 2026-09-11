@@ -13,6 +13,7 @@ from lokara_db import (
     StatementArchive,
     StatementStatus,
     UviDeliveryEvent,
+    UviRun,
     new_id,
 )
 from sqlalchemy import select
@@ -43,6 +44,9 @@ def _publication_out(row: RenterPortalPublication) -> RenterPortalPublicationOut
         sha256=row.sha256,
         published_at=row.published_at,
         supersedes_publication_id=row.supersedes_publication_id,
+        period_start=row.period_start,
+        period_end=row.period_end,
+        document_month=row.document_month,
         download_url=f"/renter/{row.tenancy_id}/documents/{row.id}/download",
     )
 
@@ -86,7 +90,11 @@ def _statement_source(
     *,
     source_id: str,
     tenancy_id: str,
-) -> tuple[StatementArchive, Literal["COVER_LETTER", "TENANT_STATEMENT"]]:
+) -> tuple[
+    StatementArchive,
+    Literal["COVER_LETTER", "TENANT_STATEMENT"],
+    Statement,
+]:
     source = session.get(StatementArchive, source_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Dokumentquelle nicht gefunden.")
@@ -111,7 +119,11 @@ def _statement_source(
         raise HTTPException(status_code=422, detail="Dokumentquelle ist nicht veröffentlichbar.")
     if not compare_digest(sha256(source.content_bytes).hexdigest(), source.sha256):
         raise HTTPException(status_code=422, detail="Dokumentquelle ist beschädigt.")
-    return source, cast(Literal["COVER_LETTER", "TENANT_STATEMENT"], source.document_type)
+    return (
+        source,
+        cast(Literal["COVER_LETTER", "TENANT_STATEMENT"], source.document_type),
+        statement,
+    )
 
 
 def _uvi_source(
@@ -119,7 +131,7 @@ def _uvi_source(
     *,
     source_id: str,
     tenancy_id: str,
-) -> RenterDeliveryArtifact:
+) -> tuple[RenterDeliveryArtifact, UviRun]:
     source = session.get(RenterDeliveryArtifact, source_id)
     if source is None or source.tenancy_id != tenancy_id:
         raise HTTPException(status_code=404, detail="Dokumentquelle nicht gefunden.")
@@ -132,7 +144,11 @@ def _uvi_source(
         raise HTTPException(status_code=422, detail="Dokumentquelle ist nicht veröffentlichbar.")
     if not compare_digest(sha256(source.content_bytes).hexdigest(), source.sha256):
         raise HTTPException(status_code=422, detail="Dokumentquelle ist beschädigt.")
-    return source
+    assert source.uvi_run_id is not None
+    uvi_run = session.get(UviRun, source.uvi_run_id)
+    if uvi_run is None or uvi_run.tenancy_id != tenancy_id:
+        raise HTTPException(status_code=404, detail="Dokumentquelle nicht gefunden.")
+    return source, uvi_run
 
 
 def _verify_predecessor(
@@ -187,7 +203,7 @@ def publish_renter_document(
     source_kind: Literal["STATEMENT_ARCHIVE", "UVI_ARTIFACT"]
     document_type: Literal["COVER_LETTER", "TENANT_STATEMENT", "UVI"]
     if body.statement_archive_id is not None:
-        statement_source, statement_document_type = _statement_source(
+        statement_source, statement_document_type, statement = _statement_source(
             session,
             source_id=body.statement_archive_id,
             tenancy_id=body.tenancy_id,
@@ -198,9 +214,12 @@ def publish_renter_document(
         source_digest = statement_source.sha256
         mime_type = statement_source.mime_type
         filename = statement_source.filename
+        period_start = statement.period_start
+        period_end = statement.period_end
+        document_month = None
     else:
         assert body.renter_delivery_artifact_id is not None
-        uvi_source = _uvi_source(
+        uvi_source, uvi_run = _uvi_source(
             session,
             source_id=body.renter_delivery_artifact_id,
             tenancy_id=body.tenancy_id,
@@ -211,6 +230,9 @@ def publish_renter_document(
         source_digest = uvi_source.sha256
         mime_type = uvi_source.mime_type
         filename = uvi_source.filename
+        period_start = None
+        period_end = None
+        document_month = uvi_run.month
 
     _verify_predecessor(
         session,
@@ -235,6 +257,9 @@ def publish_renter_document(
         published_by_membership_id=portal_membership_id(session),
         published_at=datetime.now(UTC),
         supersedes_publication_id=body.supersedes_publication_id,
+        period_start=period_start,
+        period_end=period_end,
+        document_month=document_month,
     )
     try:
         with session.begin_nested():

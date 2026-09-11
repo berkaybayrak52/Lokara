@@ -1,6 +1,13 @@
-# Lead handoff — M10-R3 verified and ready for commit
+# Lead handoff — M10-R4 verified
 
-## Current state — 11.09.2026
+## Current state — 12.09.2026
+
+`slice/m10-r4-renter-portal` is technically complete and review-clean. Migration `0044`, the
+source-derived publication metadata/API and renter portal UI are green. Focused DB/API/web tests
+pass `6 + 20 + 28`; RLS covers `77` tables, FK isolation `157` edges and the pre-context checker is
+clean. Both required reviews are clean; the full gate passes `2048` Python and `238` web tests.
+`.lokara-red` is absent. Preserve the five unrelated `adjustment/` files and do not push without
+Emir's decision.
 
 M10-R3 is technically complete and locally merged into `main` as source commit `2ba245d`. Nothing
 was pushed. `.lokara-red` is removed.

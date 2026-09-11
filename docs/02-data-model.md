@@ -79,7 +79,7 @@ account-scoped tables carries the same `account_id`; section 3 records the enfor
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
 | Guards, reminders, delivery and checklists | W1–W8 evaluations plus immutable reminders/resolutions, versioned schedules, exact-byte artifacts, email/status/suppression evidence and checklist events | **Technically closed 29.08.2026** on `development` in M9 migration `0025`; production blockers remain; later checkpoint verification is separate |
 | AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Integrated on `development`** with deferred M7-F repairs; closure reviews and runtime authority remain blocked |
-| Renter activation and renter portal context | Activation-code redemption writes `renter.person_id`; `/renter/{tenancyId}` uses a separate renter context | **Specified** by M10-R0; no schema, API or UI implementation yet |
+| Renter activation, context and publication | Activation-code redemption writes `renter.person_id`; `/renter/{tenancyId}` uses a separate renter context; immutable publications contain only renter-readable archived bytes | **Technically implemented and verified through M10-R4**, including display metadata and portal UI |
 
 These principles decide ambiguous additions:
 
@@ -202,8 +202,8 @@ renter authorization witness. This is fixture `M10-CTX-F07`.
 The implementation satisfies `M10-CTX-F01…F08`. All `116` focused DB/API/checker tests pass; RLS
 covers `76` tables, FK isolation covers `152` edges and the pre-context checker is clean. The
 mandatory boundary audit is clean with rollback-only probes, and the full gate passes `2021`
-Python and `210` web tests. No `.lokara-red` sentinel remains. M10-R3 and migration `0043` remain
-pending.
+Python and `210` web tests. M10-R3 and migration `0043` are now technically complete and locally
+merged; M10-R4 remains pending.
 
 `GET /me` preserves its existing `accounts` items byte-for-byte in meaning and adds
 `renterContexts`. Each renter item contains exactly `tenancyId`; it never exposes `accountId`, a
@@ -267,7 +267,7 @@ only immutable bytes stored on the matching publication row. This prevents the `
 input/result JSON, building-wide comparison evidence and the landlord's all-party statement
 projection from crossing the portal boundary.
 
-`renter_portal_publication` is a specified M10 record, not shipped schema. It must identify exactly
+`renter_portal_publication` is the shipped M10-R3 record. It identifies exactly
 one account, one tenancy and one source document; copy the already archived bytes, hash, MIME type
 and filename without re-rendering; store the publishing owner Membership and publication time; be
 append-only; and preserve a correction/supersession chain instead of delete or update. Its source is
@@ -284,12 +284,14 @@ the source row at request time.
 
 ### M10-R3 publication record — exact fixture contract
 
-`M10-PUB-F01` fixes migration `0043_m10_renter_portal_publication.py` and the SQLAlchemy model.
+`M10-PUB-F01` fixes migration `0043_m10_renter_portal_publication.py` and the original SQLAlchemy
+model. After the additive `M10-PUB-F08` display-metadata extension below,
 `renter_portal_publication` has exactly these domain columns in addition to its primary key:
 `account_id`, `tenancy_id`, `source_kind`, `statement_archive_id`,
 `renter_delivery_artifact_id`, `document_type`, `content_bytes`, `sha256`, `mime_type`, `filename`,
-`published_by_membership_id`, `published_at`, `supersedes_publication_id` and `created_at`. It has no
-`updated_at`, `deleted_at` or external storage pointer. `source_kind` is exactly
+`published_by_membership_id`, `published_at`, `supersedes_publication_id`, `period_start`,
+`period_end`, `document_month` and `created_at`. It has no `updated_at`, `deleted_at` or external
+storage pointer. `source_kind` is exactly
 `STATEMENT_ARCHIVE | UVI_ARTIFACT`; `document_type` is exactly
 `COVER_LETTER | TENANT_STATEMENT | UVI`. Bytes are non-empty, the digest is a lower-case 64-character
 SHA-256 hex value and MIME type and filename are non-blank.
@@ -334,6 +336,41 @@ Renters can never insert, update or delete. A cross-account owner insert is refu
 role still reads zero rows from `statement_document_archive`, `renter_delivery_artifact`,
 `statement`, `uvi_run` and `uvi_delivery_event` while renter context is set. Every adversarial
 fixture performs its probes in an explicit transaction and rolls it back.
+
+### M10-R4 publication display metadata prerequisite — exact fixture contract
+
+`M10-PUB-F08` pins the additive migration
+`0044_m10_renter_publication_display_period.py` (`down_revision = "0043"`) and exactly three new
+publication columns: `period_start: date | null`, `period_end: date | null` and
+`document_month: date | null`. `document_month` is canonicalized to the first day of its month.
+These values are immutable display metadata copied from the bound source; they are not client
+input, a publication timestamp or a value inferred from the filename.
+
+The conditional row shape is exact:
+
+- `STATEMENT_ARCHIVE` has `period_start` and `period_end` equal to the underlying `Statement`
+  period, requires `period_start <= period_end`, and has `document_month = null`.
+- `UVI_ARTIFACT` has `period_start = period_end = null` and `document_month` equal to the underlying
+  `UviRun.month`; `document_month.day` must equal `1`.
+
+Migration `0044` first adds the three nullable columns, then backfills every existing publication
+by joining through its immutable source to `Statement.period_start`/`period_end` or `UviRun.month`,
+and only then installs the conditional constraint and the extended source guard. There is no
+fallback date: if an existing row cannot be resolved exactly through its bound source, migration
+must fail rather than invent metadata. The database source guard refuses a shape-valid insert when
+its dates differ from the bound statement or UVI source. All probes are performed inside an
+explicit transaction and rolled back.
+
+The owner publication response and every item returned by the renter document list add exactly
+`periodStart`, `periodEnd` and `documentMonth` to the existing wire item. The statement shape is
+`periodStart = <source period start>`, `periodEnd = <source period end>`, `documentMonth = null`;
+the UVI shape is complementary. The publication request body is unchanged. The service copies the
+values server-side in the same immutable insert; list and idempotent responses read only the stored
+publication values. Existing eligibility, byte-copy, digest, ordering, download, supersession and
+authorization behavior remains unchanged.
+
+Legal basis: none — this is a technical, immutable display projection for the approved
+`M10-COPY-05` titles. Rechtsstand `09/2026`.
 
 ### Activation-code contract and refusal fixtures
 
@@ -1327,8 +1364,8 @@ with M7-F's read-only reviews still open.
 | Landlord *Zahlungen* screen | **UI-07 demo core implemented on `development`; partial, with automated and focused review evidence**. Unified server read model, account/consent status, filters, pagination, proposal confirmation and append-only single/bulk ignore are live. Manual payment/assignment, anomaly engine, complete shared aggregates and the live-browser matrix remain unfinished or source-blocked. | UI-07 / M6-C3c |
 | W1–W8 guards, reminders, email delivery and checklists | **Technically closed 29.08.2026 on `development`** with migration `0025`, account-scoped jobs/API and `/waechter`; delivery defaults off and real execution remains blocked | M9 / `docs/12` |
 | U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**, including later GAS/warm-water extensions; M9 scheduling on `development` refuses UVI delivery because immutable PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
-| Renter portal publication | **Specified by M10-R0; not implemented** | M10-R3/R4 |
-| Renter activation-code redemption, renter context and overview isolation | **Technically complete and verified through M10-R2**; renter document publication and screens remain pending | M10-R1/R2 |
+| Renter portal publication | **Technically complete and verified through M10-R4**, including immutable display metadata and screens | M10-R3/R4 |
+| Renter activation-code redemption, renter context and overview isolation | **Technically complete and verified through M10-R4** together with publication and screens | M10-R1/R2 |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Pure engine, rules, schema, web and the server-generated artifact/API adapter are locally merged and green; runtime output stays blocked while its register values remain `verify-before-production` | M7 / `docs/11-tax-export.md` |
 | Page 06 clause selection, risk and workflow-routing contract | Complete transcription approved and merged 21.08.2026; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |

@@ -3919,6 +3919,9 @@ class RenterPortalPublication(Base):
     published_by_membership_id: Mapped[str]
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     supersedes_publication_id: Mapped[str | None]
+    period_start: Mapped[date | None]
+    period_end: Mapped[date | None]
+    document_month: Mapped[date | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
@@ -4003,6 +4006,15 @@ class RenterPortalPublication(Base):
         CheckConstraint(
             "id <> supersedes_publication_id",
             name="ck_renter_portal_publication_not_self_superseding",
+        ),
+        CheckConstraint(
+            "((source_kind = 'STATEMENT_ARCHIVE' "
+            "AND period_start IS NOT NULL AND period_end IS NOT NULL "
+            "AND period_start <= period_end AND document_month IS NULL) OR "
+            "(source_kind = 'UVI_ARTIFACT' "
+            "AND period_start IS NULL AND period_end IS NULL "
+            "AND document_month IS NOT NULL AND EXTRACT(DAY FROM document_month) = 1))",
+            name="ck_renter_portal_publication_display_period",
         ),
         Index(
             "uq_renter_portal_publication_statement_source",

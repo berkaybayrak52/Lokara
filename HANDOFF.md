@@ -1,4 +1,19 @@
-# Lokara handoff — M10-R3 verified
+# Lokara handoff — M10-R4 verified
+
+## M10-R4 closure — 12.09.2026
+
+`slice/m10-r4-renter-portal` is technically complete and ready for local consolidation. Nothing is
+pushed. The five unrelated untracked `adjustment/` files remain untouched.
+
+- Migration `0044`, ORM and API copy immutable statement periods/UVI months from their sources.
+- The renter route group provides activation, own-tenancy, statement and UVI screens with exact
+  approved copy, renter-aware entry and context switching.
+- Focused DB/API/web tests pass `6 + 20 + 28`; RLS covers `77` tables, FK isolation `157` edges and
+  the pre-context checker is clean.
+- Statement review and boundary re-audit are clean. The full gate passes `2048` Python and `238`
+  web tests. `.lokara-red` is absent.
+
+No R4 work remains. Lane I is next under `PLAN.md`; do not push without Emir's decision.
 
 ## M10-R3 closure — 11.09.2026
 
