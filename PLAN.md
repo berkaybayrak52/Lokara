@@ -1781,7 +1781,8 @@ immutability decision without an open choice, and the refusal cases are enumerab
 **Agent:** `spec-scribe` (RED fixtures) then `engine-implementer`. Migration `0041` — the next
 revision after the consolidated `0040_ui08_workspace_invariants.py` head.
 
-**Technically complete and review-clean (11.09.2026):** migration `0041`, ORM and API implement
+**Technically complete, review-clean and locally merged into `main` as `cbecfa7` (11.09.2026):**
+migration `0041`, ORM and API implement
 owner-only hash-at-rest issuance, atomic spend-once redemption and all `M10-ACT-F01…F07` outcomes.
 Direct non-null `renter.person_id` INSERTs and writes without matching redemption evidence are
 blocked for runtime and owner roles. Missing/null/non-string shapes use the same timed HTTP `400`

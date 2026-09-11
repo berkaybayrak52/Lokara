@@ -2,9 +2,7 @@
 
 ## Current slice — 11.09.2026
 
-M10-R1 is technically complete on `slice/m10-r1-activation-codes`, created from local `main` at
-`a82023a`. The resulting local slice commit is recorded in `LAST_OUTPUT.md`; it is not merged or
-pushed.
+M10-R1 is technically complete and locally merged into `main` as `cbecfa7`. It is not pushed.
 
 - Migration `0041` and the ORM define account-scoped activation codes, immutable redemption
   evidence and immutable attributable-refusal evidence. Direct non-null `renter.person_id` INSERTs
@@ -25,8 +23,7 @@ pushed.
   formatting, strict mypy, purity, parity, ESLint and TypeScript pass.
 - Preserve the five untracked `adjustment/` reference files; they remain untouched.
 
-The remaining decision is whether to merge this slice into local `main`. Do not merge or push
-without Emir's authorization.
+M10-R2 is next in `PLAN.md`. Do not start it or push without Emir's authorization.
 
 ## Earlier verified checkpoint
 
