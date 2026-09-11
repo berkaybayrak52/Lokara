@@ -46,6 +46,7 @@ const NAVIGATION_BY_ROLE: Record<Role, string[]> = {
     'Zahlungen',
     'Kosten erfassen',
     'Zähler',
+    'UVI',
     'Abrechnungen',
     'Wächter',
     'Steuern',

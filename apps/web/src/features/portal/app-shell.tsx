@@ -75,6 +75,13 @@ const NAV_ITEMS: NavItem[] = [
     activePrefixes: ['/zaehler'],
   },
   {
+    href: (id) => `/a/${id}/uvi`,
+    label: 'UVI',
+    icon: 'statements',
+    activePrefixes: ['/uvi'],
+    visibleFor: (role) => role === 'OWNER',
+  },
+  {
     href: (id) => `/a/${id}/abrechnung`,
     label: 'Abrechnungen',
     icon: 'statements',
@@ -215,7 +222,7 @@ export function PortalShellContent({
   return (
     <div className="flex min-h-dvh min-w-0 bg-paper text-ink">
       <aside
-        className={`${sidebarWidth} sticky top-0 flex h-dvh shrink-0 flex-col overflow-visible border-r border-mint bg-white px-3 py-5 transition-[width] duration-[180ms] ease-out motion-reduce:transition-none`}
+        className={`${sidebarWidth} max-md:w-[72px] sticky top-0 flex h-dvh shrink-0 flex-col overflow-visible border-r border-mint bg-white px-3 py-5`}
       >
         <div className="flex h-10 shrink-0 items-center">
           <Link
@@ -230,9 +237,9 @@ export function PortalShellContent({
               width={103}
               height={28}
               priority
-              className={fullLogoVisibility}
+              className={`${fullLogoVisibility} max-md:hidden`}
             />
-            <Image src="/icon.png" alt="" width={28} height={28} className={signetVisibility} />
+            <Image src="/icon.png" alt="" width={28} height={28} className={`${signetVisibility} max-md:block`} />
           </Link>
         </div>
 
@@ -257,7 +264,7 @@ export function PortalShellContent({
                   href={href}
                   aria-label={item.label}
                   aria-current={active ? 'page' : undefined}
-                  title={collapsedNow ? item.label : undefined}
+                  title={item.label}
                   className={
                     'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ease-out ' +
                     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ' +
@@ -266,7 +273,7 @@ export function PortalShellContent({
                 >
                   <NavIcon name={item.icon} />
                   <span
-                    className={`${labelVisibility} truncate transition-opacity duration-[180ms] motion-reduce:transition-none`}
+                    className={`${labelVisibility} max-md:sr-only truncate transition-opacity duration-[180ms] motion-reduce:transition-none`}
                   >
                     {item.label}
                   </span>
@@ -293,7 +300,7 @@ export function PortalShellContent({
           aria-label={collapsedNow ? 'Navigation ausklappen' : 'Navigation einklappen'}
           title={collapsedNow ? 'Navigation ausklappen' : 'Navigation einklappen'}
           onClick={toggleSidebar}
-          className="mt-3 flex min-h-10 shrink-0 items-center justify-center rounded-lg text-slate transition-colors duration-150 hover:bg-mint hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+          className="mt-3 flex min-h-10 shrink-0 items-center justify-center rounded-lg text-slate transition-colors duration-150 hover:bg-mint hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none max-md:hidden"
         >
           <CollapseIcon collapsed={collapsedNow} />
           <span className="sr-only">
@@ -508,7 +515,7 @@ function AccountMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={accounts.length > 1 ? 'Konto wechseln' : 'Kontomenü öffnen'}
-        title={collapsed ? account.name : undefined}
+        title={account.name}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (event.key === 'Escape' && open) {
@@ -527,7 +534,7 @@ function AccountMenu({
           {initials || 'K'}
         </span>
         <span
-          className={`${defaultResponsive ? 'max-[1439px]:sr-only' : collapsed ? 'sr-only' : ''} min-w-0 flex-1`}
+          className={`${defaultResponsive ? 'max-[1439px]:sr-only' : collapsed ? 'sr-only' : ''} max-md:sr-only min-w-0 flex-1`}
         >
           <span className="block truncate text-sm font-semibold" title={account.name}>
             {account.name}
@@ -537,7 +544,7 @@ function AccountMenu({
           </span>
         </span>
         <ChevronIcon
-          className={`${defaultResponsive ? 'max-[1439px]:hidden' : collapsed ? 'hidden' : ''}`}
+          className={`${defaultResponsive ? 'max-[1439px]:hidden' : collapsed ? 'hidden' : ''} max-md:hidden`}
         />
       </button>
     </div>

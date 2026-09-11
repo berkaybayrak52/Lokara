@@ -84,6 +84,10 @@ export async function api<Schema extends z.ZodType>(
     if (preview !== undefined) {
       return schema.parse(preview) as z.infer<Schema>;
     }
+    const method = (init?.method ?? 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+      throw new ApiError(403, path, 'Diese Aktion ist in der Vorschau nicht verfügbar. Öffnen Sie dafür die Live-Daten.');
+    }
   }
 
   let response = await rawFetch(path, init);

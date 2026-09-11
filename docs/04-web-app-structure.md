@@ -87,6 +87,55 @@ pages. Neither is `/`, which enters a sole
 `TAX_ADVISOR` context is selected deliberately rather than
 entered automatically.
 
+## Owner UVI workspace — technically complete locally
+
+The contract below is implemented and technically verified on `slice/uvi-owner-ui` as of
+11.09.2026, but remains uncommitted. Full checks, production build, the non-fresh demo path and
+bounded UI/boundary reviews pass. Responsive/keyboard and 200% CSS scaling checks pass. Live
+metadata and missing-configuration handling are verified; browser success states use intercepted
+responses, while backend/PDF suites cover generation, archives and rendering. The existing demo
+account has no configured monthly UVI success case. Production restrictions remain unchanged;
+see `PLAN.md` and `HANDOFF.md` for evidence and limits.
+
+The mobile shell uses compact 72px icon navigation below 768px without replacing the stored
+desktop preference. The UVI form permits wrapped controls/actions and reserves header space for
+the reminder bell. The default month derives from the server workspace timestamp.
+
+The owner entry `UVI` sits after `Zähler` in the sidebar and opens
+`/a/{accountId}/uvi`, titled **Verbrauchsinformation (UVI)**. Employees and tax advisers have
+no UVI navigation or generation controls; the existing owner authorization on both backend
+endpoints remains decisive. This bounded UI exposes the U5 generation/download contract in
+`docs/16` §§ 10–12; it changes no calculation, legal value, authority flag or Rechtsstand.
+
+- Inputs are **Objekt**, **Einheit**, **Mietverhältnis** and **Monat**. The first three use
+  live account-scoped `GET /a/{accountId}/meter-workspace` metadata, including tenancy dates.
+  No fixture or synthetic reading is submitted as an input. Changing the object clears unit
+  and tenancy; changing the unit clears tenancy. Any selection/month change hides the prior
+  result so another tenancy or month never appears to own its PDF.
+- One explicit primary action, **UVI erstellen / öffnen**, calls
+  `POST /a/{accountId}/buildings/{buildingId}/uvi-runs` with exactly `tenancyId` and
+  `targetMonth`; the month control's `YYYY-MM` becomes `YYYY-MM-01`. No generation occurs on
+  page load or selection. Pending generation disables duplicate submits. HTTP 200 reopens the
+  existing archived tenancy/month run; HTTP 201 creates it using the same backend contract.
+- The validated response carries `runId`, `documentUrl`, `productionBlocked` and
+  `unresolvedConflicts`. **PDF herunterladen** uses the authenticated API transport base
+  (default same-origin `/api/backend`) and the returned account-scoped document path. A blocked
+  response shows **Nicht für den produktiven Versand freigegeben**, all returned conflicts and
+  **Es wird keine E-Mail versendet.** A downloaded engineering PDF does not clear any production
+  blocker. Generation errors, including HTTP 422 and its server detail, are visible and retryable;
+  no success/PDF is fabricated for failed requests.
+- Portfolio preview is read-only for this workflow: show a clear **Vorschau** notice, suppress
+  generation and PDF success, and provide a full-navigation link **Live-Daten öffnen** to the
+  same account's `/uvi?preview=0`. If the environment forces preview, that flag still wins and
+  the UI must not claim the link can override it. Unsupported preview mutations must never
+  fall through to the real backend.
+- Loading, retryable metadata failure and empty object/unit/tenancy states use explicit German
+  copy. Labels, focus, contrast, spacing and the single primary action follow `docs/05`.
+
+No scheduler, email send, renter portal publication, new history endpoint, ingestion wizard,
+engine, schema or backend input change is authorized by this UI contract. The `docs/16` production
+authority/content/cadence limitations and M9's missing frozen delivery artifact remain open.
+
 ## Shipped UI-00 global shell
 
 UI-00 is locally merged and changes no API, schema, calculation, money, or legal rule:

@@ -11,6 +11,18 @@ before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
+- **Owner UVI UI technically complete locally (`slice/uvi-owner-ui`, 11.09.2026).**
+  Owner-only `/uvi` exposes live object/unit/tenancy/month selection, generation/reopen, scoped
+  PDF access, visible production conflicts and preview write protection under `docs/04`.
+  The live workspace timestamp crash and mobile overflow/clipped-button defect are repaired.
+  Full gate passes 1967 Python and 210 web tests; production build and separate non-fresh demo
+  path pass. Ordinary PDF fingerprint is unchanged. Bounded statement/UI and boundary reviews
+  are clean; keyboard, 320–1920px responsive checks and 200% CSS scaling pass.
+  Live demo generation correctly returns missing-configuration 422; successful browser results
+  used intercepted responses, with backend generation/archive and PDF-render coverage in the
+  existing suites. No monthly facts were invented. All changes remain uncommitted; nothing was
+  merged or pushed. `HANDOFF.md` records evidence and limits. No delivery, portal, legal/calculation
+  or backend-schema expansion is included; every `docs/16` and M9 production blocker remains.
 - M0 is complete. M1–M4 are built and green under their original scope, but are not yet fully
   verified against all Berkay specifications.
 - The v4 migration is complete. The old TypeScript backend is gone. Mobile moved to M11.
@@ -58,7 +70,9 @@ before UI. Dates are communication events, not planning inputs.
   landlord Zahlungen screen (`6995bc4`) are technically complete and locally merged, which closes
   M6-C and with it M6.**
 - **G1 is technically complete and locally merged (`6c257f8`).** U1–U5 and M7-0 through M7-E are
-  also locally merged. Local `main` remains the last consolidated checkpoint at `3898776`.
+  also locally merged. Local `main` is now at the consolidated checkpoint `5a1ee8b`,
+  fast-forwarded from `development` with Emir's approval on 06.09.2026. The subsequent
+  Zähler preview-data correction remains an uncommitted local follow-up; nothing was pushed.
   The long-lived local `development` branch integrates UI-04, deferred M7-F repairs and M9
   work, including all W1–W8 projections, migration `0025`, account-scoped jobs/API, immutable
   delivery evidence and `/waechter`. Integration alone does not close the other workstreams.

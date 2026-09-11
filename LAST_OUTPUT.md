@@ -1,16 +1,16 @@
-# Last output — M9 checkpoint commit authorized
+# Last output — Local app restarted
 
-HEAD `edb7008` on `development` · `05.09.2026`
+HEAD `5a1ee8b` on `slice/uvi-owner-ui` · `11.09.2026`
 Status: Complete
 
 ## Wanted
-Create the approved local M9/UVI/portfolio checkpoint commit on `development`.
+Restore the local Lokara app after Chrome showed a missing Next.js chunk.
 
 ## Done
-Full and non-fresh demo gates pass: 1967 Python tests, zero skips; 188 web tests. Database `0040`, RLS/FK checks and prior boundary/statement reviews are clean. Documentation drift is reconciled. Ordinary PDF unchanged: `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes.
+Stopped the stale web process, moved its generated `.next` cache to `/tmp/lokara-next-cache-before-restart-20260911`, and started a clean Next development server. Root, UVI preview and API health now return HTTP 200. Source files and database were untouched.
 
 ## Not done
-Emir approved the local commit; commit creation is in progress. Production/legal blockers, partial UI-07 scope and the portfolio live-browser acceptance remain open.
+None. The web server remains running on port 3000; the API remains on port 3001. No source commit, merge or push.
 
 ## Optional next step
-None; promotion, push and M10 implementation require separate direction.
+None.

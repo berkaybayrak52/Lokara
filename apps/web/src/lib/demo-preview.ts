@@ -13,8 +13,8 @@
  *     aktiv), mit `?preview=0` wieder ausschalten.
  *
  * Grenzen: Unterstützte Lesewege und Zahlungsentscheidungen bleiben vollständig
- * synthetisch. Nicht unterstützte Schreibaktionen werden in Vorschau-Dashboards
- * nicht angeboten; unbekannte Routen fallen weiterhin auf das echte Backend zurück.
+ * synthetisch. Die API sperrt nicht unterstützte Schreibaktionen vor jedem
+ * Backend-Aufruf; nur unbekannte Lesewege fallen auf das echte Backend zurück.
  */
 
 import { ALLOCATION_KEY_LABELS, type AllocationKey } from './contracts';
@@ -1311,6 +1311,7 @@ function meter(
     valuationFactorX1000: factorX1000,
     valuationFactorDisplay:
       factorX1000 === null ? null : (factorX1000 / 1000).toLocaleString('de-DE'),
+    gasConversion: null,
     calibrationStatus,
     calibrationMessage:
       calibrationStatus === 'EXPIRED'
