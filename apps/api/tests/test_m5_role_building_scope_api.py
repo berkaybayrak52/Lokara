@@ -326,10 +326,13 @@ class TestM5BootstrapAndOpenApi:
         response = client.get("/me", headers=_token(_EMPLOYEE_ID))
         assert response.status_code == 200
         body = response.json()
-        assert set(body) == {"personId", "email", "accounts"}
+        # M10-CTX-F08: the membership context is unchanged; R2 only adds the
+        # separate empty renter-context list for this Person.
+        assert set(body) == {"personId", "email", "accounts", "renterContexts"}
         assert body["accounts"] == [
             {"id": DEMO_ACCOUNT_ID, "name": "Demo Konto", "role": "EMPLOYEE", "shape": "SOLO"}
         ]
+        assert body["renterContexts"] == []
 
     def test_no_current_request_schema_can_write_renter_person_id(self) -> None:
         document = create_app().openapi()

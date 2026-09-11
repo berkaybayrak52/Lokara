@@ -12,7 +12,7 @@ import importlib.util
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -22,9 +22,10 @@ CHECK = ROOT / "scripts" / "check_pre_context_reads.py"
 BOOTSTRAP_FUNCTION = "app_bootstrap_contexts"
 BOOTSTRAP_ROLE = "lokara_bootstrap"
 APP_ROLE = "lokara_app"
-ACCOUNT_SCOPE = "((id)::text = current_setting('app.account_id'::text, true))"
-MEMBERSHIP_SCOPE = "((account_id)::text = current_setting('app.account_id'::text, true))"
-PERSON_SCOPE = (
+NO_RENTER_CONTEXT = "(NULLIF(current_setting('app.tenancy_id'::text, true), ''::text) IS NULL)"
+ACCOUNT_ONLY_SCOPE = "((id)::text = current_setting('app.account_id'::text, true))"
+MEMBERSHIP_ONLY_SCOPE = "((account_id)::text = current_setting('app.account_id'::text, true))"
+PERSON_ONLY_SCOPE = (
     "((EXISTS ( SELECT 1\n"
     "   FROM membership m\n"
     "  WHERE (((m.person_id)::text = (person.id)::text) AND "
@@ -34,6 +35,9 @@ PERSON_SCOPE = (
     "  WHERE (((r.person_id)::text = (person.id)::text) AND "
     "((r.account_id)::text = current_setting('app.account_id'::text, true))))))"
 )
+ACCOUNT_SCOPE = f"({ACCOUNT_ONLY_SCOPE} AND {NO_RENTER_CONTEXT})"
+MEMBERSHIP_SCOPE = f"({MEMBERSHIP_ONLY_SCOPE} AND {NO_RENTER_CONTEXT})"
+PERSON_SCOPE = f"({PERSON_ONLY_SCOPE} AND {NO_RENTER_CONTEXT})"
 
 
 def _load_checker() -> ModuleType:
@@ -92,6 +96,9 @@ class _Catalog:
         ("person", "SELECT"),
         ("membership", "SELECT"),
         ("account", "SELECT"),
+        ("renter", "SELECT"),
+        ("tenancy_party", "SELECT"),
+        ("tenancy", "SELECT"),
     )
     # table, name, permissiveness, command, roles, using, with-check
     policies: tuple[tuple[str, str, str, str, str, str | None, str | None], ...] = (
@@ -147,6 +154,33 @@ class _Catalog:
             "SELECT",
             "{public}",
             PERSON_SCOPE,
+            None,
+        ),
+        (
+            "renter",
+            "renter_bootstrap_select",
+            "PERMISSIVE",
+            "SELECT",
+            "{lokara_bootstrap}",
+            "true",
+            None,
+        ),
+        (
+            "tenancy_party",
+            "tenancy_party_bootstrap_select",
+            "PERMISSIVE",
+            "SELECT",
+            "{lokara_bootstrap}",
+            "true",
+            None,
+        ),
+        (
+            "tenancy",
+            "tenancy_bootstrap_select",
+            "PERMISSIVE",
+            "SELECT",
+            "{lokara_bootstrap}",
+            "true",
             None,
         ),
     )
@@ -262,16 +296,18 @@ def _write_clean_api(api_src: Path) -> None:
     routers = api_src / "lokara_api" / "routers"
     routers.mkdir(parents=True)
     (routers / "me.py").write_text(
-        "from somewhere import bootstrap_contexts\n"
-        "from somewhere_else import _engine\n"
-        "def resolve_bootstrap_subject(auth):\n"
-        "    return bootstrap_contexts(_engine(), auth.person_id)\n"
+        "from somewhere import resolve_bootstrap_subject\n"
         "def me(auth):\n"
         "    return resolve_bootstrap_subject(auth)\n"
     )
     (routers / "renter_activation.py").write_text(
-        "from .me import resolve_bootstrap_subject\n"
+        "from somewhere import resolve_bootstrap_subject\n"
         "def redeem(auth):\n"
+        "    return resolve_bootstrap_subject(auth)\n"
+    )
+    (routers / "renter.py").write_text(
+        "from somewhere import resolve_bootstrap_subject\n"
+        "def overview(auth):\n"
         "    return resolve_bootstrap_subject(auth)\n"
     )
     (routers / "demo.py").write_text(
@@ -284,9 +320,13 @@ def _write_clean_api(api_src: Path) -> None:
         "        pass\n"
     )
     (api_src / "lokara_api" / "deps.py").write_text(
-        "from somewhere import _engine, account_scoped_session\n"
+        "from somewhere import _engine, account_scoped_session, bootstrap_contexts\n"
+        "def resolve_bootstrap_subject(auth):\n"
+        "    return bootstrap_contexts(_engine(), auth.person_id)\n"
         "def scoped(engine, account_id):\n"
         "    return account_scoped_session(_engine(), account_id)\n"
+        "def renter_scope(auth):\n"
+        "    return resolve_bootstrap_subject(auth)\n"
     )
 
 
@@ -308,6 +348,17 @@ class TestCleanSynthesizedShape:
 
         assert _catalog_problems(_Catalog()) == []
         assert _source_problems(api_src) == []
+
+    def test_m10_ctx_f07_checker_requires_exact_six_table_bootstrap_boundary(self) -> None:
+        checker = _load_checker()
+        assert {
+            "person",
+            "membership",
+            "account",
+            "renter",
+            "tenancy_party",
+            "tenancy",
+        } == checker.READABLE_TABLES
 
 
 class TestCatalogMutations:
@@ -473,6 +524,34 @@ class TestCatalogMutations:
         problems = _catalog_problems(catalog)
         assert problems
 
+    @pytest.mark.parametrize(
+        ("policy_name", "unguarded_using", "unguarded_check"),
+        [
+            ("account_isolation", ACCOUNT_ONLY_SCOPE, ACCOUNT_ONLY_SCOPE),
+            ("membership_isolation", MEMBERSHIP_ONLY_SCOPE, MEMBERSHIP_ONLY_SCOPE),
+            ("person_isolation", PERSON_ONLY_SCOPE, None),
+        ],
+        ids=["account", "membership", "person"],
+    )
+    def test_removing_no_renter_context_guard_is_red(
+        self,
+        policy_name: str,
+        unguarded_using: str,
+        unguarded_check: str | None,
+    ) -> None:
+        baseline = _catalog_problems(_Catalog())
+        rows = [list(row) for row in _Catalog().policies]
+        policy = next(index for index, row in enumerate(rows) if row[1] == policy_name)
+        rows[policy][5] = unguarded_using
+        rows[policy][6] = unguarded_check
+        policies = tuple(
+            cast(tuple[str, str, str, str, str, str | None, str | None], tuple(row)) for row in rows
+        )
+        catalog = replace(_Catalog(), policies=policies)
+
+        problems = _catalog_problems(catalog)
+        assert len(problems) > len(baseline)
+
     def test_catalog_queries_role_inheritance_and_complete_policy_shape(self) -> None:
         checker = _load_checker()
         connection = _Connection(_Catalog())
@@ -563,16 +642,16 @@ class TestSourceMutations:
         assert "account_scoped_session" in report
         assert "bypass.py" in report
 
-    def test_me_must_pass_auth_person_id(self, tmp_path: Path) -> None:
+    def test_bootstrap_dependency_must_pass_auth_person_id(self, tmp_path: Path) -> None:
         api_src = tmp_path / "apps" / "api" / "src"
         _write_clean_api(api_src)
-        me = api_src / "lokara_api" / "routers" / "me.py"
-        me.write_text(me.read_text().replace("auth.person_id", "'per_constant'"))
+        deps = api_src / "lokara_api" / "deps.py"
+        deps.write_text(deps.read_text().replace("auth.person_id", "'per_constant'"))
 
         problems = _source_problems(api_src)
         report = _joined(problems)
         assert "auth.person_id" in report
-        assert "me.py" in report
+        assert "deps.py" in report
 
     @pytest.mark.parametrize(
         "unsafe_source",

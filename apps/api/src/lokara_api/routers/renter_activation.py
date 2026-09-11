@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..auth import RequireAuth
 from ..authorization import require_owner
-from ..deps import PathAccountSession, activation_account_session
+from ..deps import PathAccountSession, activation_account_session, resolve_bootstrap_subject
 from ..renter_activation_service import (
     ActivationRefusal,
     ActivationTargetNotFoundError,
@@ -28,7 +28,6 @@ from ..schemas import (
     RenterActivationRedeemIn,
     RenterActivationRedeemOut,
 )
-from .me import resolve_bootstrap_subject
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

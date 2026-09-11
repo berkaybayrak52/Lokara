@@ -30,10 +30,12 @@ class BootstrapContext:
 
     person_id: str
     email: str
+    context_kind: str
     account_id: str | None
     account_name: str | None
     account_shape: AccountShape | None
     membership_role: Role | None
+    tenancy_id: str | None
 
 
 def bootstrap_contexts(engine: Engine, person_id: str) -> tuple[BootstrapContext, ...]:
@@ -51,6 +53,7 @@ def bootstrap_contexts(engine: Engine, person_id: str) -> tuple[BootstrapContext
         BootstrapContext(
             person_id=str(row.person_id),
             email=str(row.email),
+            context_kind=str(row.context_kind),
             account_id=str(row.account_id) if row.account_id is not None else None,
             account_name=str(row.account_name) if row.account_name is not None else None,
             account_shape=(
@@ -59,6 +62,7 @@ def bootstrap_contexts(engine: Engine, person_id: str) -> tuple[BootstrapContext
             membership_role=(
                 Role(str(row.membership_role)) if row.membership_role is not None else None
             ),
+            tenancy_id=str(row.tenancy_id) if row.tenancy_id is not None else None,
         )
         for row in rows
     )
@@ -76,5 +80,36 @@ def account_scoped_session(engine: Engine, account_id: str) -> Iterator[Session]
         session.execute(
             text("SELECT set_config('app.account_id', :account_id, true)"),
             {"account_id": account_id},
+        )
+        yield session
+
+
+@contextmanager
+def renter_scoped_session(engine: Engine, person_id: str, tenancy_id: str) -> Iterator[Session]:
+    """One transaction scoped to a Person's exact renter tenancy witness.
+
+    The account id is deliberately not accepted from the caller.  The sole
+    bounded bootstrap function proves the relationship and derives it before
+    either transaction-local RLS setting is installed.
+    """
+    statement = text(
+        "SELECT account_id FROM public.app_bootstrap_contexts(CAST(:person_id AS text)) "
+        "WHERE context_kind = 'RENTER_TENANCY' AND tenancy_id = :tenancy_id"
+    )
+    with Session(engine) as session, session.begin():
+        account_ids = session.scalars(
+            statement,
+            {"person_id": person_id, "tenancy_id": tenancy_id},
+        ).all()
+        if len(account_ids) != 1 or account_ids[0] is None:
+            raise LookupError("renter tenancy context not found")
+
+        session.execute(
+            text("SELECT set_config('app.account_id', :account_id, true)"),
+            {"account_id": str(account_ids[0])},
+        )
+        session.execute(
+            text("SELECT set_config('app.tenancy_id', :tenancy_id, true)"),
+            {"tenancy_id": tenancy_id},
         )
         yield session

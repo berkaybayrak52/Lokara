@@ -186,7 +186,29 @@ update is one backed by matching immutable activation-redemption evidence in the
 Renter, tenancy and Person context. Application permissions are not the boundary; an owner-role
 connection cannot seed or repair a non-null link around the evidence rule.
 
-### M10 renter context — binding design, not yet implemented
+### M10-R2 renter context — implemented and verified
+
+Migration `0042` follows the merged `0041` activation revision. It replaces the body and return
+shape of the sole `app_bootstrap_contexts(text)` function; it does not add a second
+`SECURITY DEFINER` function. Its dedicated `lokara_bootstrap` owner may `SELECT` exactly six
+tables: `person`, `membership`, `account`, `renter`, `tenancy_party` and `tenancy`. Each returned
+row has an explicit `context_kind`: `SUBJECT` proves a known Person with no live context,
+`MEMBERSHIP` carries the existing account context fields, and `RENTER_TENANCY` carries the exact
+`tenancy_id` witness plus the internally consumed `account_id`. Membership rows have no tenancy
+id; renter rows have no account name, account shape or membership role. Unknown Persons still
+produce no row. These typed rows prevent nullable membership fields from being mistaken for a
+renter authorization witness. This is fixture `M10-CTX-F07`.
+
+The implementation satisfies `M10-CTX-F01…F08`. All `116` focused DB/API/checker tests pass; RLS
+covers `76` tables, FK isolation covers `152` edges and the pre-context checker is clean. The
+mandatory boundary audit is clean with rollback-only probes, and the full gate passes `2021`
+Python and `210` web tests. No `.lokara-red` sentinel remains. M10-R3 and migration `0043` remain
+pending.
+
+`GET /me` preserves its existing `accounts` items byte-for-byte in meaning and adds
+`renterContexts`. Each renter item contains exactly `tenancyId`; it never exposes `accountId`, a
+Person/Renter id, rent, parties or owner facts. A Person with both a live Membership and a renter
+witness receives both lists (`M10-CTX-F01`).
 
 The renter URL is `/renter/{tenancyId}/...`. The client never supplies or receives the landlord's
 account id as its authority. For every request, the API first proves that the authenticated
@@ -195,11 +217,27 @@ URL. Only then does it derive the account internally and set both transaction-lo
 `app.account_id` for account partitioning and `app.tenancy_id` for the narrower renter boundary.
 Neither value is taken from a token claim or trusted request body.
 
+The R2 overview route is `GET /renter/{tenancy_id}`. Its successful response contains exactly
+`tenancyId`, `validFrom`, `validTo`, `unitLabel`, `buildingName`, `street`, `postalCode` and `city`
+(`M10-CTX-F02`). It contains no account, unit, building, renter or Person id; no rent, payment,
+cost, party, meter, owner finding, tax or raw-evidence field. Same-account other tenancies are
+refused by the application witness and, independently, remain unreadable through a rollback-only
+query with the endpoint filter removed (`M10-CTX-F03`). Cross-account and unlinked callers are
+also refused (`M10-CTX-F04`).
+
 Application authorization and Postgres RLS must each enforce the same relationship. Removing the
 application check in a rolled-back test must still leave a renter unable to read another tenancy in
 the same account. Owner/staff/tax routes continue to use only their existing account-scoped helper;
 `PathAccountSession` is not widened. A person who has both membership and renter contexts sees both
 from `/me`, but each destination re-authorizes its own URL independently.
+
+The renter session helper receives only the verified Person id and URL tenancy id. It resolves the
+Person → Renter → TenancyParty → exact Tenancy witness through the bounded bootstrap result,
+derives the account id internally, and then sets transaction-local `app.account_id` and
+`app.tenancy_id`. Existing account-scoped policies must include a no-renter-context guard: when
+`app.tenancy_id` is set, no account policy may grant access merely because `app.account_id` also
+matches. `PathAccountSession` and every owner route keep their existing account-only behavior
+(`M10-CTX-F08`).
 
 The renter database surface is an allowlist. M10 may add renter `FOR SELECT` policies only for the
 rows below; every other account table remains invisible. API responses project only the fields
@@ -212,6 +250,13 @@ needed for the stated screen even where a row is RLS-visible.
 | `building` | Exactly the building referenced by that unit; the API may project only its display name and postal address. | Other buildings and owner-only building facts or findings. |
 | `renter_portal_publication` | Every append-only publication row for the context tenancy, including preserved superseded versions. | Drafts, source artifacts not explicitly published and every other tenancy. |
 | `person`, `renter`, `tenancy_party` | No direct renter-context rows; the bounded bootstrap witness already proved the relationship. | Co-renter identity and relationship enumeration. |
+
+For R2, the positive database read allowlist is exactly `tenancy`, its referenced `unit`, and that
+unit's `building` (`M10-CTX-F05`). `renter_portal_publication` joins the allowlist only when its
+schema lands in R3. All current other tables remain invisible. Every insert, update and delete is
+refused in a renter context, including writes to those three readable tables
+(`M10-CTX-F06`). The adversarial fixtures open explicit transactions and roll them back; they never
+commit probe evidence or disable an append-only trigger.
 
 Raw source, calculation and evidence rows are not renter-visible. In particular,
 `statement_document_archive`, `renter_delivery_artifact`, `statement`, `uvi_run`,
@@ -232,7 +277,7 @@ owner-side `uvi_delivery_event(status = 'PUBLISHED')` in the same transaction, b
 renter-readable. UVI publication remains blocked until M9 has produced the immutable PDF artifact
 with an empty production-blocker snapshot.
 
-R1/R3 must implement the publication record's composite foreign keys, forced RLS, `WITH CHECK`
+R3 must implement the publication record's composite foreign keys, forced RLS, `WITH CHECK`
 policy and refused cross-account write proof before any portal document route is enabled. Stored
 bytes must reproduce the source digest; retrieval verifies the publication digest and never follows
 the source row at request time.
@@ -1230,7 +1275,7 @@ with M7-F's read-only reviews still open.
 | W1–W8 guards, reminders, email delivery and checklists | **Technically closed 29.08.2026 on `development`** with migration `0025`, account-scoped jobs/API and `/waechter`; delivery defaults off and real execution remains blocked | M9 / `docs/12` |
 | U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**, including later GAS/warm-water extensions; M9 scheduling on `development` refuses UVI delivery because immutable PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
 | Renter portal publication | **Specified by M10-R0; not implemented** | M10-R3/R4 |
-| Renter activation-code redemption, renter context and portal isolation | **Specified by M10-R0; not implemented** | M10-R1/R2 |
+| Renter activation-code redemption, renter context and overview isolation | **Technically complete and verified through M10-R2**; renter document publication and screens remain pending | M10-R1/R2 |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Pure engine, rules, schema, web and the server-generated artifact/API adapter are locally merged and green; runtime output stays blocked while its register values remain `verify-before-production` | M7 / `docs/11-tax-export.md` |
 | Page 06 clause selection, risk and workflow-routing contract | Complete transcription approved and merged 21.08.2026; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |

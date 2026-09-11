@@ -11,6 +11,7 @@ from pathlib import Path
 API_SRC = Path(__file__).resolve().parent.parent / "src" / "lokara_api"
 
 BOOTSTRAP_HELPER = "bootstrap_contexts"
+RENTER_HELPER = "renter_scoped_session"
 UNMEMBERED_HELPER = "unmembered_account_session"
 RETIRED_HELPERS = ("raw_account_scoped_session", "AccountSession")
 
@@ -32,7 +33,13 @@ def _callers(symbol: str) -> set[str]:
 
 class TestPreContextCallSites:
     def test_bootstrap_read_has_exactly_one_call_site(self) -> None:
-        assert _callers(BOOTSTRAP_HELPER) == {"apps/api/src/lokara_api/routers/me.py"}
+        # M10-CTX-F07: deps owns the one DB-function consumer; /me, activation and
+        # renter authorization consume its bounded wrapper.
+        assert _callers(BOOTSTRAP_HELPER) == {"apps/api/src/lokara_api/deps.py"}
+
+    def test_renter_session_helper_is_confined_to_the_dependency_boundary(self) -> None:
+        # M10-CTX-F08: routers never open tenancy/account context themselves.
+        assert _callers(RENTER_HELPER) == {"apps/api/src/lokara_api/deps.py"}
 
     def test_unmembered_account_session_is_confined_to_demo_router(self) -> None:
         """Only fixed-account demo bootstrap writes may omit the Membership gate."""

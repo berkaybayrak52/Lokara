@@ -377,23 +377,33 @@ switcher; no account is stored in the token or client session. M5 account switch
 `development`, but remain unverified and production-blocked. `docs/02-data-model.md` owns the
 detailed function, role, policy, privilege and call-site contract.
 
-## Specified M10 renter entry — not implemented
+## M10-R2 renter entry — implemented and verified
 
-M10-R0 fixes the future renter boundary; `docs/02-data-model.md` owns the full data and refusal
-contract. There is still no renter route, activation endpoint, renter RLS context or portal UI.
+M10-R0 fixes the renter boundary; `docs/02-data-model.md` owns the full data and refusal contract.
+M10-R1 activation is shipped. Migration `0042`, the R2 overview route and the renter RLS context
+are implemented and verified on `slice/m10-r2-renter-context`; the M10-R3 publication boundary and
+M10-R4 portal UI remain pending. All `116` focused DB/API/checker tests pass; RLS covers `76`
+tables, FK isolation covers `152` edges and the pre-context checker is clean. The mandatory
+boundary audit is clean with rollback-only probes, and the full gate passes `2021` Python and `210`
+web tests. No `.lokara-red` sentinel remains; migration `0043` remains pending.
 
-- `/me` will keep membership contexts and add only renter/tenancy witnesses returned by the same
-  bounded `app_bootstrap_contexts(text)` function. A second pre-context identity read is forbidden.
+- `/me` keeps its existing `accounts` list unchanged and adds `renterContexts`; each item contains
+  only `tenancyId`. A dual-role Person receives both. The same bounded
+  `app_bootstrap_contexts(text)` function returns explicitly typed `SUBJECT`, `MEMBERSHIP` and
+  `RENTER_TENANCY` rows. A second pre-context identity read is forbidden.
 - Renter pages live under `/renter/{tenancyId}/...`, never `/a/{accountId}`. The API proves the
   authenticated Person → Renter → TenancyParty → exact URL tenancy chain before deriving the
   account internally and setting transaction-local `app.account_id` plus `app.tenancy_id`.
 - The owner/staff/tax session helper and every `/a/{accountId}` route remain unchanged. The context
   switcher lists renter destinations only when the authenticated Person has them; a link itself
   grants no access.
-- The portal exposes only an own-tenancy overview and append-only published document entries.
-  Overview projection is limited to the tenancy period, unit label and building display
-  name/postal address. It exposes no Person/Renter party list, rent/payment, cost, meter, bank,
-  guard, owner finding or tax record.
+- `GET /renter/{tenancyId}` is the R2 overview endpoint. It returns exactly `tenancyId`,
+  `validFrom`, `validTo`, `unitLabel`, `buildingName`, `street`, `postalCode` and `city`. It exposes
+  no account/unit/building/Person/Renter id, party list, rent/payment, cost, meter, bank, guard,
+  owner finding, tax or raw-evidence field.
+- The database read allowlist in R2 is exactly the context tenancy, its unit and its building.
+  All renter-context writes are refused. Same-account other-tenancy denial is proved at the API
+  and by a rollback-only RLS probe with the application query filter removed.
 - Publication copies already archived bytes, hash, MIME type and filename into one append-only
   tenancy-scoped portal record. Statement sources are `TENANT` cover-letter or tenant-statement
   archives; UVI sources must be blocker-free frozen artifacts. A download reads and verifies only
@@ -623,9 +633,10 @@ production-blocking.
 
 ## Future architecture
 
-- M10 renter activation, `/renter/{tenancyId}`, renter-portal isolation and account-safe portal
-  access are **Specified by M10-R0 but not implemented**. Adviser profile, account mapping and tax functions exist, while deferred
-  M7-F repairs on `development` remain unverified and production-blocked.
+- M10 renter activation, `/renter/{tenancyId}` and renter-context isolation are implemented and
+  verified through M10-R2. Renter document publication and portal screens remain pending in
+  M10-R3/R4. Adviser profile, account mapping and tax functions exist, while deferred M7-F repairs
+  on `development` remain unverified and production-blocked.
 - `apps/mobile` is **Future** at M11: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.

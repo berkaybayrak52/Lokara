@@ -11,6 +11,13 @@ before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
+- **M10-R2 technically complete and verified (`slice/m10-r2-renter-context`).** Migration `0042`,
+  renter-scoped sessions and the exact renter RLS boundary are green. The API adds minimal
+  `/me.renterContexts`, `GET /renter/{tenancy_id}` and shared bootstrap dependency wiring. All `116`
+  focused DB/API/checker tests pass; RLS covers `76` tables, FK isolation covers `152` edges and the
+  pre-context checker is clean. The mandatory boundary audit is clean with rollback-only probes,
+  and the full gate passes `2021` Python and `210` web tests. No `.lokara-red` sentinel remains.
+  M10-R3 and later work remain pending.
 - **Owner UVI UI technically complete locally (`slice/uvi-owner-ui`, 11.09.2026).**
   Owner-only `/uvi` exposes live object/unit/tenancy/month selection, generation/reopen, scoped
   PDF access, visible production conflicts and preview write protection under `docs/04`.
@@ -335,7 +342,7 @@ not replace the complete documentation or reconciliation gates.
 | M8    | **Lane A unblocked; lane B source-blocked**                                                                                                            | Document and letter engine                           | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | UI    | **UI-00 through UI-06 and UI-08 are implemented on `development`; UI-07's non-blocked demo core is implemented but partial; later full/demo and focused reviews provide partial verification; live-browser acceptance remains open** | Portfolio UI 00–08                                   | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 from the supplied UX specifications. UI-07 was pulled forward by Emir for the demo. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | M9    | **Technically complete and review-clean on `development`; not production-approved**                                                              | Reminders, email and checklists                      | W1–W8, migration `0025`, account-scoped jobs/API, default-off delivery and `/waechter` are implemented. `scripts/gate.sh demo` is green with `1916` Python and `183` web tests; RLS/FK checks cover `73` tables and `144` account-scoped foreign keys. Boundary and statement reviews are clean, the ordinary statement fingerprint is unchanged at `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes, and no `.lokara-red` remains. Provider/scheduler, frozen UVI artifact, checklist catalogue, UVI-register/monthly-content/cadence and all recorded legal/runtime blockers remain production-blocking.                                                                                                                                                                                                                                                                                                                                                    |
-| M10   | **R0 authorization design reviewed locally; full gate green**                                                                                          | Portals and investment                               | Two independent lanes, R before I: renter activation, renter context and the renter portal, then the approved `docs/14` investment cockpit. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| M10   | **R0–R2 technically complete and verified; R3/R4 and Lane I pending**                                                                                   | Portals and investment                               | Renter activation, renter context and the minimal overview API are implemented through migration `0042`; publication, portal screens and the approved `docs/14` investment cockpit remain pending. Tax-adviser guest access is already shipped and tickets have no approved source; the four M10 decisions were accepted on 25.08.2026 and are recorded in § 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | M11   | After M10                                                                                                                                              | Native apps, billing and load test                   | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | M7-F  | **After M10; integrated repair candidate remains required before programme/production closure**                                                        | Finish tax/AfA review and repair                     | Revalidate the boundary repairs, complete statement/docs review, rerun focused and closing verification, and preserve every legal/runtime production blocker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
@@ -1809,25 +1816,35 @@ and `check_fk_isolation` are green with their new counts recorded.
 
 ##### M10-R2 — renter context and the `/renter/{tenancyId}` API
 
-**Agent:** `app-implementer`, with the `0025`/bootstrap parts from `engine-implementer`.
+**Status:** technically complete and verified on `slice/m10-r2-renter-context`. Migration `0042`,
+the renter-scoped session helper and the API satisfy `M10-CTX-F01…F08`: the single-function
+bootstrap extension, minimal `/me` and overview projections, exact renter RLS allowlist, zero
+writes, adversarial same-account denial and owner non-regression. All `116` focused
+DB/API/checker tests pass; RLS covers `76` tables, FK isolation covers `152` edges and the
+pre-context checker is clean. The mandatory boundary audit is clean with rollback-only probes,
+and the full gate passes `2021` Python and `210` web tests. No `.lokara-red` sentinel remains.
+M10-R3 and migration `0043` remain pending.
 
-- Implement the D1 pre-context extension and the D2 renter session helper alongside
+**Agent:** `spec-scribe` (RED fixtures), then `engine-implementer` for migration `0042` and the DB
+session helper, then `app-implementer` for the API boundary.
+
+- The D1 pre-context extension and D2 renter session helper run alongside
   `account_scoped_session` in `packages/db/src/lokara_db/session.py` and the dependencies in
   `apps/api/src/lokara_api/deps.py`. `PathAccountSession` stays untouched for owner routes.
 - `GET /me` returns renter contexts as well as membership contexts.
-- Add the renter router next to `apps/api/src/lokara_api/routers/portal.py`. Every route verifies
+- The renter router lives next to `apps/api/src/lokara_api/routers/portal.py`. Every route verifies
   the tenancy named in the URL against the authenticated Person's renter link, then scopes RLS.
-- Renter routes expose the renter's own tenancy data and published documents only. No owner route,
-  no cross-tenancy read, no building-wide view, no other party's figures.
+- R2 exposes only the renter's own tenancy overview. Published documents join this boundary in R3.
+  No owner route, cross-tenancy read, building-wide view or other party's figures are exposed.
 
-**Done when:** a renter session reads its own tenancy and is refused every other tenancy in the same
+**Verified:** a renter session reads its own tenancy and is refused every other tenancy in the same
 account with the app check disabled in a rolled-back probe; no owner route changed behaviour; and
 `scripts/check_pre_context_reads.py` is green against its deliberately updated boundary.
 
 ##### M10-R3 — publication of renter documents
 
 **Agent:** `spec-scribe` (RED fixtures), then `engine-implementer` for
-`0042_m10_renter_portal_publication.py`, then `app-implementer`.
+`0043_m10_renter_portal_publication.py`, then `app-implementer`.
 
 - Publication is an append-only owner action over artifacts that already exist: the M6-B tenant
   archives in `statement_document_archive` (which already carries `audience` and `tenancy_id`) and

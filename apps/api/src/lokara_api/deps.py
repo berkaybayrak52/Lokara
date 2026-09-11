@@ -19,12 +19,15 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from lokara_db import (
+    BootstrapContext,
     BuildingAssignment,
     DbSettings,
     Membership,
     Role,
     account_scoped_session,
+    bootstrap_contexts,
     create_db_engine,
+    renter_scoped_session,
 )
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
@@ -36,6 +39,11 @@ from .auth import AuthContext, require_auth
 def _engine() -> Engine:
     # DATABASE_URL = the non-owner lokara_app role — RLS binds (never DIRECT_URL).
     return create_db_engine(DbSettings().database_url)
+
+
+def resolve_bootstrap_subject(auth: AuthContext) -> tuple[BootstrapContext, ...]:
+    """Use the sole bounded pre-account identity read for one verified subject."""
+    return bootstrap_contexts(_engine(), auth.person_id)
 
 
 def unmembered_account_session(account_id: str) -> AbstractContextManager[Session]:
@@ -130,6 +138,28 @@ def account_session_for_path(
 
 
 PathAccountSession = Annotated[Session, Depends(account_session_for_path)]
+
+
+def renter_session_for_path(
+    tenancy_id: str,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+) -> Iterator[Session]:
+    """Authorize and open the exact renter tenancy carried by the URL."""
+    contexts = resolve_bootstrap_subject(auth)
+    if not any(
+        context.context_kind == "RENTER_TENANCY" and context.tenancy_id == tenancy_id
+        for context in contexts
+    ):
+        raise HTTPException(status_code=404, detail="Mietverhältnis nicht gefunden.")
+
+    try:
+        with renter_scoped_session(_engine(), auth.person_id, tenancy_id) as session:
+            yield session
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Mietverhältnis nicht gefunden.") from exc
+
+
+PathRenterSession = Annotated[Session, Depends(renter_session_for_path)]
 
 
 def tax_account_session_for_path(

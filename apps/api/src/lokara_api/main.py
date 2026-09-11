@@ -19,6 +19,7 @@ from .routers import (
     meters,
     payments,
     portal,
+    renter,
     renter_activation,
     statement_drafts,
     statements,
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(me.router)
     app.include_router(demo.router)
     app.include_router(portal.router)
+    app.include_router(renter.router)
     app.include_router(renter_activation.router)
     app.include_router(advances.router)
     app.include_router(finalized_statements.router)

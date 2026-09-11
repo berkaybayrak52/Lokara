@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Verify that Lokara has exactly one bounded pre-account-context read.
 
-Login must resolve a verified JWT subject before an account can be placed in the
-URL.  That exceptional read is deliberately narrow: one SECURITY DEFINER
-function, one inert owner role, three identity tables, and one API caller.
+Login must resolve a verified JWT subject before an account or renter tenancy
+can be placed in the URL.  That exceptional read is deliberately narrow: one
+SECURITY DEFINER function, one inert owner role, six identity/context tables,
+and one API caller.
 
 Exit 0 means the database and source boundaries are clean.  Exit 1 means an
 invariant is broken.  Exit 2 means the live database could not be inspected.
@@ -26,10 +27,13 @@ API_SRC = REPO / "apps/api/src"
 BOOTSTRAP_FUNCTION = "app_bootstrap_contexts"
 BOOTSTRAP_ROLE = "lokara_bootstrap"
 APP_ROLE = "lokara_app"
-READABLE_TABLES = frozenset({"person", "membership", "account"})
-ACCOUNT_SCOPE = "((id)::text = current_setting('app.account_id'::text, true))"
-MEMBERSHIP_SCOPE = "((account_id)::text = current_setting('app.account_id'::text, true))"
-PERSON_SCOPE = (
+READABLE_TABLES = frozenset(
+    {"person", "membership", "account", "renter", "tenancy_party", "tenancy"}
+)
+NO_RENTER_CONTEXT = "(NULLIF(current_setting('app.tenancy_id'::text, true), ''::text) IS NULL)"
+ACCOUNT_ONLY_SCOPE = "((id)::text = current_setting('app.account_id'::text, true))"
+MEMBERSHIP_ONLY_SCOPE = "((account_id)::text = current_setting('app.account_id'::text, true))"
+PERSON_ONLY_SCOPE = (
     "((EXISTS ( SELECT 1\n"
     "   FROM membership m\n"
     "  WHERE (((m.person_id)::text = (person.id)::text) AND "
@@ -39,6 +43,9 @@ PERSON_SCOPE = (
     "  WHERE (((r.person_id)::text = (person.id)::text) AND "
     "((r.account_id)::text = current_setting('app.account_id'::text, true))))))"
 )
+ACCOUNT_SCOPE = f"({ACCOUNT_ONLY_SCOPE} AND {NO_RENTER_CONTEXT})"
+MEMBERSHIP_SCOPE = f"({MEMBERSHIP_ONLY_SCOPE} AND {NO_RENTER_CONTEXT})"
+PERSON_SCOPE = f"({PERSON_ONLY_SCOPE} AND {NO_RENTER_CONTEXT})"
 EXPECTED_IDENTITY_POLICIES = {
     (
         "account",
@@ -94,17 +101,46 @@ EXPECTED_IDENTITY_POLICIES = {
         PERSON_SCOPE,
         None,
     ),
+    (
+        "renter",
+        "renter_bootstrap_select",
+        "PERMISSIVE",
+        "SELECT",
+        "{lokara_bootstrap}",
+        "true",
+        None,
+    ),
+    (
+        "tenancy_party",
+        "tenancy_party_bootstrap_select",
+        "PERMISSIVE",
+        "SELECT",
+        "{lokara_bootstrap}",
+        "true",
+        None,
+    ),
+    (
+        "tenancy",
+        "tenancy_bootstrap_select",
+        "PERMISSIVE",
+        "SELECT",
+        "{lokara_bootstrap}",
+        "true",
+        None,
+    ),
 }
 
 EXPECTED_CALLERS = {
-    "bootstrap_contexts": "lokara_api/routers/me.py",
+    "bootstrap_contexts": "lokara_api/deps.py",
     "unmembered_account_session": "lokara_api/routers/demo.py",
 }
 BOOTSTRAP_WRAPPER = "resolve_bootstrap_subject"
 EXPECTED_BOOTSTRAP_WRAPPER_CALLERS = frozenset(
     {
+        "lokara_api/deps.py",
         "lokara_api/routers/me.py",
         "lokara_api/routers/renter_activation.py",
+        "lokara_api/routers/renter.py",
     }
 )
 RETIRED_HELPERS = ("raw_account_scoped_session", "AccountSession")
@@ -204,7 +240,17 @@ Q_POLICIES = text(
     SELECT tablename, policyname, permissive, cmd, roles::text, qual, with_check
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename IN ('person', 'membership', 'account')
+      AND (
+          tablename IN ('person', 'membership', 'account')
+          OR (
+              tablename IN ('renter', 'tenancy_party', 'tenancy')
+              AND policyname IN (
+                  'renter_bootstrap_select',
+                  'tenancy_party_bootstrap_select',
+                  'tenancy_bootstrap_select'
+              )
+          )
+      )
     ORDER BY tablename, policyname
     """
 )
@@ -214,7 +260,7 @@ Q_UNCONDITIONAL_PUBLIC_POLICIES = text(
     SELECT tablename, policyname
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename IN ('person', 'membership', 'account')
+      AND tablename IN ('person', 'membership', 'account', 'renter', 'tenancy_party', 'tenancy')
       AND permissive = 'PERMISSIVE'
       AND cmd IN ('SELECT', 'ALL')
       AND 'public' = ANY(roles)
@@ -353,7 +399,7 @@ def _db_invariants(conn: Connection) -> list[str]:
     }
     if identity_policies != EXPECTED_IDENTITY_POLICIES:
         problems.append(
-            "identity policy catalog differs from the six approved policies; "
+            "identity/context policy catalog differs from the nine approved policies; "
             f"found {sorted(identity_policies, key=str)}"
         )
     for table_name, policy_name in conn.execute(Q_UNCONDITIONAL_PUBLIC_POLICIES).all():
@@ -536,7 +582,7 @@ def main() -> int:
 
     print(
         "pre-context reads: clean — one bounded SECURITY DEFINER function, "
-        "one bootstrap caller, one demo-only unmembered helper"
+        "one bootstrap caller, bounded renter consumers, one demo-only unmembered helper"
     )
     return 0
 

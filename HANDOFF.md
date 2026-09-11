@@ -1,29 +1,36 @@
-# Lokara handoff — M10-R1 technically complete
+# Lokara handoff — M10-R2 technically complete
 
-## Current slice — 11.09.2026
+## M10-R2 closure — 11.09.2026
 
-M10-R1 is technically complete and locally merged into `main` as `cbecfa7`. It is not pushed.
+M10-R2 is technically complete on `slice/m10-r2-renter-context`, created from local `main` at
+`58f96b5`. The slice is ready for its authorized local commit and merge. Nothing was pushed.
 
-- Migration `0041` and the ORM define account-scoped activation codes, immutable redemption
-  evidence and immutable attributable-refusal evidence. Direct non-null `renter.person_id` INSERTs
-  and writes without matching redemption evidence are blocked for runtime and owner roles.
-- Owner-only issuance stores only the SHA-256 digest. Redemption uses the non-secret account
-  locator only to open an RLS-scoped session, links exactly the authenticated Person and appends one
-  spend under concurrency.
-- All refusal cases, including missing/null/non-string request shapes, use the same timed HTTP 400
-  `M10-COPY-03` response. Safely attributable refusals append `renter_activation_attempt`; malformed
-  or nonexistent locators remain structured operational logs without raw values.
-- `resolve_bootstrap_subject` consumers are checked exactly to `me.py` and
-  `renter_activation.py`. `.lokara-red` is removed.
-- Focused verification: DB/RLS `116 passed`; activation API/M5 guard `39 passed`; pre-context
-  `48 passed`; schema inventory `26 passed`.
-- Boundary re-audit is clean. RLS covers `76` tenant tables and FK isolation covers `152`
-  account-scoped edges; the live pre-context checker is clean.
-- Closing `scripts/gate.sh full` is green: `2003` Python tests and `210` web tests; Ruff,
-  formatting, strict mypy, purity, parity, ESLint and TypeScript pass.
-- Preserve the five untracked `adjustment/` reference files; they remain untouched.
+- The named red window is closed; `.lokara-red` is absent.
+- The spec lane pinned `M10-CTX-F01…F08`, migration `0042`, the minimal `/me.renterContexts`
+  shape and `GET /renter/{tenancy_id}` overview. R3 publication moves to migration `0043`.
+- Migration `0042`, `renter_scoped_session` and DB exports are implemented. The sole bootstrap
+  function now returns typed SUBJECT/MEMBERSHIP/RENTER_TENANCY rows with exact six-table privilege.
+  Every permissive PUBLIC account policy stops at renter context; SELECT is allowlisted only to the
+  exact tenancy, its unit and building, and renter-context writes are refused.
+- Database verification is green: `134 passed`; RLS covers `76` tables; FK isolation covers `152`
+  edges. A real `0042 → 0041 → 0042` cycle passed. Fast gate is green under the sentinel.
+- `scripts/check_pre_context_reads.py` is updated for the six-table/nine-policy boundary. Its `45`
+  mutation tests pass, and the live checker is now clean.
+- The API half is implemented in `apps/api/src/**`: shared bootstrap resolution in `deps.py`,
+  `PathRenterSession`, minimal `/me.renterContexts`, exact `GET /renter/{tenancy_id}` overview,
+  schemas and router wiring. Renter activation uses the moved shared resolver.
+- Main-session focused verification passes `116` DB/API/checker tests. RLS covers `76` tables, FK
+  isolation covers `152` edges, and the pre-context checker is clean. The mandatory boundary audit
+  found no confirmed or suspected issue; its adversarial database probes were rollback-only.
+- `scripts/gate.sh full` passes with `2021` Python tests and `210` web tests. Ruff, formatting,
+  strict mypy, purity, parity, pre-context, ESLint and TypeScript checks are green. The first closing
+  run exposed one strict-mypy fixture defect; the spec lane repaired and formatted it, and its `45`
+  focused checker tests pass.
+- Preserve all five untracked `adjustment/` files; they are unrelated.
 
-M10-R2 is next in `PLAN.md`. Do not start it or push without Emir's authorization.
+No implementation or review work remains in R2. Commit and locally merge the verified slice under
+the standing authorization, preserving the five unrelated `adjustment/` files. Never push without
+separate approval. M10-R3 publication is the next planned slice.
 
 ## Earlier verified checkpoint
 

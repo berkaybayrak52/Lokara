@@ -7,18 +7,12 @@ laden" in that case), so this returns an empty list instead of 403.
 """
 
 from fastapi import APIRouter, HTTPException
-from lokara_db import BootstrapContext, bootstrap_contexts
 
-from ..auth import AuthContext, RequireAuth
-from ..deps import _engine
-from ..schemas import MeAccount, MeResponse
+from ..auth import RequireAuth
+from ..deps import resolve_bootstrap_subject
+from ..schemas import MeAccount, MeRenterContext, MeResponse
 
 router = APIRouter()
-
-
-def resolve_bootstrap_subject(auth: AuthContext) -> tuple[BootstrapContext, ...]:
-    """Use the sole bounded pre-account identity read for one verified subject."""
-    return bootstrap_contexts(_engine(), auth.person_id)
 
 
 @router.get("/me")
@@ -28,7 +22,17 @@ def me(auth: RequireAuth) -> MeResponse:
         raise HTTPException(status_code=401, detail="Authenticated subject has no Person")
 
     accounts: list[MeAccount] = []
+    renter_contexts: list[MeRenterContext] = []
     for row in rows:
+        if row.context_kind == "RENTER_TENANCY":
+            if row.tenancy_id is None:
+                raise HTTPException(status_code=500, detail="Invalid bootstrap renter context")
+            renter_contexts.append(MeRenterContext(tenancy_id=row.tenancy_id))
+            continue
+        if row.context_kind == "SUBJECT":
+            continue
+        if row.context_kind != "MEMBERSHIP":
+            raise HTTPException(status_code=500, detail="Invalid bootstrap context kind")
         account_id = row.account_id
         account_name = row.account_name
         account_shape = row.account_shape
@@ -45,4 +49,9 @@ def me(auth: RequireAuth) -> MeResponse:
                 shape=account_shape.value,
             )
         )
-    return MeResponse(person_id=rows[0].person_id, email=rows[0].email, accounts=accounts)
+    return MeResponse(
+        person_id=rows[0].person_id,
+        email=rows[0].email,
+        accounts=accounts,
+        renter_contexts=renter_contexts,
+    )

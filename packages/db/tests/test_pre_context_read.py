@@ -1,8 +1,8 @@
 """Red contract for the sole pre-account-context database read.
 
-The specification is ``docs/02-data-model.md`` → "The bootstrap contexts read".
-The implementation is intentionally absent when this fixture is written: migration 0014
-must add one bounded ``SECURITY DEFINER`` function, ``app_bootstrap_contexts(text)``.
+The specification is ``docs/02-data-model.md`` → "M10-R2 renter context". Migration
+0042 extends the one existing ``app_bootstrap_contexts(text)`` function; it must never
+add a second ``SECURITY DEFINER`` identity read.
 """
 
 import os
@@ -32,7 +32,9 @@ _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent
 APP_ROLE = "lokara_app"
 BOOTSTRAP_ROLE = "lokara_bootstrap"
 BOOTSTRAP_FUNCTION = "app_bootstrap_contexts"
-READABLE_TABLES = frozenset({"person", "membership", "account"})
+READABLE_TABLES = frozenset(
+    {"person", "membership", "account", "renter", "tenancy_party", "tenancy"}
+)
 
 
 def _upgraded_engines() -> tuple[Engine, Engine]:
@@ -139,7 +141,18 @@ def seed(engines: tuple[Engine, Engine]) -> Iterator[_Seed]:
 
 def _contexts(
     app: Engine, person_id: str
-) -> list[tuple[str, str, str | None, str | None, str | None, str | None]]:
+) -> list[
+    tuple[
+        str,
+        str,
+        str,
+        str | None,
+        str | None,
+        str | None,
+        str | None,
+        str | None,
+    ]
+]:
     """Call the function as lokara_app with no app.account_id set."""
     with Session(app) as session:
         rows = session.execute(
@@ -150,10 +163,12 @@ def _contexts(
         (
             str(row.person_id),
             str(row.email),
+            str(row.context_kind),
             row.account_id,
             row.account_name,
             row.account_shape,
             row.membership_role,
+            row.tenancy_id,
         )
         for row in rows
     ]
@@ -225,7 +240,7 @@ class TestBootstrapMechanismShape:
             )
         assert inherited is None
 
-    def test_bootstrap_role_may_select_three_tables_and_nothing_else(
+    def test_bootstrap_role_may_select_six_tables_and_nothing_else(
         self, engines: tuple[Engine, Engine]
     ) -> None:
         owner, _ = engines
@@ -245,7 +260,7 @@ class TestBootstrapMechanismShape:
             (table, "SELECT") for table in READABLE_TABLES
         }
 
-    def test_bootstrap_policies_are_exactly_three_select_policies(
+    def test_bootstrap_policies_are_exactly_six_select_policies(
         self, engines: tuple[Engine, Engine]
     ) -> None:
         owner, _ = engines
@@ -293,18 +308,22 @@ class TestBootstrapReadBehaviour:
             (
                 seed.switcher,
                 f"{seed.switcher}@example.test",
+                "MEMBERSHIP",
                 seed.account_one,
                 "Hausverwaltung Nord",
                 "SOLO",
                 "OWNER",
+                None,
             ),
             (
                 seed.switcher,
                 f"{seed.switcher}@example.test",
+                "MEMBERSHIP",
                 seed.account_two,
                 "Immobilien Süd",
                 "HAUSVERWALTUNG",
                 "EMPLOYEE",
+                None,
             ),
         ]
 
@@ -314,7 +333,16 @@ class TestBootstrapReadBehaviour:
         _, app = engines
         unmembered = _contexts(app, seed.unmembered)
         assert unmembered == [
-            (seed.unmembered, f"{seed.unmembered}@example.test", None, None, None, None)
+            (
+                seed.unmembered,
+                f"{seed.unmembered}@example.test",
+                "SUBJECT",
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         ]
         assert _contexts(app, seed.unknown) == []
 
@@ -323,13 +351,24 @@ class TestBootstrapReadBehaviour:
     ) -> None:
         _, app = engines
         assert _contexts(app, seed.colleague)[0][2:] == (
+            "MEMBERSHIP",
             seed.other_account,
             "Fremdkonto",
             "SOLO",
             "TAX_ADVISOR",
+            None,
         )
         assert _contexts(app, seed.revoked) == [
-            (seed.revoked, f"{seed.revoked}@example.test", None, None, None, None)
+            (
+                seed.revoked,
+                f"{seed.revoked}@example.test",
+                "SUBJECT",
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         ]
 
     def test_call_does_not_open_domain_rows_or_set_account_context(

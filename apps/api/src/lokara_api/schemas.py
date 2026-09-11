@@ -168,11 +168,27 @@ class MeAccount(ApiModel):
     shape: str
 
 
+class MeRenterContext(ApiModel):
+    tenancy_id: str
+
+
 class MeResponse(ApiModel):
     person_id: str
     email: str
     # Empty ⇒ no live membership yet (e.g. before the demo scenario is loaded).
     accounts: list[MeAccount]
+    renter_contexts: list[MeRenterContext]
+
+
+class RenterOverviewResponse(ApiModel):
+    tenancy_id: str
+    valid_from: date
+    valid_to: date | None
+    unit_label: str
+    building_name: str
+    street: str
+    postal_code: str
+    city: str
 
 
 class RenterActivationCodeOut(ApiModel):

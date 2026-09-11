@@ -98,6 +98,7 @@ from .session import (
     account_scoped_session,
     bootstrap_contexts,
     create_db_engine,
+    renter_scoped_session,
 )
 from .settings import DbSettings, sqlalchemy_url
 
@@ -197,5 +198,6 @@ __all__ = [
     "bootstrap_contexts",
     "create_db_engine",
     "new_id",
+    "renter_scoped_session",
     "sqlalchemy_url",
 ]
