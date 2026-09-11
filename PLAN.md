@@ -11,7 +11,7 @@ before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
-- **M10-R2 technically complete and verified (`slice/m10-r2-renter-context`).** Migration `0042`,
+- **M10-R2 technically complete, verified and locally merged (`92e18d5`, 11.09.2026).** Migration `0042`,
   renter-scoped sessions and the exact renter RLS boundary are green. The API adds minimal
   `/me.renterContexts`, `GET /renter/{tenancy_id}` and shared bootstrap dependency wiring. All `116`
   focused DB/API/checker tests pass; RLS covers `76` tables, FK isolation covers `152` edges and the
@@ -1816,7 +1816,7 @@ and `check_fk_isolation` are green with their new counts recorded.
 
 ##### M10-R2 — renter context and the `/renter/{tenancyId}` API
 
-**Status:** technically complete and verified on `slice/m10-r2-renter-context`. Migration `0042`,
+**Status:** technically complete, verified and locally merged as `92e18d5`. Migration `0042`,
 the renter-scoped session helper and the API satisfy `M10-CTX-F01…F08`: the single-function
 bootstrap extension, minimal `/me` and overview projections, exact renter RLS allowlist, zero
 writes, adversarial same-account denial and owner non-regression. All `116` focused

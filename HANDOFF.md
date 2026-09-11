@@ -2,8 +2,8 @@
 
 ## M10-R2 closure — 11.09.2026
 
-M10-R2 is technically complete on `slice/m10-r2-renter-context`, created from local `main` at
-`58f96b5`. The slice is ready for its authorized local commit and merge. Nothing was pushed.
+M10-R2 is technically complete. Source commit `92e18d5` was fast-forwarded into local `main` on
+11.09.2026. Nothing was pushed.
 
 - The named red window is closed; `.lokara-red` is absent.
 - The spec lane pinned `M10-CTX-F01…F08`, migration `0042`, the minimal `/me.renterContexts`
@@ -28,9 +28,8 @@ M10-R2 is technically complete on `slice/m10-r2-renter-context`, created from lo
   focused checker tests pass.
 - Preserve all five untracked `adjustment/` files; they are unrelated.
 
-No implementation or review work remains in R2. Commit and locally merge the verified slice under
-the standing authorization, preserving the five unrelated `adjustment/` files. Never push without
-separate approval. M10-R3 publication is the next planned slice.
+No implementation or review work remains in R2. Preserve the five unrelated `adjustment/` files.
+Never push without separate approval. M10-R3 publication is the next planned slice.
 
 ## Earlier verified checkpoint
 
