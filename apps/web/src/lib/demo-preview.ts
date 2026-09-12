@@ -12,15 +12,17 @@
  *   - im Browser: eine Seite mit `?preview=1` öffnen (bleibt per localStorage
  *     aktiv), mit `?preview=0` wieder ausschalten.
  *
- * Grenzen: Unterstützte Lesewege und Zahlungsentscheidungen bleiben vollständig
- * synthetisch. Die API sperrt nicht unterstützte Schreibaktionen vor jedem
- * Backend-Aufruf; nur unbekannte Lesewege fallen auf das echte Backend zurück.
+ * Grenzen: Unterstützte Lesewege, Zahlungsentscheidungen und Mieteraktivierungen
+ * bleiben vollständig synthetisch. Die API sperrt nicht unterstützte
+ * Schreibaktionen vor jedem Backend-Aufruf; nur unbekannte Lesewege fallen auf
+ * das echte Backend zurück.
  */
 
 import { ALLOCATION_KEY_LABELS, type AllocationKey } from './contracts';
 import { centsToEurDisplay } from './format';
 
 const PREVIEW_KEY = 'lokara:preview';
+export const PREVIEW_NOT_FOUND = Symbol('preview-not-found');
 
 /** True, wenn der Vorschau-Modus aktiv ist. Client-seitig ausgewertet. */
 export function isDemoPreview(): boolean {
@@ -311,6 +313,34 @@ const BERND = { renterId: 'r_bernd', tenancyId: 't_bernd', name: 'Bernd Muster',
 
 // ── Generatoren ────────────────────────────────────────────────────────────
 type Json = Record<string, unknown>;
+
+interface PreviewIssuedActivation {
+  tenancyId: string;
+  renterId: string;
+  expiresAtMs: number;
+}
+
+const ACTIVATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+const previewIssuedActivations = new Map<string, PreviewIssuedActivation>();
+const activatedPreviewTenancies = new Set<string>();
+
+/** Test-only: clears ephemeral activation state between deterministic fixtures. */
+export function resetPreviewActivationStateForTests(): void {
+  previewIssuedActivations.clear();
+  activatedPreviewTenancies.clear();
+}
+
+function activationCodeFromBody(body: BodyInit | null | undefined): string | undefined {
+  if (typeof body !== 'string') return undefined;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    const activationCode = (parsed as Record<string, unknown>).activationCode;
+    return typeof activationCode === 'string' ? activationCode : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function allocation(
   id: string,
@@ -1130,8 +1160,10 @@ function unitDashboard(unitId: string): Json | undefined {
         },
         {
           key: 'PORTAL',
-          available: false,
-          unavailableReason: 'Das Mieterportal wird mit M10 aktiviert.',
+          available: party !== undefined,
+          unavailableReason: party
+            ? null
+            : 'Das Mieterportal ist nur für ein aktuelles Mietverhältnis verfügbar.',
         },
         {
           key: 'MESSAGES',
@@ -1152,6 +1184,27 @@ function unitDashboard(unitId: string): Json | undefined {
         canCreateTenancy: false,
         canRecordContractFacts: false,
       },
+    };
+  }
+  return undefined;
+}
+
+function renterOverview(tenancyId: string): Json | undefined {
+  if (!activatedPreviewTenancies.has(tenancyId)) return undefined;
+  const party = PARTIES.find((item) => item.tenancyId === tenancyId);
+  if (!party) return undefined;
+  for (const building of BUILDINGS) {
+    const unit = building.units.find((item) => item.id === party.unitId);
+    if (!unit) continue;
+    return {
+      tenancyId: party.tenancyId,
+      validFrom: monthISO(party.startOffset, 1),
+      validTo: null,
+      unitLabel: unit.label,
+      buildingName: building.name,
+      street: building.street,
+      postalCode: building.postalCode,
+      city: building.city,
     };
   }
   return undefined;
@@ -1661,6 +1714,18 @@ const HEATING_COSTS: Record<string, Json[]> = {
 export function previewResponse(path: string, init?: RequestInit): unknown {
   const method = (init?.method ?? 'GET').toUpperCase();
   const clean = path.split('?')[0] ?? path;
+  const accountPath = clean.match(/^\/a\/([^/]+)(?:\/|$)/);
+  const recognizedAccountWrite =
+    method === 'POST' &&
+    (/^\/a\/[^/]+\/tenancies\/[^/]+\/renters\/[^/]+\/activation-codes$/.test(clean) ||
+      /^\/a\/[^/]+\/bank-transactions\/[^/]+\/decision$/.test(clean));
+  if (
+    accountPath?.[1] !== undefined &&
+    accountPath[1] !== 'acc_demo_lokara' &&
+    (method === 'GET' || method === 'HEAD' || recognizedAccountWrite)
+  ) {
+    return PREVIEW_NOT_FOUND;
+  }
 
   if (method === 'GET') {
     if (clean === '/me') {
@@ -1670,8 +1735,19 @@ export function previewResponse(path: string, init?: RequestInit): unknown {
         accounts: [
           { id: 'acc_demo_lokara', name: 'Demo Portfolio', role: 'OWNER', shape: 'HAUSVERWALTUNG' },
         ],
+        renterContexts: PARTIES.filter((party) =>
+          activatedPreviewTenancies.has(party.tenancyId),
+        ).map((party) => ({ tenancyId: party.tenancyId })),
       };
     }
+    const renterDocuments = clean.match(/^\/renter\/([^/]+)\/documents$/);
+    if (renterDocuments?.[1]) {
+      return activatedPreviewTenancies.has(renterDocuments[1])
+        ? { documents: [] }
+        : PREVIEW_NOT_FOUND;
+    }
+    const renter = clean.match(/^\/renter\/([^/]+)$/);
+    if (renter?.[1]) return renterOverview(renter[1]) ?? PREVIEW_NOT_FOUND;
     if (/\/a\/[^/]+\/portfolio\/overview$/.test(clean)) return portfolioOverview();
     if (/\/a\/[^/]+\/buildings$/.test(clean)) return buildingList();
     if (/\/a\/[^/]+\/meter-workspace$/.test(clean)) return meterWorkspace();
@@ -1703,6 +1779,49 @@ export function previewResponse(path: string, init?: RequestInit): unknown {
     if (/\/a\/[^/]+\/bank-transactions$/.test(clean)) return { transactions: data().transactions };
     if (/\/a\/[^/]+\/receivables$/.test(clean)) return { receivables: data().receivables };
     if (/\/a\/[^/]+\/payment-ledger$/.test(clean)) return { entries: data().ledger };
+  }
+
+  const activationCode = clean.match(
+    /^\/a\/([^/]+)\/tenancies\/([^/]+)\/renters\/([^/]+)\/activation-codes$/,
+  );
+  if (method === 'POST' && activationCode) {
+    const [, accountId, tenancyId, renterId] = activationCode;
+    const party = PARTIES.find(
+      (item) => item.tenancyId === tenancyId && item.renterId === renterId,
+    );
+    if (accountId !== 'acc_demo_lokara' || !party) return PREVIEW_NOT_FOUND;
+    const issuanceId = globalThis.crypto.randomUUID();
+    const rawCode = `acc_demo_lokara.${globalThis.crypto.randomUUID()}`;
+    const expiresAtMs = Date.now() + ACTIVATION_LIFETIME_MS;
+    previewIssuedActivations.set(rawCode, {
+      tenancyId: party.tenancyId,
+      renterId: party.renterId,
+      expiresAtMs,
+    });
+    return {
+      activationCodeId: `activation_preview_${issuanceId}`,
+      activationCode: rawCode,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+    };
+  }
+
+  const renterActivation = clean.match(/^\/renter\/([^/]+)\/activation$/);
+  if (method === 'POST' && renterActivation?.[1]) {
+    const rawCode = activationCodeFromBody(init?.body);
+    if (!rawCode) return PREVIEW_NOT_FOUND;
+    const issued = previewIssuedActivations.get(rawCode);
+    if (!issued || issued.tenancyId !== renterActivation[1]) return PREVIEW_NOT_FOUND;
+    if (Date.now() >= issued.expiresAtMs) {
+      previewIssuedActivations.delete(rawCode);
+      return PREVIEW_NOT_FOUND;
+    }
+    const party = PARTIES.find(
+      (item) => item.tenancyId === issued.tenancyId && item.renterId === issued.renterId,
+    );
+    if (!party) return PREVIEW_NOT_FOUND;
+    previewIssuedActivations.delete(rawCode);
+    activatedPreviewTenancies.add(party.tenancyId);
+    return { ok: true, tenancyId: party.tenancyId, renterId: party.renterId };
   }
 
   // Entscheidungs-POST: synthetische Erfolgsantwort, damit ein Klick nicht crasht.

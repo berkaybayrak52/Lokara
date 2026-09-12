@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import { isDemoPreview, previewResponse } from './demo-preview';
+import { isDemoPreview, PREVIEW_NOT_FOUND, previewResponse } from './demo-preview';
 
 /**
  * The shared API interceptor (docs/04 "Auth in one api.ts interceptor").
@@ -81,12 +81,19 @@ export async function api<Schema extends z.ZodType>(
   // aus; aktiv nur bei NEXT_PUBLIC_DEMO_PREVIEW=true oder `?preview=1`.
   if (isDemoPreview()) {
     const preview = previewResponse(path, init);
+    if (preview === PREVIEW_NOT_FOUND) {
+      throw new ApiError(404, path);
+    }
     if (preview !== undefined) {
       return schema.parse(preview) as z.infer<Schema>;
     }
     const method = (init?.method ?? 'GET').toUpperCase();
     if (method !== 'GET' && method !== 'HEAD') {
-      throw new ApiError(403, path, 'Diese Aktion ist in der Vorschau nicht verfügbar. Öffnen Sie dafür die Live-Daten.');
+      throw new ApiError(
+        403,
+        path,
+        'Diese Aktion ist in der Vorschau nicht verfügbar. Öffnen Sie dafür die Live-Daten.',
+      );
     }
   }
 

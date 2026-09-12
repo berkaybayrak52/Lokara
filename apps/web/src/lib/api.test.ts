@@ -7,6 +7,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+import { RenterOverviewResponseSchema } from './contracts';
+
 const PingSchema = z.object({ pong: z.boolean() });
 
 type FetchMock = ReturnType<typeof vi.fn<typeof fetch>>;
@@ -132,5 +134,24 @@ describe('api interceptor', () => {
     await api('/first', PingSchema);
     await api('/second', PingSchema);
     expect(callsTo('/api/session')).toBe(2); // one per expired session, not one forever
+  });
+
+  it('turns a recognized preview refusal into 404 without falling through to fetch', async () => {
+    const previousPreview = process.env.NEXT_PUBLIC_DEMO_PREVIEW;
+    process.env.NEXT_PUBLIC_DEMO_PREVIEW = 'true';
+    try {
+      const { api } = await loadApi();
+
+      await expect(api('/renter/t_anna', RenterOverviewResponseSchema)).rejects.toMatchObject({
+        name: 'ApiError',
+        status: 404,
+        path: '/renter/t_anna',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      if (previousPreview === undefined) delete process.env.NEXT_PUBLIC_DEMO_PREVIEW;
+      else process.env.NEXT_PUBLIC_DEMO_PREVIEW = previousPreview;
+      vi.resetModules();
+    }
   });
 });

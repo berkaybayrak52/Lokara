@@ -135,6 +135,7 @@ describe('UI-03 tenancy entry on UnitDetailPage', () => {
   let root: Root;
 
   beforeEach(() => {
+    localStorage.removeItem('lokara:preview');
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -192,6 +193,7 @@ describe('UI-03 tenancy entry on UnitDetailPage', () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem('lokara:preview');
     act(() => root.unmount());
     container.remove();
     vi.clearAllMocks();
@@ -322,6 +324,7 @@ describe('UI-03 tenancy entry on UnitDetailPage', () => {
   it('shows the one-time code, renter and expiry together without client persistence', () => {
     const rawCode = 'account-locator.one-time-secret';
     localStorage.clear();
+    localStorage.setItem('lokara:preview', '1');
     sessionStorage.clear();
     mocks.useUnitDashboard.mockReturnValue({
       isPending: false,
@@ -357,11 +360,61 @@ describe('UI-03 tenancy entry on UnitDetailPage', () => {
     expect(successResult?.textContent).toContain('13.09.2026');
     expect(successResult?.textContent).toContain('14:00');
     expect(successResult?.textContent).toContain('MESZ');
+    const portalLink = Array.from(
+      successResult?.querySelectorAll<HTMLAnchorElement>('a') ?? [],
+    ).find((link) => link.textContent?.trim() === 'Mieterportal öffnen');
+    expect(portalLink, 'the success status must link to the activated renter portal').toBeDefined();
+    expect(portalLink?.getAttribute('href')).toBe('/renter/tenancy-1');
+    expect(portalLink?.getAttribute('target')).toBeNull();
     expect(document.body.textContent?.split(rawCode)).toHaveLength(2);
-    expect([...Array(localStorage.length)].map((_, index) => localStorage.key(index))).toEqual([]);
+    expect(localStorage.getItem('lokara:preview')).toBe('1');
+    expect([...Array(localStorage.length)].map((_, index) => localStorage.key(index))).toEqual([
+      'lokara:preview',
+    ]);
+    expect(
+      [...Array(localStorage.length)].map((_, index) =>
+        localStorage.getItem(localStorage.key(index)!),
+      ),
+    ).not.toContain(rawCode);
     expect([...Array(sessionStorage.length)].map((_, index) => sessionStorage.key(index))).toEqual(
       [],
     );
+  });
+
+  it('does not offer the synthetic renter-portal link after a live issuance', () => {
+    const rawCode = 'account-locator.live-one-time-secret';
+    localStorage.removeItem('lokara:preview');
+    mocks.useUnitDashboard.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: rentedDashboard(),
+    });
+    mocks.useCreateRenterActivationCode.mockReturnValue({
+      mutate: vi.fn(),
+      data: {
+        activationCodeId: 'activation-code-live',
+        activationCode: rawCode,
+        expiresAt: '2026-09-13T12:00:00Z',
+      },
+      variables: 'renter-1',
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+
+    act(() => root.render(<UnitDetailPage accountId="account-1" unitId="unit-1" />));
+
+    const successResult = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="status"]'),
+    ).find((node) => node.textContent?.includes(rawCode));
+    expect(successResult).toBeDefined();
+    expect(successResult?.textContent).toContain(rawCode);
+    expect(
+      Array.from(successResult?.querySelectorAll('a') ?? []).some(
+        (link) => link.textContent?.trim() === 'Mieterportal öffnen',
+      ),
+    ).toBe(false);
+    expect([...Array(localStorage.length)].map((_, index) => localStorage.key(index))).toEqual([]);
   });
 
   it('shows a German refusal and leaves the selected renter action retryable', () => {

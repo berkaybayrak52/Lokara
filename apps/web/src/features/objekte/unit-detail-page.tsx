@@ -26,6 +26,7 @@ import type {
   UnitDashboardResponse,
 } from '@/lib/contracts';
 import { UnitAmenitySchema } from '@/lib/contracts';
+import { isDemoPreview } from '@/lib/demo-preview';
 import { isoToGermanDate, parseEurToCents } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
 
@@ -620,6 +621,14 @@ function RenterPortalActions({
               timeZoneName: 'short',
             }).format(new Date(create.data.expiresAt))}
           </p>
+          {isDemoPreview() ? (
+            <Link
+              href={`/renter/${tenancy.id}`}
+              className="mt-3 inline-block font-semibold text-forest underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              Mieterportal öffnen
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>
