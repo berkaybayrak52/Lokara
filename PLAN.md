@@ -16,7 +16,10 @@ before UI. Dates are communication events, not planning inputs.
   new `/renter/{tenancyId}` web route group provides activation, own-tenancy, statement and UVI
   screens with the approved copy. Focused DB/API/web tests pass `6 + 20 + 28`; RLS covers `77`
   tables, FK isolation `157` edges, both required reviews are clean and the full gate passes `2048`
-  Python and `238` web tests. Lane I remains pending.
+  Python and `238` web tests. The owner follow-up `2e65aa9` adds the per-renter activation-code
+  action to the Unit overview with owner/current-tenancy availability, one-time display and exact
+  accessible party identification; its reviews are clean and the closing full gate passes `2052`
+  Python and `246` web tests. Lane I remains pending.
 - **Owner UVI UI technically complete locally (`slice/uvi-owner-ui`, 11.09.2026).**
   Owner-only `/uvi` exposes live object/unit/tenancy/month selection, generation/reopen, scoped
   PDF access, visible production conflicts and preview write protection under `docs/04`.
@@ -1882,6 +1885,14 @@ source period; UVI titles use only the immutable source month. Activation, overv
 lists, exact copy, renter-aware entry and context switching are covered by `28` web fixtures. The
 statement review and boundary re-audit are clean; the full gate passes `2048` Python and `238` web
 tests. The named red window is closed.
+
+Owner activation follow-up `2e65aa9` is also locally merged. The Unit overview's lower-right
+`Mieterportal` module now issues an activation code for an explicitly identified current renter
+through the existing owner-only endpoint and displays the raw code once with its exact
+Europe/Berlin expiry. Overlapping issuance is blocked in the UI; no code is stored in browser
+storage. The API projection enables the module only for an owner with exactly one unconflicted
+current tenancy. Focused API/web tests pass `4 + 10`; statement/UI and boundary reviews are clean;
+the full gate passes `2052` Python and `246` web tests.
 
 - New route group `apps/web/src/app/renter/[tenancyId]/`, separate from `a/[accountId]`.
 - Before the screen work, extend each immutable publication with the underlying statement period or

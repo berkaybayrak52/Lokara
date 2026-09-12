@@ -1,4 +1,25 @@
-# Lokara handoff — M10-R4 verified
+# Lokara handoff — owner activation button complete
+
+## Owner activation follow-up closure — 12.09.2026
+
+The follow-up is committed as `2e65aa9` and fast-forwarded into local `main`. Nothing was pushed.
+The named RED window is closed and `.lokara-red` is absent.
+
+- Emir requested an owner-side activation-code button in the lower-right `Mieterportal` module of
+  the Unit overview.
+- The feature and fixtures are implemented in the API dashboard projection, strict client contract,
+  query hook, Unit overview and focused API/web tests.
+- The API exposes the portal module only to an owner with exactly one unconflicted current tenancy.
+  The UI provides one activation action per renter, single-flight pending behavior, unique party
+  identification, exact one-time code output and Europe/Berlin expiry without browser persistence.
+- Focused verification is green: API `4 passed`; web `10 passed`. The statement/UI review and
+  boundary audit are clean after the UI findings were repaired.
+- `scripts/gate.sh full` is green: Ruff, formatting, strict mypy, purity, agent parity, pre-context,
+  all `2052` Python tests, ESLint, TypeScript and all `246` web tests pass.
+- The boundary auditor ran one existing activation API test whose fixture commits random non-demo
+  append-only test rows without cleanup. It stopped further probes and did not attempt forbidden
+  deletion. The repository result and demo account are unaffected.
+- Preserve `LAST_OUTPUT.md` as the live checkpoint and the five unrelated `adjustment/` files.
 
 ## M10-R4 closure — 12.09.2026
 

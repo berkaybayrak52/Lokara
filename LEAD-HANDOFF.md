@@ -1,4 +1,4 @@
-# Lead handoff — M10-R4 verified
+# Lead handoff — M10-R4 and owner activation verified
 
 ## Current state — 12.09.2026
 
@@ -8,6 +8,13 @@ pass `6 + 20 + 28`; RLS covers `77` tables, FK isolation `157` edges and the pre
 clean. Both required reviews are clean; the full gate passes `2048` Python and `238` web tests.
 `.lokara-red` is absent. Preserve the five unrelated `adjustment/` files and do not push without
 Emir's decision.
+
+Owner activation follow-up `2e65aa9` is locally merged into `main`. The lower-right Unit overview
+module now issues a one-time activation code through the existing owner-only endpoint for an
+explicitly identified current renter. Portal availability requires exactly one unconflicted current
+tenancy; browser persistence is absent. Focused API/web tests pass `4 + 10`; statement/UI and
+boundary reviews are clean; the full gate passes `2052` Python and `246` web tests. No push was
+performed.
 
 M10-R3 is technically complete and locally merged into `main` as source commit `2ba245d`. Nothing
 was pushed. `.lokara-red` is removed.
