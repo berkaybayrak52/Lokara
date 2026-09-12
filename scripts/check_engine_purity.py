@@ -198,6 +198,25 @@ LAYERS: tuple[Layer, ...] = (
         ),
     ),
     Layer(
+        "packages/investment-engine/src",
+        forbidden_internal=frozenset(
+            {
+                "lokara_rules_store",
+                "lokara_adapters",
+                "lokara_db",
+                "lokara_api",
+                "lokara_pdf",
+                "lokara_nk_engine",
+                "lokara_heating_engine",
+                "lokara_matching_engine",
+                "lokara_guard_engine",
+                "lokara_uvi_engine",
+                "afa_engine",
+                "export_engine",
+            }
+        ),
+    ),
+    Layer(
         "packages/export-engine/src",
         forbidden_internal=frozenset(
             {

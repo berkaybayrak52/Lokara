@@ -11,6 +11,7 @@ members = [
   "packages/uvi-engine",
   "packages/matching-engine",
   "packages/afa-engine",
+  "packages/investment-engine",
   "packages/export-engine",
   "packages/rules-store",
   "packages/adapters",
@@ -34,6 +35,7 @@ dev = [
   "lokara-uvi-engine",
   "lokara-matching-engine",
   "lokara-afa-engine",
+  "lokara-investment-engine",
   "lokara-export-engine",
   "lokara-rules-store",
   "lokara-adapters",
@@ -51,6 +53,7 @@ lokara-guard-engine = { workspace = true }
 lokara-uvi-engine = { workspace = true }
 lokara-matching-engine = { workspace = true }
 lokara-afa-engine = { workspace = true }
+lokara-investment-engine = { workspace = true }
 lokara-export-engine = { workspace = true }
 lokara-rules-store = { workspace = true }
 lokara-adapters = { workspace = true }
@@ -92,6 +95,8 @@ files = [
   "packages/matching-engine/tests",
   "packages/afa-engine/src",
   "packages/afa-engine/tests",
+  "packages/investment-engine/src",
+  "packages/investment-engine/tests",
   "packages/export-engine/src",
   "packages/export-engine/tests",
   "packages/rules-store/src",
@@ -115,6 +120,7 @@ testpaths = [
   "packages/uvi-engine/tests",
   "packages/matching-engine/tests",
   "packages/afa-engine/tests",
+  "packages/investment-engine/tests",
   "packages/export-engine/tests",
   "packages/rules-store/tests",
   "packages/adapters/tests",

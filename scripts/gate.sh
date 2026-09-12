@@ -86,7 +86,7 @@ case "$LEVEL" in
       packages/domain/tests packages/nk-engine/tests \
       packages/heating-engine/tests packages/rules-store/tests \
       packages/guard-engine/tests packages/uvi-engine/tests \
-      packages/matching-engine/tests
+      packages/matching-engine/tests packages/investment-engine/tests
     ;;
   full|demo)
     # LOKARA_REQUIRE_DB / LOKARA_REQUIRE_PDF turn an unreachable Postgres or a missing
