@@ -8,8 +8,9 @@ usual two isolation proofs (path re-authorization + RLS backstop).
 import os
 import time
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import jwt
@@ -23,9 +24,19 @@ from lokara_api import create_app
 from lokara_api.authorization import PortalScope
 from lokara_api.deps import account_session_for_path
 from lokara_api.routers import buildings as buildings_router
-from lokara_api.schemas import BuildingCreate, BuildingSummary
+from lokara_api.schemas import BuildingCreate, BuildingSummary, UnitDashboardResponse
 from lokara_api.settings import ApiSettings
-from lokara_db import Account, Building, DbSettings, Membership, Person, Role, create_db_engine
+from lokara_api.unit_dashboard import build_unit_dashboard
+from lokara_db import (
+    Account,
+    Building,
+    DbSettings,
+    Membership,
+    Person,
+    Role,
+    SelfUseKind,
+    create_db_engine,
+)
 from lokara_db.seed import DEMO_ACCOUNT_ID, DEMO_PERSON_ID, seed_demo
 from pydantic import ValidationError
 from sqlalchemy import text
@@ -88,6 +99,79 @@ def _token(person_id: str) -> dict[str, str]:
 
 DEMO = _token(DEMO_PERSON_ID)
 BASE = f"/a/{DEMO_ACCOUNT_ID}"
+
+
+class _EmptyRows:
+    def all(self) -> list[object]:
+        return []
+
+
+class _UnitDashboardSession:
+    def scalar(self, statement: object) -> None:
+        del statement
+        return None
+
+    def scalars(self, statement: object) -> _EmptyRows:
+        del statement
+        return _EmptyRows()
+
+    def execute(self, statement: object) -> _EmptyRows:
+        del statement
+        return _EmptyRows()
+
+
+def _unit_dashboard_projection(
+    *, role: Role, current_tenancies: int, current_self_use: bool
+) -> UnitDashboardResponse:
+    renter = SimpleNamespace(
+        id="renter-current",
+        legal_name="Erika Musterfrau",
+        email="erika@example.test",
+    )
+    tenancies = [
+        SimpleNamespace(
+            id=f"tenancy-current-{index}",
+            valid_from=date(2025, 1, 1),
+            valid_to=None,
+            base_rent_cents=89_000,
+            parties=[SimpleNamespace(renter=renter)],
+        )
+        for index in range(current_tenancies)
+    ]
+    self_use_periods = (
+        [
+            SimpleNamespace(
+                kind=SelfUseKind.OWNER_OCCUPIED,
+                valid_from=date(2025, 1, 1),
+                valid_to=None,
+            )
+        ]
+        if current_self_use
+        else []
+    )
+    unit = SimpleNamespace(
+        id="unit-portal-fixture",
+        label="Wohnung Portal",
+        area_sqm_x100=5_000,
+        building_id="building-portal-fixture",
+        building=SimpleNamespace(
+            name="Portalhaus",
+            street="Portalweg 1",
+            postal_code="60311",
+            city="Frankfurt am Main",
+        ),
+        tenancies=tenancies,
+        self_use_periods=self_use_periods,
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
+    )
+    response = build_unit_dashboard(
+        cast(Any, _UnitDashboardSession()),
+        account_id="account-portal-fixture",
+        unit=cast(Any, unit),
+        role=role,
+        as_of=date(2026, 9, 12),
+    )
+    return response
 
 
 def _building_payload(**overrides: object) -> dict[str, object]:
@@ -177,6 +261,34 @@ class TestBuildingContracts:
         assert summary.building_type == "WOHNHAUS"
         assert summary.latitude is None
         assert summary.longitude is None
+
+
+class TestOwnerRenterPortalModule:
+    @pytest.mark.parametrize(
+        ("role", "current_tenancies", "current_self_use", "expected_available"),
+        [
+            pytest.param(Role.OWNER, 1, False, True, id="owner-current-tenancy"),
+            pytest.param(Role.EMPLOYEE, 1, False, False, id="employee-current-tenancy"),
+            pytest.param(Role.OWNER, 0, False, False, id="owner-no-current-tenancy"),
+            pytest.param(Role.OWNER, 1, True, False, id="owner-conflicting-current-use"),
+        ],
+    )
+    def test_portal_module_requires_owner_and_exactly_one_unconflicted_current_tenancy(
+        self,
+        role: Role,
+        current_tenancies: int,
+        current_self_use: bool,
+        expected_available: bool,
+    ) -> None:
+        dashboard = _unit_dashboard_projection(
+            role=role,
+            current_tenancies=current_tenancies,
+            current_self_use=current_self_use,
+        )
+        portal = next(module for module in dashboard.modules if module.key == "PORTAL")
+
+        assert portal.available is expected_available
+        assert (portal.unavailable_reason is None) is expected_available
 
 
 class TestCreateChain:

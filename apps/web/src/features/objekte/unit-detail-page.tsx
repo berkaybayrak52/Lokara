@@ -30,7 +30,12 @@ import { isoToGermanDate, parseEurToCents } from '@/lib/format';
 import { useFormDraft } from '@/lib/form-draft';
 
 import { FormField } from './form-field';
-import { useCreateTenancy, useCreateUnitProfileVersion, useUnitDashboard } from './queries';
+import {
+  useCreateRenterActivationCode,
+  useCreateTenancy,
+  useCreateUnitProfileVersion,
+  useUnitDashboard,
+} from './queries';
 
 const TenancyFormSchema = z
   .object({
@@ -239,7 +244,9 @@ export function UnitDetailPage({ accountId, unitId }: { accountId: string; unitI
           <Card>
             <CardHeader>
               <CardTitle>Mietverhältnis erstellen</CardTitle>
-              <CardDescription>Wählen Sie, wie die Vertragsdaten übernommen werden.</CardDescription>
+              <CardDescription>
+                Wählen Sie, wie die Vertragsdaten übernommen werden.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <Button asChild variant="outline" className="h-auto min-h-20 whitespace-normal py-4">
@@ -512,6 +519,14 @@ function ModulesCard({ accountId, unit }: { accountId: string; unit: UnitDashboa
                 >
                   Zahlungsarbeitsfläche öffnen
                 </Link>
+              ) : module.key === 'PORTAL' && module.available ? (
+                unit.currentTenancy ? (
+                  <RenterPortalActions accountId={accountId} tenancy={unit.currentTenancy} />
+                ) : (
+                  <p className="text-sm text-slate">
+                    Für diese Einheit besteht kein aktuelles Mietverhältnis.
+                  </p>
+                )
               ) : (
                 <p className="text-sm text-slate">{module.unavailableReason}</p>
               )}
@@ -519,6 +534,95 @@ function ModulesCard({ accountId, unit }: { accountId: string; unit: UnitDashboa
           ))}
       </CardContent>
     </Card>
+  );
+}
+
+function RenterPortalActions({
+  accountId,
+  tenancy,
+}: {
+  accountId: string;
+  tenancy: NonNullable<UnitDashboardResponse['currentTenancy']>;
+}) {
+  const create = useCreateRenterActivationCode(accountId, tenancy.id);
+  const selectedRenterIndex = tenancy.parties.findIndex((party) => party.id === create.variables);
+  const selectedRenter =
+    selectedRenterIndex >= 0 ? tenancy.parties[selectedRenterIndex] : undefined;
+
+  return (
+    <div className="mt-2 space-y-3">
+      {tenancy.parties.length === 0 ? (
+        <p className="text-sm text-slate">
+          Für das aktuelle Mietverhältnis ist keine Vertragspartei hinterlegt.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {tenancy.parties.map((party, index) => {
+            const isSelectedPending = create.isPending && create.variables === party.id;
+            const partyLabel = `Vertragspartei ${index + 1}`;
+            const hasDuplicateName = tenancy.parties.some(
+              (candidate, candidateIndex) =>
+                candidateIndex !== index && candidate.name === party.name,
+            );
+            const accessibleParty = hasDuplicateName ? `${party.name}, ${partyLabel}` : party.name;
+            return (
+              <li
+                key={party.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-mint p-3"
+              >
+                <span className="text-sm text-ink">
+                  <span className="block text-xs font-semibold text-slate">{partyLabel}</span>
+                  <span className="font-medium">{party.name}</span>
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-busy={isSelectedPending || undefined}
+                  aria-label={`Aktivierungscode für ${accessibleParty} ${isSelectedPending ? 'wird erstellt' : 'erstellen'}`}
+                  disabled={create.isPending}
+                  onClick={() => create.mutate(party.id)}
+                >
+                  {isSelectedPending ? 'Wird erstellt…' : 'Aktivierungscode erstellen'}
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {create.isError ? (
+        <StatusNote kind="danger" label="Aktivierungscode konnte nicht erstellt werden.">
+          Bitte versuchen Sie es erneut.
+        </StatusNote>
+      ) : null}
+
+      {create.data && selectedRenter ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-slate bg-white p-3 text-sm text-ink"
+        >
+          <p className="font-semibold">
+            Aktivierungscode für {selectedRenter.name} · Vertragspartei {selectedRenterIndex + 1}
+          </p>
+          <p className="mt-1">Dieser Code wird nur einmal angezeigt.</p>
+          <p className="mt-2 break-all font-mono font-semibold">{create.data.activationCode}</p>
+          <p className="mt-2">
+            Gültig bis{' '}
+            {new Intl.DateTimeFormat('de-DE', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hourCycle: 'h23',
+              timeZone: 'Europe/Berlin',
+              timeZoneName: 'short',
+            }).format(new Date(create.data.expiresAt))}
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -121,6 +121,17 @@ export const RenterPublicationListResponseSchema = z
   .strict();
 export type RenterPublicationListResponse = z.infer<typeof RenterPublicationListResponseSchema>;
 
+export const RenterActivationCodeIssueResponseSchema = z
+  .object({
+    activationCodeId: z.string(),
+    activationCode: z.string(),
+    expiresAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+export type RenterActivationCodeIssueResponse = z.infer<
+  typeof RenterActivationCodeIssueResponseSchema
+>;
+
 export const RenterActivationResponseSchema = z
   .object({
     ok: z.literal(true),

@@ -8,6 +8,7 @@ import {
   BuildingDetailResponseSchema,
   BuildingListResponseSchema,
   BuildingSummarySchema,
+  RenterActivationCodeIssueResponseSchema,
   TenancyOutSchema,
   UnitDashboardResponseSchema,
   UnitDashboardWriteResponseSchema,
@@ -53,6 +54,17 @@ export function useUnitDashboard(accountId: string, unitId: string) {
     queryKey: ['account', accountId, 'units', unitId, 'dashboard'],
     queryFn: () => api(`/a/${accountId}/units/${unitId}/dashboard`, UnitDashboardResponseSchema),
     retry: false,
+  });
+}
+
+export function useCreateRenterActivationCode(accountId: string, tenancyId: string) {
+  return useMutation({
+    mutationFn: (renterId: string) =>
+      api(
+        `/a/${accountId}/tenancies/${tenancyId}/renters/${renterId}/activation-codes`,
+        RenterActivationCodeIssueResponseSchema,
+        { method: 'POST' },
+      ),
   });
 }
 

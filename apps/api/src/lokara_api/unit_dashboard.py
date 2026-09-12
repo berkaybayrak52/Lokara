@@ -422,6 +422,22 @@ def build_unit_dashboard(
         unit,
         active_tenancies[0].id if is_owner and len(active_tenancies) == 1 else None,
     )
+    portal_available = is_owner and current is not None and not conflict
+    if portal_available:
+        portal_unavailable_reason = None
+    elif not is_owner:
+        portal_unavailable_reason = (
+            "Aktivierungscodes für das Mieterportal können nur Eigentümer erstellen."
+        )
+    elif conflict:
+        portal_unavailable_reason = (
+            "Das Mieterportal ist wegen widersprüchlicher aktueller Nutzungszeiträume "
+            "nicht verfügbar."
+        )
+    else:
+        portal_unavailable_reason = (
+            "Das Mieterportal ist nur für ein aktuelles Mietverhältnis verfügbar."
+        )
     return UnitDashboardResponse(
         as_of=as_of,
         id=unit.id,
@@ -451,8 +467,8 @@ def build_unit_dashboard(
             ),
             UnitDashboardModule(
                 key="PORTAL",
-                available=False,
-                unavailable_reason="Das Mieterportal wird mit M10 aktiviert.",
+                available=portal_available,
+                unavailable_reason=portal_unavailable_reason,
             ),
             UnitDashboardModule(
                 key="MESSAGES",
