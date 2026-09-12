@@ -19,7 +19,10 @@ before UI. Dates are communication events, not planning inputs.
   Python and `238` web tests. The owner follow-up `2e65aa9` adds the per-renter activation-code
   action to the Unit overview with owner/current-tenancy availability, one-time display and exact
   accessible party identification; its reviews are clean and the closing full gate passes `2052`
-  Python and `246` web tests. Lane I remains pending.
+  Python and `246` web tests. Demo repair `4032889` exposes the same action in Portfolio Preview,
+  provides a synthetic fresh seven-day spend-once activation flow without browser storage or live
+  fallback, and keeps the same-session renter route reachable. Its reviews are clean and the full
+  gate passes `2052` Python and `258` web tests. Lane I remains pending.
 - **Owner UVI UI technically complete locally (`slice/uvi-owner-ui`, 11.09.2026).**
   Owner-only `/uvi` exposes live object/unit/tenancy/month selection, generation/reopen, scoped
   PDF access, visible production conflicts and preview write protection under `docs/04`.
@@ -1893,6 +1896,13 @@ Europe/Berlin expiry. Overlapping issuance is blocked in the UI; no code is stor
 storage. The API projection enables the module only for an owner with exactly one unconflicted
 current tenancy. Focused API/web tests pass `4 + 10`; statement/UI and boundary reviews are clean;
 the full gate passes `2052` Python and `246` web tests.
+
+Demo repair `4032889` is locally merged. Portfolio Preview now exposes the action for rented units
+and implements a fully synthetic issuance, activation, context, overview and empty-document path.
+Codes are fresh, expire after seven days, are spend-once and remain only in module memory. Recognized
+preview refusals never fall through to the live backend, wrong account/tenancy/renter paths are
+denied, and the same-tab portal link is preview-only. Statement/UI and boundary reviews are clean;
+the full gate passes `2052` Python and `258` web tests.
 
 - New route group `apps/web/src/app/renter/[tenancyId]/`, separate from `a/[accountId]`.
 - Before the screen work, extend each immutable publication with the underlying statement period or

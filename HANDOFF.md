@@ -1,4 +1,22 @@
-# Lokara handoff — owner activation button complete
+# Lokara handoff — owner activation demo complete
+
+## Demo preview repair closure — 12.09.2026
+
+Demo repair `4032889` is fast-forwarded into local `main`; nothing was pushed. The local demo stack
+was restarted through `scripts/Lokara Demo.command` and verified healthy: database healthy, API
+`/health` 200 and web `/` 200.
+
+- Portfolio Preview exposes `Mieterportal` only for a rented preview unit and issues a fresh
+  synthetic activation code for the exact preview tenancy/renter pair.
+- Preview codes expire after seven days, spend once, stay in module memory and unlock only the
+  activated renter context, overview and empty document list.
+- Recognized preview refusals remain local synthetic 404s and never fall through to live API data;
+  wrong account, tenancy and renter paths are refused.
+- The successful owner result offers a same-tab `Mieterportal öffnen` link only in preview mode.
+  Live issuance continues to show the raw code without inviting the owner into the renter context.
+- Statement/UI and boundary reviews are clean. The full gate passes `2052` Python and `258` web
+  tests; `.lokara-red` is absent.
+- Preserve `LAST_OUTPUT.md` and the five unrelated `adjustment/` files. No push is authorized.
 
 ## Owner activation follow-up closure — 12.09.2026
 

@@ -1,4 +1,4 @@
-# Lead handoff — M10-R4 and owner activation verified
+# Lead handoff — M10-R4 owner activation demo verified
 
 ## Current state — 12.09.2026
 
@@ -15,6 +15,13 @@ explicitly identified current renter. Portal availability requires exactly one u
 tenancy; browser persistence is absent. Focused API/web tests pass `4 + 10`; statement/UI and
 boundary reviews are clean; the full gate passes `2052` Python and `246` web tests. No push was
 performed.
+
+Demo repair `4032889` is locally merged into `main`. Portfolio Preview now supplies a fresh,
+seven-day, spend-once synthetic activation lifecycle for exact renter/tenancy pairs, with
+activated-only renter reads and no live-backend fallback for recognized refusals. The portal link
+is preview-only and same-tab; no raw code enters browser storage. Both required reviews are clean;
+the full gate passes `2052` Python and `258` web tests. The restarted local database/API/web stack
+is healthy. Nothing was pushed.
 
 M10-R3 is technically complete and locally merged into `main` as source commit `2ba245d`. Nothing
 was pushed. `.lokara-red` is removed.
