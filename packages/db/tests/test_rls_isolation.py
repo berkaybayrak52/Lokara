@@ -14,8 +14,10 @@ TODO(supabase): on Supabase the migration role is a non-superuser owner, so
 FORCE binds it too — admin/seed flows there must set a context.
 """
 
+import json
 import os
 from collections.abc import Iterator
+from dataclasses import asdict
 from datetime import UTC, date, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -24,6 +26,7 @@ from typing import Any, NamedTuple
 import pytest
 from alembic import command
 from alembic.config import Config
+from investment_engine import InvestmentInput, InvestmentRuleBundle, calculate_investment_snapshot
 from lokara_db import (
     Account,
     AdvanceAllocation,
@@ -114,7 +117,7 @@ from lokara_domain import (
     RemoteReadability,
 )
 from sqlalchemy import CursorResult, Engine, select, text
-from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 _DB_PACKAGE_DIR = Path(__file__).resolve().parent.parent
@@ -635,6 +638,304 @@ class TestM10PublicationCrossAccountWrites:
                     "digest": sha256(content).hexdigest(),
                     "membership": seed.membership_a,
                     "published_at": datetime(2026, 9, 11, tzinfo=UTC),
+                },
+            )
+
+
+class TestM10InvestmentCrossAccountWrites:
+    def test_investment_owner_reads_b_cannot_and_renter_a_is_fully_excluded_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """All three owner-only record types have non-vacuous SELECT and INSERT isolation."""
+        _, app = engines
+        facts = {
+            "purchase_price_cents": 30_000_000,
+            "acquisition_costs_cents": 3_000_000,
+            "monthly_actual_rent_cents": 150_000,
+            "vacancy_bp": 500,
+            "administration_cents": 50_000,
+            "maintenance_cents": 70_000,
+            "reserve_cents": 40_000,
+            "vacancy_risk_cents": 20_000,
+            "equity_cents": 10_000_000,
+            "loan_cents": 23_000_000,
+            "interest_bp": 350,
+            "initial_repayment_bp": 200,
+            "marginal_tax_bp": 4_200,
+            "building_share_bp": 7_500,
+            "afa_rate_bp": 200,
+            "analysis_period_months": 12,
+            "financing_provenance": "annahme",
+        }
+        rules = asdict(
+            InvestmentRuleBundle(
+                default_building_share_bp=7_500,
+                default_afa_rate_bp=200,
+                default_marginal_tax_bp=4_200,
+                interest_sensitivity_offsets_bp=(-100, -50, 0, 50, 100),
+                repayment_sensitivity_steps_bp=(100, 200, 300, 400),
+                dscr_amber_hundredths=100,
+                dscr_green_hundredths=120,
+                cashflow_amber_cents=0,
+                cashflow_green_cents=5_000,
+                source_evidence=("Page 07",),
+                rechtsstand="07/2026",
+                production_blocked=True,
+            )
+        )
+        result = asdict(
+            calculate_investment_snapshot(
+                InvestmentInput(facts=facts),
+                InvestmentRuleBundle(
+                    **{
+                        **rules,
+                        "interest_sensitivity_offsets_bp": tuple(
+                            rules["interest_sensitivity_offsets_bp"]
+                        ),
+                        "repayment_sensitivity_steps_bp": tuple(
+                            rules["repayment_sensitivity_steps_bp"]
+                        ),
+                        "source_evidence": tuple(rules["source_evidence"]),
+                    }
+                ),
+            )
+        )
+        financing = {"source": "annahme", "record_version": "finance-v1"}
+        afa = result["afa_provenance"]
+        layout_id, input_id, spare_input_id, result_id = (new_id() for _ in range(4))
+        with app.connect() as connection:
+            transaction = connection.begin()
+            try:
+                connection.execute(
+                    text("SELECT set_config('app.account_id', :account, true)"),
+                    {"account": seed.account_a},
+                )
+                connection.execute(text("SELECT set_config('app.tenancy_id', '', true)"))
+                connection.execute(
+                    text(
+                        "INSERT INTO investment_layout_version "
+                        "(id, account_id, layout_key, version, layout_snapshot, "
+                        "supersedes_layout_version_id) VALUES "
+                        "(:id, :account, 'rls-bank-pdf', 1, "
+                        '\'{"layout": "bank-view-v1"}\'::jsonb, NULL)'
+                    ),
+                    {"id": layout_id, "account": seed.account_a},
+                )
+                canonical_input = connection.scalar(
+                    text(
+                        "SELECT convert_to(jsonb_build_object("
+                        "'afa_provenance', CAST(:afa AS jsonb), "
+                        "'financing_provenance', CAST(:financing AS jsonb), "
+                        "'input', CAST(:facts AS jsonb), "
+                        "'layout_version_id', CAST(:layout AS text), "
+                        "'rules', CAST(:rules AS jsonb))::text, 'UTF8')"
+                    ),
+                    {
+                        "afa": json.dumps(afa),
+                        "financing": json.dumps(financing),
+                        "facts": json.dumps(facts),
+                        "layout": layout_id,
+                        "rules": json.dumps(rules),
+                    },
+                )
+                assert isinstance(canonical_input, bytes)
+                input_params = {
+                    "account": seed.account_a,
+                    "case": "rls-case",
+                    "facts": json.dumps(facts),
+                    "rules": json.dumps(rules),
+                    "financing": json.dumps(financing),
+                    "afa": json.dumps(afa),
+                    "layout": layout_id,
+                    "canonical": canonical_input,
+                    "digest": sha256(canonical_input).hexdigest(),
+                    "frozen": datetime(2026, 9, 12, tzinfo=UTC),
+                }
+                input_insert = text(
+                    "INSERT INTO investment_input_snapshot "
+                    "(id, account_id, case_key, version, input_snapshot, rule_snapshot, "
+                    "financing_provenance_snapshot, afa_provenance_snapshot, "
+                    "layout_version_id, canonical_payload_version, canonical_payload_bytes, "
+                    "sha256, supersedes_input_snapshot_id, frozen_at) VALUES "
+                    "(:id, :account, :case, 1, CAST(:facts AS jsonb), CAST(:rules AS jsonb), "
+                    "CAST(:financing AS jsonb), CAST(:afa AS jsonb), :layout, "
+                    "'postgres-jsonb-text-v1', :canonical, :digest, NULL, :frozen)"
+                )
+                connection.execute(input_insert, {**input_params, "id": input_id})
+                connection.execute(
+                    input_insert,
+                    {
+                        **input_params,
+                        "id": spare_input_id,
+                        "case": "rls-spare-result-parent",
+                    },
+                )
+                canonical_result = connection.scalar(
+                    text("SELECT convert_to(CAST(:result AS jsonb)::text, 'UTF8')"),
+                    {"result": json.dumps(result)},
+                )
+                assert isinstance(canonical_result, bytes)
+                result_insert = text(
+                    "INSERT INTO investment_result_snapshot "
+                    "(id, account_id, input_snapshot_id, engine_version, result_snapshot, "
+                    "canonical_payload_version, canonical_result_bytes, sha256, calculated_at) "
+                    "VALUES (:id, :account, :input, 'investment-engine-v1', "
+                    "CAST(:result AS jsonb), 'postgres-jsonb-text-v1', :canonical, :digest, "
+                    ":calculated)"
+                )
+                result_params = {
+                    "id": result_id,
+                    "account": seed.account_a,
+                    "input": input_id,
+                    "result": json.dumps(result),
+                    "canonical": canonical_result,
+                    "digest": sha256(canonical_result).hexdigest(),
+                    "calculated": datetime(2026, 9, 12, tzinfo=UTC),
+                }
+                connection.execute(result_insert, result_params)
+
+                for table in (
+                    "investment_layout_version",
+                    "investment_input_snapshot",
+                    "investment_result_snapshot",
+                ):
+                    assert connection.scalar(text(f"SELECT count(*) FROM {table}")) > 0
+
+                connection.execute(
+                    text("SELECT set_config('app.account_id', :account, true)"),
+                    {"account": seed.account_b},
+                )
+                for table in (
+                    "investment_layout_version",
+                    "investment_input_snapshot",
+                    "investment_result_snapshot",
+                ):
+                    assert connection.scalar(text(f"SELECT count(*) FROM {table}")) == 0
+
+                connection.execute(
+                    text("SELECT set_config('app.account_id', :account, true)"),
+                    {"account": seed.account_a},
+                )
+                connection.execute(
+                    text("SELECT set_config('app.tenancy_id', :tenancy, true)"),
+                    {"tenancy": seed.tenancy_a},
+                )
+                for table in (
+                    "investment_layout_version",
+                    "investment_input_snapshot",
+                    "investment_result_snapshot",
+                ):
+                    assert connection.scalar(text(f"SELECT count(*) FROM {table}")) == 0
+
+                renter_writes = (
+                    (
+                        text(
+                            "INSERT INTO investment_layout_version "
+                            "(id, account_id, layout_key, version, layout_snapshot, "
+                            "supersedes_layout_version_id) VALUES "
+                            "(:id, :account, 'renter-forbidden', 1, '{\"layout\": 1}'::jsonb, NULL)"
+                        ),
+                        {"id": new_id(), "account": seed.account_a},
+                    ),
+                    (
+                        input_insert,
+                        {
+                            **input_params,
+                            "id": new_id(),
+                            "case": "renter-forbidden",
+                        },
+                    ),
+                    (
+                        result_insert,
+                        {
+                            **result_params,
+                            "id": new_id(),
+                            "input": spare_input_id,
+                        },
+                    ),
+                )
+                for statement, params in renter_writes:
+                    savepoint = connection.begin_nested()
+                    try:
+                        with pytest.raises(DBAPIError, match="row-level security"):
+                            connection.execute(statement, params)
+                    finally:
+                        savepoint.rollback()
+            finally:
+                transaction.rollback()
+
+    def test_investment_layout_version_rejects_cross_account_insert_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO investment_layout_version "
+                    "(id, account_id, layout_key, version, layout_snapshot, "
+                    "supersedes_layout_version_id) VALUES "
+                    "(:id, :account_a, 'bank-pdf', 1, '{}'::jsonb, NULL)"
+                ),
+                {"id": new_id(), "account_a": seed.account_a},
+            )
+
+    def test_investment_input_snapshot_rejects_cross_account_insert_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO investment_input_snapshot "
+                    "(id, account_id, case_key, version, input_snapshot, rule_snapshot, "
+                    "financing_provenance_snapshot, afa_provenance_snapshot, "
+                    "layout_version_id, canonical_payload_version, canonical_payload_bytes, "
+                    "sha256, supersedes_input_snapshot_id, frozen_at) VALUES "
+                    "(:id, :account_a, 'cross-account', 1, '{}'::jsonb, "
+                    "jsonb_build_object('rechtsstand', '07/2026'), "
+                    "jsonb_build_object('source', 'annahme', 'record_version', 'probe-v1'), "
+                    "jsonb_build_object('source', 'wizard', 'record_version', 'probe-v1', "
+                    "'assumption', false), NULL, 'postgres-jsonb-text-v1', :payload, :digest, "
+                    "NULL, :frozen_at)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "payload": b"{}",
+                    "digest": sha256(b"{}").hexdigest(),
+                    "frozen_at": datetime(2026, 9, 12, tzinfo=UTC),
+                },
+            )
+
+    def test_investment_result_snapshot_rejects_cross_account_insert_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO investment_result_snapshot "
+                    "(id, account_id, input_snapshot_id, engine_version, result_snapshot, "
+                    "canonical_payload_version, canonical_result_bytes, sha256, calculated_at) "
+                    "VALUES (:id, :account_a, :input, 'investment-engine-v1', '{}'::jsonb, "
+                    "'postgres-jsonb-text-v1', :payload, :digest, :calculated_at)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "input": new_id(),
+                    "payload": b"{}",
+                    "digest": sha256(b"{}").hexdigest(),
+                    "calculated_at": datetime(2026, 9, 12, tzinfo=UTC),
                 },
             )
 

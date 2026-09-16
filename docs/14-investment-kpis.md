@@ -1,6 +1,6 @@
 # Investment KPIs — planning calculations and deterministic bank view
 
-**Status:** D2 transcription complete; approved and merged 21.08.2026; not implemented
+**Status:** D2 transcription complete; M10-I0/I1 and M10-I2 technically implemented
 
 **Rechtsstand:** 07/2026
 
@@ -10,8 +10,9 @@
 **Fixtures:** exactly `14-F01`–`14-F14` in
 `packages/rules-store/tests/berkay_14_golden.py`
 
-**Implementation status:** specification and data-only oracle only. This slice adds no schema,
-migration, API, engine, UI, PDF renderer, pricing or bank integration.
+**Implementation status:** the pure engine and the section-4.7 persistence contract are technically
+complete through migration `0045`. API, UI, PDF rendering, pricing and bank integration remain
+outside this contract.
 
 This document defines a future planning calculation for a **Prüfobjekt**: a property being
 considered for purchase. It produces exactly seven KPIs and a deterministic Bank-PDF view. The
@@ -76,7 +77,7 @@ The two checked rows are the V+V surplus-calculation form and AfA/interest as We
 KPI definitions, defaults, thresholds, the 30/360 planning recurrence, Bank-PDF choices and
 financing-source labels remain blocked before production.
 
-## 4. Future logical contracts — no schema approval
+## 4. Logical contracts and M10-I2 persistence
 
 All money is integer cents. Rates and ratios are integer basis points. KPI ratios are integer
 hundredths. `Decimal` with `ROUND_HALF_UP` is used exactly at specified division or multiplication
@@ -121,6 +122,171 @@ costs, seven KPIs, sensitivity, twelve-month schedule, assumptions/method includ
 through `14-K13` definitions, and disclosure. Missing KPIs remain `—`. LTV is labelled “Auslauf zum
 Kaufpreis, nicht zum Beleihungswert”. The view includes no renter names and is not a tax export,
 archive, valuation, credit decision or bank application.
+
+### 4.7 M10-I2 persistence contract — migration `0045`
+
+This subsection supersedes the former “no schema approval” marker for M10-I2 only. It is a technical
+persistence decision accepted on 12.09.2026. It does not approve any production-blocked Page-07
+convention or legal claim.
+
+M10-I2 adds exactly three account-scoped, append-only tables. A Prüfobjekt is identified by the
+stable `case_key` on its input-snapshot correction stream. It has no `building_id`, no relationship
+to `building`, and no path into statements, tax exports or the owner demo.
+
+#### `investment_layout_version`
+
+| Column | Type and nullability | Meaning |
+| --- | --- | --- |
+| `id` | string PK | immutable row identity |
+| `account_id` | string, not null | account boundary |
+| `layout_key` | nonblank string, not null | stable logical layout stream |
+| `version` | positive integer, not null | stream version, starting at `1` |
+| `layout_snapshot` | nonempty JSONB object, not null | complete renderer-owned layout definition |
+| `supersedes_layout_version_id` | string, nullable | prior version in the same account and `layout_key` |
+| `created_at` | timezone timestamp, not null | append time |
+
+`(id, account_id, layout_key)` and `(account_id, layout_key, version)` are unique. The predecessor
+is a composite self-FK on `(supersedes_layout_version_id, account_id, layout_key)`. Version `1` has
+no predecessor; every version above `1` has exactly the immediately preceding version. Each stream
+has one root and each row has at most one successor, so corrections cannot fork.
+
+#### `investment_input_snapshot`
+
+| Column | Type and nullability | Meaning |
+| --- | --- | --- |
+| `id` | string PK | immutable frozen-input identity |
+| `account_id` | string, not null | account boundary |
+| `case_key` | nonblank string, not null | stable Prüfobjekt correction stream |
+| `version` | positive integer, not null | stream version, starting at `1` |
+| `input_snapshot` | JSONB object, not null | normalized public engine facts |
+| `rule_snapshot` | nonempty JSONB object, not null | complete `InvestmentRuleBundle` used for calculation |
+| `financing_provenance_snapshot` | nonempty JSONB object, not null | stored financing source and version |
+| `afa_provenance_snapshot` | nonempty JSONB object, not null | stored AfA source and version |
+| `layout_version_id` | string, nullable | frozen layout selection; null means no Bank-PDF layout selected |
+| `canonical_payload_version` | nonblank string, not null | exactly `postgres-jsonb-text-v1` |
+| `canonical_payload_bytes` | nonempty bytes, not null | canonical reproduction-input bytes defined below |
+| `sha256` | 64 lowercase hex characters, not null | SHA-256 of `canonical_payload_bytes` |
+| `supersedes_input_snapshot_id` | string, nullable | prior version in the same account and `case_key` |
+| `frozen_at` | timezone timestamp, not null | time at which inputs became immutable |
+
+The public `input_snapshot` shape uses only these normalized engine keys, with their existing engine
+types: integer cents/rates/month counts; string provenance/version fields; tuple values serialized as
+JSON arrays; and nested JSON objects for `afa_reference` and `bank_header`:
+
+```text
+purchase_price_cents, acquisition_costs_cents, monthly_actual_rent_cents, vacancy_bp,
+administration_cents, maintenance_cents, reserve_cents, vacancy_risk_cents, equity_cents,
+loan_cents, interest_bp, initial_repayment_bp, fixed_monthly_annuity_cents, marginal_tax_bp,
+building_share_bp, afa_rate_bp, annual_full_afa_cents, afa_record_version,
+analysis_period_months, financing_provenance, afa_reference, bank_header, renter_names
+```
+
+No other key is permitted. Each supplied cents/rate/month field is a JSON integer, never a string,
+fraction or boolean. Purchase price, acquisition costs, monthly rent, all four planning costs,
+equity, loan, interest, initial repayment, fixed annuity, AfA rate and annual full AfA are
+nonnegative. `vacancy_bp` and `building_share_bp` are `0…10000`, `marginal_tax_bp` is `0…9999`,
+and `analysis_period_months` is nonnegative. `financing_provenance`, when supplied, is one of the
+strings `annahme`, `indikativ` or `angebot`. `afa_record_version`, when supplied, is a nonblank
+string and is required when top-level `annual_full_afa_cents` is non-null.
+
+`afa_reference` is null or an object containing only `afa_basis_cents`,
+`annual_full_afa_cents`, `source` and `record_version`. Its two amount fields are null or
+nonnegative JSON integers. If either amount is non-null, both metadata fields are required as
+nonblank strings. `bank_header` is null or an object containing only `address`, `property_type`,
+`year_built`, `area_sqm_x100`, `unit_count`, `creator`, `export_date` and `layout_version`.
+Supplied text fields are nonblank strings; `year_built` is a positive JSON integer; area and unit
+count are nonnegative JSON integers. `renter_names` is null or an array of strings and remains
+excluded from Bank-PDF output.
+
+An optional value that was absent stays absent or JSON null exactly as received. It is never
+replaced by numeric zero. A zero is stored only when the caller explicitly supplied a valid zero.
+`rule_snapshot` has exactly these required fields and JSON types:
+
+```text
+default_building_share_bp: integer 0…10000
+default_afa_rate_bp: nonnegative integer
+default_marginal_tax_bp: integer 0…9999
+interest_sensitivity_offsets_bp: exactly five ordered integers with exactly one 0
+repayment_sensitivity_steps_bp: exactly four strictly increasing positive integers
+dscr_amber_hundredths: nonnegative integer
+dscr_green_hundredths: nonnegative integer, at least dscr_amber_hundredths
+cashflow_amber_cents: integer
+cashflow_green_cents: integer, at least cashflow_amber_cents
+source_evidence: nonempty array of nonblank strings
+rechtsstand: nonblank string
+production_blocked: boolean
+```
+
+`financing_provenance_snapshot` has exactly nonblank string `source` and `record_version`; `source`
+is one of `annahme`, `indikativ` or `angebot`. `afa_provenance_snapshot` preserves the complete
+engine provenance object and requires nonblank string `source` and `record_version` plus boolean
+`assumption`. Linked Page-03 and Wizard nested provenance remains inside that object unchanged.
+
+`(id, account_id, case_key)` and `(account_id, case_key, version)` are unique. The predecessor is a
+composite self-FK on `(supersedes_input_snapshot_id, account_id, case_key)` with the same root,
+immediate-version and no-fork rules as layout versions. `layout_version_id`, when present, is a
+composite FK with `account_id` to `investment_layout_version(id, account_id)`.
+
+#### `investment_result_snapshot`
+
+| Column | Type and nullability | Meaning |
+| --- | --- | --- |
+| `id` | string PK | immutable result identity |
+| `account_id` | string, not null | account boundary |
+| `input_snapshot_id` | string, not null | the one frozen input that produced this result |
+| `engine_version` | nonblank string, not null | exact investment-engine release identity |
+| `result_snapshot` | nonempty JSONB object, not null | complete plain `InvestmentResult` mapping |
+| `canonical_payload_version` | nonblank string, not null | exactly `postgres-jsonb-text-v1` |
+| `canonical_result_bytes` | nonempty bytes, not null | canonical result bytes defined below |
+| `sha256` | 64 lowercase hex characters, not null | SHA-256 of `canonical_result_bytes` |
+| `calculated_at` | timezone timestamp, not null | calculation time |
+
+`(id, account_id)` is unique. `(input_snapshot_id, account_id)` is both a composite FK to
+`investment_input_snapshot(id, account_id)` and unique, so a frozen input has at most one stored
+result. A correction appends a new input version and its new result; a result is never corrected or
+relinked in place. `result_snapshot` has exactly all fields of the plain `InvestmentResult`:
+
+```text
+outcome: "calculated" or "hard_block"
+calculated_values, kpi_slots: objects
+source_evidence: nonempty array of nonblank strings
+rechtsstand: nonblank string
+production_blocked: boolean
+applied_conventions: nonempty array of nonblank strings
+financing_provenance, afa_provenance, tax_provenance, bank_view: objects
+interest_sensitivity, repayment_sensitivity: arrays of objects
+repayment_axis_meaning, tax_scenario_label: nonblank strings
+findings, warnings: arrays of strings
+guard: object
+```
+
+No field may be omitted and no additional field is permitted. A `hard_block` keeps the engine's
+nonempty financing provenance selected before the repayment guard, empty calculated values and KPI
+slots, empty AfA/tax provenance, empty Bank view and sensitivity containers, and the complete
+nonblank repayment guard. A `calculated` result keeps its complete values and an empty guard.
+Database shape checks reject structurally incomplete or invented result mappings. The canonical
+replay check below remains the authority for the numeric content.
+
+#### Canonical bytes and lifecycle
+
+Canonical JSON is PostgreSQL JSONB text encoded as UTF-8. For an input row the value is the JSONB
+object with exactly these keys: `afa_provenance`, `financing_provenance`, `input`,
+`layout_version_id` and `rules`, populated from the corresponding frozen columns. Its UTF-8 bytes
+must equal `canonical_payload_bytes`. For a result row, `canonical_result_bytes` is exactly UTF-8
+`result_snapshot::text`. Each stored SHA-256 is the lowercase hex digest of its canonical byte
+column. Migration triggers reject any mismatch; application-supplied hashes are never trusted.
+
+Byte-for-byte reproduction means loading only the frozen input row, its frozen rule snapshot and
+the identified `engine_version`, running the pure engine, converting its plain result through the
+same `postgres-jsonb-text-v1` serializer, and obtaining exactly `canonical_result_bytes` and its
+SHA-256. Live account, layout or legal-rule rows never participate in replay.
+
+All three tables reject `UPDATE` and `DELETE`. Layout and input corrections use INSERT plus their
+scoped predecessor. A layout row becomes immutable when inserted; an input freezes its nullable
+layout selection at `frozen_at`; and the result permanently binds to that input. All three tables
+ENABLE and FORCE RLS. Owner-account `SELECT` and `INSERT` policies use `app.account_id`, refuse a
+nonempty renter `app.tenancy_id`, and every INSERT policy has an equivalent `WITH CHECK`. M10-I3
+adds entitlement and role authorization above this database account boundary.
 
 ## 5. Inputs
 
@@ -358,6 +524,7 @@ owning document.
 | eight Page-07 Non-Goals | §10 |
 | 18 register rows | §3 and `PAGE_07_REGISTER_ROWS` |
 | arithmetic audit | §1 and `ARITHMETIC_AUDIT` |
+| M10-I2 technical persistence decision accepted 12.09.2026 | §4.7 and migration `0045` fixtures |
 
 `docs/03` Appendix D is the single historical correspondence-retirement ledger. It records no
 Page-07 rule; current Page-07 authority is fully covered above.

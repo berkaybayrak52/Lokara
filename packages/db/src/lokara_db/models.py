@@ -4257,6 +4257,624 @@ class ChecklistItemEvent(Base):
     )
 
 
+_INVESTMENT_INPUT_KEYS = (
+    "purchase_price_cents",
+    "acquisition_costs_cents",
+    "monthly_actual_rent_cents",
+    "vacancy_bp",
+    "administration_cents",
+    "maintenance_cents",
+    "reserve_cents",
+    "vacancy_risk_cents",
+    "equity_cents",
+    "loan_cents",
+    "interest_bp",
+    "initial_repayment_bp",
+    "fixed_monthly_annuity_cents",
+    "marginal_tax_bp",
+    "building_share_bp",
+    "afa_rate_bp",
+    "annual_full_afa_cents",
+    "afa_record_version",
+    "analysis_period_months",
+    "financing_provenance",
+    "afa_reference",
+    "bank_header",
+    "renter_names",
+)
+_INVESTMENT_RULE_KEYS = (
+    "default_building_share_bp",
+    "default_afa_rate_bp",
+    "default_marginal_tax_bp",
+    "interest_sensitivity_offsets_bp",
+    "repayment_sensitivity_steps_bp",
+    "dscr_amber_hundredths",
+    "dscr_green_hundredths",
+    "cashflow_amber_cents",
+    "cashflow_green_cents",
+    "source_evidence",
+    "rechtsstand",
+    "production_blocked",
+)
+_INVESTMENT_RESULT_KEYS = (
+    "outcome",
+    "calculated_values",
+    "kpi_slots",
+    "source_evidence",
+    "rechtsstand",
+    "production_blocked",
+    "applied_conventions",
+    "financing_provenance",
+    "afa_provenance",
+    "tax_provenance",
+    "bank_view",
+    "interest_sensitivity",
+    "repayment_sensitivity",
+    "repayment_axis_meaning",
+    "tax_scenario_label",
+    "findings",
+    "warnings",
+    "guard",
+)
+
+
+def _investment_jsonb_key_array(values: tuple[str, ...]) -> str:
+    return "ARRAY[" + ", ".join(f"'{value}'" for value in values) + "]"
+
+
+def _investment_optional_integer(
+    column: str,
+    key: str,
+    *,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> str:
+    bounds = []
+    if minimum is not None:
+        bounds.append(f"({column} ->> '{key}')::numeric >= {minimum}")
+    if maximum is not None:
+        bounds.append(f"({column} ->> '{key}')::numeric <= {maximum}")
+    range_check = " AND ".join(bounds)
+    if range_check:
+        range_check = f" AND {range_check}"
+    return (
+        f"(NOT {column} ? '{key}' OR {column} -> '{key}' = 'null'::jsonb OR "
+        f"(public.jsonb_is_integer_m10({column} -> '{key}'){range_check}))"
+    )
+
+
+def _investment_optional_nonblank_string(column: str, key: str) -> str:
+    return (
+        f"(NOT {column} ? '{key}' OR {column} -> '{key}' = 'null'::jsonb OR "
+        f"(jsonb_typeof({column} -> '{key}') = 'string' AND "
+        f"btrim({column} ->> '{key}', E' \\t\\n\\r') <> ''))"
+    )
+
+
+_INVESTMENT_PUBLIC_VALUE_CHECKS = [
+    _investment_optional_integer("input_snapshot", key, minimum=0)
+    for key in (
+        "purchase_price_cents",
+        "acquisition_costs_cents",
+        "monthly_actual_rent_cents",
+        "administration_cents",
+        "maintenance_cents",
+        "reserve_cents",
+        "vacancy_risk_cents",
+        "equity_cents",
+        "loan_cents",
+        "interest_bp",
+        "initial_repayment_bp",
+        "fixed_monthly_annuity_cents",
+        "afa_rate_bp",
+        "annual_full_afa_cents",
+        "analysis_period_months",
+    )
+]
+_INVESTMENT_PUBLIC_VALUE_CHECKS.extend(
+    (
+        _investment_optional_integer("input_snapshot", "vacancy_bp", minimum=0, maximum=10_000),
+        _investment_optional_integer(
+            "input_snapshot", "building_share_bp", minimum=0, maximum=10_000
+        ),
+        _investment_optional_integer("input_snapshot", "marginal_tax_bp", minimum=0, maximum=9_999),
+        _investment_optional_nonblank_string("input_snapshot", "afa_record_version"),
+        "(NOT input_snapshot ? 'financing_provenance' "
+        "OR input_snapshot -> 'financing_provenance' = 'null'::jsonb "
+        "OR (jsonb_typeof(input_snapshot -> 'financing_provenance') = 'string' "
+        "AND input_snapshot ->> 'financing_provenance' "
+        "IN ('annahme', 'indikativ', 'angebot')))",
+        "(NOT input_snapshot ? 'annual_full_afa_cents' "
+        "OR input_snapshot -> 'annual_full_afa_cents' = 'null'::jsonb "
+        "OR (input_snapshot ? 'afa_record_version' "
+        "AND jsonb_typeof(input_snapshot -> 'afa_record_version') = 'string' "
+        "AND btrim(input_snapshot ->> 'afa_record_version', E' \\t\\n\\r') <> ''))",
+    )
+)
+_INVESTMENT_AFA_REFERENCE = "input_snapshot -> 'afa_reference'"
+_INVESTMENT_AFA_REFERENCE_VALUES = " AND ".join(
+    (
+        f"({_INVESTMENT_AFA_REFERENCE}) - ARRAY['afa_basis_cents', 'annual_full_afa_cents', "
+        "'source', 'record_version'] = '{}'::jsonb",
+        _investment_optional_integer(_INVESTMENT_AFA_REFERENCE, "afa_basis_cents", minimum=0),
+        _investment_optional_integer(_INVESTMENT_AFA_REFERENCE, "annual_full_afa_cents", minimum=0),
+        _investment_optional_nonblank_string(_INVESTMENT_AFA_REFERENCE, "source"),
+        _investment_optional_nonblank_string(_INVESTMENT_AFA_REFERENCE, "record_version"),
+        f"((COALESCE({_INVESTMENT_AFA_REFERENCE} -> 'afa_basis_cents', 'null'::jsonb) "
+        "= 'null'::jsonb "
+        f"AND COALESCE({_INVESTMENT_AFA_REFERENCE} -> 'annual_full_afa_cents', "
+        "'null'::jsonb) = 'null'::jsonb) OR "
+        f"({_INVESTMENT_AFA_REFERENCE} ?& ARRAY['source', 'record_version'] "
+        f"AND jsonb_typeof({_INVESTMENT_AFA_REFERENCE} -> 'source') = 'string' "
+        f"AND btrim({_INVESTMENT_AFA_REFERENCE} ->> 'source', E' \\t\\n\\r') <> '' "
+        f"AND jsonb_typeof({_INVESTMENT_AFA_REFERENCE} -> 'record_version') = 'string' "
+        f"AND btrim({_INVESTMENT_AFA_REFERENCE} ->> 'record_version', "
+        "E' \\t\\n\\r') <> ''))",
+    )
+)
+_INVESTMENT_BANK_HEADER = "input_snapshot -> 'bank_header'"
+_INVESTMENT_BANK_HEADER_VALUES = " AND ".join(
+    (
+        f"({_INVESTMENT_BANK_HEADER}) - ARRAY['address', 'property_type', 'year_built', "
+        "'area_sqm_x100', 'unit_count', 'creator', 'export_date', 'layout_version'] "
+        "= '{}'::jsonb",
+        *(
+            _investment_optional_nonblank_string(_INVESTMENT_BANK_HEADER, key)
+            for key in (
+                "address",
+                "property_type",
+                "creator",
+                "export_date",
+                "layout_version",
+            )
+        ),
+        _investment_optional_integer(_INVESTMENT_BANK_HEADER, "year_built", minimum=1),
+        _investment_optional_integer(_INVESTMENT_BANK_HEADER, "area_sqm_x100", minimum=0),
+        _investment_optional_integer(_INVESTMENT_BANK_HEADER, "unit_count", minimum=0),
+    )
+)
+_INVESTMENT_RULE_TYPES_CHECK = (
+    "public.jsonb_is_integer_m10(rule_snapshot -> 'default_building_share_bp') "
+    "AND public.jsonb_is_integer_m10(rule_snapshot -> 'default_afa_rate_bp') "
+    "AND public.jsonb_is_integer_m10(rule_snapshot -> 'default_marginal_tax_bp') "
+    "AND jsonb_typeof(rule_snapshot -> 'interest_sensitivity_offsets_bp') = 'array' "
+    "AND jsonb_typeof(rule_snapshot -> 'repayment_sensitivity_steps_bp') = 'array' "
+    "AND public.jsonb_is_integer_m10(rule_snapshot -> 'dscr_amber_hundredths') "
+    "AND public.jsonb_is_integer_m10(rule_snapshot -> 'dscr_green_hundredths') "
+    "AND public.jsonb_is_integer_m10(rule_snapshot -> 'cashflow_amber_cents') "
+    "AND public.jsonb_is_integer_m10(rule_snapshot -> 'cashflow_green_cents') "
+    "AND jsonb_typeof(rule_snapshot -> 'source_evidence') = 'array' "
+    "AND jsonb_typeof(rule_snapshot -> 'rechtsstand') = 'string' "
+    "AND btrim(rule_snapshot ->> 'rechtsstand', E' \\t\\n\\r') <> '' "
+    "AND jsonb_typeof(rule_snapshot -> 'production_blocked') = 'boolean'"
+)
+_INVESTMENT_RULE_VALUES_CHECK = (
+    "(rule_snapshot ->> 'default_building_share_bp')::numeric BETWEEN 0 AND 10000 "
+    "AND (rule_snapshot ->> 'default_afa_rate_bp')::numeric >= 0 "
+    "AND (rule_snapshot ->> 'default_marginal_tax_bp')::numeric BETWEEN 0 AND 9999 "
+    "AND public.jsonb_array_is_integer_m10("
+    "rule_snapshot -> 'interest_sensitivity_offsets_bp') "
+    "AND jsonb_array_length(rule_snapshot -> 'interest_sensitivity_offsets_bp') = 5 "
+    "AND (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 0)::numeric "
+    "<= (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 1)::numeric "
+    "AND (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 1)::numeric "
+    "<= (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 2)::numeric "
+    "AND (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 2)::numeric "
+    "<= (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 3)::numeric "
+    "AND (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 3)::numeric "
+    "<= (rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 4)::numeric "
+    "AND ((CASE WHEN rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 0 = '0' "
+    "THEN 1 ELSE 0 END) + "
+    "(CASE WHEN rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 1 = '0' "
+    "THEN 1 ELSE 0 END) + "
+    "(CASE WHEN rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 2 = '0' "
+    "THEN 1 ELSE 0 END) + "
+    "(CASE WHEN rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 3 = '0' "
+    "THEN 1 ELSE 0 END) + "
+    "(CASE WHEN rule_snapshot -> 'interest_sensitivity_offsets_bp' ->> 4 = '0' "
+    "THEN 1 ELSE 0 END)) = 1 "
+    "AND public.jsonb_array_is_integer_m10("
+    "rule_snapshot -> 'repayment_sensitivity_steps_bp') "
+    "AND jsonb_array_length(rule_snapshot -> 'repayment_sensitivity_steps_bp') = 4 "
+    "AND (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 0)::numeric > 0 "
+    "AND (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 0)::numeric "
+    "< (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 1)::numeric "
+    "AND (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 1)::numeric "
+    "< (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 2)::numeric "
+    "AND (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 2)::numeric "
+    "< (rule_snapshot -> 'repayment_sensitivity_steps_bp' ->> 3)::numeric "
+    "AND (rule_snapshot ->> 'dscr_amber_hundredths')::numeric >= 0 "
+    "AND (rule_snapshot ->> 'dscr_green_hundredths')::numeric "
+    ">= (rule_snapshot ->> 'dscr_amber_hundredths')::numeric "
+    "AND (rule_snapshot ->> 'cashflow_green_cents')::numeric "
+    ">= (rule_snapshot ->> 'cashflow_amber_cents')::numeric "
+    "AND jsonb_array_length(rule_snapshot -> 'source_evidence') > 0 "
+    "AND public.jsonb_array_is_nonblank_string_m10(rule_snapshot -> 'source_evidence')"
+)
+_INVESTMENT_RESULT_COMPLETE_CHECK = (
+    f"result_snapshot ?& {_investment_jsonb_key_array(_INVESTMENT_RESULT_KEYS)} "
+    f"AND result_snapshot - {_investment_jsonb_key_array(_INVESTMENT_RESULT_KEYS)} = '{{}}'::jsonb "
+    "AND jsonb_typeof(result_snapshot -> 'outcome') = 'string' "
+    "AND result_snapshot ->> 'outcome' IN ('calculated', 'hard_block') "
+    "AND jsonb_typeof(result_snapshot -> 'calculated_values') = 'object' "
+    "AND jsonb_typeof(result_snapshot -> 'kpi_slots') = 'object' "
+    "AND public.jsonb_array_is_nonblank_string_m10(result_snapshot -> 'source_evidence') "
+    "AND jsonb_array_length(result_snapshot -> 'source_evidence') > 0 "
+    "AND jsonb_typeof(result_snapshot -> 'rechtsstand') = 'string' "
+    "AND btrim(result_snapshot ->> 'rechtsstand', E' \\t\\n\\r') <> '' "
+    "AND jsonb_typeof(result_snapshot -> 'production_blocked') = 'boolean' "
+    "AND public.jsonb_array_is_nonblank_string_m10("
+    "result_snapshot -> 'applied_conventions') "
+    "AND jsonb_array_length(result_snapshot -> 'applied_conventions') > 0 "
+    "AND jsonb_typeof(result_snapshot -> 'financing_provenance') = 'object' "
+    "AND jsonb_typeof(result_snapshot -> 'afa_provenance') = 'object' "
+    "AND jsonb_typeof(result_snapshot -> 'tax_provenance') = 'object' "
+    "AND jsonb_typeof(result_snapshot -> 'bank_view') = 'object' "
+    "AND public.jsonb_array_is_object_m10(result_snapshot -> 'interest_sensitivity') "
+    "AND public.jsonb_array_is_object_m10(result_snapshot -> 'repayment_sensitivity') "
+    "AND jsonb_typeof(result_snapshot -> 'repayment_axis_meaning') = 'string' "
+    "AND btrim(result_snapshot ->> 'repayment_axis_meaning', E' \\t\\n\\r') <> '' "
+    "AND jsonb_typeof(result_snapshot -> 'tax_scenario_label') = 'string' "
+    "AND btrim(result_snapshot ->> 'tax_scenario_label', E' \\t\\n\\r') <> '' "
+    "AND public.jsonb_array_is_string_m10(result_snapshot -> 'findings') "
+    "AND public.jsonb_array_is_string_m10(result_snapshot -> 'warnings') "
+    "AND jsonb_typeof(result_snapshot -> 'guard') = 'object'"
+)
+_INVESTMENT_RESULT_VARIANT_CHECK = (
+    "((result_snapshot ->> 'outcome' = 'calculated' "
+    "AND result_snapshot -> 'guard' = '{}'::jsonb) OR "
+    "(result_snapshot ->> 'outcome' = 'hard_block' "
+    "AND result_snapshot -> 'calculated_values' = '{}'::jsonb "
+    "AND result_snapshot -> 'kpi_slots' = '{}'::jsonb "
+    "AND result_snapshot -> 'financing_provenance' <> '{}'::jsonb "
+    "AND result_snapshot -> 'afa_provenance' = '{}'::jsonb "
+    "AND result_snapshot -> 'tax_provenance' = '{}'::jsonb "
+    "AND result_snapshot -> 'bank_view' = '{}'::jsonb "
+    "AND result_snapshot -> 'interest_sensitivity' = '[]'::jsonb "
+    "AND result_snapshot -> 'repayment_sensitivity' = '[]'::jsonb "
+    "AND result_snapshot -> 'guard' ?& "
+    "ARRAY['first_interest_cents', 'first_repayment_cents', 'guard_text'] "
+    "AND (result_snapshot -> 'guard') - "
+    "ARRAY['first_interest_cents', 'first_repayment_cents', 'guard_text'] = '{}'::jsonb "
+    "AND public.jsonb_is_integer_m10("
+    "result_snapshot -> 'guard' -> 'first_interest_cents') "
+    "AND public.jsonb_is_integer_m10("
+    "result_snapshot -> 'guard' -> 'first_repayment_cents') "
+    "AND jsonb_typeof(result_snapshot -> 'guard' -> 'guard_text') = 'string' "
+    "AND btrim(result_snapshot -> 'guard' ->> 'guard_text', E' \\t\\n\\r') <> ''))"
+)
+
+
+class InvestmentLayoutVersion(Base):
+    """Immutable renderer-owned Bank-PDF layout correction stream."""
+
+    __tablename__ = "investment_layout_version"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    layout_key: Mapped[str]
+    version: Mapped[int]
+    layout_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    supersedes_layout_version_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["supersedes_layout_version_id", "account_id", "layout_key"],
+            [
+                "investment_layout_version.id",
+                "investment_layout_version.account_id",
+                "investment_layout_version.layout_key",
+            ],
+            name="investment_layout_version_supersedes_layout_version_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("investment_layout_version"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "layout_key",
+            name="uq_investment_layout_version_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "layout_key",
+            "version",
+            name="uq_investment_layout_version_stream_version",
+        ),
+        CheckConstraint("version > 0", name="ck_investment_layout_version_positive"),
+        CheckConstraint(
+            "btrim(layout_key, E' \\t\\n\\r') <> ''",
+            name="ck_investment_layout_version_key_nonblank",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(layout_snapshot) = 'object' AND layout_snapshot <> '{}'::jsonb",
+            name="ck_investment_layout_version_snapshot_object",
+        ),
+        CheckConstraint(
+            "((version = 1 AND supersedes_layout_version_id IS NULL) OR "
+            "(version > 1 AND supersedes_layout_version_id IS NOT NULL))",
+            name="ck_investment_layout_version_root",
+        ),
+        CheckConstraint(
+            "id <> supersedes_layout_version_id",
+            name="ck_investment_layout_version_not_self",
+        ),
+        Index(
+            "uq_investment_layout_version_root",
+            "account_id",
+            "layout_key",
+            unique=True,
+            postgresql_where=text("supersedes_layout_version_id IS NULL"),
+        ),
+        Index(
+            "uq_investment_layout_version_successor",
+            "account_id",
+            "supersedes_layout_version_id",
+            unique=True,
+            postgresql_where=text("supersedes_layout_version_id IS NOT NULL"),
+        ),
+        Index("ix_investment_layout_version_account", "account_id"),
+    )
+
+
+class InvestmentInputSnapshot(Base):
+    """Immutable normalized investment input and its complete replay context."""
+
+    __tablename__ = "investment_input_snapshot"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    case_key: Mapped[str]
+    version: Mapped[int]
+    input_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    rule_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    financing_provenance_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    afa_provenance_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    layout_version_id: Mapped[str | None]
+    canonical_payload_version: Mapped[str]
+    canonical_payload_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    sha256: Mapped[str]
+    supersedes_input_snapshot_id: Mapped[str | None]
+    frozen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["supersedes_input_snapshot_id", "account_id", "case_key"],
+            [
+                "investment_input_snapshot.id",
+                "investment_input_snapshot.account_id",
+                "investment_input_snapshot.case_key",
+            ],
+            name="investment_input_snapshot_supersedes_input_snapshot_id_fkey",
+            match="SIMPLE",
+        ),
+        ForeignKeyConstraint(
+            ["layout_version_id", "account_id"],
+            ["investment_layout_version.id", "investment_layout_version.account_id"],
+            name="investment_input_snapshot_layout_version_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_pair("investment_input_snapshot"),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "case_key",
+            name="uq_investment_input_snapshot_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "case_key",
+            "version",
+            name="uq_investment_input_snapshot_stream_version",
+        ),
+        CheckConstraint("version > 0", name="ck_investment_input_snapshot_positive"),
+        CheckConstraint(
+            "btrim(case_key, E' \\t\\n\\r') <> ''",
+            name="ck_investment_input_snapshot_case_key_nonblank",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(input_snapshot) = 'object'",
+            name="ck_investment_input_snapshot_input_object",
+        ),
+        CheckConstraint(
+            f"input_snapshot - {_investment_jsonb_key_array(_INVESTMENT_INPUT_KEYS)} "
+            "= '{}'::jsonb",
+            name="ck_investment_input_snapshot_public_keys",
+        ),
+        CheckConstraint(
+            "(NOT input_snapshot ? 'afa_reference' "
+            "OR input_snapshot -> 'afa_reference' = 'null'::jsonb "
+            "OR jsonb_typeof(input_snapshot -> 'afa_reference') = 'object') "
+            "AND (NOT input_snapshot ? 'bank_header' "
+            "OR input_snapshot -> 'bank_header' = 'null'::jsonb "
+            "OR jsonb_typeof(input_snapshot -> 'bank_header') = 'object') "
+            "AND (NOT input_snapshot ? 'renter_names' "
+            "OR input_snapshot -> 'renter_names' = 'null'::jsonb "
+            "OR jsonb_typeof(input_snapshot -> 'renter_names') = 'array')",
+            name="ck_investment_input_snapshot_nested_shapes",
+        ),
+        CheckConstraint(
+            " AND ".join(_INVESTMENT_PUBLIC_VALUE_CHECKS),
+            name="ck_investment_input_snapshot_public_value_types",
+        ),
+        CheckConstraint(
+            "(NOT input_snapshot ? 'afa_reference' "
+            "OR input_snapshot -> 'afa_reference' = 'null'::jsonb "
+            f"OR ({_INVESTMENT_AFA_REFERENCE_VALUES}))",
+            name="ck_investment_input_snapshot_afa_reference_values",
+        ),
+        CheckConstraint(
+            "(NOT input_snapshot ? 'bank_header' "
+            "OR input_snapshot -> 'bank_header' = 'null'::jsonb "
+            f"OR ({_INVESTMENT_BANK_HEADER_VALUES}))",
+            name="ck_investment_input_snapshot_bank_header_values",
+        ),
+        CheckConstraint(
+            "(NOT input_snapshot ? 'renter_names' "
+            "OR input_snapshot -> 'renter_names' = 'null'::jsonb "
+            "OR public.jsonb_array_is_string_m10(input_snapshot -> 'renter_names'))",
+            name="ck_investment_input_snapshot_renter_names_values",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(rule_snapshot) = 'object' AND rule_snapshot <> '{}'::jsonb",
+            name="ck_investment_input_snapshot_rule_object",
+        ),
+        CheckConstraint(
+            f"rule_snapshot ?& {_investment_jsonb_key_array(_INVESTMENT_RULE_KEYS)} "
+            f"AND rule_snapshot - {_investment_jsonb_key_array(_INVESTMENT_RULE_KEYS)} "
+            "= '{}'::jsonb",
+            name="ck_investment_input_snapshot_rule_shape",
+        ),
+        CheckConstraint(
+            _INVESTMENT_RULE_TYPES_CHECK,
+            name="ck_investment_input_snapshot_rule_types",
+        ),
+        CheckConstraint(
+            _INVESTMENT_RULE_VALUES_CHECK,
+            name="ck_investment_input_snapshot_rule_values",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(financing_provenance_snapshot) = 'object' "
+            "AND financing_provenance_snapshot <> '{}'::jsonb",
+            name="ck_investment_input_snapshot_financing_provenance_object",
+        ),
+        CheckConstraint(
+            "financing_provenance_snapshot ?& ARRAY['source', 'record_version'] "
+            "AND financing_provenance_snapshot - ARRAY['source', 'record_version'] = '{}'::jsonb "
+            "AND jsonb_typeof(financing_provenance_snapshot -> 'source') = 'string' "
+            "AND financing_provenance_snapshot ->> 'source' "
+            "IN ('annahme', 'indikativ', 'angebot') "
+            "AND jsonb_typeof(financing_provenance_snapshot -> 'record_version') = 'string' "
+            "AND btrim(financing_provenance_snapshot ->> 'record_version', E' \\t\\n\\r') <> ''",
+            name="ck_investment_input_snapshot_financing_provenance",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(afa_provenance_snapshot) = 'object' "
+            "AND afa_provenance_snapshot <> '{}'::jsonb",
+            name="ck_investment_input_snapshot_afa_provenance_object",
+        ),
+        CheckConstraint(
+            "afa_provenance_snapshot ?& ARRAY['source', 'record_version', 'assumption'] "
+            "AND jsonb_typeof(afa_provenance_snapshot -> 'source') = 'string' "
+            "AND btrim(afa_provenance_snapshot ->> 'source', E' \\t\\n\\r') <> '' "
+            "AND jsonb_typeof(afa_provenance_snapshot -> 'record_version') = 'string' "
+            "AND btrim(afa_provenance_snapshot ->> 'record_version', E' \\t\\n\\r') <> '' "
+            "AND jsonb_typeof(afa_provenance_snapshot -> 'assumption') = 'boolean'",
+            name="ck_investment_input_snapshot_afa_provenance",
+        ),
+        CheckConstraint(
+            "canonical_payload_version = 'postgres-jsonb-text-v1'",
+            name="ck_investment_input_snapshot_canonical_version",
+        ),
+        CheckConstraint(
+            "octet_length(canonical_payload_bytes) > 0",
+            name="ck_investment_input_snapshot_canonical_bytes_nonempty",
+        ),
+        CheckConstraint(
+            "sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_investment_input_snapshot_sha256",
+        ),
+        CheckConstraint(
+            "((version = 1 AND supersedes_input_snapshot_id IS NULL) OR "
+            "(version > 1 AND supersedes_input_snapshot_id IS NOT NULL))",
+            name="ck_investment_input_snapshot_root",
+        ),
+        CheckConstraint(
+            "id <> supersedes_input_snapshot_id",
+            name="ck_investment_input_snapshot_not_self",
+        ),
+        Index(
+            "uq_investment_input_snapshot_root",
+            "account_id",
+            "case_key",
+            unique=True,
+            postgresql_where=text("supersedes_input_snapshot_id IS NULL"),
+        ),
+        Index(
+            "uq_investment_input_snapshot_successor",
+            "account_id",
+            "supersedes_input_snapshot_id",
+            unique=True,
+            postgresql_where=text("supersedes_input_snapshot_id IS NOT NULL"),
+        ),
+        Index("ix_investment_input_snapshot_account", "account_id"),
+    )
+
+
+class InvestmentResultSnapshot(Base):
+    """One immutable engine result for one frozen investment input."""
+
+    __tablename__ = "investment_result_snapshot"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    input_snapshot_id: Mapped[str]
+    engine_version: Mapped[str]
+    result_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    canonical_payload_version: Mapped[str]
+    canonical_result_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    sha256: Mapped[str]
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        _scoped_fk("investment_result_snapshot", "input_snapshot_id", "investment_input_snapshot"),
+        _scoped_pair("investment_result_snapshot"),
+        UniqueConstraint(
+            "input_snapshot_id",
+            "account_id",
+            name="uq_investment_result_snapshot_input",
+        ),
+        CheckConstraint(
+            "btrim(engine_version, E' \\t\\n\\r') <> ''",
+            name="ck_investment_result_snapshot_engine_version_nonblank",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(result_snapshot) = 'object' AND result_snapshot <> '{}'::jsonb",
+            name="ck_investment_result_snapshot_object",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(result_snapshot -> 'source_evidence') = 'array' "
+            "AND jsonb_array_length(result_snapshot -> 'source_evidence') > 0 "
+            "AND jsonb_typeof(result_snapshot -> 'rechtsstand') = 'string' "
+            "AND btrim(result_snapshot ->> 'rechtsstand', E' \\t\\n\\r') <> '' "
+            "AND jsonb_typeof(result_snapshot -> 'production_blocked') = 'boolean' "
+            "AND jsonb_typeof(result_snapshot -> 'financing_provenance') = 'object' "
+            "AND result_snapshot -> 'financing_provenance' ?& ARRAY['source', 'badge'] "
+            "AND (result_snapshot -> 'financing_provenance') - "
+            "ARRAY['source', 'badge'] = '{}'::jsonb "
+            "AND result_snapshot -> 'financing_provenance' ->> 'source' "
+            "IN ('annahme', 'indikativ', 'angebot') "
+            "AND jsonb_typeof(result_snapshot -> 'financing_provenance' -> 'badge') = 'string' "
+            "AND btrim(result_snapshot -> 'financing_provenance' ->> 'badge', "
+            "E' \\t\\n\\r') <> '' "
+            "AND jsonb_typeof(result_snapshot -> 'afa_provenance') = 'object'",
+            name="ck_investment_result_snapshot_replay_provenance",
+        ),
+        CheckConstraint(
+            _INVESTMENT_RESULT_COMPLETE_CHECK,
+            name="ck_investment_result_snapshot_complete_shape",
+        ),
+        CheckConstraint(
+            _INVESTMENT_RESULT_VARIANT_CHECK,
+            name="ck_investment_result_snapshot_variant_shape",
+        ),
+        CheckConstraint(
+            "canonical_payload_version = 'postgres-jsonb-text-v1'",
+            name="ck_investment_result_snapshot_canonical_version",
+        ),
+        CheckConstraint(
+            "octet_length(canonical_result_bytes) > 0",
+            name="ck_investment_result_snapshot_canonical_bytes_nonempty",
+        ),
+        CheckConstraint(
+            "sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_investment_result_snapshot_sha256",
+        ),
+        Index("ix_investment_result_snapshot_account", "account_id"),
+    )
+
+
 # Tables scoped by their own account_id column — the Alembic migration enables
 # FORCEd RLS on each of these plus `account`, which is scoped by its own id.
 # `building_assignment` joined this tuple with migration 0004: its scope used to be
@@ -4341,4 +4959,7 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "recipient_suppression_event",
     "checklist_instance",
     "checklist_item_event",
+    "investment_layout_version",
+    "investment_input_snapshot",
+    "investment_result_snapshot",
 )

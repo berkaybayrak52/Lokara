@@ -1,16 +1,16 @@
-# Last output — M10-R3 verified
+# Last output — M10-I2 technically complete
 
-HEAD `e011540` on `slice/m10-r3-renter-publication` · `11.09.2026`
+HEAD `58f8f36` on `slice/m10-i2-investment-persistence` · `16.09.2026`
 Status: Complete
 
 ## Wanted
-Complete and verify M10-R3 renter document publication.
+Finish the active M10-I2 persistence slice.
 
 ## Done
-Implemented migration `0043`, immutable renter publications, owner publication and renter list/download APIs. A real `0043 → 0042 → 0043` cycle and 132 focused tests pass. RLS covers 77 tables, FK isolation covers 157 edges and the boundary audit is clean. The red window is closed. The full gate passes 2045 Python and 210 web tests.
+Migration `0045` and its three immutable investment tables are implemented. Focused persistence tests pass `109`, RLS tests pass `113`, coverage is clean for `80` tenant tables and `161` tenant FKs, and the boundary audit has no finding. The full gate passes `2259` Python and `258` web tests. The RED window is closed.
 
 ## Not done
-Commit, merge and push were not authorized and remain undone. The five unrelated `adjustment/` files remain untouched.
+Commit, merge and push were not authorized. M10-I3/I4 and all Page-07 production blockers remain pending. Five unrelated `adjustment/` files remain untouched.
 
 ## Optional next step
-Commit the verified M10-R3 slice if Emir authorizes it.
+Review and commit the completed M10-I2 slice.

@@ -131,6 +131,10 @@ EXPECTED_TABLES = {
     "renter_activation_attempt",
     # M10-R3 immutable renter document publication (docs/02; migration 0043).
     "renter_portal_publication",
+    # M10-I2 immutable investment persistence (docs/14 § 4.7; migration 0045).
+    "investment_layout_version",
+    "investment_input_snapshot",
+    "investment_result_snapshot",
 }
 
 

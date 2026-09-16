@@ -1,4 +1,45 @@
-# Lokara handoff — owner activation demo complete
+# Lokara handoff — M10-I2 technically complete
+
+## Investment persistence closure — 16.09.2026
+
+M10-I2 is technically complete on `slice/m10-i2-investment-persistence` and remains uncommitted.
+Nothing was pushed. Migration `0045` implements the approved `docs/14` § 4.7 contract with exactly
+three append-only, account-scoped tables for layout versions, frozen inputs and one-to-one results.
+
+- A real `0044 → 0045` application and all `109` focused persistence tests pass. Frozen inputs
+  reproduce their stored KPI result byte-for-byte through canonical PostgreSQL JSONB bytes and a
+  database-verified SHA-256 digest.
+- The full RLS isolation suite passes `113`. RLS coverage is clean for `80` tenant tables and FK
+  isolation is clean for all `161` tenant edges. Owner-only policies, renter refusal, correction
+  streams and UPDATE/DELETE rejection are live-tested with rolled-back probes.
+- The required boundary audit reports no finding and confirms there is no Building, statement, tax
+  export or demo coupling.
+- `scripts/gate.sh full` is green: strict typing, lint, purity, parity, pre-context checks, `2259`
+  Python tests and `258` web tests pass. `.lokara-red` is absent.
+- All Page-07 production blockers remain active. M10-I3 API and entitlement work is next; I4 cockpit
+  and Bank-PDF remain pending. Preserve the five unrelated untracked `adjustment/` files.
+
+## Investment engine closure — 12.09.2026
+
+M10-I0/I1 is committed as `58f8f36` and fast-forwarded into local `main`. Nothing is pushed.
+
+- `packages/investment-engine` and its executable Page-07 suite are present with workspace, gate and
+  purity wiring. The focused suite passes `94`; the fast gate passes with `734`
+  pure-package tests.
+- Closed review findings include strict top-level Wizard AfA version validation, the complete
+  four-row guarded repayment axis, all-equity LTV, AfA value provenance, populated Bank-view blocks,
+  disclosures, complete/partial input validation, runtime-rule validation, Bank-header key/value
+  allowlisting, caller-owned layout version, repayment-control ranges, nonblank source evidence and
+  `Rechtsstand`, nested AfA metadata, and five-row guarded interest sensitivity.
+- The required read-only statement review is clean. No known I0/I1 implementation blocker remains.
+- A negative closing balance under early payoff is suspected, but `docs/14` does not define payoff
+  capping. Keep it recorded as a specification-authority limit; do not invent behavior in I0/I1.
+- `scripts/gate.sh full` is green: Ruff, formatting, strict mypy, purity, parity, pre-context checks,
+  `2146` Python tests and `258` web tests pass.
+- The later approved `docs/14` § 4.7 contract and its M10-I2 implementation supersede the former
+  no-schema marker; see the current closure above.
+
+## Previous checkpoint — owner activation demo complete
 
 ## Demo preview repair closure — 12.09.2026
 
