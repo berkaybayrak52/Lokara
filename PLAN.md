@@ -17,9 +17,8 @@ before UI. Dates are communication events, not planning inputs.
   append-only concurrency, server-owned rules/provenance, atomic input/result persistence,
   canonical hashes and stored-only reads are enforced. The boundary audit is clean; RLS covers
   `81` tenant tables and FK isolation covers `163` edges. The full gate passes `2285` Python and
-  `258` web tests, and the RED window is closed. The work is uncommitted and unmerged on
-  `slice/m10-i3-investment-api`; nothing was pushed. M10-I4 remains pending and every Page-07
-  production blocker remains active.
+  `258` web tests, and the RED window is closed. Commit `dc8ccd9` is locally merged into `main`;
+  nothing was pushed. M10-I4 remains pending and every Page-07 production blocker remains active.
 - **M10-I2 technically complete and verified locally (16.09.2026).** Migration `0045` adds exactly
   three immutable account-scoped investment tables for versioned layouts, frozen inputs and their
   one-to-one results. Composite account FKs, correction chains, owner-only forced RLS, renter
@@ -2033,9 +2032,8 @@ production blockers remain active.
 and the six exact owner-only route-methods. The combined focused suite passes `165`; the required
 read-only boundary audit reports no confirmed or suspected finding. RLS covers `81` tenant tables
 and FK isolation covers all `163` tenant edges. The full gate passes `2285` Python and `258` web
-tests, and `.lokara-red` is absent. The work is uncommitted and unmerged on
-`slice/m10-i3-investment-api`; nothing was pushed. M10-I4 and all Page-07 production blockers remain
-pending.
+tests, and `.lokara-red` is absent. The implementation is committed as `dc8ccd9` and locally merged
+into `main`; nothing was pushed. M10-I4 and all Page-07 production blockers remain pending.
 
 ##### M10-I4 — investment cockpit and Bank-PDF
 

@@ -2,9 +2,8 @@
 
 ## Current state — 16.09.2026
 
-M10-I2 is committed as `e9a17e3` and locally merged into `main`. M10-I3 is technically complete but
-uncommitted and unmerged on `slice/m10-i3-investment-api`. Nothing was pushed and `.lokara-red` is
-absent.
+M10-I2 is committed as `e9a17e3` and locally merged into `main`. M10-I3 is committed as `dc8ccd9`
+and locally merged into `main`. Nothing was pushed and `.lokara-red` is absent.
 
 The approved `docs/14` § 4.8 contract and fixtures `M10-INV-F01…F10` are implemented by migration
 `0046`, the server-owned rule bundle and six exact owner-only route-methods. D4 gating, renter

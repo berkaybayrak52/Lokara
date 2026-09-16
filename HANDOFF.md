@@ -2,9 +2,9 @@
 
 ## Investment API and entitlement closure — 16.09.2026
 
-M10-I3 is technically complete on `slice/m10-i3-investment-api`. It is uncommitted and unmerged;
-nothing was pushed. Migration `0046`, the server-owned investment rule bundle and the six approved
-owner-only route-methods implement `docs/14` § 4.8 and fixtures `M10-INV-F01…F10`.
+M10-I3 is committed as `dc8ccd9` and locally merged into `main`; nothing was pushed. Migration
+`0046`, the server-owned investment rule bundle and the six approved owner-only route-methods
+implement `docs/14` § 4.8 and fixtures `M10-INV-F01…F10`.
 
 - D4 entitlement gating, renter refusal, anti-enumeration, append-only concurrency, atomic
   input/result persistence, canonical hashes, server-owned provenance and stored-only reads are
@@ -33,8 +33,8 @@ account-scoped tables for layout versions, frozen inputs and one-to-one results.
   export or demo coupling.
 - `scripts/gate.sh full` is green: strict typing, lint, purity, parity, pre-context checks, `2259`
   Python tests and `258` web tests pass. `.lokara-red` is absent.
-- All Page-07 production blockers remain active. M10-I3 API and entitlement work is next; I4 cockpit
-  and Bank-PDF remain pending. Preserve the five unrelated untracked `adjustment/` files.
+- All Page-07 production blockers remain active. M10-I3 is now complete; I4 cockpit and Bank-PDF
+  remain pending. Preserve the five unrelated untracked `adjustment/` files.
 
 ## Investment engine closure — 12.09.2026
 
