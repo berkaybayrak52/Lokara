@@ -1,20 +1,22 @@
-# Last output — M10-I3 technically complete
+# Last output — M10-I4 repaired and verified
 
-HEAD `e9a17e3` on `slice/m10-i3-investment-api` · `16.09.2026`
+HEAD `62c9fda` on `slice/m10-i4-investment-cockpit` · `16.09.2026`
 Status: Complete
 
 ## Wanted
-Finish M10-I3 investment API and entitlement work.
+
+Resume M10-I4 review repairs and close its technical checks.
 
 ## Done
-Migration `0046`, the immutable D4 entitlement stream, server-owned rules and all six approved
-owner-only API route-methods are implemented. The focused suite passes `165`; the boundary audit is
-clean; RLS covers `81` tables and FK isolation covers `163` edges. The full gate is green with
-`2285` Python and `258` web tests, and `.lokara-red` is absent.
+
+Complete entry, visible liquidity colours, source-backed partial PDF and mobile readability repaired;
+both reviews clean. Focused tests `18 + 7 + 22`; full/demo gates `2310` Python / `265` web, non-fresh path green.
+Ordinary statement fingerprint unchanged: `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes; RED closed.
 
 ## Not done
-M10-I3 is uncommitted and unmerged; nothing was pushed. M10-I4 and all Page-07 production blockers
-remain pending. Five unrelated `adjustment/` files remain untouched.
+
+Uncommitted/unmerged; nothing pushed. Live UI/true 200% zoom, M10-F and production approval remain deferred.
 
 ## Optional next step
-Commit and locally merge M10-I3 when authorized.
+
+None.

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, date, datetime
 from hashlib import sha256
 from importlib.metadata import version as package_version
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from investment_engine import InvestmentInput, calculate_investment_snapshot
 from lokara_db import (
     InvestmentEntitlementEvent,
@@ -17,6 +18,11 @@ from lokara_db import (
     InvestmentLayoutVersion,
     InvestmentResultSnapshot,
     new_id,
+)
+from lokara_pdf import (
+    DEFAULT_BANK_LAYOUT_SNAPSHOT,
+    InvestmentBankPdfData,
+    render_investment_bank_pdf,
 )
 from lokara_rules_store import resolve_investment_rule_bundle
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -29,6 +35,7 @@ from ..deps import PathAccountSession
 router = APIRouter(prefix="/a/{account_id}/investment", tags=["investment"])
 
 _ENTITLEMENT_KEY = "INVESTMENT"
+_DEFAULT_LAYOUT_KEY = "DEFAULT_BANK"
 _CANONICAL_VERSION = "postgres-jsonb-text-v1"
 _ENGINE_VERSION = f"lokara-investment-engine/{package_version('lokara-investment-engine')}"
 
@@ -305,6 +312,37 @@ def _afa_provenance_snapshot(
     }
 
 
+def _default_layout_version(session: PathAccountSession, account_id: str) -> str:
+    """Resolve the canonical account layout under one transaction-scoped stream lock."""
+
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:stream_key, 0))"),
+        {"stream_key": f"{account_id}:{_DEFAULT_LAYOUT_KEY}"},
+    )
+    previous = session.scalar(
+        select(InvestmentLayoutVersion)
+        .where(
+            InvestmentLayoutVersion.account_id == account_id,
+            InvestmentLayoutVersion.layout_key == _DEFAULT_LAYOUT_KEY,
+        )
+        .order_by(InvestmentLayoutVersion.version.desc())
+        .limit(1)
+    )
+    if previous is not None and previous.layout_snapshot == DEFAULT_BANK_LAYOUT_SNAPSHOT:
+        return previous.id
+    layout = InvestmentLayoutVersion(
+        id=new_id(),
+        account_id=account_id,
+        layout_key=_DEFAULT_LAYOUT_KEY,
+        version=1 if previous is None else previous.version + 1,
+        layout_snapshot=deepcopy(DEFAULT_BANK_LAYOUT_SNAPSHOT),
+        supersedes_layout_version_id=None if previous is None else previous.id,
+    )
+    session.add(layout)
+    session.flush()
+    return layout.id
+
+
 @router.get("/entitlement", response_model=EntitlementResponse)
 def get_entitlement(account_id: str, session: PathAccountSession) -> EntitlementResponse:
     require_owner(session)
@@ -361,15 +399,18 @@ def create_case(
 ) -> InvestmentCaseResponse:
     require_owner(session)
     _require_enabled(session, account_id)
-    if payload.layout_version_id is not None:
+    layout_version_id = payload.layout_version_id
+    if layout_version_id is not None:
         layout_exists = session.scalar(
             select(InvestmentLayoutVersion.id).where(
-                InvestmentLayoutVersion.id == payload.layout_version_id,
+                InvestmentLayoutVersion.id == layout_version_id,
                 InvestmentLayoutVersion.account_id == account_id,
             )
         )
         if layout_exists is None:
             raise HTTPException(status_code=422, detail="Invalid investment layout version")
+    else:
+        layout_version_id = _default_layout_version(session, account_id)
 
     facts = payload.facts.model_dump(
         mode="json",
@@ -396,7 +437,7 @@ def create_case(
         rules=rules,
         financing=financing,
         afa=afa,
-        layout_version_id=payload.layout_version_id,
+        layout_version_id=layout_version_id,
     )
     canonical_result = _canonical_result_bytes(session, result)
     now = datetime.now(UTC)
@@ -412,7 +453,7 @@ def create_case(
         rule_snapshot=rules,
         financing_provenance_snapshot=financing,
         afa_provenance_snapshot=afa,
-        layout_version_id=payload.layout_version_id,
+        layout_version_id=layout_version_id,
         canonical_payload_version=_CANONICAL_VERSION,
         canonical_payload_bytes=canonical_input,
         sha256=sha256(canonical_input).hexdigest(),
@@ -480,3 +521,45 @@ def get_bank_view(
     _require_enabled(session, account_id)
     _stored_input, stored_result = _stored_case(session, account_id, case_key)
     return BankViewResponse(bank_view=_stored_dict(stored_result.result_snapshot["bank_view"]))
+
+
+@router.get("/cases/{case_key}/bank-pdf")
+def get_bank_pdf(
+    account_id: str,
+    case_key: str,
+    session: PathAccountSession,
+) -> Response:
+    require_owner(session)
+    _require_enabled(session, account_id)
+    stored_input, stored_result = _stored_case(session, account_id, case_key)
+    if stored_input.layout_version_id is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Für dieses Prüfobjekt ist keine PDF-Vorlage gespeichert.",
+        )
+    layout = session.scalar(
+        select(InvestmentLayoutVersion).where(
+            InvestmentLayoutVersion.id == stored_input.layout_version_id,
+            InvestmentLayoutVersion.account_id == account_id,
+        )
+    )
+    if layout is None:
+        raise HTTPException(status_code=404, detail="Investment case not found")
+    result = _stored_dict(stored_result.result_snapshot)
+    data = InvestmentBankPdfData(
+        case_key=stored_input.case_key,
+        input_version=stored_input.version,
+        result_id=stored_result.id,
+        engine_version=stored_result.engine_version,
+        layout_version_id=layout.id,
+        bank_view=_stored_dict(result["bank_view"]),
+        result_snapshot=result,
+        layout_snapshot=_stored_dict(layout.layout_snapshot),
+    )
+    return Response(
+        content=render_investment_bank_pdf(data),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (f'attachment; filename="investitionsuebersicht-{case_key}.pdf"')
+        },
+    )

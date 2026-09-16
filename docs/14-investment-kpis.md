@@ -1,6 +1,6 @@
 # Investment KPIs — planning calculations and deterministic bank view
 
-**Status:** D2 transcription complete; M10-I0/I1 and M10-I2 technically implemented; M10-I3 contract approved
+**Status:** D2 transcription complete; M10-I0–I4 technically implemented and locally verified; I4 unmerged
 
 **Rechtsstand:** 07/2026
 
@@ -10,11 +10,13 @@
 **Fixtures:** exactly `14-F01`–`14-F14` in
 `packages/rules-store/tests/berkay_14_golden.py`
 
-**Implementation status:** the pure engine and the section-4.7 persistence contract are technically
-complete through migration `0045`. Section 4.8 fixes the M10-I3 entitlement and API contract before
-implementation. UI, PDF rendering, pricing and bank integration remain outside this contract.
+**Implementation status:** the pure engine, section-4.7 persistence contract and section-4.8 API
+contract are technically complete through migration `0046`. The section-4.9 cockpit, server-owned
+default layout and frozen Bank-PDF are implemented and verified locally on
+`slice/m10-i4-investment-cockpit`, unmerged. No production approval is implied;
+all Page-07 production blockers remain. Pricing and bank integration remain outside this contract.
 
-This document defines a future planning calculation for a **Prüfobjekt**: a property being
+This document defines a planning calculation for a **Prüfobjekt**: a property being
 considered for purchase. It produces exactly seven KPIs and a deterministic Bank-PDF view. The
 results are conventions and scenarios, not a valuation, credit decision, bank application,
 investment recommendation, tax export or promise of a tax result.
@@ -388,6 +390,148 @@ identity.
 | `M10-INV-F08` | forbidden or invalid request data returns `422` and writes nothing |
 | `M10-INV-F09` | foreign/missing cases are `404`; renter identity and billing/product surfaces are absent |
 | `M10-INV-F10` | OpenAPI exposes exactly the six route-method pairs above, with no list/correction/PDF route |
+
+### 4.9 M10-I4 cockpit, default layout and Bank-PDF contract
+
+This subsection is the accepted M10-I4 technical decision, fixed on 16.09.2026. It adds no table,
+calculation, pricing, purchase, billing, bank integration or production approval. The legal and
+calculation Rechtsstand remains **07/2026**, and every production blocker in § 11 stays active.
+
+#### Server-owned immutable default layout
+
+The account-scoped `investment_layout_version` stream with `layout_key = "DEFAULT_BANK"` is the
+server-owned Bank-PDF default. Its canonical layout snapshot is a nonempty JSON object with schema
+version `investment-bank-pdf-v1`, locale `de-DE`, A4 format, and this exact ordered block list:
+
+```text
+header_disclosure
+investment
+financing_ltv
+rent_and_planning_costs
+seven_kpis
+sensitivity
+twelve_month_schedule
+assumptions_method
+disclosure
+```
+
+It also freezes the artifact disclosure from § 2, the product disclaimer
+`rechtskonform, keine Rechts- oder Steuerberatung`, the permanent LTV wording
+`Auslauf zum Kaufpreis, nicht zum Beleihungswert`, and the missing-value glyph `—`. These are
+renderer data, not live copy looked up at download time.
+
+When case POST omits `layoutVersionId`, the server takes an account-and-layout-stream advisory
+transaction lock and resolves the latest `DEFAULT_BANK` row. If none exists, it appends version 1
+from the server-owned canonical snapshot. If a later server release changes that canonical
+snapshot, the first subsequent case appends the immediate next version; it never updates a row.
+Concurrent creates for one account therefore produce one root or one immediate successor, never a
+fork. Different accounts always receive different account-scoped rows. A latest row whose snapshot
+already equals the canonical snapshot is reused.
+
+The selected row ID is persisted on the new frozen input before the case transaction completes.
+An explicitly supplied same-account `layoutVersionId` remains supported and is frozen unchanged.
+An existing case never floats to a later default-layout version. Default resolution, optional
+layout append, input and result insertion are one transaction: any case failure leaves none of
+those writes behind. No layout-management route, caller-supplied layout snapshot or new table is
+added.
+
+#### Exact route, authorization and frozen rendering
+
+M10-I4 adds exactly one route to the six route-method pairs in § 4.8:
+
+```text
+GET /a/{account_id}/investment/cases/{case_key}/bank-pdf
+```
+
+The complete investment API surface is therefore exactly seven method-path pairs. The PDF route
+requires a live `OWNER` Membership and latest enabled D4 entitlement exactly like every other case
+route. Employee, tax-adviser, foreign-Membership and renter contexts are denied. A missing or
+foreign `case_key` returns the same anti-enumeration `404` as the stored JSON reads.
+
+The route loads only the latest frozen input/result pair for that case and the exact
+`investment_layout_version.id` stored on that input. Its renderer input is an immutable, slotted
+value carrying the stored `bank_view`, complete stored result snapshot, exact stored layout
+snapshot and their frozen identities. It does not run the investment engine, resolve a live rule
+bundle, resolve the latest layout stream, or read Building, Renter, statement, tax-export or demo
+data. A legacy frozen input whose `layout_version_id` is null receives `409` with
+`Für dieses Prüfobjekt ist keine PDF-Vorlage gespeichert.`; it never acquires the current default
+retroactively.
+
+The response is `application/pdf` with attachment filename
+`investitionsuebersicht-{case_key}.pdf`. For identical frozen renderer input and the same renderer
+version, two renders are byte-identical. The document uses the exact block order above. It renders
+all seven stored KPI slots, both stored sensitivity axes and exactly twelve stored schedule rows;
+it performs no arithmetic. Under `14-F12` partial data stays renderable: every unavailable value is
+the standalone glyph `—`, with `Daten unvollständig`, and the financing section carries a soft
+missing-financing note. Missing loan facts must not be presented as known zero debt or as
+`Kein Fremdkapital`; that non-applicability statement is reserved for explicitly stored zero
+financing. The `14-F12` data-only oracle records this as
+`partial_pdf_renderable=true` but has no second partial mapping. Its machine-readable partial branch
+therefore follows only the Page-07 F12/E12 sentence: keep the reference purchase, rent and planning
+facts; omit financing; keep factor, gross and net; and render LTV, DSCR, cashflow, equity return and
+break-even as `—`. Empty sensitivity and schedule sections show, in their own block, respectively
+`Daten unvollständig – ohne Finanzierung ist keine Sensitivität verfügbar.` and
+`Daten unvollständig – ohne Finanzierung ist kein Annuitätenplan verfügbar.` They render no empty
+table. Export dates use German `DD.MM.JJJJ`; every rendered money value has two decimal places,
+including `0,00 €`.
+
+The `M10-I4-F03` renderer fixture consumes the actual engine-derived Bank view of that no-financing
+input, not a manually assembled partial mapping. Its expected factor/gross/net values come from
+the approved `14-F01` oracle; each missing financing-dependent KPI, both LTV values and the empty
+sensitivity/schedule blocks are checked separately so an earlier failure cannot hide another one.
+
+The document visibly prints the artifact disclosure, product disclaimer, Rechtsstand and
+production-blocked state. It contains no renter identity and is not a valuation, appraisal, credit
+decision, bank application, archive, tax export or investment recommendation. It has no automatic
+sending and no purchase or billing action.
+
+#### Cockpit route and case hand-off
+
+The owner-only web route is `/a/{accountId}/investment`. Navigation visibility follows the live
+Membership, but the API remains authoritative. The page first loads entitlement. Pending, failed,
+absent/disabled and non-owner states do not request case data or expose creation/download actions.
+
+The selected immutable case is carried only as the URL query `caseKey`. If it is present, the page
+loads that exact case through the three stored JSON reads from § 4.8; it neither guesses nor lists
+cases. If absent, the page offers the Page-07 Prüfobjekt input flow and posts to the existing case
+route. The UI omits `layoutVersionId`; the server binds the default as specified above. After a
+successful POST it replaces the URL with the returned `caseKey` and displays that frozen result.
+Reload and share therefore preserve the case hand-off without local storage, a list route or a
+correction route.
+
+Case entry uses landlord-facing euros, percentages, years, square metres and unit counts, never
+raw cents or basis points. It covers purchase price and acquisition costs; monthly actual cold
+rent and vacancy; all four annual planning-cost amounts; equity, loan, interest, initial repayment
+and financing provenance; marginal tax, building share and AfA rate; and the optional Bank header
+address, property type, construction year, area, unit count, creator and export date. On explicit
+submit the client only validates and normalizes these values to the exact public § 4.7 API facts:
+euros to integer cents, percentages to integer basis points and square metres to integer
+hundredths. It sends the fixed twelve-month analysis period and performs no KPI, schedule,
+sensitivity, tax, AfA or financing calculation.
+
+The cockpit shows exactly the seven KPIs from § 6, the five stored interest rows, the four stored
+repayment rows and exactly twelve stored schedule rows. Unavailable KPI values use `—` and `Daten
+unvollständig`. Only DSCR and after-tax monthly cashflow may use the stored `14-K19` red/amber/green
+liquidity colours. The visible explanation says `Liquiditätsindikator unter Ihren Annahmen – keine
+Risikobewertung und keine Bankzusage.` Repayment keeps liquidity and debt reduction together and
+states that it is a structure trade-off, not a stress or risk axis. There is no score, ranking,
+winner, recommendation, default target return or client-side recalculation. The download action
+targets only the exact Bank-PDF route above.
+
+#### M10-I4 RED fixtures
+
+| Fixture | Required behavior |
+| --- | --- |
+| `M10-I4-F01` | immutable renderer data consumes only frozen bank-view/result/exact-layout snapshots |
+| `M10-I4-F02` | Bank-PDF uses the exact block order, German disclosures, disclaimer and LTV wording |
+| `M10-I4-F03` | the Page-07 F12/E12 no-financing subcase renders standalone `—`, honest in-block absence notes and no empty tables |
+| `M10-I4-F04` | PDF contains no renter identity, valuation/advice claim, sending, purchase or billing surface |
+| `M10-I4-F05` | two Chromium renders of one frozen input are byte-identical |
+| `M10-I4-F06` | omitted layout creates/reuses one account-isolated, concurrency-safe `DEFAULT_BANK` version; explicit same-account layout remains exact |
+| `M10-I4-F07` | owner, D4, renter-context and anti-enumeration rules protect the PDF route; OpenAPI has exactly seven method-path pairs |
+| `M10-I4-F08` | PDF loads the stored exact layout/result only, never engine, live rules or a newer layout; null legacy layout is `409` |
+| `M10-I4-F09` | owner cockpit normalizes complete euro/percent inputs, then case hand-off shows seven KPIs, both sensitivity axes, twelve schedule rows and PDF download |
+| `M10-I4-F10` | entitlement/role states, partial copy and visible liquidity-only red/amber/green styling expose no score, ranking, recommendation or default target return |
 
 ## 5. Inputs
 

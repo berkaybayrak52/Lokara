@@ -37,6 +37,7 @@ type IconName =
   | 'meters'
   | 'statements'
   | 'guards'
+  | 'investment'
   | 'tax';
 
 interface NavItem {
@@ -93,6 +94,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: 'guards',
     activePrefixes: ['/waechter'],
     visibleFor: (role) => role === 'OWNER' || role === 'EMPLOYEE',
+  },
+  {
+    href: (id) => `/a/${id}/investment`,
+    label: 'Investition',
+    icon: 'investment',
+    activePrefixes: ['/investment'],
+    visibleFor: (role) => role === 'OWNER',
   },
   {
     href: (id) => `/a/${id}/steuern`,
@@ -239,7 +247,13 @@ export function PortalShellContent({
               priority
               className={`${fullLogoVisibility} max-md:hidden`}
             />
-            <Image src="/icon.png" alt="" width={28} height={28} className={`${signetVisibility} max-md:block`} />
+            <Image
+              src="/icon.png"
+              alt=""
+              width={28}
+              height={28}
+              className={`${signetVisibility} max-md:block`}
+            />
           </Link>
         </div>
 
@@ -594,6 +608,12 @@ function NavIcon({ name }: { name: IconName }) {
       <>
         <path d="M12 3 5 6v5c0 4.6 2.8 8.1 7 10 4.2-1.9 7-5.4 7-10V6l-7-3Z" />
         <path d="M12 8v5m0 3h.01" />
+      </>
+    ),
+    investment: (
+      <>
+        <path d="M4 20V10m5 10V4m6 16v-7m5 7V7" />
+        <path d="m3 8 6-5 6 8 6-6" />
       </>
     ),
     tax: (

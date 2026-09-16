@@ -32,6 +32,7 @@ _ROUTES = {
     f"{_PREFIX}/cases/{{case_key}}": {"get"},
     f"{_PREFIX}/cases/{{case_key}}/sensitivity": {"get"},
     f"{_PREFIX}/cases/{{case_key}}/bank-view": {"get"},
+    f"{_PREFIX}/cases/{{case_key}}/bank-pdf": {"get"},
 }
 _CASE_FIELDS = {
     "caseKey",
@@ -307,6 +308,7 @@ def test_m10_inv_f03_only_owner_can_reach_every_investment_route(
         ("get", _case_path(graph.account_a), None),
         ("get", f"{_case_path(graph.account_a)}/sensitivity", None),
         ("get", f"{_case_path(graph.account_a)}/bank-view", None),
+        ("get", f"{_case_path(graph.account_a)}/bank-pdf", None),
     )
     for person_id in (graph.employee_a, graph.adviser_a, graph.owner_b):
         for method, path, body in calls:
@@ -354,6 +356,7 @@ def test_m10_inv_f04_absent_or_disabled_entitlement_denies_every_case_route(
         ("get", _case_path(graph.account_a), None),
         ("get", f"{_case_path(graph.account_a)}/sensitivity", None),
         ("get", f"{_case_path(graph.account_a)}/bank-view", None),
+        ("get", f"{_case_path(graph.account_a)}/bank-pdf", None),
     ):
         response = client.request(method, path, headers=_token(graph.owner_a), json=body)
         assert response.status_code == 403

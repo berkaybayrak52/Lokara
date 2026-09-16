@@ -31,6 +31,7 @@ lokara/
 │  ├─ afa-engine/             # pure Python AfA calculation
 │  ├─ export-engine/          # pure Python Anlage-V/DATEV projections
 │  ├─ uvi-engine/             # pure Python monthly UVI calculation
+│  ├─ investment-engine/      # pure Python Page-07 planning calculations
 │  ├─ adapters/               # ports plus current stubs/adapters
 │  ├─ db/                     # SQLAlchemy, Alembic and RLS
 │  ├─ pdf/                    # HTML→PDF through Playwright Chromium
@@ -47,7 +48,7 @@ Integrated M9 work connects `packages/guard-engine` to migration `0025`, account
 and `/a/{accountId}/waechter`. M9 technically closed with clean reviews on 29.08.2026;
 production blockers remain. The later checkpoint has separate verification recorded in `PLAN.md`.
 
-`apps/mobile`, KPI engines, Redis and workers are absent. `packages/afa-engine`,
+`apps/mobile`, Redis and workers are absent. `packages/afa-engine`,
 `packages/export-engine` and the tax route/workspace are present; deferred M7-F repairs are
 integrated but unverified. Real Supabase, Vision, bank, email and MDL providers are absent; current
 external edges use local infrastructure or stubs.
@@ -692,7 +693,10 @@ production-blocking.
 - `apps/mobile` is **Future** at M11: Expo/React Native, the same API verification through Bearer JWT,
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.
-- Pure KPI packages wait for their approved implementation milestone. W3/W5–W8 guard work is
+- The pure investment engine, immutable persistence and owner API are implemented through M10-I3.
+  The M10-I4 cockpit and frozen Bank-PDF are **Prepared but unmerged** on
+  `slice/m10-i4-investment-cockpit`; Page-07 production blockers remain active.
+  W3/W5–W8 guard work is
   technically closed on `development` through M9 on 29.08.2026; its production blockers remain. Pure AfA/export packages
   are present; M7-F closure remains deferred.
 - Redis plus Celery or Arq wait for a real rate-limit, retry, sync or scheduled-delivery slice.

@@ -49,6 +49,7 @@ const NAVIGATION_BY_ROLE: Record<Role, string[]> = {
     'UVI',
     'Abrechnungen',
     'Wächter',
+    'Investition',
     'Steuern',
   ],
   EMPLOYEE: ['Übersicht', 'Objekte', 'Kosten erfassen', 'Zähler', 'Abrechnungen', 'Wächter'],
