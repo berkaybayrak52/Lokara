@@ -1,10 +1,27 @@
-# Lokara handoff — M10-I2 technically complete
+# Lokara handoff — M10-I3 technically complete
+
+## Investment API and entitlement closure — 16.09.2026
+
+M10-I3 is technically complete on `slice/m10-i3-investment-api`. It is uncommitted and unmerged;
+nothing was pushed. Migration `0046`, the server-owned investment rule bundle and the six approved
+owner-only route-methods implement `docs/14` § 4.8 and fixtures `M10-INV-F01…F10`.
+
+- D4 entitlement gating, renter refusal, anti-enumeration, append-only concurrency, atomic
+  input/result persistence, canonical hashes, server-owned provenance and stored-only reads are
+  enforced.
+- The combined focused suite passes `165`. RLS coverage is clean for `81` tenant tables and FK
+  isolation is clean for all `163` tenant edges.
+- The required boundary audit reports no confirmed or suspected finding.
+- `scripts/gate.sh full` is green: strict typing, lint, purity, parity, pre-context checks, `2285`
+  Python tests and `258` web tests pass. `.lokara-red` is absent.
+- M10-I4 cockpit/Bank-PDF and all Page-07 production blockers remain pending. Preserve the five
+  unrelated untracked `adjustment/` files.
 
 ## Investment persistence closure — 16.09.2026
 
-M10-I2 is technically complete on `slice/m10-i2-investment-persistence` and remains uncommitted.
-Nothing was pushed. Migration `0045` implements the approved `docs/14` § 4.7 contract with exactly
-three append-only, account-scoped tables for layout versions, frozen inputs and one-to-one results.
+M10-I2 is committed as `e9a17e3` and locally merged into `main`. Nothing was pushed. Migration
+`0045` implements the approved `docs/14` § 4.7 contract with exactly three append-only,
+account-scoped tables for layout versions, frozen inputs and one-to-one results.
 
 - A real `0044 → 0045` application and all `109` focused persistence tests pass. Frozen inputs
   reproduce their stored KPI result byte-for-byte through canonical PostgreSQL JSONB bytes and a

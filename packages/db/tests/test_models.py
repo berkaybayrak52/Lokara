@@ -135,6 +135,8 @@ EXPECTED_TABLES = {
     "investment_layout_version",
     "investment_input_snapshot",
     "investment_result_snapshot",
+    # M10-I3 investment entitlement (docs/14 § 4.8; migration 0046).
+    "investment_entitlement_event",
 }
 
 

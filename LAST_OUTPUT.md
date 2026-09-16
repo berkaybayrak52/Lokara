@@ -1,16 +1,20 @@
-# Last output — M10-I2 technically complete
+# Last output — M10-I3 technically complete
 
-HEAD `58f8f36` on `slice/m10-i2-investment-persistence` · `16.09.2026`
+HEAD `e9a17e3` on `slice/m10-i3-investment-api` · `16.09.2026`
 Status: Complete
 
 ## Wanted
-Finish the active M10-I2 persistence slice.
+Finish M10-I3 investment API and entitlement work.
 
 ## Done
-Migration `0045` and its three immutable investment tables are implemented. Focused persistence tests pass `109`, RLS tests pass `113`, coverage is clean for `80` tenant tables and `161` tenant FKs, and the boundary audit has no finding. The full gate passes `2259` Python and `258` web tests. The RED window is closed.
+Migration `0046`, the immutable D4 entitlement stream, server-owned rules and all six approved
+owner-only API route-methods are implemented. The focused suite passes `165`; the boundary audit is
+clean; RLS covers `81` tables and FK isolation covers `163` edges. The full gate is green with
+`2285` Python and `258` web tests, and `.lokara-red` is absent.
 
 ## Not done
-Commit, merge and push were not authorized. M10-I3/I4 and all Page-07 production blockers remain pending. Five unrelated `adjustment/` files remain untouched.
+M10-I3 is uncommitted and unmerged; nothing was pushed. M10-I4 and all Page-07 production blockers
+remain pending. Five unrelated `adjustment/` files remain untouched.
 
 ## Optional next step
-Review and commit the completed M10-I2 slice.
+Commit and locally merge M10-I3 when authorized.

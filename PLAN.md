@@ -11,14 +11,24 @@ before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
+- **M10-I3 technically complete and verified locally (16.09.2026).** Migration `0046` adds the
+  immutable account-scoped investment-entitlement stream, and the API exposes the six approved
+  owner-only entitlement and case route-methods. D4 gating, renter refusal, anti-enumeration,
+  append-only concurrency, server-owned rules/provenance, atomic input/result persistence,
+  canonical hashes and stored-only reads are enforced. The boundary audit is clean; RLS covers
+  `81` tenant tables and FK isolation covers `163` edges. The full gate passes `2285` Python and
+  `258` web tests, and the RED window is closed. The work is uncommitted and unmerged on
+  `slice/m10-i3-investment-api`; nothing was pushed. M10-I4 remains pending and every Page-07
+  production blocker remains active.
 - **M10-I2 technically complete and verified locally (16.09.2026).** Migration `0045` adds exactly
   three immutable account-scoped investment tables for versioned layouts, frozen inputs and their
   one-to-one results. Composite account FKs, correction chains, owner-only forced RLS, renter
   refusal, canonical PostgreSQL JSONB bytes and database-verified SHA-256 replay are enforced. The
   real `0044 → 0045` application, `109` focused persistence tests and `113` RLS tests pass; RLS
   covers `80` tenant tables and FK isolation covers `161` edges. The boundary audit is clean and
-  the full gate passes `2259` Python and `258` web tests. The RED window is closed. The slice is
-  uncommitted; M10-I3/I4 remain pending and every Page-07 production blocker remains active.
+  the full gate passes `2259` Python and `258` web tests. The RED window is closed. Source commit
+  `e9a17e3` is locally merged into `main`; M10-I3 was completed later on its own slice, M10-I4
+  remains pending and every Page-07 production blocker remains active. Nothing was pushed.
 - **M10-R4 technically complete, verified and locally merged (`ed28f55`, 12.09.2026).** Additive migration `0044` stores
   source-derived immutable publication periods/months; the owner/list API projects them and the
   new `/renter/{tenancyId}` web route group provides activation, own-tenancy, statement and UVI
@@ -355,7 +365,7 @@ not replace the complete documentation or reconciliation gates.
 | M8    | **Lane A unblocked; lane B source-blocked**                                                                                                            | Document and letter engine                           | Lane A implements Page 06's B1–B8 arithmetic, E1–E11 and the signature gate as a pure engine against `CLAUSES-F01`–`F19`. Lane B — clause catalogue, composition, contract generation, action letters and SEPA capture — cannot start until the missing source-backed clause/version and action-letter bodies are supplied and approved. M7-F does not block either.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | UI    | **UI-00 through UI-06 and UI-08 are implemented on `development`; UI-07's non-blocked demo core is implemented but partial; later full/demo and focused reviews provide partial verification; live-browser acceptance remains open** | Portfolio UI 00–08                                   | Execute UI-00, UI-01, UI-02, UI-03, UI-04, UI-05A, UI-05B, UI-06, UI-07 and UI-08 from the supplied UX specifications. UI-07 was pulled forward by Emir for the demo. Preserve legal, calculation, isolation and immutable-evidence contracts. Do not reuse or remove `slice/ui-00-layout-global`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | M9    | **Technically complete and review-clean on `development`; not production-approved**                                                              | Reminders, email and checklists                      | W1–W8, migration `0025`, account-scoped jobs/API, default-off delivery and `/waechter` are implemented. `scripts/gate.sh demo` is green with `1916` Python and `183` web tests; RLS/FK checks cover `73` tables and `144` account-scoped foreign keys. Boundary and statement reviews are clean, the ordinary statement fingerprint is unchanged at `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes, and no `.lokara-red` remains. Provider/scheduler, frozen UVI artifact, checklist catalogue, UVI-register/monthly-content/cadence and all recorded legal/runtime blockers remain production-blocking.                                                                                                                                                                                                                                                                                                                                                    |
-| M10   | **R0–R4 and I0–I2 technically complete and verified; I3–I4 pending**                                                                                    | Portals and investment                               | Renter activation, context, overview, immutable publication, source-derived display metadata and the renter portal screens are implemented through migration `0044`. The approved `docs/14` executable fixtures, pure investment engine and immutable persistence are green through migration `0045`; API, entitlement, cockpit UI and Bank-PDF remain pending.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| M10   | **R0–R4 and I0–I3 technically complete and verified; I4 pending**                                                                                       | Portals and investment                               | Renter activation, context, overview, immutable publication, source-derived display metadata and the renter portal screens are implemented through migration `0044`. The approved `docs/14` executable fixtures, pure investment engine, immutable persistence, D4 entitlement and owner-only API are green through migration `0046`; cockpit UI and Bank-PDF remain pending.                                                                                                                                                                                                                                                                                                                                                                                  |
 | M11   | After M10                                                                                                                                              | Native apps, billing and load test                   | Ship the Expo mobile app against the same FastAPI API, Stripe web billing, RevenueCat mobile billing and the Locust load test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | M7-F  | **After M10; integrated repair candidate remains required before programme/production closure**                                                        | Finish tax/AfA review and repair                     | Revalidate the boundary repairs, complete statement/docs review, rerun focused and closing verification, and preserve every legal/runtime production blocker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
@@ -1938,8 +1948,8 @@ top-level Wizard AfA provenance and one-cent repayment-axis guards. The read-onl
 is clean, and the fast gate passes with `734` pure-package tests. Negative closing balance on early
 payoff remains an explicit specification-authority limit because `docs/14` does not define payoff
 capping; no behavior was invented. All `docs/14` production blockers remain active. The named red
-window is closed. The full gate passes with `2146` Python and `258` web tests. Commit, merge and push
-are not done.
+window is closed. The full gate passes with `2146` Python and `258` web tests. M10-I0/I1 is
+committed as `58f8f36` and locally merged; nothing was pushed.
 
 - `packages/rules-store/tests/berkay_14_golden.py` is the approved **data-only** oracle with exactly
   `14-F01`–`14-F14`. Turn it into executable engine tests, following
@@ -1994,16 +2004,38 @@ persistence tests pass, including byte-identical replay, correction streams, imm
 cross-account refusal and renter-context refusal. The full RLS suite passes `113`; RLS covers `80`
 tenant tables and FK isolation covers all `161` tenant edges. The read-only boundary audit has no
 finding, the full gate passes `2259` Python and `258` web tests, and `.lokara-red` is absent. The
-slice is uncommitted; all Page-07 production blockers remain active.
+source is committed as `e9a17e3` and locally merged into `main`; nothing was pushed and all Page-07
+production blockers remain active.
 
 ##### M10-I3 — investment API and entitlement
 
-**Agent:** `app-implementer`.
+**Agents:** `spec-scribe`, then `engine-implementer` for migration/model/rules-store work, then
+`app-implementer` for the API; `boundary-auditor` required.
 
-- Owner-scoped routes under `/a/{accountId}` for Prüfobjekt create, KPI read, sensitivity and the
-  Bank-PDF view. `EMPLOYEE` and `TAX_ADVISOR` receive no investment access.
-- Enforce the D4 entitlement server-side. Hiding the navigation entry is not authorization.
-- No pricing, plan name or purchase flow.
+- RED contract: `docs/14` § 4.8 and fixtures `M10-INV-F01…F10` fix migration `0046`, the exact
+  route surface and atomic behavior before implementation.
+- Migration `0046` adds one immutable account-scoped `investment_entitlement_event` stream with
+  account-safe Membership/predecessor FKs, immediate-version/no-fork enforcement, forced RLS and
+  rejected rewrites. Database RLS owns account scope; API authorization separately requires the
+  authorizing membership to be `OWNER`.
+- Exact routes under `/a/{account_id}/investment`: GET/POST entitlement, POST cases, and stored KPI,
+  sensitivity and Bank-view GETs for one `case_key`. No case list, correction or PDF route.
+- `EMPLOYEE`, `TAX_ADVISOR`, foreign Memberships and renter contexts receive no investment access.
+  An absent or latest-disabled D4 entitlement denies every case route server-side.
+- Case create accepts only normalized facts plus optional layout version, resolves the versioned
+  server-owned Page-07 rule bundle, runs the pure engine and atomically appends input v1 plus one
+  result. Invalid input stores nothing; a valid engine hard block is persisted.
+- Reads return stored snapshots only and never recalculate. Foreign or missing `case_key` is `404`;
+  renter identity, pricing, plan names, purchase flow and billing integration remain absent.
+
+**Technical completion (16.09.2026):** the approved `docs/14` § 4.8 contract and fixtures
+`M10-INV-F01…F10` are implemented through migration `0046`, the versioned server-owned rule bundle
+and the six exact owner-only route-methods. The combined focused suite passes `165`; the required
+read-only boundary audit reports no confirmed or suspected finding. RLS covers `81` tenant tables
+and FK isolation covers all `163` tenant edges. The full gate passes `2285` Python and `258` web
+tests, and `.lokara-red` is absent. The work is uncommitted and unmerged on
+`slice/m10-i3-investment-api`; nothing was pushed. M10-I4 and all Page-07 production blockers remain
+pending.
 
 ##### M10-I4 — investment cockpit and Bank-PDF
 

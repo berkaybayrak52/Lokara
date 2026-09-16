@@ -24,6 +24,11 @@ from .betrkv_catalogue import (
     list_catalogue,
     resolve_rule,
 )
+from .investment import (
+    INVESTMENT_RULE_BUNDLES,
+    InvestmentRuleBundle,
+    resolve_investment_rule_bundle,
+)
 from .page01_statement import (
     PAGE_01_STATEMENT_RULES,
     Page01StatementEvidence,
@@ -100,6 +105,7 @@ __all__ = [
     "DEGREE_DAY_TABLE",
     "EXTF_PROFILES",
     "HEATING_SPLIT_BOUNDS",
+    "INVESTMENT_RULE_BUNDLES",
     "PAGE_01_STATEMENT_RULES",
     "PAGE_05_G1_RULES",
     "PAGE_05_M9_RULES",
@@ -123,6 +129,7 @@ __all__ = [
     "ClassificationResult",
     "ContractFacts",
     "ExtfProfile",
+    "InvestmentRuleBundle",
     "Page01StatementEvidence",
     "Page01StatementRules",
     "Page05ComparativeRentRules",
@@ -151,6 +158,7 @@ __all__ = [
     "list_catalogue",
     "lookup_plz_geocoord",
     "resolve_afa_rule_bundle",
+    "resolve_investment_rule_bundle",
     "resolve_page01_statement_rules",
     "resolve_page05_g1_rules",
     "resolve_page05_m9_rules",

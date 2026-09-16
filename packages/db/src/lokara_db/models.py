@@ -4875,6 +4875,83 @@ class InvestmentResultSnapshot(Base):
     )
 
 
+class InvestmentEntitlementEvent(Base):
+    """Immutable enable/disable event for an account's investment access."""
+
+    __tablename__ = "investment_entitlement_event"
+
+    id: Mapped[str] = mapped_column(primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("account.id"))
+    entitlement_key: Mapped[str]
+    version: Mapped[int]
+    enabled: Mapped[bool]
+    supersedes_entitlement_event_id: Mapped[str | None]
+    recorded_by_membership_id: Mapped[str]
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["supersedes_entitlement_event_id", "account_id", "entitlement_key"],
+            [
+                "investment_entitlement_event.id",
+                "investment_entitlement_event.account_id",
+                "investment_entitlement_event.entitlement_key",
+            ],
+            name="investment_entitlement_event_supersedes_id_fkey",
+            match="SIMPLE",
+        ),
+        _scoped_fk(
+            "investment_entitlement_event",
+            "recorded_by_membership_id",
+            "membership",
+        ),
+        UniqueConstraint(
+            "id",
+            "account_id",
+            "entitlement_key",
+            name="uq_investment_entitlement_event_correction_context",
+        ),
+        UniqueConstraint(
+            "account_id",
+            "entitlement_key",
+            "version",
+            name="uq_investment_entitlement_event_stream_version",
+        ),
+        CheckConstraint(
+            "entitlement_key = 'INVESTMENT'",
+            name="ck_investment_entitlement_event_key",
+        ),
+        CheckConstraint("version > 0", name="ck_investment_entitlement_event_positive"),
+        CheckConstraint(
+            "((version = 1 AND supersedes_entitlement_event_id IS NULL) OR "
+            "(version > 1 AND supersedes_entitlement_event_id IS NOT NULL))",
+            name="ck_investment_entitlement_event_root",
+        ),
+        CheckConstraint(
+            "id <> supersedes_entitlement_event_id",
+            name="ck_investment_entitlement_event_not_self",
+        ),
+        Index(
+            "uq_investment_entitlement_event_root",
+            "account_id",
+            "entitlement_key",
+            unique=True,
+            postgresql_where=text("supersedes_entitlement_event_id IS NULL"),
+        ),
+        Index(
+            "uq_investment_entitlement_event_successor",
+            "account_id",
+            "entitlement_key",
+            "supersedes_entitlement_event_id",
+            unique=True,
+            postgresql_where=text("supersedes_entitlement_event_id IS NOT NULL"),
+        ),
+        Index("ix_investment_entitlement_event_account", "account_id"),
+    )
+
+
 # Tables scoped by their own account_id column — the Alembic migration enables
 # FORCEd RLS on each of these plus `account`, which is scoped by its own id.
 # `building_assignment` joined this tuple with migration 0004: its scope used to be
@@ -4962,4 +5039,5 @@ ACCOUNT_SCOPED_TABLES: tuple[str, ...] = (
     "investment_layout_version",
     "investment_input_snapshot",
     "investment_result_snapshot",
+    "investment_entitlement_event",
 )

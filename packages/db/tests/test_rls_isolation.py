@@ -939,6 +939,36 @@ class TestM10InvestmentCrossAccountWrites:
                 },
             )
 
+    def test_investment_entitlement_event_rejects_cross_account_insert_rollback_only(
+        self, engines: tuple[Engine, Engine], seed: _Seed
+    ) -> None:
+        """M10-INV-F01: B context cannot append account A's entitlement event."""
+
+        class _InvestmentEntitlementWriteUnexpectedlyPermitted(Exception):
+            pass
+
+        _, app = engines
+        with (
+            pytest.raises(ProgrammingError, match="row-level security"),
+            account_scoped_session(app, seed.account_b) as session,
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO investment_entitlement_event "
+                    "(id, account_id, entitlement_key, version, enabled, "
+                    "supersedes_entitlement_event_id, recorded_by_membership_id) VALUES "
+                    "(:id, :account_a, 'INVESTMENT', 1, true, NULL, :membership)"
+                ),
+                {
+                    "id": new_id(),
+                    "account_a": seed.account_a,
+                    "membership": seed.membership_a,
+                },
+            )
+            # If a defective policy permits the row, force the transaction to roll
+            # back before making that defect fail the test.
+            raise _InvestmentEntitlementWriteUnexpectedlyPermitted
+
 
 class _M10ActivationRows(NamedTuple):
     code_id: str

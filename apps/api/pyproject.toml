@@ -16,6 +16,7 @@ dependencies = [
   "lokara-nk-engine",
   "lokara-heating-engine",
   "lokara-matching-engine",
+  "lokara-investment-engine",
   "lokara-afa-engine",
   "lokara-export-engine",
   "lokara-rules-store",
@@ -32,6 +33,7 @@ lokara-db = { workspace = true }
 lokara-nk-engine = { workspace = true }
 lokara-heating-engine = { workspace = true }
 lokara-matching-engine = { workspace = true }
+lokara-investment-engine = { workspace = true }
 lokara-afa-engine = { workspace = true }
 lokara-export-engine = { workspace = true }
 lokara-rules-store = { workspace = true }

@@ -1,6 +1,6 @@
 # Investment KPIs — planning calculations and deterministic bank view
 
-**Status:** D2 transcription complete; M10-I0/I1 and M10-I2 technically implemented
+**Status:** D2 transcription complete; M10-I0/I1 and M10-I2 technically implemented; M10-I3 contract approved
 
 **Rechtsstand:** 07/2026
 
@@ -11,8 +11,8 @@
 `packages/rules-store/tests/berkay_14_golden.py`
 
 **Implementation status:** the pure engine and the section-4.7 persistence contract are technically
-complete through migration `0045`. API, UI, PDF rendering, pricing and bank integration remain
-outside this contract.
+complete through migration `0045`. Section 4.8 fixes the M10-I3 entitlement and API contract before
+implementation. UI, PDF rendering, pricing and bank integration remain outside this contract.
 
 This document defines a future planning calculation for a **Prüfobjekt**: a property being
 considered for purchase. It produces exactly seven KPIs and a deterministic Bank-PDF view. The
@@ -287,6 +287,107 @@ layout selection at `frozen_at`; and the result permanently binds to that input.
 ENABLE and FORCE RLS. Owner-account `SELECT` and `INSERT` policies use `app.account_id`, refuse a
 nonempty renter `app.tenancy_id`, and every INSERT policy has an equivalent `WITH CHECK`. M10-I3
 adds entitlement and role authorization above this database account boundary.
+
+### 4.8 M10-I3 entitlement and API contract — migration `0046`
+
+This subsection is the accepted D4 technical decision for M10-I3, fixed on 16.09.2026. It does not
+approve a price, plan name, purchase flow, billing provider, PDF renderer or any production-blocked
+Page-07 convention. Stripe and RevenueCat remain M11 work. The legal and calculation Rechtsstand
+remains **07/2026**.
+
+#### Immutable account entitlement
+
+Migration `0046` adds exactly one account-scoped append-only table,
+`investment_entitlement_event`:
+
+| Column | Type and nullability | Meaning |
+| --- | --- | --- |
+| `id` | string PK | immutable event identity |
+| `account_id` | string, not null | account boundary |
+| `entitlement_key` | string, not null, exactly `INVESTMENT` | the sole M10 investment entitlement stream |
+| `version` | positive integer, not null | stream version, starting at `1` |
+| `enabled` | boolean, not null | entitlement state from this event onward |
+| `supersedes_entitlement_event_id` | string, nullable | immediately preceding event in the same account and stream |
+| `recorded_by_membership_id` | string, not null | owner Membership that authorized the event |
+| `recorded_at` | server timestamp with timezone, not null | database append time; never caller-supplied |
+
+`(id, account_id, entitlement_key)` and `(account_id, entitlement_key, version)` are unique. The
+predecessor is a composite self-FK on
+`(supersedes_entitlement_event_id, account_id, entitlement_key)`. The author is a composite FK on
+`(recorded_by_membership_id, account_id)` to `membership(id, account_id)`. Version `1` has no
+predecessor; every later event points to the immediately preceding version. Each account stream has
+one root and every event has at most one successor, so versions cannot skip, cross accounts or fork.
+
+The table rejects `UPDATE` and `DELETE`, and it ENABLEs and FORCEs RLS. `SELECT` and `INSERT` are
+limited to the active `app.account_id`, refuse nonempty renter context, and the INSERT policy has an
+equivalent `WITH CHECK`. RLS supplies account isolation only. The API separately proves that the
+live authorizing Membership is `OWNER`; database account scope is not treated as role authorization.
+
+#### Exact route and role surface
+
+The complete M10-I3 surface is exactly:
+
+```text
+GET  /a/{account_id}/investment/entitlement
+POST /a/{account_id}/investment/entitlement
+POST /a/{account_id}/investment/cases
+GET  /a/{account_id}/investment/cases/{case_key}
+GET  /a/{account_id}/investment/cases/{case_key}/sensitivity
+GET  /a/{account_id}/investment/cases/{case_key}/bank-view
+```
+
+There is no list route, correction route, PDF route, price, plan name, purchase flow or billing
+integration. Every route requires a live `OWNER` Membership in the path account. `EMPLOYEE`,
+`TAX_ADVISOR`, a foreign-account Membership and renter context receive no investment access. Only
+the owner entitlement POST may enable or disable access. It accepts only `enabled`; the server
+appends the next version with its own timestamp, predecessor and author Membership. GET returns the
+latest stored state, or `enabled=false` with no event identity when the stream is absent.
+
+An absent entitlement or a latest event with `enabled=false` denies every case route server-side.
+Navigation visibility is never authorization. A `case_key` that is absent or belongs to another
+account returns the same anti-enumeration `404`.
+
+#### Server-owned create and immutable reads
+
+Case POST accepts exactly `facts` plus optional `layoutVersionId`. `facts` is the normalized public
+engine input from § 4.7 except that `renter_names` is forbidden at this boundary. Extra request
+fields are rejected, including caller-supplied rules, result, engine version, canonical bytes or
+hash, provenance snapshots, account/case/version identifiers and timestamps. These values are
+derived by the server and never trusted from the client.
+
+The server resolves one versioned investment rule bundle from `packages/rules-store`. It contains
+the complete § 4.7 rule shape, source evidence and Rechtsstand, and keeps every applicable Page-07
+production blocker active (`production_blocked=true`). The server then runs the pure
+`investment-engine`, derives the complete financing and AfA provenance, canonical PostgreSQL JSONB
+bytes and hashes, and atomically inserts input version `1` plus exactly one result. There is no
+Building, statement, tax-export or demo dependency.
+
+Malformed public facts or an engine input that cannot produce a valid `InvestmentResult` return
+`422` and store neither input nor result. A valid engine `hard_block` is different: it is a complete
+auditable result under § 4.7 and is persisted with its input exactly like a calculated result.
+
+All GET routes load the latest stored input/result pair and never run the engine or consult live
+rules/layout data. The KPI read returns the logical `caseKey`, input `version` and result identity,
+plus the stored `outcome`, `calculatedValues`, `kpiSlots`, twelve-month schedule through the stored
+calculated values, `rechtsstand`, `productionBlocked`, `findings` and `warnings`. Sensitivity returns
+only the stored `interestSensitivity`, `repaymentSensitivity` and `repaymentAxisMeaning`. Bank-view
+returns only the stored `bankView`. No response surface contains `renter_names` or any other renter
+identity.
+
+#### M10-I3 RED fixtures
+
+| Fixture | Required behavior |
+| --- | --- |
+| `M10-INV-F01` | migration `0046` and mapped entitlement event have the exact account-safe append-only shape |
+| `M10-INV-F02` | owner enable/disable appends the immediate, non-forking version chain with server author/time |
+| `M10-INV-F03` | only `OWNER` reaches any investment route; employee, tax adviser and foreign Membership are denied |
+| `M10-INV-F04` | absent or latest-disabled entitlement denies every case route |
+| `M10-INV-F05` | valid create atomically stores input v1 plus one result and GET replays the stored result |
+| `M10-INV-F06` | KPI, sensitivity and Bank-view reads use stored snapshots only and expose their bounded fields |
+| `M10-INV-F07` | a valid engine `hard_block` is persisted as a complete result |
+| `M10-INV-F08` | forbidden or invalid request data returns `422` and writes nothing |
+| `M10-INV-F09` | foreign/missing cases are `404`; renter identity and billing/product surfaces are absent |
+| `M10-INV-F10` | OpenAPI exposes exactly the six route-method pairs above, with no list/correction/PDF route |
 
 ## 5. Inputs
 

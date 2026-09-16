@@ -14,6 +14,7 @@ from .routers import (
     finalized_statements,
     guards_delivery,
     health,
+    investment,
     mdl,
     me,
     meters,
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(payments.router)
     app.include_router(uvi_runs.router)
     app.include_router(tax.router)
+    app.include_router(investment.router)
     return app
 
 
