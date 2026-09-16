@@ -141,9 +141,8 @@ function setControl(name: string, value: string): void {
   const element = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`);
   expect(element, `user-facing control ${name} is missing`).toBeTruthy();
   if (!element) throw new Error(`user-facing control ${name} is missing`);
-  const prototype = element instanceof HTMLSelectElement
-    ? HTMLSelectElement.prototype
-    : HTMLInputElement.prototype;
+  const prototype =
+    element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
   act(() => {
     Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));
@@ -218,6 +217,24 @@ describe('M10-I4 owner investment cockpit', () => {
     expect(link?.getAttribute('href')).toBe(
       '/api/backend/a/account-1/investment/cases/case-frozen-1/bank-pdf',
     );
+
+    const simulate = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Finanzierung simulieren',
+    );
+    act(() => simulate?.click());
+    const interestSlider = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Sollzins-Szenario"]',
+    );
+    expect(interestSlider).toBeTruthy();
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        interestSlider,
+        '4',
+      );
+      interestSlider?.dispatchEvent(new Event('input', { bubbles: true }));
+      interestSlider?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelector('output')?.textContent).toBe('4,90 %');
   });
 
   it('M10-I4-F10 uses colours only for liquidity and prints the required guardrail', async () => {
@@ -312,7 +329,16 @@ describe('M10-I4 owner investment cockpit', () => {
       throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
     });
     await renderCockpit();
+    expect(container.textContent).toContain('Investment-Dashboard');
+    expect(container.querySelector('form')).toBeNull();
+    const openWizard = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Neues Prüfobjekt',
+    );
+    expect(openWizard).toBeDefined();
+    act(() => openWizard?.click());
     const form = container.querySelector('form');
+    expect(form).toBeTruthy();
+    expect(container.querySelectorAll('button[aria-label^="Schritt "]')).toHaveLength(6);
     expect(form?.textContent).not.toMatch(/\bCent\b|Basispunkt/);
     for (const label of [
       'Kaufpreis (€)',
@@ -368,6 +394,11 @@ describe('M10-I4 owner investment cockpit', () => {
     })) {
       setControl(name, value);
     }
+    const reviewStep = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Schritt 6: Angaben prüfen"]',
+    );
+    expect(reviewStep).toBeTruthy();
+    act(() => reviewStep?.click());
     const create = Array.from(container.querySelectorAll('button')).find(
       (candidate) => candidate.textContent?.trim() === 'Prüfobjekt berechnen',
     );

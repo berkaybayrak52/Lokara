@@ -7,8 +7,8 @@ import { api } from '@/lib/api';
 
 const KpiSlotSchema = z
   .object({
-    status: z.enum(['available', 'unavailable']),
-    value: z.union([z.number().int(), z.literal('—')]).optional(),
+    status: z.enum(['available', 'unavailable', 'not_applicable']),
+    value: z.union([z.number().int(), z.string()]).optional(),
     before_tax: z.number().int().optional(),
     after_tax: z.number().int().optional(),
     color: z.enum(['red', 'amber', 'green']).optional(),

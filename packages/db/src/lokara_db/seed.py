@@ -45,6 +45,7 @@ from .models import (
     CostEntry,
     DeliveryAddress,
     HeatingCostEntry,
+    InvestmentEntitlementEvent,
     MatchProposal,
     Membership,
     Meter,
@@ -930,6 +931,42 @@ def seed_demo(session: Session) -> None:
             accepted_at=_RECORDED_AT,
         )
     )
+    latest_investment_entitlement = session.scalar(
+        select(InvestmentEntitlementEvent)
+        .where(
+            InvestmentEntitlementEvent.account_id == DEMO_ACCOUNT_ID,
+            InvestmentEntitlementEvent.entitlement_key == "INVESTMENT",
+        )
+        .order_by(InvestmentEntitlementEvent.version.desc())
+        .limit(1)
+    )
+    if latest_investment_entitlement is None or not latest_investment_entitlement.enabled:
+        session.add(
+            InvestmentEntitlementEvent(
+                id=(
+                    "investment_entitlement_demo_enabled"
+                    if latest_investment_entitlement is None
+                    else new_id()
+                ),
+                account_id=DEMO_ACCOUNT_ID,
+                entitlement_key="INVESTMENT",
+                version=(
+                    1
+                    if latest_investment_entitlement is None
+                    else latest_investment_entitlement.version + 1
+                ),
+                enabled=True,
+                supersedes_entitlement_event_id=(
+                    None
+                    if latest_investment_entitlement is None
+                    else latest_investment_entitlement.id
+                ),
+                recorded_by_membership_id="mem_demo_owner",
+                recorded_at=(
+                    _RECORDED_AT if latest_investment_entitlement is None else datetime.now(UTC)
+                ),
+            )
+        )
     session.merge(
         Building(
             id="bld_demo_muster12",
