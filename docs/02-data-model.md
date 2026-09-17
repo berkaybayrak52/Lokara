@@ -72,14 +72,15 @@ account-scoped tables carries the same `account_id`; section 3 records the enfor
 | Property and occupancy | `Building` (with `fiktivbelegung_mode` and `fiktivbelegung_waiver_note`), `Unit`, `Tenancy`, `TenancyParty`, `SelfUsePeriod`, `PersonCount` | **Shipped** |
 | Operating-cost inputs | `CostEntry`, `AllocationKeyAssignment` | **Shipped** |
 | Metering and heating inputs | `Meter`, `MeterLifecycleEvent`, `MeterReading`, `HeatingCostEntry`, `HeatingBillingModeVersion` | Base model **shipped**; UI-08 extensions are **implemented, partially verified** on `development`, including the `0040` invariant repair and clean boundary re-audit |
-| Monthly UVI evidence, weather, configuration and archive | U4/U4b records in migrations `0022`/`0023`; U5 composes them into immutable `UviRun` inputs/results and a `GENERATED` event | **Technically implemented** for owner-side generation and document download; no scheduling, email or renter publication |
+| Monthly UVI evidence, weather, configuration and archive | U4/U4b records in migrations `0022`/`0023`; U5 composes them into immutable `UviRun` inputs/results and a `GENERATED` event | **Technically implemented** for owner-side generation and document download; M10 portal publication is implemented, while scheduled/email delivery keeps its M9 production prerequisites |
 | Confirmed third-party heating statement | `MdlStatement`, `MdlStatementPosition` — validated and passed through, never recomputed (`docs/03` H7) | **Shipped** |
 | Statement row | `Statement` with period, version, status, total, finalized snapshot and predecessor relation | **Shipped** for M6-B owner-only technical archives; live preview stays separate |
-| Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; no renter portal/delivery |
+| Page 01 normalized result and audience projections | One calculation result projected to owner, one tenancy or tax | **Shipped** for owner-only M6-B archives; M10 adds explicit renter portal publication, while scheduled/email delivery remains separate |
 | Temporal advance schedule, confirmed advances, settlements and immutable finalization | M6-A/M6-B handoff described below | **Shipped** technical archive scope; ledger/matching persistence and C3a are technically complete, development-synchronized and locally merged; C3b's job wiring is technically complete and locally merged |
 | Guards, reminders, delivery and checklists | W1–W8 evaluations plus immutable reminders/resolutions, versioned schedules, exact-byte artifacts, email/status/suppression evidence and checklist events | **Technically closed 29.08.2026** on `development` in M9 migration `0025`; production blockers remain; later checkpoint verification is separate |
 | AfA versions, normalized tax events, adviser/mapping versions, readiness attempts and export archive/artifacts | Seven account-scoped records in migration `0024`; exact behavior is approved in `docs/10`/`docs/11` | **Integrated on `development`** with deferred M7-F repairs; closure reviews and runtime authority remain blocked |
 | Renter activation, context and publication | Activation-code redemption writes `renter.person_id`; `/renter/{tenancyId}` uses a separate renter context; immutable publications contain only renter-readable archived bytes | **Technically implemented and verified through M10-R4**, including display metadata and portal UI |
+| Investment snapshots, entitlement and Bank-PDF | Immutable layouts, inputs, results and entitlement events in migrations `0045`/`0046`; owner API, cockpit and frozen renderer | **Technically complete and review-clean through M10-F**; all Page-07 production blockers remain active |
 
 These principles decide ambiguous additions:
 
@@ -155,7 +156,7 @@ The two shipped foreign keys to the global identity table have different meaning
 | Edge | Required mechanism |
 | --- | --- |
 | `membership.person_id → person.id` | Account-scoped `Membership` is a read witness under migration `0005`; staff writes are not granted through the person RLS policy. |
-| `renter.person_id → person.id` | Account-scoped `Renter` is a read witness; the future write is authorized by activation-code redemption, not by a composite constraint or pre-existing membership. |
+| `renter.person_id → person.id` | Account-scoped `Renter` is a read witness; the sole positive write is authorized by activation-code redemption, not by a composite constraint or pre-existing membership. |
 
 The write invariant cannot be “the person already belongs to this account.” A legitimate renter may
 have no earlier relationship to the landlord's account, and may simultaneously own another account.
@@ -168,13 +169,13 @@ targets one `Renter` party record; it is never shared across the tenancy.
 `main`. The design uses one bounded `SECURITY DEFINER` function, a dedicated
 `NOLOGIN`/`NOBYPASSRLS` owner with read access only to `person`, `membership` and `account`, and one
 checked API call site. M5 also ships the live `/me` contexts, role and nested-route authorization,
-and the URL-based account chooser/switcher. It does not create a renter portal. M10 must extend
-this same function and its checked privilege boundary to return renter/tenancy witnesses for the
-authenticated Person. A second pre-context identity function is forbidden.
+and the URL-based account chooser/switcher. M10 extends this same function and its checked privilege
+boundary to return renter/tenancy witnesses for the authenticated Person. The implemented renter
+portal uses that extension; a second pre-context identity function remains forbidden.
 
-`renter.person_id` is nullable and has no default. Current create APIs leave it `NULL`; no current
-API route is authorized to write it. M5 owns a negative OpenAPI guard proving that absence. M10 owns
-the only positive writer: redemption of a tenancy-bound, per-person, single-use activation code.
+`renter.person_id` is nullable and has no default. Ordinary owner create APIs leave it `NULL`; M5's
+negative OpenAPI guard protects those routes. M10 activation redemption is the only positive writer:
+it consumes a tenancy-bound, per-person, single-use activation code.
 The link proves consent and intended identity, not shared account membership. Once non-null, the
 link is immutable: it cannot be overwritten or cleared. A genuine correction must append immutable
 correction evidence and supersede the earlier link through a separately approved flow; activation
@@ -202,8 +203,8 @@ renter authorization witness. This is fixture `M10-CTX-F07`.
 The implementation satisfies `M10-CTX-F01…F08`. All `116` focused DB/API/checker tests pass; RLS
 covers `76` tables, FK isolation covers `152` edges and the pre-context checker is clean. The
 mandatory boundary audit is clean with rollback-only probes, and the full gate passes `2021`
-Python and `210` web tests. M10-R3 and migration `0043` are now technically complete and locally
-merged; M10-R4 remains pending.
+Python and `210` web tests. M10-R3 migration `0043` and M10-R4 migration `0044` were completed later;
+their publication, display-metadata and portal verification is recorded below.
 
 `GET /me` preserves its existing `accounts` items byte-for-byte in meaning and adds
 `renterContexts`. Each renter item contains exactly `tenancyId`; it never exposes `accountId`, a
@@ -277,8 +278,8 @@ owner-side `uvi_delivery_event(status = 'PUBLISHED')` in the same transaction, b
 renter-readable. UVI publication remains blocked until M9 has produced the immutable PDF artifact
 with an empty production-blocker snapshot.
 
-R3 must implement the publication record's composite foreign keys, forced RLS, `WITH CHECK`
-policy and refused cross-account write proof before any portal document route is enabled. Stored
+R3 implements the publication record's composite foreign keys, forced RLS, `WITH CHECK` policy and
+refused cross-account write proof before enabling the portal document routes. Stored
 bytes must reproduce the source digest; retrieval verifies the publication digest and never follows
 the source row at request time.
 
@@ -315,6 +316,14 @@ artifact: `uq_renter_portal_publication_statement_source` and
 `uq_renter_portal_publication_uvi_source`. `uq_uvi_delivery_event_published_once` permits one
 `PUBLISHED` event per UVI run. Repeating the same publish request returns that existing row and
 creates no second publication or delivery event.
+
+M10-F migration `0047` also adds the partial unique index
+`uq_renter_portal_publication_successor` on
+`(account_id, tenancy_id, document_type, supersedes_publication_id)` where the predecessor is
+non-null. A preserved publication has at most one corrective successor; correction streams cannot
+fork. The ORM declares the same index. The source-eligibility trigger additionally requires exact
+source bytes, digest, MIME type and filename and verifies SHA-256 at insertion, not only in the
+service. These constraints strengthen the existing R3 contract without adding columns or routes.
 
 `M10-PUB-F03` fixes source eligibility and the byte copy. A statement source must have
 `audience = TENANT`, the same tenancy, `document_type = COVER_LETTER | TENANT_STATEMENT`, and an
@@ -396,6 +405,11 @@ the code, Renter, tenancy, Person and server redemption time. Concurrent or repe
 produce only one successful link and one spend record. A failed redemption changes neither the
 Renter link nor the code evidence. The clock is an explicit service/fixture input; domain logic does
 not read a framework or system clock.
+
+M10-F migration `0047` independently enforces expiry against the database's
+`statement_timestamp()` and overwrites `redeemed_at` with that server time. A caller-supplied
+historical timestamp cannot redeem an expired code. This database backstop does not change the
+pure domain clock input or the uniform public refusal contract.
 
 Refusals attributable to a real locator account append a separate immutable
 `renter_activation_attempt` row after the state-changing redemption transaction refuses. It carries
@@ -522,8 +536,8 @@ Fehler (alle drei Ansichten, identisch):
 ```
 
 The tenancy empty state is defensive: a successful activation should make it unreachable, but the
-screen must still provide the stated instruction if the invariant is broken. These six copy slots
-remove the M10-R4 copy blocker; they do not approve any schema, endpoint or UI implementation.
+screen must still provide the stated instruction if the invariant is broken. These six approved copy
+slots are implemented in the M10-R4 schema/API/UI path.
 
 ## 3. Account isolation and composite-FK rules
 
@@ -598,8 +612,8 @@ Foreign keys to `account.id` and the two edges to global `person.id` are outside
 The account edge terminates at the isolation boundary and therefore cannot be composite. `Person`
 must remain global because one Supabase Auth identity can participate in many accounts. Giving it an
 `account_id` would either duplicate the human or incorrectly choose one account as owner. Migration
-`0005` protects reads with a relationship policy, and the M5/M10 ordering protects the future
-renter-link write. The composite-FK gate is silent about these global edges by design, not because
+`0005` protects reads with a relationship policy, and the M5/M10 ordering protects the implemented
+renter-link activation write. The composite-FK gate is silent about these global edges by design, not because
 they are safe without a separate mechanism. A new edge to any global table must name its own read
 and write mechanisms before it is accepted.
 
@@ -862,9 +876,9 @@ Subsequent migrations extend this boundary without replacing archived evidence:
 
 U5 resolves the effective correction leaf for every month it consumes, records the normalized
 evidence in `UviRun`, creates only a `GENERATED` event and renders a separate German renter
-document for an authorized owner to download. This is an owner-side generation/archive boundary,
-not renter publication or delivery: scheduled and email delivery belong to M9, and portal
-publication belongs to M10.
+document for an authorized owner to download. M10 adds explicit immutable portal publication from
+an eligible frozen artifact. Scheduled and email delivery remain separate M9 paths with active
+production prerequisites.
 
 ## 5. Owner residual and Page 01 statement model
 
@@ -1060,7 +1074,7 @@ One normalized calculation must produce one immutable result and explicit audien
 | Operating-cost result | Cost identity/classification, total, key, numerator, denominator, measurement unit, rounded renter share, § 35a inputs/result, warnings and provenance. |
 | Heating and CO₂ result | Every required block, ratio, numerator/denominator, device evidence, CO₂ figures, warnings and provenance defined in `docs/03`. |
 | Vacancy result | Origin unit/dates, fictional occupancy basis, residual block (a), non-allocable block (b), rounding block (c) and evidence. The residual contract is settled; the full annex is not implemented. |
-| Projection and archive | Audience plus exactly one tenancy for tenant output, document bytes/storage keys and hashes. **Shipped M6-B owner-only archive scope**; portal/delivery remains open. |
+| Projection and archive | Audience plus exactly one tenancy for tenant output, document bytes/storage keys and hashes. **Shipped M6-B owner-only archive scope**; M10 portal publication is implemented, while scheduled/email delivery remains separate and production-blocked. |
 
 Finalization must enforce all of these together:
 
@@ -1366,6 +1380,7 @@ with M7-F's read-only reviews still open.
 | U1–U5 monthly UVI calculation, adapters, persistent evidence/run archive and separate owner-downloadable renter document | **Technically implemented**, including later GAS/warm-water extensions; M9 scheduling on `development` refuses UVI delivery because immutable PDF bytes and production authority are missing | U1–U5 / M9 / `docs/16` |
 | Renter portal publication | **Technically complete and verified through M10-R4**, including immutable display metadata and screens | M10-R3/R4 |
 | Renter activation-code redemption, renter context and overview isolation | **Technically complete and verified through M10-R4** together with publication and screens | M10-R1/R2 |
+| Investment snapshots, entitlement, cockpit and deterministic Bank-PDF | **Technically complete and review-clean through M10-F**; migrations `0045`–`0047`, owner-only API and frozen renderer are locally verified, while all Page-07 production blockers remain active | M10-I0–I4/M10-F / `docs/14` |
 | Mid-year self-use/rental change for AfA apportionment | Merged normalized M7-A code selects month-granular 453,798 ct and separately returns object/deductible/non-deductible AfA; K09 authority remains `verify-before-production` | `docs/10-afa.md` / M7 |
 | Page 04 Anlage-V/DATEV export contract | Pure engine, rules, schema, web and the server-generated artifact/API adapter are locally merged and green; runtime output stays blocked while its register values remain `verify-before-production` | M7 / `docs/11-tax-export.md` |
 | Page 06 clause selection, risk and workflow-routing contract | Complete transcription approved and merged 21.08.2026; no schema, clause bodies, letter bodies or production implementation, and the missing text catalogues still block M8 | `docs/13-contract-clauses.md` / M8 |
@@ -1373,9 +1388,9 @@ with M7-F's read-only reviews still open.
 
 Other later temporal or immutable records arrive only with their owning milestones: separate
 normalized `Loan`/work-detail tables beyond the AfA snapshot, `LettingEffort`, tickets,
-subprocessors, activation codes, clause/contract versions and prospect objects. Paused M9 work on
+subprocessors, clause/contract versions and prospect objects. Paused M9 work on
 `development` creates guard/reminder and delivery records but does not authorize production delivery.
 `docs/13` defines only their future logical references, composition evidence and risk routing; it
-does not approve a schema or provide clause text. `docs/14` likewise defines only the future
-Prüfobjekt snapshot, provenance, partial-result, annuity, sensitivity and Bank-PDF boundaries; it
-approves no prospect schema. Their names in this inventory do not approve their final schemas.
+does not approve a schema or provide clause text. `docs/14` defines the implemented Prüfobjekt
+snapshot, provenance, partial-result, annuity, sensitivity and Bank-PDF contracts; it approves no
+separate prospect schema. Their names in this inventory do not approve unimplemented final schemas.

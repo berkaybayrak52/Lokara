@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import Mock
 
 import jwt
 import pytest
@@ -39,7 +41,7 @@ from lokara_db import (
     new_id,
 )
 from sqlalchemy import Engine, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.orm import Session
 
 _DB_PACKAGE_DIR = Path(__file__).resolve().parents[3] / "packages" / "db"
@@ -863,7 +865,9 @@ def test_m10_pub_f07_download_returns_verified_publication_bytes_only(
     assert unpublished.status_code == 404
 
 
-def test_m10_pub_f07_digest_mismatch_is_409_and_probe_is_rolled_back(setup: _Setup) -> None:
+def test_m10_pub_f07_corrupt_publication_is_rejected_and_probe_is_rolled_back(
+    setup: _Setup,
+) -> None:
     ids = setup.ids
     publication_id = new_id()
     with setup.owner.connect() as connection:
@@ -872,43 +876,74 @@ def test_m10_pub_f07_digest_mismatch_is_409_and_probe_is_rolled_back(setup: _Set
             assert connection.scalar(
                 text("SELECT to_regclass('public.renter_portal_publication')")
             ), "M10-R3 migration 0043 has not created renter_portal_publication"
-            connection.execute(
-                text(
-                    "INSERT INTO renter_portal_publication "
-                    "(id, account_id, tenancy_id, source_kind, statement_archive_id, "
-                    "renter_delivery_artifact_id, document_type, content_bytes, sha256, mime_type, "
-                    "filename, published_by_membership_id, published_at, "
-                    "period_start, period_end, document_month, supersedes_publication_id) "
-                    "VALUES (:id, :account, :tenancy, 'STATEMENT_ARCHIVE', :archive, NULL, "
-                    "'COVER_LETTER', :content, :digest, 'application/pdf', 'corrupt.pdf', "
-                    ":membership, :now, :period_start, :period_end, NULL, NULL)"
-                ),
-                {
-                    "id": publication_id,
-                    "account": ids.account_a,
-                    "tenancy": ids.tenancy_a,
-                    "archive": ids.archive_a_cover,
-                    "content": b"corrupt-bytes",
-                    "digest": sha256(b"cover-a").hexdigest(),
-                    "membership": ids.membership_owner_a,
-                    "now": datetime.now(UTC),
-                    "period_start": date(2025, 1, 1),
-                    "period_end": date(2025, 12, 31),
-                },
+            savepoint = connection.begin_nested()
+            try:
+                with pytest.raises(DBAPIError):
+                    connection.execute(
+                        text(
+                            "INSERT INTO renter_portal_publication "
+                            "(id, account_id, tenancy_id, source_kind, statement_archive_id, "
+                            "renter_delivery_artifact_id, document_type, content_bytes, sha256, "
+                            "mime_type, filename, published_by_membership_id, published_at, "
+                            "period_start, period_end, document_month, supersedes_publication_id) "
+                            "VALUES (:id, :account, :tenancy, 'STATEMENT_ARCHIVE', :archive, "
+                            "NULL, 'COVER_LETTER', :content, :digest, 'application/pdf', "
+                            "'corrupt.pdf', :membership, :now, :period_start, :period_end, "
+                            "NULL, NULL)"
+                        ),
+                        {
+                            "id": publication_id,
+                            "account": ids.account_a,
+                            "tenancy": ids.tenancy_a,
+                            "archive": ids.archive_a_cover,
+                            "content": b"corrupt-bytes",
+                            "digest": sha256(b"cover-a").hexdigest(),
+                            "membership": ids.membership_owner_a,
+                            "now": datetime.now(UTC),
+                            "period_start": date(2025, 1, 1),
+                            "period_end": date(2025, 12, 31),
+                        },
+                    )
+            finally:
+                savepoint.rollback()
+            assert (
+                connection.scalar(
+                    text("SELECT count(*) FROM renter_portal_publication WHERE id = :id"),
+                    {"id": publication_id},
+                )
+                == 0
             )
-
-            def same_transaction_renter_session() -> Iterator[Session]:
-                with Session(bind=connection, join_transaction_mode="create_savepoint") as session:
-                    yield session
-
-            app = cast(FastAPI, setup.client.app)
-            app.dependency_overrides[renter_session_for_path] = same_transaction_renter_session
-            response = setup.client.get(
-                f"/renter/{ids.tenancy_a}/documents/{publication_id}/download",
-                headers=_token(ids.renter_person),
-            )
-            assert response.status_code == 409
-            assert response.content != b"corrupt-bytes"
         finally:
-            app.dependency_overrides.pop(renter_session_for_path, None)
             transaction.rollback()
+
+
+def test_m10_pub_f07_historical_corruption_returns_409_at_download(setup: _Setup) -> None:
+    ids = setup.ids
+    publication_id = new_id()
+    historical_row = SimpleNamespace(
+        id=publication_id,
+        tenancy_id=ids.tenancy_a,
+        content_bytes=b"historically-corrupt-bytes",
+        sha256=sha256(b"expected-historical-bytes").hexdigest(),
+        mime_type="application/pdf",
+        filename="historical.pdf",
+    )
+    mocked_session = Mock(spec=Session)
+    mocked_session.scalar.return_value = historical_row
+
+    def historical_publication_session() -> Iterator[Session]:
+        yield cast(Session, mocked_session)
+
+    app = cast(FastAPI, setup.client.app)
+    app.dependency_overrides[renter_session_for_path] = historical_publication_session
+    try:
+        response = setup.client.get(
+            f"/renter/{ids.tenancy_a}/documents/{publication_id}/download",
+            headers=_token(ids.renter_person),
+        )
+    finally:
+        app.dependency_overrides.pop(renter_session_for_path, None)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Dokumentintegrität konnte nicht bestätigt werden."}
+    assert response.content != historical_row.content_bytes

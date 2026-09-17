@@ -131,6 +131,48 @@ function installEnabledCaseResponses(): void {
   });
 }
 
+function installAllEquityCaseResponses(): void {
+  const allEquitySlots = {
+    ...kpiSlots,
+    dscr: { status: 'not_applicable', value: 'n/a (kein Fremdkapital)' },
+  };
+  mocks.fetch.mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.endsWith('/investment/entitlement')) return json({ enabled: true });
+    if (url.endsWith('/investment/cases/case-frozen-1/sensitivity')) {
+      return json({
+        interestSensitivity: [],
+        repaymentSensitivity: [],
+        repaymentAxisMeaning: 'structure_not_stress',
+      });
+    }
+    if (url.endsWith('/investment/cases/case-frozen-1/bank-view')) {
+      return json({
+        bankView: {
+          renderable: true,
+          recalculated: false,
+          header: {},
+          investment: {
+            purchase_price_cents: 42_000_000,
+            total_investment_cents: 45_360_000,
+          },
+          financing_ltv: { loan_cents: 0 },
+          seven_kpis: allEquitySlots,
+          twelve_month_schedule: [],
+        },
+      });
+    }
+    if (url.endsWith('/investment/cases/case-frozen-1')) {
+      return json({
+        ...caseResponse,
+        calculatedValues: { schedule: [] },
+        kpiSlots: allEquitySlots,
+      });
+    }
+    throw new Error(`Unexpected request: GET ${url}`);
+  });
+}
+
 async function settle(): Promise<void> {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -316,6 +358,121 @@ describe('M10-I4 owner investment cockpit', () => {
     await renderCockpit();
     expect(container.textContent).toContain('Daten unvollständig');
     expect((container.textContent?.match(/—/g) ?? []).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('M10-I4-F10 describes all-equity DSCR as not applicable without incomplete copy', async () => {
+    installAllEquityCaseResponses();
+    await renderCockpit();
+
+    const dscr = container.querySelector<HTMLElement>('[data-kpi-key="dscr"]');
+    expect(dscr?.textContent).toContain('n/a (kein Fremdkapital)');
+    expect(dscr?.textContent).toContain('Kein Fremdkapital');
+    expect(dscr?.textContent).not.toContain('Daten unvollständig');
+  });
+
+  it('M10-I4-F10 describes empty all-equity sensitivity as no debt', async () => {
+    installAllEquityCaseResponses();
+    await renderCockpit();
+
+    const section = container.querySelector<HTMLElement>(
+      'section[aria-labelledby="investment-sensitivity"]',
+    );
+    act(() => section?.querySelector('button')?.click());
+    expect(section?.textContent).toContain('Kein Fremdkapital');
+    expect(section?.textContent).not.toContain('Daten unvollständig');
+  });
+
+  it('M10-I4-F10 describes an empty all-equity plan as no debt', async () => {
+    installAllEquityCaseResponses();
+    await renderCockpit();
+
+    const section = container.querySelector<HTMLElement>(
+      'section[aria-labelledby="investment-schedule"]',
+    );
+    act(() => section?.querySelector('button')?.click());
+    expect(section?.textContent).toContain('Kein Fremdkapital');
+    expect(section?.textContent).not.toContain('Daten unvollständig');
+  });
+
+  it('M10-I4-F09 requires an explicit loan and normalizes that exact amount', async () => {
+    mocks.search = '';
+    mocks.fetch.mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/investment/entitlement')) return json({ enabled: true });
+      if (url.endsWith('/investment/cases') && init?.method === 'POST') {
+        return json(caseResponse, 201);
+      }
+      throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
+    });
+    await renderCockpit();
+    const openWizard = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Neues Prüfobjekt',
+    );
+    act(() => openWizard?.click());
+
+    setControl('purchasePriceEuros', '420000.00');
+    setControl('acquisitionCostsEuros', '33600.00');
+    setControl('equityEuros', '113600.00');
+    await settle();
+    const loan = container.querySelector<HTMLInputElement>('[name="loanEuros"]');
+    expect(loan?.value).toBe('');
+
+    setControl('loanEuros', '123456.78');
+    setControl('monthlyActualRentEuros', '2650.00');
+    const reviewStep = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Schritt 6: Angaben prüfen"]',
+    );
+    act(() => reviewStep?.click());
+    const create = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Prüfobjekt berechnen',
+    );
+    act(() => create?.click());
+    await settle();
+
+    const post = mocks.fetch.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(post).toBeDefined();
+    const body = JSON.parse(String(post?.[1]?.body)) as {
+      facts: Record<string, unknown>;
+    };
+    expect(body.facts.purchasePriceCents).toBe(42_000_000);
+    expect(body.facts.acquisitionCostsCents).toBe(3_360_000);
+    expect(body.facts.equityCents).toBe(11_360_000);
+    expect(body.facts.loanCents).toBe(12_345_678);
+  });
+
+  it('M10-F lets wizard footer actions stack and wrap without horizontal overflow', async () => {
+    mocks.search = '';
+    mocks.fetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/investment/entitlement')) return json({ enabled: true });
+      throw new Error(`Unexpected request: GET ${url}`);
+    });
+    await renderCockpit();
+    const openWizard = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Neues Prüfobjekt',
+    );
+    act(() => openWizard?.click());
+    const reviewStep = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Schritt 6: Angaben prüfen"]',
+    );
+    act(() => reviewStep?.click());
+
+    const back = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Zurück',
+    );
+    const submit = Array.from(container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Prüfobjekt berechnen',
+    );
+    const footer = submit?.parentElement;
+
+    expect(back, 'the wizard footer must expose the back action').toBeDefined();
+    expect(submit, 'the wizard footer must expose the submit action').toBeDefined();
+    expect(back?.parentElement).toBe(footer);
+    expect(footer?.className).toMatch(/(?:\bflex-wrap\b|\bflex-col\b|\bgrid\b)/);
+    for (const action of [back, submit]) {
+      expect(action?.className).toMatch(/(?:\bw-full\b|\bmax-w-full\b|\bmin-w-0\b)/);
+      expect(action?.className).toMatch(/(?:\bwhitespace-normal\b|\bbreak-words\b)/);
+    }
   });
 
   it('M10-I4-F09 creates without a layout id and hands the returned case through the URL', async () => {

@@ -149,8 +149,10 @@ export function ReminderSidebar() {
           className="absolute right-0 mt-2 max-h-[80vh] w-[340px] overflow-y-auto rounded-xl border border-mint bg-white p-4 shadow-lg"
         >
           <div className="mb-3">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-lg font-bold text-ink">Fristen &amp; Erinnerungen</h2>
+            <div className="flex items-center gap-2 @max-[240px]/lokara-shell:flex-wrap">
+              <h2 className="font-display text-lg font-bold text-ink @max-[240px]/lokara-shell:text-[15px] @max-[240px]/lokara-shell:leading-tight">
+                Fristen &amp; Erinnerungen
+              </h2>
               <span className="rounded bg-mint px-1.5 py-0.5 text-[10px] font-semibold text-forest">
                 Demo
               </span>
@@ -162,8 +164,11 @@ export function ReminderSidebar() {
 
           <ul className="flex flex-col gap-2">
             {REMINDERS.map((reminder) => (
-              <li key={reminder.title} className="rounded-lg border border-mint bg-paper p-3">
-                <div className="flex items-center gap-2">
+              <li
+                key={reminder.title}
+                className="rounded-lg border border-mint bg-paper p-3 @max-[240px]/lokara-shell:p-2"
+              >
+                <div className="flex items-center gap-2 @max-[240px]/lokara-shell:flex-wrap">
                   <span
                     aria-hidden="true"
                     className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_DOT[reminder.severity]}`}
@@ -171,12 +176,16 @@ export function ReminderSidebar() {
                   <span className={`text-xs font-semibold ${SEVERITY_TEXT[reminder.severity]}`}>
                     {reminder.tag}
                   </span>
-                  <span className="ml-auto text-[11px] whitespace-nowrap text-slate">
+                  <span className="ml-auto text-[11px] whitespace-nowrap text-slate @max-[240px]/lokara-shell:ml-0 @max-[240px]/lokara-shell:basis-full @max-[240px]/lokara-shell:pl-4 @max-[240px]/lokara-shell:text-[10px]">
                     {reminder.when}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm font-semibold text-ink">{reminder.title}</p>
-                <p className="mt-0.5 text-xs text-slate">{reminder.detail}</p>
+                <p className="mt-1.5 text-sm font-semibold text-ink @max-[240px]/lokara-shell:text-[11px]">
+                  {reminder.title}
+                </p>
+                <p className="mt-0.5 text-xs text-slate @max-[240px]/lokara-shell:text-[10px] @max-[240px]/lokara-shell:[overflow-wrap:break-word]">
+                  {reminder.detail}
+                </p>
               </li>
             ))}
           </ul>

@@ -425,8 +425,9 @@ Berkay approved `M10-COPY-01…06` on 11.09.2026. The exact activation, success,
 context-switcher, navigation, heading, PDF-action, loading, empty and error strings are owned by
 `docs/02`. The UI uses them verbatim, keeps the **Sie** form, names
 „Vermieterin oder Vermieter“, uses no gender punctuation or Anglicisms and shows no amount,
-co-renter name or unrelated object data in navigation. M10-R4 is no longer copy-blocked; its schema,
-API and UI remain unimplemented.
+co-renter name or unrelated object data in navigation. M10-R4's schema, API and UI are implemented
+and review-clean. The M10-F review is also clean after the reminder-overlap fix; true browser 200%
+zoom and DB-backed browser proof remain coverage limits.
 
 ### M10-R3 publication API — exact wire contract
 
@@ -500,8 +501,9 @@ renter. A period longer than 12 months hard-blocks before calculation or renderi
 
 M6-A/M6-B ship owner-only controls for confirmed actual advances, Saldo, immutable/versioned
 finalization, history and stored-document download. The separate tenant archive is independently
-rendered and isolated, but is not a renter route, portal item, email/delivery feature or
-legal-production approval. The live demo PDF remains unchanged.
+rendered and isolated; M10 can publish eligible frozen bytes explicitly into the renter portal.
+Scheduled/email delivery and legal-production approval remain separate. The live demo PDF remains
+unchanged.
 
 ### UI-05A development workflow — implemented, partially verified
 
@@ -549,8 +551,9 @@ positions and documented rent changes. The UI converts an inclusive “Letzter M
 database's exclusive end boundary at the form edge. Unknown legacy facts stay “Nicht dokumentiert”.
 
 UI-07 now supplies the owner-only payment projection from existing receivable facts. The renter
-portal waits until M10, and messages until a real model and policy exist. Documents list only stored immutable archives and
-offer no upload control. Migration `0029` supplies the four account-scoped temporal tables. Ruff,
+portal is implemented under M10; messages still wait for a real model and policy. Documents list
+only stored immutable archives and offer no upload control. Migration `0029` supplies the four
+account-scoped temporal tables. Ruff,
 strict mypy, web lint, typecheck, production build, local migration/seed and an authenticated live
 API read pass. Later checkpoint full/demo gates and clean boundary/focused statement/UI re-reviews
 provide partial verification. The separate live-browser acceptance matrix remains outstanding.
@@ -694,8 +697,8 @@ production-blocking.
   secure storage, TanStack Query, Jotai, React Hook Form/Zod, i18n and shared mobile
   theming/patterns. No shared mobile UI package exists today.
 - The pure investment engine, immutable persistence and owner API are implemented through M10-I3.
-  The M10-I4 cockpit and frozen Bank-PDF are **Prepared but unmerged** on
-  `slice/m10-i4-investment-cockpit`; Page-07 production blockers remain active.
+  The M10-I4 cockpit and frozen Bank-PDF are **Implemented and locally merged** as
+  `97f6448`; Page-07 production blockers remain active.
   W3/W5–W8 guard work is
   technically closed on `development` through M9 on 29.08.2026; its production blockers remain. Pure AfA/export packages
   are present; M7-F closure remains deferred.

@@ -228,9 +228,9 @@ export function PortalShellContent({
     collapsed === null ? 'hidden size-7 max-[1439px]:block' : collapsedNow ? 'size-7' : 'hidden';
 
   return (
-    <div className="flex min-h-dvh min-w-0 bg-paper text-ink">
+    <div className="@container/lokara-shell flex min-h-dvh min-w-0 bg-paper text-ink">
       <aside
-        className={`${sidebarWidth} max-md:w-[72px] sticky top-0 flex h-dvh shrink-0 flex-col overflow-visible border-r border-mint bg-white px-3 py-5`}
+        className={`${sidebarWidth} max-md:w-[72px] sticky top-0 flex h-dvh shrink-0 flex-col overflow-visible border-r border-mint bg-white px-3 py-5 @max-[320px]/lokara-shell:w-12 @max-[320px]/lokara-shell:px-0`}
       >
         <div className="flex h-10 shrink-0 items-center">
           <Link
@@ -257,6 +257,12 @@ export function PortalShellContent({
           </Link>
         </div>
 
+        {account && account.role !== 'TAX_ADVISOR' ? (
+          <div className="@max-[320px]/lokara-shell:mt-2 @max-[320px]/lokara-shell:flex @max-[320px]/lokara-shell:shrink-0 @max-[320px]/lokara-shell:justify-center @max-[320px]/lokara-shell:[&>div]:relative @max-[320px]/lokara-shell:[&>div]:top-auto @max-[320px]/lokara-shell:[&>div]:right-auto @max-[320px]/lokara-shell:[&_[role=dialog]]:fixed @max-[320px]/lokara-shell:[&_[role=dialog]]:top-2 @max-[320px]/lokara-shell:[&_[role=dialog]]:right-2 @max-[320px]/lokara-shell:[&_[role=dialog]]:bottom-2 @max-[320px]/lokara-shell:[&_[role=dialog]]:left-14 @max-[320px]/lokara-shell:[&_[role=dialog]]:mt-0 @max-[320px]/lokara-shell:[&_[role=dialog]]:max-h-none @max-[320px]/lokara-shell:[&_[role=dialog]]:w-auto @max-[320px]/lokara-shell:[&_[role=dialog]]:p-2">
+            <ReminderSidebar />
+          </div>
+        ) : null}
+
         {isLoading ? (
           <SidebarSkeleton />
         ) : account && isKnownRole(account.role) ? (
@@ -280,7 +286,7 @@ export function PortalShellContent({
                   aria-current={active ? 'page' : undefined}
                   title={item.label}
                   className={
-                    'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ease-out ' +
+                    'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ease-out @max-[320px]/lokara-shell:justify-center @max-[320px]/lokara-shell:px-1 @max-[320px]/lokara-shell:focus-visible:outline-offset-[-2px] ' +
                     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ' +
                     (active ? 'bg-mint font-semibold text-forest' : 'text-ink hover:bg-mint/60')
                   }
@@ -324,7 +330,7 @@ export function PortalShellContent({
       </aside>
 
       <div className="min-w-0 flex-1">
-        <div className="mx-auto min-w-0 w-full max-w-[1440px] px-6 min-[1440px]:px-8 min-[1800px]:px-10">
+        <div className="mx-auto min-w-0 w-full max-w-[1440px] px-6 min-[1440px]:px-8 min-[1800px]:px-10 @max-[320px]/lokara-shell:px-2">
           {isLoading ? (
             <ShellLoadingState />
           ) : isError ? (
@@ -352,7 +358,6 @@ export function PortalShellContent({
           )}
         </div>
       </div>
-      {account && account.role !== 'TAX_ADVISOR' ? <ReminderSidebar /> : null}
     </div>
   );
 }
@@ -465,7 +470,7 @@ function AccountMenu({
         role="menu"
         aria-label="Konten"
         hidden={!open}
-        className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 min-w-64 rounded-xl border border-mint bg-white p-2 shadow-lg"
+        className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 min-w-64 rounded-xl border border-mint bg-white p-2 shadow-lg @max-[320px]/lokara-shell:min-w-0 @max-[320px]/lokara-shell:w-[calc(100cqw-1rem)] @max-[320px]/lokara-shell:[overflow-wrap:anywhere]"
         onKeyDown={(event) => {
           const items = Array.from(
             event.currentTarget.querySelectorAll<HTMLElement>(
@@ -542,7 +547,7 @@ function AccountMenu({
             focusMenuItem(event.key === 'ArrowDown' ? 'first' : 'last');
           }
         }}
-        className="flex min-h-14 w-full items-center gap-3 rounded-xl bg-paper px-3 text-left transition-colors duration-150 hover:bg-mint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+        className="flex min-h-14 w-full items-center gap-3 rounded-xl bg-paper px-3 text-left transition-colors duration-150 hover:bg-mint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none @max-[320px]/lokara-shell:justify-center @max-[320px]/lokara-shell:px-1 @max-[320px]/lokara-shell:focus-visible:outline-offset-[-2px]"
       >
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-mint font-display text-xs font-bold text-forest">
           {initials || 'K'}

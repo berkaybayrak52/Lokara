@@ -37,6 +37,7 @@ PAGE_07_GOLDENS = cast(dict[str, dict[str, object]], _ORACLE["PAGE_07_GOLDENS"])
 REFERENCE_INPUTS = cast(dict[str, int], _ORACLE["REFERENCE_INPUTS"])
 F01 = PAGE_07_GOLDENS["14-F01"]
 F02 = PAGE_07_GOLDENS["14-F02"]
+F04 = PAGE_07_GOLDENS["14-F04"]
 F12 = PAGE_07_GOLDENS["14-F12"]
 F13 = PAGE_07_GOLDENS["14-F13"]
 F14 = PAGE_07_GOLDENS["14-F14"]
@@ -211,6 +212,26 @@ def _data(*, f12_partial_without_financing: bool = False) -> tuple[Any, Any, Any
     return data, html, render
 
 
+def _f04_all_equity_data() -> tuple[Any, Any, Any]:
+    data_type, html, render, layout = _api()
+    fixture = runpy.run_path(str(_ENGINE_FIXTURE_PATH))
+    source_facts = cast(dict[str, dict[str, object]], fixture["SEMANTIC_INPUTS"])["14-F04"]
+    calculate = cast(Callable[[dict[str, object]], dict[str, Any]], fixture["_calculate"])
+    result = calculate(source_facts)
+    bank_view = cast(dict[str, object], result["bank_view"])
+    data = data_type(
+        case_key="case-f04-all-equity",
+        input_version=1,
+        result_id="result-f04-all-equity",
+        engine_version="lokara-investment-engine/0.1.0",
+        layout_version_id="layout-default-v1",
+        bank_view=bank_view,
+        result_snapshot=result,
+        layout_snapshot=layout,
+    )
+    return data, html, render
+
+
 def test_m10_i4_f01_renderer_input_is_frozen_slotted_and_snapshot_only() -> None:
     data, _html, _render = _data()
     data_type = type(data)
@@ -364,6 +385,28 @@ def test_m10_i4_f03_actual_empty_block_has_own_honest_note_and_no_table(
     data, render_html, _render_pdf = _data(f12_partial_without_financing=True)
     section = _block(render_html(data), block)
     assert note in _visible(section)
+    assert "<table" not in section
+
+
+def test_m10_i4_f04_actual_all_equity_dscr_is_not_applicable_without_missing_badge() -> None:
+    data, render_html, _render_pdf = _f04_all_equity_data()
+    dscr = data.result_snapshot["kpi_slots"]["dscr"]
+    assert dscr == {"status": "not_applicable", "value": F04["dscr"]}
+    section = _block(render_html(data), "seven_kpis")
+    row = next(row for row in re.findall(r"<tr\b[^>]*>.*?</tr>", section, re.S) if "DSCR" in row)
+    assert str(F04["dscr"]) in _visible(row)
+    assert "Daten unvollständig" not in _visible(section)
+
+
+@pytest.mark.parametrize("block", ("sensitivity", "twelve_month_schedule"))
+def test_m10_i4_f04_actual_all_equity_empty_financing_block_says_no_debt(
+    block: str,
+) -> None:
+    data, render_html, _render_pdf = _f04_all_equity_data()
+    section = _block(render_html(data), block)
+    visible = _visible(section)
+    assert "Kein Fremdkapital" in visible
+    assert "Daten unvollständig" not in visible
     assert "<table" not in section
 
 

@@ -4030,6 +4030,15 @@ class RenterPortalPublication(Base):
             unique=True,
             postgresql_where=text("renter_delivery_artifact_id IS NOT NULL"),
         ),
+        Index(
+            "uq_renter_portal_publication_successor",
+            "account_id",
+            "tenancy_id",
+            "document_type",
+            "supersedes_publication_id",
+            unique=True,
+            postgresql_where=text("supersedes_publication_id IS NOT NULL"),
+        ),
         Index("ix_renter_portal_publication_account", "account_id"),
         Index(
             "ix_renter_portal_publication_tenancy",

@@ -110,6 +110,9 @@ def _section(block: str, heading: str, content: str) -> str:
 
 
 def _kpi_value(key: str, slot: dict[str, object]) -> str:
+    if slot.get("status") == "not_applicable":
+        value = slot.get("value")
+        return value if isinstance(value, str) else _MISSING
     if slot.get("status") != "available":
         return _MISSING
     if key == "factor":
@@ -159,6 +162,7 @@ def investment_bank_pdf_html(data: InvestmentBankPdfData) -> str:
     sensitivity = _mapping(view.get("sensitivity"))
     assumptions = _mapping(view.get("assumptions_method"))
     area = header.get("area_sqm_x100")
+    no_debt = isinstance(financing.get("loan_cents"), int) and financing.get("loan_cents") == 0
 
     header_rows = "".join(
         (
@@ -240,7 +244,10 @@ def investment_bank_pdf_html(data: InvestmentBankPdfData) -> str:
         ("cashflow", "Cashflow monatlich"),
         ("break_even", "Break-Even-Miete monatlich"),
     )
-    unavailable = any(_mapping(kpis.get(key)).get("status") != "available" for key, _ in kpi_labels)
+    unavailable = any(
+        _mapping(kpis.get(key)).get("status") not in {"available", "not_applicable"}
+        for key, _ in kpi_labels
+    )
     kpi_html = (
         '<table class="facts"><tbody>'
         + "".join(
@@ -289,12 +296,20 @@ def investment_bank_pdf_html(data: InvestmentBankPdfData) -> str:
         schedule_rows,
         "Annuitätenplan Jahr 1",
     )
-    if not interest_rows and not repayment_rows:
+    if no_debt:
+        sensitivity_html = (
+            '<p class="notice">Kein Fremdkapital – keine Sensitivität erforderlich.</p>'
+        )
+    elif not interest_rows and not repayment_rows:
         sensitivity_html = (
             '<p class="notice">Daten unvollständig – ohne Finanzierung ist keine '
             "Sensitivität verfügbar.</p>"
         )
-    if not schedule_rows:
+    if no_debt:
+        schedule_html = (
+            '<p class="notice">Kein Fremdkapital – kein Annuitätenplan erforderlich.</p>'
+        )
+    elif not schedule_rows:
         schedule_html = (
             '<p class="notice">Daten unvollständig – ohne Finanzierung ist kein '
             "Annuitätenplan verfügbar.</p>"

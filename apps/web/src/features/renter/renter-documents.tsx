@@ -100,9 +100,11 @@ export function RenterDocumentsView({
       : 'Es liegen noch keine Verbrauchsinformationen für Sie bereit.';
 
   return (
-    <main className="py-12">
+    <main className="min-w-0 py-12 [overflow-wrap:anywhere]">
       <div className="mx-auto max-w-3xl">
-        <h1 className="font-display text-3xl font-bold text-ink">{heading}</h1>
+        <h1 className="font-display text-3xl font-bold text-ink [overflow-wrap:anywhere]">
+          {heading}
+        </h1>
 
         {state === 'loading' ? (
           <p role="status" className="mt-8 text-ink">
@@ -113,7 +115,7 @@ export function RenterDocumentsView({
             <p role="alert" className="leading-7 text-ink">
               Die Daten konnten nicht geladen werden. Bitte versuchen Sie es später erneut.
             </p>
-            <Button type="button" variant="outline" onClick={onRetry}>
+            <Button type="button" variant="outline" onClick={onRetry} className="h-auto min-h-11 max-w-full whitespace-normal">
               Erneut versuchen
             </Button>
           </div>
@@ -129,11 +131,13 @@ export function RenterDocumentsView({
                 <li key={document.id}>
                   <Card>
                     <CardHeader>
-                      <h2 className="font-display text-xl font-semibold text-ink">{title}</h2>
+                      <h2 className="font-display text-xl font-semibold text-ink [overflow-wrap:anywhere]">
+                        {title}
+                      </h2>
                     </CardHeader>
                     {href ? (
                       <CardContent>
-                        <Button asChild variant="outline">
+                        <Button asChild variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal">
                           <a href={href}>Als PDF speichern</a>
                         </Button>
                       </CardContent>

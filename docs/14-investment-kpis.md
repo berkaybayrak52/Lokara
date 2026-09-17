@@ -1,6 +1,6 @@
 # Investment KPIs — planning calculations and deterministic bank view
 
-**Status:** D2 transcription complete; M10-I0–I4 technically implemented and locally verified; I4 unmerged
+**Status:** D2 transcription complete; M10-I0–I4 technically implemented and locally verified; I4 locally merged
 
 **Rechtsstand:** 07/2026
 
@@ -13,8 +13,10 @@
 **Implementation status:** the pure engine, section-4.7 persistence contract and section-4.8 API
 contract are technically complete through migration `0046`. The section-4.9 cockpit, server-owned
 default layout and frozen Bank-PDF are implemented and verified locally on
-`slice/m10-i4-investment-cockpit`, unmerged. No production approval is implied;
-all Page-07 production blockers remain. Pricing and bank integration remain outside this contract.
+`slice/m10-i4-investment-cockpit`, committed as `97f6448` and locally merged into `main`. M10-F is
+technically complete and review-clean locally on 17.09.2026; its closure changes remain uncommitted.
+No production approval is implied; all Page-07 production blockers remain. Pricing and bank
+integration remain outside this contract.
 
 This document defines a planning calculation for a **Prüfobjekt**: a property being
 considered for purchase. It produces exactly seven KPIs and a deterministic Bank-PDF view. The
@@ -87,7 +89,7 @@ boundaries; no float crosses the contract.
 
 ### 4.1 Prüfobjekt input snapshot
 
-A future immutable snapshot groups object/purchase data, monthly cold rent and vacancy assumption,
+The implemented immutable snapshot groups object/purchase data, monthly cold rent and vacancy assumption,
 four user-entered operating amounts, financing assumptions, tax/AfA provenance, optional Bank-PDF
 header data and rule/layout versions. It records `finanzierungQuelle` as `annahme`, `indikativ` or
 `angebot`. Missing data stays missing; it is never replaced by zero.
@@ -95,7 +97,7 @@ header data and rule/layout versions. It records `finanzierungQuelle` as `annahm
 ### 4.2 Financing and AfA provenance
 
 Each financing value records whether it is a pre-offer assumption, indication or offer. Each AfA
-value records whether it came from Page-03 R13, a future wizard input or the acquisition-phase
+value records whether it came from Page-03 R13, the implemented cockpit wizard or the acquisition-phase
 default. A linked Page-03 record wins. The snapshot must retain both source and version.
 
 ### 4.3 Partial KPI result
@@ -106,7 +108,7 @@ unvollständig”; no fabricated zero. No overall score or purchase decision is 
 
 ### 4.4 Twelve-month annuity schedule
 
-The future schedule contains exactly twelve ordered rows with opening balance, rounded monthly
+The implemented schedule contains exactly twelve ordered rows with opening balance, rounded monthly
 interest, repayment and closing balance, plus annual interest, repayment, debt service and closing
 balance. Every row reconciles and the annual sums reconcile. Non-positive repayment hard-blocks.
 
@@ -118,7 +120,7 @@ reduction together. Interest is a stress axis; repayment is a financing-structur
 
 ### 4.6 Deterministic Bank-PDF view
 
-The future view is `f(frozen KPI snapshot, versioned layout) → bytes`. It performs no
+The implemented view is `f(frozen KPI snapshot, versioned layout) → bytes`. It performs no
 recalculation. Blocks are ordered: header/disclosure, investment, financing/LTV, rent and planning
 costs, seven KPIs, sensitivity, twelve-month schedule, assumptions/method including the `14-K01`
 through `14-K13` definitions, and disclosure. Missing KPIs remain `—`. LTV is labelled “Auslauf zum
@@ -324,6 +326,12 @@ The table rejects `UPDATE` and `DELETE`, and it ENABLEs and FORCEs RLS. `SELECT`
 limited to the active `app.account_id`, refuse nonempty renter context, and the INSERT policy has an
 equivalent `WITH CHECK`. RLS supplies account isolation only. The API separately proves that the
 live authorizing Membership is `OWNER`; database account scope is not treated as role authorization.
+
+M10-F migration `0047` adds a database backstop: an entitlement event's author must be a live,
+accepted, unrevoked `OWNER` in the same account, and `recorded_at` is overwritten with
+`statement_timestamp()` on insertion. The immediate-version predecessor check remains in force.
+This closes direct-write actor and caller-supplied timestamp gaps; it adds no table, column, route
+or production entitlement. Foreign-account application writes remain subject to forced RLS.
 
 #### Exact route and role surface
 

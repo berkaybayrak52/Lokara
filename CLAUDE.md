@@ -72,8 +72,9 @@ Login has one bounded exception because it must find the Person before account c
 - It is owned by a dedicated least-privilege role.
 - `scripts/check_pre_context_reads.py` enforces its function, role, policy, privilege and call-site
   boundaries.
-- M5 role enforcement, nested-route authorization and the account switcher are shipped. Renter
-  context and portal authorization remain M10 work.
+- M5 role enforcement, nested-route authorization and the account switcher are shipped. M10 renter
+  activation, renter context and portal authorization are shipped; the bounded bootstrap function
+  returns membership and renter-tenancy contexts.
 
 ---
 

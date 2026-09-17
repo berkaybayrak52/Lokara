@@ -324,6 +324,12 @@ nothing busy. Tokens provide structure; these rules provide the feel. They apply
 - The authenticated web shell uses one centered content frame up to 1440px wide, with 24px
   horizontal breathing room and 32px from the `xl` breakpoint. Individual tables or prose may use
   a narrower reading measure; never shrink the global frame to repair one screen.
+- Accessibility exception: when the shell's actual CSS container width is below 320px, including
+  an enlarged mobile view, use a compact navigation rail and 8px horizontal breathing room.
+  Investment cards, form sections and controls may reduce nested padding to 8px in this compact
+  mode so labels and entered numbers remain readable. Keep navigation and explicit units available;
+  do not hide content, shrink fonts or accept one-letter-per-line labels as a successful reflow.
+  Ordinary 320px-and-wider layouts retain their normal rail, spacing and desktop breakpoints.
 - Constrain body and content columns to about 640–760px for readability; do not stretch prose
   full-bleed.
 - Card grids align at the top and preserve natural card heights. Do not stretch a short card only

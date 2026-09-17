@@ -18,7 +18,7 @@ import {
   cn,
 } from '@lokara/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { useMe } from '@/features/portal/queries';
 import { API_URL } from '@/lib/api';
@@ -222,12 +222,12 @@ function FormField({
   required?: boolean;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <Label htmlFor={`investment-${name}`}>
         {label}
         {required ? <span className="ml-1 text-danger">*</span> : null}
       </Label>
-      <div className="relative">
+      <div className="relative min-w-0">
         <Input
           id={`investment-${name}`}
           name={name}
@@ -236,10 +236,13 @@ function FormField({
           required={required}
           value={fieldValue}
           onChange={(event) => onChange(name, event.target.value)}
-          className={suffix ? 'pr-12' : undefined}
+          className={cn(
+            'min-w-0 @max-[320px]/lokara-shell:px-2',
+            suffix && 'pr-12 @max-[320px]/lokara-shell:pr-6',
+          )}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate">
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate @max-[320px]/lokara-shell:right-2">
             {suffix}
           </span>
         ) : null}
@@ -283,9 +286,9 @@ function SelectField({
 
 function ReviewLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate/20 py-3 last:border-b-0">
-      <dt className="text-sm text-slate">{label}</dt>
-      <dd className="text-right text-sm font-semibold text-ink">{children}</dd>
+    <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-1 border-b border-slate/20 py-3 last:border-b-0">
+      <dt className="min-w-0 text-sm text-slate">{label}</dt>
+      <dd className="min-w-0 text-right text-sm font-semibold text-ink">{children}</dd>
     </div>
   );
 }
@@ -295,12 +298,12 @@ export function InvestmentCockpit({ accountId }: { accountId: string }) {
   const account = me.data?.accounts.find((candidate) => candidate.id === accountId);
 
   return (
-    <main className="min-w-0 space-y-8 py-8 [overflow-wrap:anywhere]">
-      <header className="max-w-3xl space-y-3 pr-12">
+    <main className="min-w-0 space-y-8 py-8 [overflow-wrap:anywhere] @max-[320px]/lokara-shell:hyphens-auto @max-[320px]/lokara-shell:[&_fieldset]:min-w-0">
+      <header className="max-w-3xl space-y-3 pr-12 @max-[320px]/lokara-shell:pr-0">
         <div className="inline-flex rounded-full bg-mint px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-forest">
           Investmentcockpit
         </div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink [overflow-wrap:normal] sm:text-4xl">
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
           Investition prüfen
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-slate">
@@ -378,8 +381,8 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-xl bg-forest text-white">
-        <div className="grid gap-8 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8 lg:py-10">
-          <div className="max-w-2xl">
+        <div className="grid min-w-0 gap-8 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8 lg:py-10 @max-[320px]/lokara-shell:px-2">
+          <div className="min-w-0 max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
               Investment-Dashboard
             </p>
@@ -392,7 +395,11 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
               Finanzierungsübersicht.
             </p>
           </div>
-          <Button type="button" onClick={onCreate} className="bg-white text-forest hover:bg-cream">
+          <Button
+            type="button"
+            onClick={onCreate}
+            className="h-auto min-h-11 min-w-0 max-w-full whitespace-normal bg-white text-forest hover:bg-cream"
+          >
             Neues Prüfobjekt
           </Button>
         </div>
@@ -410,8 +417,8 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
             Ihre Investitionsanalyse
           </h2>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
+        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
+          <Card className="min-w-0 @max-[320px]/lokara-shell:[&>div]:px-2">
             <CardHeader className="pb-3">
               <p className="text-3xl font-semibold text-forest">7</p>
               <CardTitle className="text-base">Investment-Kennzahlen</CardTitle>
@@ -423,7 +430,7 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="min-w-0 @max-[320px]/lokara-shell:[&>div]:px-2">
             <CardHeader className="pb-3">
               <p className="text-3xl font-semibold text-forest">2</p>
               <CardTitle className="text-base">Finanzierungsachsen</CardTitle>
@@ -435,7 +442,7 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="min-w-0 @max-[320px]/lokara-shell:[&>div]:px-2">
             <CardHeader className="pb-3">
               <p className="text-3xl font-semibold text-forest">12</p>
               <CardTitle className="text-base">Monate Annuitätenplan</CardTitle>
@@ -450,13 +457,13 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <Card>
+      <section className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <Card className="min-w-0 @max-[320px]/lokara-shell:[&>div]:px-2">
           <CardHeader>
             <CardTitle className="font-display text-xl">So entsteht Ihre Analyse</CardTitle>
           </CardHeader>
           <CardContent>
-            <ol className="grid gap-5 sm:grid-cols-3">
+            <ol className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-3">
               {[
                 [
                   '1',
@@ -474,11 +481,11 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
                   'Das eingefrorene Ergebnis als deterministisches Bank-PDF.',
                 ],
               ].map(([number, title, description]) => (
-                <li key={number} className="flex gap-3">
+                <li key={number} className="flex min-w-0 gap-3">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-mint text-sm font-semibold text-forest">
                     {number}
                   </span>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-ink">{title}</p>
                     <p className="mt-1 text-sm leading-relaxed text-slate">{description}</p>
                   </div>
@@ -487,7 +494,7 @@ function InvestmentDashboard({ onCreate }: { onCreate: () => void }) {
             </ol>
           </CardContent>
         </Card>
-        <div className="rounded-xl border border-warning/30 bg-warning-tint p-5">
+        <div className="min-w-0 rounded-xl border border-warning/30 bg-warning-tint p-5 @max-[320px]/lokara-shell:px-2">
           <p className="text-sm font-semibold text-ink">Planungsrechnung</p>
           <p className="mt-2 text-sm leading-relaxed text-slate">
             Ergebnisse beruhen auf Ihren Angaben und Annahmen. Sie sind keine Bewertung, Bankzusage
@@ -504,7 +511,6 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
   const create = useCreateInvestmentCase(accountId);
   const [activeStep, setActiveStep] = useState(0);
   const [repaymentMode, setRepaymentMode] = useState<'percent' | 'annuity'>('percent');
-  const [loanEdited, setLoanEdited] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [entries, setEntries] = useState<Entries>({
     vacancyPercent: '0',
@@ -521,18 +527,6 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
     return purchase === undefined ? undefined : purchase + (costs ?? 0);
   }, [entries.acquisitionCostsEuros, entries.purchasePriceEuros]);
 
-  const suggestedLoan = useMemo(() => {
-    const equity = inputEuro(entries.equityEuros);
-    return totalInvestment === undefined || equity === undefined
-      ? undefined
-      : Math.max(totalInvestment - equity, 0);
-  }, [entries.equityEuros, totalInvestment]);
-
-  useEffect(() => {
-    if (loanEdited || suggestedLoan === undefined) return;
-    setEntries((current) => ({ ...current, loanEuros: suggestedLoan.toFixed(2) }));
-  }, [loanEdited, suggestedLoan]);
-
   let input: ReturnType<typeof caseInput> | undefined;
   try {
     input = caseInput(entries);
@@ -545,7 +539,6 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
     Boolean(entries.monthlyActualRentEuros?.trim());
 
   const update = (name: string, raw: string) => {
-    if (name === 'loanEuros') setLoanEdited(true);
     setEntries((current) => ({ ...current, [name]: raw }));
   };
 
@@ -575,7 +568,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
     >
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <Card className="min-w-0 overflow-hidden">
-          <div className="border-b border-slate/20 bg-cream/40 px-5 py-4 sm:px-7">
+          <div className="border-b border-slate/20 bg-cream/40 px-5 py-4 sm:px-7 @max-[320px]/lokara-shell:px-2">
             <ol aria-label="Fortschritt" className="grid grid-cols-3 gap-2 lg:grid-cols-6">
               {STEPS.map((step, index) => (
                 <li key={step.short}>
@@ -585,7 +578,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
                     aria-current={activeStep === index ? 'step' : undefined}
                     onClick={() => goTo(index)}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors',
+                      'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors @max-[320px]/lokara-shell:justify-center @max-[320px]/lokara-shell:px-0',
                       activeStep === index
                         ? 'bg-forest text-white'
                         : index < activeStep
@@ -601,7 +594,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
             </ol>
           </div>
 
-          <CardHeader className="border-b border-slate/20 px-5 py-6 sm:px-7">
+          <CardHeader className="border-b border-slate/20 px-5 py-6 sm:px-7 @max-[320px]/lokara-shell:px-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-green">
               Schritt {activeStep + 1} von {STEPS.length}
             </p>
@@ -609,7 +602,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
             <p className="text-sm leading-relaxed text-slate">{currentStep.description}</p>
           </CardHeader>
 
-          <CardContent className="px-5 py-7 sm:px-7">
+          <CardContent className="px-5 py-7 sm:px-7 @max-[320px]/lokara-shell:px-2 @max-[320px]/lokara-shell:[&_div.rounded-lg]:px-2">
             <fieldset disabled={create.isPending} hidden={activeStep !== 0} className="space-y-6">
               <legend className="sr-only">Objektdaten</legend>
               <div className="rounded-lg border border-green/20 bg-mint/50 p-4 text-sm leading-relaxed text-forest">
@@ -780,11 +773,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
                   value={entries.loanEuros ?? ''}
                   onChange={update}
                   suffix="€"
-                  hint={
-                    loanEdited
-                      ? 'Manuell überschrieben.'
-                      : 'Automatisch aus Gesamtinvestition minus Eigenkapital.'
-                  }
+                  hint="Darlehensbetrag aus Ihrer Annahme oder dem Finanzierungsangebot."
                 />
                 <FormField
                   name="interestPercent"
@@ -817,7 +806,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
                       setEntries((current) => ({ ...current, fixedMonthlyAnnuityEuros: '' }));
                     }}
                     className={cn(
-                      'rounded-full border px-4 py-2 text-sm font-semibold',
+                      'rounded-full border px-4 py-2 text-sm font-semibold @max-[320px]/lokara-shell:px-2',
                       repaymentMode === 'percent'
                         ? 'border-forest bg-forest text-white'
                         : 'border-slate/30 text-slate',
@@ -832,7 +821,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
                       setEntries((current) => ({ ...current, initialRepaymentPercent: '' }));
                     }}
                     className={cn(
-                      'rounded-full border px-4 py-2 text-sm font-semibold',
+                      'rounded-full border px-4 py-2 text-sm font-semibold @max-[320px]/lokara-shell:px-2',
                       repaymentMode === 'annuity'
                         ? 'border-forest bg-forest text-white'
                         : 'border-slate/30 text-slate',
@@ -906,7 +895,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
             <fieldset disabled={create.isPending} hidden={activeStep !== 5} className="space-y-7">
               <legend className="sr-only">Angaben prüfen</legend>
               <div className="grid gap-5 sm:grid-cols-2">
-                <Card className="border-slate/20 shadow-none">
+                <Card className="min-w-0 border-slate/20 shadow-none @max-[320px]/lokara-shell:[&>div]:px-2">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Investition</CardTitle>
                   </CardHeader>
@@ -924,7 +913,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
                     </dl>
                   </CardContent>
                 </Card>
-                <Card className="border-slate/20 shadow-none">
+                <Card className="min-w-0 border-slate/20 shadow-none @max-[320px]/lokara-shell:[&>div]:px-2">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Finanzierung</CardTitle>
                   </CardHeader>
@@ -948,7 +937,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
                     Optional. Fehlende Angaben bleiben im PDF offen.
                   </p>
                 </div>
-                <div className="grid gap-5 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
                   <FormField
                     name="bankCreator"
                     label="Erstellt von"
@@ -977,21 +966,30 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
               ) : null}
             </fieldset>
 
-            <div className="mt-8 flex items-center justify-between border-t border-slate/20 pt-5">
+            <div className="mt-8 flex flex-col items-stretch justify-between gap-3 border-t border-slate/20 pt-5 sm:flex-row sm:items-center">
               <Button
                 type="button"
                 variant="outline"
                 disabled={create.isPending}
                 onClick={() => (activeStep === 0 ? onCancel() : goTo(activeStep - 1))}
+                className="w-full max-w-full whitespace-normal sm:w-auto"
               >
                 {activeStep === 0 ? 'Abbrechen' : 'Zurück'}
               </Button>
               {activeStep < STEPS.length - 1 ? (
-                <Button type="button" onClick={() => goTo(activeStep + 1)}>
+                <Button
+                  type="button"
+                  onClick={() => goTo(activeStep + 1)}
+                  className="w-full max-w-full whitespace-normal sm:w-auto"
+                >
                   Weiter
                 </Button>
               ) : (
-                <Button type="submit" disabled={!valid || create.isPending}>
+                <Button
+                  type="submit"
+                  disabled={!valid || create.isPending}
+                  className="w-full max-w-full whitespace-normal sm:w-auto"
+                >
                   {create.isPending ? 'Prüfobjekt wird berechnet …' : 'Prüfobjekt berechnen'}
                 </Button>
               )}
@@ -1000,7 +998,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
         </Card>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <Card className="border-green/20 bg-forest text-white">
+          <Card className="border-green/20 bg-forest text-white @max-[320px]/lokara-shell:[&>div]:px-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-base text-white">Ihre Kalkulation</CardTitle>
             </CardHeader>
@@ -1031,7 +1029,7 @@ function CreateCase({ accountId, onCancel }: { accountId: string; onCancel: () =
               </div>
             </CardContent>
           </Card>
-          <div className="rounded-lg border border-slate/20 bg-white p-4 text-sm leading-relaxed text-slate">
+          <div className="rounded-lg border border-slate/20 bg-white p-4 text-sm leading-relaxed text-slate @max-[320px]/lokara-shell:px-2">
             <p className="font-semibold text-ink">Was Sie erhalten</p>
             <ul className="mt-3 space-y-2">
               <li>✓ sieben Investment-Kennzahlen</li>
@@ -1108,8 +1106,8 @@ function CaseResult({
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-xl bg-forest text-white">
-        <div className="grid gap-6 px-6 py-7 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div>
+        <div className="grid min-w-0 gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end @max-[320px]/lokara-shell:px-2">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
               Prüfobjekt
             </p>
@@ -1122,16 +1120,19 @@ function CaseResult({
               <span>Darlehen {money(financing.loan_cents)}</span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex min-w-0 flex-wrap gap-3">
             <Button
               type="button"
               variant="outline"
-              className="border-white/30 bg-transparent text-white hover:bg-white/10"
+              className="h-auto min-h-11 min-w-0 max-w-full whitespace-normal border-white/30 bg-transparent text-white hover:bg-white/10"
               onClick={() => router.replace(`/a/${encodeURIComponent(accountId)}/investment`)}
             >
               Neues Prüfobjekt
             </Button>
-            <Button asChild className="bg-white text-forest hover:bg-cream">
+            <Button
+              asChild
+              className="h-auto min-h-11 min-w-0 max-w-full whitespace-normal bg-white text-forest hover:bg-cream"
+            >
               <a
                 href={`${API_URL}/a/${encodeURIComponent(accountId)}/investment/cases/${encodeURIComponent(investmentCase.caseKey)}/bank-pdf`}
               >
@@ -1166,7 +1167,7 @@ function CaseResult({
             zeigen die Wirkung Ihrer Finanzierungsannahmen.
           </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {KPI_LABELS.map(([key, label]) => {
             const slot = investmentCase.kpiSlots[key];
             const liquid = key === 'dscr' || key === 'cashflow';
@@ -1176,16 +1177,16 @@ function CaseResult({
               <Card
                 key={key}
                 data-kpi-key={key}
+                className={cn('min-w-0 @max-[320px]/lokara-shell:[&>div]:px-2', tone?.className)}
                 {...(tone
                   ? {
                       'data-liquidity-color': slot?.color,
                       'data-tax-basis': key === 'cashflow' ? 'after' : 'before',
-                      className: tone.className,
                     }
                   : {})}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
                     <CardTitle className="text-base">{label}</CardTitle>
                     {tone ? (
                       <span className="rounded-full border border-current px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide">
@@ -1217,10 +1218,14 @@ function CaseResult({
 
       <FinancingLab
         sensitivity={sensitivity}
+        noDebt={financing.loan_cents === 0}
         open={financingOpen}
         onToggle={() => setFinancingOpen((current) => !current)}
       />
-      <ScheduleTable schedule={investmentCase.calculatedValues.schedule} />
+      <ScheduleTable
+        schedule={investmentCase.calculatedValues.schedule}
+        noDebt={financing.loan_cents === 0}
+      />
     </div>
   );
 }
@@ -1244,9 +1249,9 @@ function LiquidityMetric({
       {...(tone
         ? {
             'data-liquidity-color': String(color),
-            className: cn('rounded-lg border p-4', tone.className),
+            className: cn('rounded-lg border p-4 @max-[320px]/lokara-shell:p-2', tone.className),
           }
-        : { className: 'rounded-lg border border-slate/20 p-4' })}
+        : { className: 'rounded-lg border border-slate/20 p-4 @max-[320px]/lokara-shell:p-2' })}
     >
       <p className="text-xs text-slate">{label}</p>
       <p className="mt-1 text-xl font-semibold text-ink">{children}</p>
@@ -1278,10 +1283,12 @@ function LiquidityTableCell({
 
 function FinancingLab({
   sensitivity,
+  noDebt,
   open,
   onToggle,
 }: {
   sensitivity: InvestmentSensitivity;
+  noDebt: boolean;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -1315,9 +1322,9 @@ function FinancingLab({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left sm:px-7"
+        className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left sm:px-7 @max-[320px]/lokara-shell:flex-col @max-[320px]/lokara-shell:items-stretch @max-[320px]/lokara-shell:gap-2 @max-[320px]/lokara-shell:px-2"
       >
-        <span>
+        <span className="min-w-0">
           <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-green">
             Finanzierungslabor
           </span>
@@ -1331,30 +1338,34 @@ function FinancingLab({
             Zins-Stresstest und Tilgung als Struktur-Trade-off.
           </span>
         </span>
-        <span aria-hidden="true" className="text-2xl text-green">
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-2xl text-green @max-[320px]/lokara-shell:self-end"
+        >
           {open ? '−' : '+'}
         </span>
       </button>
       {open ? (
-        <div className="border-t border-green/20 px-5 py-6 sm:px-7">
+        <div className="border-t border-green/20 px-5 py-6 sm:px-7 @max-[320px]/lokara-shell:px-2">
           {rows.length === 0 ? (
             <p className="text-sm text-slate">
-              Daten unvollständig – keine Finanzierungssensitivität verfügbar.
+              {noDebt
+                ? 'Kein Fremdkapital – keine Finanzierungssensitivität erforderlich.'
+                : 'Daten unvollständig – keine Finanzierungssensitivität verfügbar.'}
             </p>
           ) : (
             <div className="space-y-7">
               <div
-                className="inline-flex rounded-lg bg-cream p-1"
-                role="tablist"
+                className="inline-flex min-w-0 max-w-full flex-wrap rounded-lg bg-cream p-1 @max-[320px]/lokara-shell:flex @max-[320px]/lokara-shell:w-full @max-[320px]/lokara-shell:flex-col"
+                role="group"
                 aria-label="Finanzierungsachse"
               >
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={axis === 'interest'}
+                  aria-pressed={axis === 'interest'}
                   onClick={() => setAxis('interest')}
                   className={cn(
-                    'rounded-md px-4 py-2 text-sm font-semibold',
+                    'min-h-11 min-w-0 max-w-full whitespace-normal rounded-md px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring @max-[320px]/lokara-shell:w-full @max-[320px]/lokara-shell:px-2',
                     axis === 'interest' ? 'bg-white text-forest shadow-sm' : 'text-slate',
                   )}
                 >
@@ -1362,11 +1373,10 @@ function FinancingLab({
                 </button>
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={axis === 'repayment'}
+                  aria-pressed={axis === 'repayment'}
                   onClick={() => setAxis('repayment')}
                   className={cn(
-                    'rounded-md px-4 py-2 text-sm font-semibold',
+                    'min-h-11 min-w-0 max-w-full whitespace-normal rounded-md px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring @max-[320px]/lokara-shell:w-full @max-[320px]/lokara-shell:px-2',
                     axis === 'repayment' ? 'bg-white text-forest shadow-sm' : 'text-slate',
                   )}
                 >
@@ -1374,10 +1384,10 @@ function FinancingLab({
                 </button>
               </div>
 
-              <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_16rem]">
-                <div className="space-y-4">
-                  <div className="flex items-end justify-between gap-4">
-                    <div>
+              <div className="grid min-w-0 grid-cols-1 gap-7 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                <div className="min-w-0 space-y-4">
+                  <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
+                    <div className="min-w-0">
                       <Label htmlFor={`investment-${axis}-slider`}>
                         {axis === 'interest' ? 'Sollzins' : 'Anfängliche Tilgung'}
                       </Label>
@@ -1414,7 +1424,7 @@ function FinancingLab({
                     ))}
                   </div>
                 </div>
-                <div className="rounded-lg bg-cream p-4 text-sm leading-relaxed text-slate">
+                <div className="rounded-lg bg-cream p-4 text-sm leading-relaxed text-slate @max-[320px]/lokara-shell:p-2">
                   <strong className="text-ink">
                     {axis === 'interest' ? 'Stress' : 'Struktur'}
                   </strong>
@@ -1426,7 +1436,10 @@ function FinancingLab({
                 </div>
               </div>
 
-              <div aria-live="polite" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div
+                aria-live="polite"
+                className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5"
+              >
                 <LiquidityMetric kpi="dscr" color={value(selected, 'dscr_color')} label="DSCR">
                   {hundredths(value(selected, 'dscr_hundredths'))}
                 </LiquidityMetric>
@@ -1437,19 +1450,19 @@ function FinancingLab({
                 >
                   {money(value(selected, 'cashflow_after_month_cents'))}
                 </LiquidityMetric>
-                <div className="rounded-lg border border-slate/20 p-4">
+                <div className="rounded-lg border border-slate/20 p-4 @max-[320px]/lokara-shell:p-2">
                   <p className="text-xs text-slate">EK-Rendite nach Steuer</p>
                   <p className="mt-1 text-xl font-semibold text-ink">
                     {percent(value(selected, 'equity_return_after_bp'))}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate/20 p-4">
+                <div className="rounded-lg border border-slate/20 p-4 @max-[320px]/lokara-shell:p-2">
                   <p className="text-xs text-slate">Break-Even nach Steuer</p>
                   <p className="mt-1 text-xl font-semibold text-ink">
                     {money(value(selected, 'break_even_after_month_cents'))}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate/20 p-4">
+                <div className="rounded-lg border border-slate/20 p-4 @max-[320px]/lokara-shell:p-2">
                   <p className="text-xs text-slate">Restschuld Jahr 1</p>
                   <p className="mt-1 text-xl font-semibold text-ink">
                     {axis === 'repayment' ? money(value(selected, 'closing_balance_cents')) : '—'}
@@ -1527,7 +1540,7 @@ function SensitivityTables({ sensitivity }: { sensitivity: InvestmentSensitivity
   );
 }
 
-function ScheduleTable({ schedule }: { schedule: number[][] }) {
+function ScheduleTable({ schedule, noDebt }: { schedule: number[][]; noDebt: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <section
@@ -1538,9 +1551,9 @@ function ScheduleTable({ schedule }: { schedule: number[][] }) {
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left sm:px-7"
+        className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left sm:px-7 @max-[320px]/lokara-shell:flex-col @max-[320px]/lokara-shell:items-stretch @max-[320px]/lokara-shell:gap-2 @max-[320px]/lokara-shell:px-2"
       >
-        <span>
+        <span className="min-w-0">
           <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-green">
             Darlehensverlauf
           </span>
@@ -1551,15 +1564,20 @@ function ScheduleTable({ schedule }: { schedule: number[][] }) {
             Annuitätenplan Jahr 1
           </span>
         </span>
-        <span aria-hidden="true" className="text-2xl text-green">
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-2xl text-green @max-[320px]/lokara-shell:self-end"
+        >
           {open ? '−' : '+'}
         </span>
       </button>
       {open ? (
-        <div className="border-t border-slate/20 p-4 sm:p-6">
+        <div className="border-t border-slate/20 p-4 sm:p-6 @max-[320px]/lokara-shell:p-2">
           {schedule.length === 0 ? (
             <p className="text-sm text-slate">
-              Daten unvollständig – kein Annuitätenplan verfügbar.
+              {noDebt
+                ? 'Kein Fremdkapital – kein Annuitätenplan erforderlich.'
+                : 'Daten unvollständig – kein Annuitätenplan verfügbar.'}
             </p>
           ) : (
             <Table

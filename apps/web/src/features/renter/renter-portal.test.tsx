@@ -332,6 +332,62 @@ describe('M10-COPY-04 renter shell and context switching', () => {
     expect(summary).toMatch(/<svg\b|[\u2304\u25be\u25bc]/);
   });
 
+  it('M10-F lets renter navigation, switcher labels and document headings reflow', () => {
+    const longContext = {
+      tenancyId: 'tenancy-current',
+      street: 'Donaudampfschifffahrtsgesellschaftskapitänstraße 123',
+      unitLabel: 'Wohnung mit sehr langer Bezeichnung',
+    };
+    const shellHtml = renderShell({
+      tenancyId: 'tenancy-current',
+      pathname: '/renter/tenancy-current/verbrauchsinformationen',
+      accounts: [{ id: 'account-owner', name: 'Eigene Verwaltung', role: 'OWNER', shape: 'SOLO' }],
+      renterContexts: [longContext],
+    });
+    const header = shellHtml.match(/<header\b[\s\S]*?<\/header>/)?.[0];
+    const headerRowClasses = header?.match(/<div class="([^"]+)"/)?.[1];
+    const detailsClasses = header?.match(/<details class="([^"]+)"/)?.[1];
+    const summary = header?.match(/<summary\b[\s\S]*?<\/summary>/)?.[0];
+    const switcherLabelClasses = summary?.match(/<span class="([^"]+)"/)?.[1];
+    const contextLinkClasses = header?.match(
+      /<a class="([^"]+)"[^>]*>Mietverhältnis — Donaudampfschifffahrtsgesellschaftskapitänstraße/,
+    )?.[1];
+
+    expect(header, 'the renter header must render').toBeDefined();
+    expect(headerRowClasses).toMatch(/\bmin-w-0\b/);
+    expect(headerRowClasses).toMatch(/\bflex-wrap\b/);
+    expect(detailsClasses).toMatch(/\bmin-w-0\b/);
+    expect(detailsClasses).toMatch(/\bmax-w-full\b/);
+    expect(switcherLabelClasses).toMatch(/\bmin-w-0\b/);
+    expect(switcherLabelClasses).toMatch(
+      /(?:\bbreak-words\b|\bhyphens-auto\b|\[overflow-wrap:anywhere\])/,
+    );
+    expect(contextLinkClasses).toMatch(
+      /(?:\bbreak-words\b|\bhyphens-auto\b|\[overflow-wrap:anywhere\])/,
+    );
+
+    const Documents = requiredExport<ComponentType<DocumentsProps>>(
+      './renter-documents.tsx',
+      'RenterDocumentsView',
+    );
+    const documentsHtml = renderToStaticMarkup(
+      <Documents kind="UVI_ARTIFACT" state="ready" documents={[UVI_DOCUMENT]} />,
+    );
+    const pageHeadingClasses = documentsHtml.match(
+      /<h1 class="([^"]+)">Verbrauchsinformationen<\/h1>/,
+    )?.[1];
+    const documentHeadingClasses = documentsHtml.match(
+      /<h2 class="([^"]+)">Verbrauchsinformation April 2026<\/h2>/,
+    )?.[1];
+
+    expect(pageHeadingClasses).toMatch(
+      /(?:\bbreak-words\b|\bhyphens-auto\b|\[overflow-wrap:anywhere\])/,
+    );
+    expect(documentHeadingClasses).toMatch(
+      /(?:\bbreak-words\b|\bhyphens-auto\b|\[overflow-wrap:anywhere\])/,
+    );
+  });
+
   it('uses a design-system shadow token instead of a raw rgba shadow', () => {
     expect(RENTER_SHELL_SOURCE).not.toMatch(/rgba\s*\(/);
     expect(RENTER_SHELL_SOURCE).toMatch(/\bshadow-(?:sm|md|lg|xl|2xl)\b/);

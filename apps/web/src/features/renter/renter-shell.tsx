@@ -44,12 +44,12 @@ export function RenterShellContent({
   return (
     <div className="min-h-dvh bg-paper text-ink">
       <header className="border-b border-mint bg-white">
-        <div className="mx-auto flex min-h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-6 min-[1440px]:px-8">
-          <p className="font-display text-xl font-bold text-forest">Meine Unterlagen</p>
+        <div className="mx-auto flex min-h-16 w-full min-w-0 max-w-[1440px] flex-wrap items-center justify-between gap-4 px-6 min-[1440px]:px-8">
+          <p className="min-w-0 font-display text-xl font-bold text-forest [overflow-wrap:anywhere]">Meine Unterlagen</p>
           {showSwitcher ? (
-            <details className="relative">
+            <details className="relative min-w-0 max-w-full">
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate px-4 py-2 text-sm font-semibold text-ink transition-colors duration-150 ease-out hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none">
-                <span>
+                <span className="min-w-0 [overflow-wrap:anywhere]">
                   {currentContext
                     ? `Mietverhältnis — ${currentContext.street}, ${currentContext.unitLabel}`
                     : 'Meine Unterlagen'}
@@ -62,7 +62,7 @@ export function RenterShellContent({
                   <path d="m5.25 7.75 4.75 4.5 4.75-4.5" />
                 </svg>
               </summary>
-              <div className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-3rem)] rounded-xl bg-white p-4 shadow-sm">
+              <div className="absolute right-0 z-20 mt-2 w-80 max-w-full rounded-xl bg-white p-4 shadow-sm [overflow-wrap:anywhere]">
                 {accounts.length > 0 ? (
                   <ul aria-label="Meine Unterlagen" className="mb-4 space-y-1">
                     {accounts.map((account) => (
@@ -82,9 +82,9 @@ export function RenterShellContent({
                   {renterContexts.map((context) => (
                     <li key={context.tenancyId}>
                       <Link
+                        className="block rounded-lg px-3 py-2 text-sm text-ink [overflow-wrap:anywhere] transition-colors duration-150 ease-out hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
                         href={`/renter/${context.tenancyId}`}
                         aria-current={context.tenancyId === tenancyId ? 'page' : undefined}
-                        className="block rounded-lg px-3 py-2 text-sm text-ink transition-colors duration-150 ease-out hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
                       >
                         Mietverhältnis — {context.street}, {context.unitLabel}
                       </Link>
@@ -104,12 +104,12 @@ export function RenterShellContent({
               const href = `/renter/${tenancyId}${item.suffix}`;
               const active = pathname === href;
               return (
-                <li key={href}>
+                <li key={href} className="min-w-0 max-w-full">
                   <Link
                     href={href}
                     aria-current={active ? 'page' : undefined}
                     className={
-                      'block rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ' +
+                      'block max-w-full rounded-lg px-3 py-2 text-sm font-semibold [overflow-wrap:anywhere] transition-colors duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none ' +
                       (active ? 'bg-mint text-forest' : 'text-ink hover:bg-mint/60')
                     }
                   >

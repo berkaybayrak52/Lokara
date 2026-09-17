@@ -1,22 +1,20 @@
-# Last output — M10-I4 repaired and verified
+# Last output — M10 technically complete locally
 
-HEAD `62c9fda` on `slice/m10-i4-investment-cockpit` · `16.09.2026`
+HEAD `b93dc24` on `slice/m10-f-closure` · `17.09.2026`
 Status: Complete
 
 ## Wanted
 
-Resume M10-I4 review repairs and close its technical checks.
+Resume and complete M10-F review and programme closure.
 
 ## Done
 
-Complete entry, visible liquidity colours, source-backed partial PDF and mobile readability repaired;
-both reviews clean. Focused tests `18 + 7 + 22`; full/demo gates `2310` Python / `265` web, non-fresh path green.
-Ordinary statement fingerprint unchanged: `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes; RED closed.
+Final UI and boundary reviews are clean. Fast/full/demo gates pass `2335` Python and `271` web tests; RLS covers `81` tables and FK isolation `163` edges. Statement fingerprint is unchanged at `c4eecb355d57cec620dfcb0134fc9141` / `149275` bytes. Documentation is reconciled.
 
 ## Not done
 
-Uncommitted/unmerged; nothing pushed. Live UI/true 200% zoom, M10-F and production approval remain deferred.
+Changes remain uncommitted; production blockers and true-browser/DB-backed browser coverage limits remain.
 
 ## Optional next step
 
-None.
+Review the diff and decide whether to commit the completed M10-F slice.

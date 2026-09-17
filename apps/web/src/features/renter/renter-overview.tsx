@@ -12,7 +12,7 @@ export type RenterOverviewViewProps = {
 
 export function RenterOverviewView({ state, overview, onRetry }: RenterOverviewViewProps) {
   return (
-    <main className="py-12">
+    <main className="min-w-0 py-12 [overflow-wrap:anywhere]">
       <div className="mx-auto max-w-3xl">
         <h1 className="font-display text-3xl font-bold text-ink">Mein Mietverhältnis</h1>
 
@@ -25,7 +25,7 @@ export function RenterOverviewView({ state, overview, onRetry }: RenterOverviewV
             <p role="alert" className="leading-7 text-ink">
               Die Daten konnten nicht geladen werden. Bitte versuchen Sie es später erneut.
             </p>
-            <Button type="button" variant="outline" onClick={onRetry}>
+            <Button type="button" variant="outline" onClick={onRetry} className="h-auto min-h-11 max-w-full whitespace-normal">
               Erneut versuchen
             </Button>
           </div>
