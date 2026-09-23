@@ -1,5 +1,14 @@
 import type { NextConfig } from 'next';
 
+function apiBackendUrl(): string {
+  const configured = process.env.API_BACKEND_URL?.replace(/\/$/, '');
+  if (configured) return configured;
+  if (process.env.VERCEL === '1') {
+    throw new Error('API_BACKEND_URL is required for a Vercel deployment');
+  }
+  return 'http://127.0.0.1:3001';
+}
+
 const nextConfig: NextConfig = {
   // Workspace packages ship TS source; Next transpiles them.
   transpilePackages: ['@lokara/ui'],
@@ -11,7 +20,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/backend/:path*',
-        destination: 'http://127.0.0.1:3001/:path*',
+        destination: `${apiBackendUrl()}/:path*`,
       },
     ];
   },

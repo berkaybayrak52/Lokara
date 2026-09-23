@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn>=0.34",
-  "pyjwt>=2.10",
+  "pyjwt[crypto]>=2.10",
   "pydantic>=2.10",
   "pydantic-settings>=2.7",
   # multipart/form-data parsing — required by FastAPI for the M4 Beleg upload.

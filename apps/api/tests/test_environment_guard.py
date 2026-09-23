@@ -35,6 +35,7 @@ SAFE_SECRET = "a-real-deployment-secret-at-least-32-chars"
 def _base_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """A settings environment that is safe apart from whatever the test then breaks."""
     monkeypatch.setenv("SUPABASE_JWT_SECRET", SAFE_SECRET)
+    monkeypatch.setenv("SUPABASE_JWT_ISSUER", "https://project-ref.supabase.co/auth/v1")
     monkeypatch.setenv("AUTH_DEV_TOKEN", "false")
     monkeypatch.setenv("DEMO_SEED_ENABLED", "false")
 
@@ -148,6 +149,47 @@ class TestDeployedEnvironmentsRefuseDevSwitches:
             "GEOCODING_ENABLED",
         ):
             assert unsafe_setting in message
+
+
+class TestDeployedJwksConfiguration:
+    def test_es256_accepts_the_issuer_exact_jwks_endpoint_without_a_secret(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        issuer = "https://project-ref.supabase.co/auth/v1"
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("SUPABASE_JWT_ALGORITHM", "ES256")
+        monkeypatch.setenv("SUPABASE_JWT_ISSUER", issuer)
+        monkeypatch.setenv("SUPABASE_JWKS_URL", f"{issuer}/.well-known/jwks.json")
+        monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
+        monkeypatch.setenv("AUTH_DEV_TOKEN", "false")
+        monkeypatch.setenv("DEMO_SEED_ENABLED", "false")
+
+        settings = ApiSettings()
+
+        assert settings.supabase_jwt_algorithm == "ES256"
+        assert settings.supabase_jwt_secret == ""
+
+    @pytest.mark.parametrize(
+        "jwks_url",
+        [
+            "https://attacker.invalid/.well-known/jwks.json",
+            "http://project-ref.supabase.co/auth/v1/.well-known/jwks.json",
+            "https://project-ref.supabase.co/auth/v1/other.json",
+        ],
+    )
+    def test_es256_rejects_a_noncanonical_jwks_endpoint(
+        self, monkeypatch: pytest.MonkeyPatch, jwks_url: str
+    ) -> None:
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("SUPABASE_JWT_ALGORITHM", "ES256")
+        monkeypatch.setenv("SUPABASE_JWT_ISSUER", "https://project-ref.supabase.co/auth/v1")
+        monkeypatch.setenv("SUPABASE_JWKS_URL", jwks_url)
+        monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
+        monkeypatch.setenv("AUTH_DEV_TOKEN", "false")
+        monkeypatch.setenv("DEMO_SEED_ENABLED", "false")
+
+        with pytest.raises(ValidationError, match="SUPABASE_JWKS_URL"):
+            ApiSettings()
 
 
 class TestLocalKeepsWorking:

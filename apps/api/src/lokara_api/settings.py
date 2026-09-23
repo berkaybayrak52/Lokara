@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # local | ci -> developer machines and the CI job; both run the demo path with every
 # dev switch on. staging | production -> deployed, reachable, and therefore guarded.
 Environment = Literal["local", "ci", "staging", "production"]
+JwtAlgorithm = Literal["HS256", "ES256"]
 
 # The signing secret shipped in .env.example (line 33) and committed to this
 # repository. Anyone holding it can mint a valid token for any subject, so a deployed
@@ -27,14 +28,13 @@ class ApiSettings(BaseSettings):
     # switches on and nothing in the logs to say so. An unknown value ("prod") fails
     # the Literal rather than being read as "not production".
     environment: Environment
-    # TODO(supabase): the real project's JWT secret (Settings → API). The auth
-    # dependency verifies HS256 access tokens with it — when wiring real
-    # Supabase, check whether the project uses HS256 or asymmetric JWKS.
-    # Empty default only so mypy accepts env-driven construction; the validated
-    # min_length makes a missing SUPABASE_JWT_SECRET fail loudly at startup.
-    # min_length alone is not enough: the published dev secret satisfies it happily,
-    # which is why _refuse_dev_switches_in_deployed_environments checks it by value.
-    supabase_jwt_secret: str = Field(default="", min_length=16, validate_default=True)
+    # Local/CI keeps the deterministic HS256 token path. New Supabase projects use
+    # asymmetric signing keys, so deployed instances select ES256 and verify the
+    # public key through the project's exact JWKS endpoint. The two modes are
+    # mutually exclusive; a failed JWKS lookup never falls back to a shared secret.
+    supabase_jwt_algorithm: JwtAlgorithm = "HS256"
+    supabase_jwt_secret: str = ""
+    supabase_jwks_url: str | None = None
     # Exact Supabase Auth issuer. The loopback default keeps local/CI auth usable
     # without requiring developers to retrofit an existing .env; deployments set
     # their project's https://<project-ref>.supabase.co/auth/v1 value explicitly.
@@ -82,10 +82,40 @@ class ApiSettings(BaseSettings):
         All unsafe routes are checked independently: reporting only the first one found
         sends an operator to close one open door while leaving the others unnoticed.
         """
+        problems: list[str] = []
+        expected_jwks_url = f"{self.supabase_jwt_issuer.rstrip('/')}/.well-known/jwks.json"
+        if self.supabase_jwt_algorithm == "HS256":
+            if len(self.supabase_jwt_secret) < 16:
+                problems.append(
+                    "SUPABASE_JWT_SECRET of at least 16 characters is required for HS256"
+                )
+            if self.supabase_jwks_url is not None:
+                problems.append("SUPABASE_JWKS_URL must be unset for HS256")
+        else:
+            if self.supabase_jwks_url is None:
+                problems.append("SUPABASE_JWKS_URL is required for ES256")
+            elif self.supabase_jwks_url != expected_jwks_url:
+                problems.append(
+                    "SUPABASE_JWKS_URL must be the configured issuer's exact JWKS endpoint"
+                )
+            if self.supabase_jwt_secret:
+                problems.append("SUPABASE_JWT_SECRET must be unset for ES256")
+            if self.auth_dev_token:
+                problems.append("AUTH_DEV_TOKEN requires the local HS256 mode")
+
         if self.environment not in DEPLOYED_ENVIRONMENTS:
+            if problems:
+                raise ValueError("Unsafe authentication configuration: " + "; ".join(problems))
             return self
 
-        problems: list[str] = []
+        issuer = urlsplit(self.supabase_jwt_issuer)
+        if issuer.scheme != "https" or not issuer.hostname:
+            problems.append("SUPABASE_JWT_ISSUER must be an absolute HTTPS URL")
+        if self.supabase_jwks_url is not None:
+            jwks = urlsplit(self.supabase_jwks_url)
+            if jwks.scheme != "https" or jwks.hostname != issuer.hostname:
+                problems.append("SUPABASE_JWKS_URL must use HTTPS on the issuer host")
+
         if self.auth_dev_token:
             problems.append("AUTH_DEV_TOKEN is on (mints tokens for any subject) — unset it")
         if self.demo_seed_enabled:

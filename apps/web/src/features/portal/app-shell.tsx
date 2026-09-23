@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 
 import type { MeAccount } from '@/lib/contracts';
+import { endSession } from '@/lib/api';
 
 import { useMe } from './queries';
 import { ReminderSidebar } from './reminder-sidebar';
@@ -526,6 +527,15 @@ function AccountMenu({
         >
           Zur Kontoauswahl
         </Link>
+        <button
+          type="button"
+          role="menuitem"
+          tabIndex={open ? 0 : -1}
+          onClick={() => void endSession()}
+          className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-mint/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Abmelden
+        </button>
       </div>
 
       <button
