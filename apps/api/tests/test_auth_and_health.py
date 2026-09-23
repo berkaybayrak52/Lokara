@@ -5,6 +5,7 @@ import time
 import jwt
 import lokara_api.auth as auth_module
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from lokara_api import create_app
@@ -31,9 +32,11 @@ def _valid_claims() -> dict[str, object]:
 
 
 def _encoded(claims: dict[str, object], secret: str | None = None) -> str:
+    signing_secret = secret or ApiSettings().supabase_jwt_secret
+    assert signing_secret is not None
     return jwt.encode(
         claims,
-        secret or ApiSettings().supabase_jwt_secret,
+        signing_secret,
         algorithm="HS256",
     )
 
@@ -198,6 +201,69 @@ class TestAuthSettings:
         assert getattr(ApiSettings(), "supabase_jwt_issuer", None) == TEST_JWT_ISSUER
 
 
+class TestSupabaseEs256:
+    @staticmethod
+    def _configure(monkeypatch: pytest.MonkeyPatch) -> str:
+        issuer = "https://project-ref.supabase.co/auth/v1"
+        monkeypatch.setenv("ENVIRONMENT", "staging")
+        monkeypatch.setenv("SUPABASE_JWT_ALGORITHM", "ES256")
+        monkeypatch.setenv("SUPABASE_JWT_ISSUER", issuer)
+        monkeypatch.setenv("SUPABASE_JWKS_URL", f"{issuer}/.well-known/jwks.json")
+        monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
+        monkeypatch.setenv("AUTH_DEV_TOKEN", "false")
+        monkeypatch.setenv("DEMO_SEED_ENABLED", "false")
+        return issuer
+
+    def test_es256_token_uses_only_the_configured_jwks_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        issuer = self._configure(monkeypatch)
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        token = jwt.encode(
+            _valid_claims(),
+            private_key,
+            algorithm="ES256",
+            headers={"kid": "supabase-test-key"},
+        )
+        public_jwk = jwt.PyJWK.from_dict(
+            jwt.algorithms.ECAlgorithm.to_jwk(private_key.public_key(), as_dict=True)
+        )
+
+        class FakeJwksClient:
+            def get_signing_key_from_jwt(self, raw_token: str) -> jwt.PyJWK:
+                assert raw_token == token
+                return public_jwk
+
+        monkeypatch.setattr(auth_module, "_jwks_client", lambda _url: FakeJwksClient())
+        response = TestClient(create_app()).post(
+            "/calc/nk",
+            json={},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 422
+        assert ApiSettings().supabase_jwt_issuer == issuer
+
+    def test_es256_mode_rejects_an_hs256_token_without_fallback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._configure(monkeypatch)
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        token = jwt.encode(_valid_claims(), "attacker-secret-at-least-32-characters", "HS256")
+        public_jwk = jwt.PyJWK.from_dict(
+            jwt.algorithms.ECAlgorithm.to_jwk(private_key.public_key(), as_dict=True)
+        )
+
+        class FakeJwksClient:
+            def get_signing_key_from_jwt(self, _raw_token: str) -> jwt.PyJWK:
+                return public_jwk
+
+        monkeypatch.setattr(auth_module, "_jwks_client", lambda _url: FakeJwksClient())
+        response = TestClient(create_app()).get("/me", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 401
+
+
 class TestDevToken:
     def test_disabled_by_default_returns_403(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
@@ -213,9 +279,11 @@ class TestDevToken:
         assert response.status_code == 200
         body = response.json()
         assert body["expiresInSeconds"] == 3600
+        secret = ApiSettings().supabase_jwt_secret
+        assert secret is not None
         claims = jwt.decode(
             body["accessToken"],
-            ApiSettings().supabase_jwt_secret,
+            secret,
             algorithms=["HS256"],
             issuer=_configured_issuer(),
             audience="authenticated",

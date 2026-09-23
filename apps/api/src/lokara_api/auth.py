@@ -6,10 +6,12 @@ comes from an ``/a/{account_id}/...`` URL and is authorized independently.
 
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Annotated, Any
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException
+from jwt import PyJWKClient, PyJWKClientError
 
 from .settings import ApiSettings
 
@@ -32,24 +34,49 @@ class AuthContext:
     person_id: str  # Supabase user id (JWT `sub`) — maps onto Person
 
 
-def verify_supabase_token(token: str, secret: str, issuer: str | None = None) -> AuthContext:
+@lru_cache(maxsize=8)
+def _jwks_client(url: str) -> PyJWKClient:
+    """Return a cached client which still refreshes keys on an unknown ``kid``."""
+
+    return PyJWKClient(url)
+
+
+def verify_supabase_token(
+    token: str,
+    secret: str | None,
+    issuer: str | None = None,
+    *,
+    algorithm: str = "HS256",
+    jwks_url: str | None = None,
+) -> AuthContext:
     """Verify the complete Supabase access-token provenance contract.
 
-    TODO(supabase): confirm whether the real project uses legacy HS256 or
-    asymmetric signing keys via JWKS (ES256/RS256). The issuer, audience, role,
-    expiry and subject checks remain required with either signing mechanism.
+    Local/CI tokens use HS256. Deployed Supabase tokens use ES256 and the
+    project's exact JWKS endpoint. There is no cross-algorithm fallback.
     """
     expected_issuer = issuer or ApiSettings().supabase_jwt_issuer
     try:
+        if algorithm == "ES256":
+            if jwks_url is None:
+                raise jwt.InvalidTokenError("ES256 verifier has no JWKS endpoint")
+            verification_key: jwt.PyJWK | str = _jwks_client(jwks_url).get_signing_key_from_jwt(
+                token
+            )
+        elif algorithm == "HS256":
+            if secret is None:
+                raise jwt.InvalidTokenError("HS256 verifier has no signing secret")
+            verification_key = secret
+        else:
+            raise jwt.InvalidAlgorithmError("Unsupported JWT algorithm")
         payload: dict[str, Any] = jwt.decode(
             token,
-            secret,
-            algorithms=["HS256"],
+            verification_key,
+            algorithms=[algorithm],
             issuer=expected_issuer,
             audience=AUTHENTICATED_AUDIENCE,
             options={"require": REQUIRED_JWT_CLAIMS},
         )
-    except jwt.InvalidTokenError as exc:
+    except (jwt.InvalidTokenError, PyJWKClientError) as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
     person_id = payload.get("sub")
     if not isinstance(person_id, str) or not person_id:
@@ -75,11 +102,19 @@ def require_auth(
     else:
         raise HTTPException(status_code=401, detail="Missing bearer token or session cookie")
     settings = ApiSettings()
-    return verify_supabase_token(token, settings.supabase_jwt_secret, settings.supabase_jwt_issuer)
+    return verify_supabase_token(
+        token,
+        settings.supabase_jwt_secret,
+        settings.supabase_jwt_issuer,
+        algorithm=settings.supabase_jwt_algorithm,
+        jwks_url=settings.supabase_jwks_url,
+    )
 
 
-def create_dev_token(secret: str, issuer: str | None = None) -> str:
+def create_dev_token(secret: str | None, issuer: str | None = None) -> str:
     """DEV ONLY — issue a subject-only token through the production auth path."""
+    if secret is None:
+        raise ValueError("The development token path requires SUPABASE_JWT_SECRET")
     now = int(time.time())
     expected_issuer = issuer or ApiSettings().supabase_jwt_issuer
     return jwt.encode(

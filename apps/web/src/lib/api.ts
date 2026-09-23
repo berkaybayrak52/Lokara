@@ -15,10 +15,10 @@ import { isDemoPreview, PREVIEW_NOT_FOUND, previewResponse } from './demo-previe
  */
 
 /** Exported for the rare non-JSON case (PDF download links). */
-// Keep browser requests on the frontend origin by default. Next.js proxies
-// account API paths to FastAPI in `next.config.ts`; deployments can still
-// provide an explicit API origin when frontend and API are hosted separately.
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/backend';
+// Browser requests always stay on the frontend origin so the HttpOnly session
+// cookie reaches FastAPI through Next.js's server-side proxy. The external
+// backend origin is configured only as API_BACKEND_URL on the server.
+export const API_URL = '/api/backend';
 
 export class ApiError extends Error {
   constructor(
@@ -53,7 +53,6 @@ async function readDetail(response: Response): Promise<string | undefined> {
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-/** TODO(supabase): at M5 this exchanges the Supabase refresh token instead. */
 async function refreshSession(): Promise<boolean> {
   try {
     const response = await fetch('/api/session', { method: 'POST', cache: 'no-store' });
@@ -61,6 +60,17 @@ async function refreshSession(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function openLogin(): void {
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+}
+
+export async function endSession(): Promise<void> {
+  await fetch('/api/session', { method: 'DELETE', cache: 'no-store' }).catch(() => null);
+  if (typeof window !== 'undefined') window.location.assign('/login');
 }
 
 function rawFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -107,10 +117,13 @@ export async function api<Schema extends z.ZodType>(
     });
     const refreshed = await refreshInFlight;
     if (!refreshed) {
+      openLogin();
       throw new ApiError(401, path);
     }
     response = await rawFetch(path, init); // replay exactly once — a second 401 falls through
   }
+
+  if (response.status === 401) openLogin();
 
   if (!response.ok) {
     throw new ApiError(response.status, path, await readDetail(response));
