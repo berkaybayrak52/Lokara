@@ -217,13 +217,31 @@ Q_EFFECTIVE_ROLE_MEMBERSHIP = text("SELECT pg_has_role(:app, :bootstrap, 'MEMBER
 
 Q_BOOTSTRAP_ROLE_MEMBERSHIP_EDGES = text(
     """
-    SELECT granted.rolname, member.rolname, member.rolcanlogin
+    SELECT
+        granted.rolname,
+        member.rolname,
+        member.rolcanlogin,
+        grantor.rolname,
+        membership.admin_option,
+        membership.inherit_option,
+        membership.set_option
     FROM pg_auth_members membership
     JOIN pg_roles granted ON granted.oid = membership.roleid
     JOIN pg_roles member ON member.oid = membership.member
+    JOIN pg_roles grantor ON grantor.oid = membership.grantor
     WHERE granted.rolname = :bootstrap OR member.rolname = :bootstrap
-    ORDER BY granted.rolname, member.rolname
+    ORDER BY granted.rolname, member.rolname, grantor.rolname
     """
+)
+
+SUPABASE_PLATFORM_ADMIN_EDGE = (
+    BOOTSTRAP_ROLE,
+    "postgres",
+    True,
+    "supabase_admin",
+    True,
+    False,
+    False,
 )
 
 Q_GRANTS = text(
@@ -271,12 +289,18 @@ Q_UNCONDITIONAL_PUBLIC_POLICIES = text(
 
 Q_EXECUTE = text(
     """
-    SELECT grantee
-    FROM information_schema.routine_privileges
-    WHERE routine_schema = 'public'
-      AND routine_name = :function
-      AND privilege_type = 'EXECUTE'
-    ORDER BY grantee
+    SELECT COALESCE(grantee.rolname, 'PUBLIC')
+    FROM pg_proc function
+    JOIN pg_namespace namespace ON namespace.oid = function.pronamespace
+    CROSS JOIN LATERAL aclexplode(
+        COALESCE(function.proacl, acldefault('f', function.proowner))
+    ) privilege
+    LEFT JOIN pg_roles grantee ON grantee.oid = privilege.grantee
+    WHERE namespace.nspname = 'public'
+      AND function.proname = :function
+      AND oidvectortypes(function.proargtypes) = 'text'
+      AND privilege.privilege_type = 'EXECUTE'
+    ORDER BY COALESCE(grantee.rolname, 'PUBLIC')
     """
 )
 
@@ -360,15 +384,30 @@ def _db_invariants(conn: Connection) -> list[str]:
             f"{APP_ROLE} effectively inherits {BOOTSTRAP_ROLE} directly or transitively"
         )
     bootstrap_membership_edges = {
-        (str(granted), str(member), bool(member_can_login))
-        for granted, member, member_can_login in conn.execute(
-            Q_BOOTSTRAP_ROLE_MEMBERSHIP_EDGES, {"bootstrap": BOOTSTRAP_ROLE}
-        ).all()
+        (
+            str(granted),
+            str(member),
+            bool(member_can_login),
+            str(grantor),
+            bool(admin_option),
+            bool(inherit_option),
+            bool(set_option),
+        )
+        for (
+            granted,
+            member,
+            member_can_login,
+            grantor,
+            admin_option,
+            inherit_option,
+            set_option,
+        ) in conn.execute(Q_BOOTSTRAP_ROLE_MEMBERSHIP_EDGES, {"bootstrap": BOOTSTRAP_ROLE}).all()
     }
-    if bootstrap_membership_edges:
+    unexpected_bootstrap_edges = bootstrap_membership_edges - {SUPABASE_PLATFORM_ADMIN_EDGE}
+    if unexpected_bootstrap_edges:
         problems.append(
-            f"{BOOTSTRAP_ROLE} must have no role-membership edges, found "
-            f"{sorted(bootstrap_membership_edges)}"
+            f"{BOOTSTRAP_ROLE} has unsafe role-membership edges: "
+            f"{sorted(unexpected_bootstrap_edges)}"
         )
 
     bootstrap_usage, bootstrap_create, app_create = conn.execute(

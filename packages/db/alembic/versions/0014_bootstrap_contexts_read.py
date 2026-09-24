@@ -22,9 +22,12 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # A separate owner keeps SECURITY DEFINER bounded by ordinary grants and
-    # FORCE RLS.  Creation is conditional because roles are cluster-global and
-    # may outlive a restored database; the unconditional ALTER below is what
-    # makes an existing role satisfy the same bounded contract.
+    # FORCE RLS. Creation is conditional because roles are cluster-global and
+    # may outlive a restored database. Supabase's managed `postgres` role has
+    # CREATEROLE but is intentionally not a true superuser: it may create a
+    # bounded role, but PostgreSQL rejects even an explicit *NO*SUPERUSER or
+    # *NO*BYPASSRLS in ALTER ROLE. Verify those superuser-only attributes first,
+    # then normalize only the attributes a managed owner may alter.
     op.execute(
         """
         DO $role$
@@ -42,37 +45,40 @@ def upgrade() -> None:
     )
     op.execute(
         """
-        ALTER ROLE lokara_bootstrap
-        NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS
+        DO $role_safety$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_roles
+                WHERE rolname = 'lokara_bootstrap'
+                  AND (
+                      rolsuper
+                      OR rolcreatedb
+                      OR rolcreaterole
+                      OR rolreplication
+                      OR rolbypassrls
+                  )
+            ) THEN
+                RAISE EXCEPTION 'lokara_bootstrap has unsafe elevated privileges';
+            END IF;
+        END
+        $role_safety$
         """
     )
-
-    # A restored cluster could also carry stale memberships for the role.  It
-    # must neither inherit ambient privileges nor be reachable via SET ROLE by
-    # another principal, so normalize both directions before granting anything.
     op.execute(
         """
-        DO $memberships$
-        DECLARE
-            membership record;
-        BEGIN
-            FOR membership IN
-                SELECT granted.rolname AS granted_role,
-                       member.rolname AS member_role
-                FROM pg_catalog.pg_auth_members AS edge
-                JOIN pg_catalog.pg_roles AS granted ON granted.oid = edge.roleid
-                JOIN pg_catalog.pg_roles AS member ON member.oid = edge.member
-                WHERE granted.rolname = 'lokara_bootstrap'
-                   OR member.rolname = 'lokara_bootstrap'
-            LOOP
-                EXECUTE format(
-                    'REVOKE %I FROM %I',
-                    membership.granted_role,
-                    membership.member_role
-                );
-            END LOOP;
-        END
-        $memberships$
+        ALTER ROLE lokara_bootstrap
+        NOLOGIN NOINHERIT NOCREATEDB NOCREATEROLE
+        """
+    )
+    # PostgreSQL 16 gives a non-superuser CREATEROLE owner an ADMIN-only edge
+    # on roles it creates, deliberately without SET. Add a separate temporary
+    # SET-only edge so the managed owner can transfer function ownership. This
+    # edge is revoked below; Supabase's inert platform-admin edge remains.
+    op.execute(
+        """
+        GRANT lokara_bootstrap TO CURRENT_USER
+        WITH INHERIT FALSE, SET TRUE
         """
     )
 
@@ -144,9 +150,85 @@ def upgrade() -> None:
         $function$
         """
     )
-    op.execute("ALTER FUNCTION public.app_bootstrap_contexts(text) OWNER TO lokara_bootstrap")
+    # Remove the default PUBLIC execution grant and add the application caller
+    # while the migration owner still owns the function. Hosted Supabase also
+    # installs explicit default EXECUTE grants for its Data API roles; remove
+    # those when the roles exist so this identity read cannot become an RPC.
+    # After ownership moves, the managed non-superuser can no longer change
+    # these privileges without another temporary SET edge.
     op.execute("REVOKE ALL ON FUNCTION public.app_bootstrap_contexts(text) FROM PUBLIC")
+    op.execute(
+        """
+        DO $revoke_supabase_api_roles$
+        DECLARE
+            role_name text;
+        BEGIN
+            FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role']
+            LOOP
+                IF EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = role_name
+                ) THEN
+                    EXECUTE format(
+                        'REVOKE EXECUTE ON FUNCTION public.app_bootstrap_contexts(text) FROM %I',
+                        role_name
+                    );
+                END IF;
+            END LOOP;
+        END
+        $revoke_supabase_api_roles$
+        """
+    )
     op.execute("GRANT EXECUTE ON FUNCTION public.app_bootstrap_contexts(text) TO lokara_app")
+
+    # A non-superuser may transfer ownership only to a role it can SET ROLE to,
+    # and that role must be able to create in the containing schema. The creator
+    # receives the required administration edge on PostgreSQL 16; keep it just
+    # long enough to transfer this one function, grant CREATE temporarily, then
+    # remove both capabilities before the migration commits.
+    op.execute("GRANT CREATE ON SCHEMA public TO lokara_bootstrap")
+    op.execute("ALTER FUNCTION public.app_bootstrap_contexts(text) OWNER TO lokara_bootstrap")
+    op.execute("REVOKE CREATE ON SCHEMA public FROM lokara_bootstrap")
+
+    # Remove only the SET edge granted by this migration. PostgreSQL 16 may
+    # retain a separate platform-granted ADMIN edge with INHERIT false and SET
+    # false; it cannot confer the bootstrap role's privileges or impersonation.
+    op.execute(
+        """
+        REVOKE lokara_bootstrap FROM CURRENT_USER
+        GRANTED BY CURRENT_USER
+        """
+    )
+
+    # Reject every effective or unexpected membership. The sole tolerated edge
+    # is PostgreSQL 16's inert ADMIN-only creator edge for the migration owner.
+    op.execute(
+        """
+        DO $memberships$
+        BEGIN
+            IF EXISTS (
+                SELECT granted.rolname AS granted_role,
+                       member.rolname AS member_role
+                FROM pg_catalog.pg_auth_members AS edge
+                JOIN pg_catalog.pg_roles AS granted ON granted.oid = edge.roleid
+                JOIN pg_catalog.pg_roles AS member ON member.oid = edge.member
+                WHERE (
+                    granted.rolname = 'lokara_bootstrap'
+                    OR member.rolname = 'lokara_bootstrap'
+                )
+                  AND NOT (
+                      granted.rolname = 'lokara_bootstrap'
+                      AND member.rolname = CURRENT_USER
+                      AND edge.admin_option
+                      AND NOT edge.inherit_option
+                      AND NOT edge.set_option
+                  )
+            ) THEN
+                RAISE EXCEPTION 'lokara_bootstrap has an unsafe role-membership edge';
+            END IF;
+        END
+        $memberships$
+        """
+    )
 
 
 def downgrade() -> None:

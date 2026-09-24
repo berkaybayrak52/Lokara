@@ -3,6 +3,7 @@
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "init-supabase-app-role.sql"
+MIGRATIONS = Path(__file__).resolve().parents[1] / "alembic" / "versions"
 
 
 def test_supabase_runtime_role_is_non_owner_and_cannot_bypass_rls() -> None:
@@ -25,9 +26,28 @@ def test_supabase_runtime_role_receives_current_and_future_schema_grants() -> No
     assert "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public" in sql
 
 
-def test_supabase_runtime_password_is_prompted_and_not_literal() -> None:
+def test_supabase_runtime_password_is_supplied_without_a_literal() -> None:
     sql = SCRIPT.read_text()
 
-    assert "\\prompt -s" in sql
+    assert "\\prompt" not in sql
+    assert "\\if :{?lokara_app_password}" in sql
+    assert "\\quit 3" in sql
     assert ":'lokara_app_password'" in sql
     assert "PASSWORD 'lokara'" not in sql
+
+
+def test_existing_runtime_role_is_verified_before_password_rotation() -> None:
+    sql = SCRIPT.read_text()
+
+    assert "rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls" in sql
+    assert "lokara_app has unsafe elevated privileges" in sql
+    assert "ALTER ROLE lokara_app WITH LOGIN PASSWORD %L" in sql
+    assert "ALTER ROLE lokara_app WITH LOGIN PASSWORD %L NOSUPERUSER" not in sql
+
+
+def test_bootstrap_function_is_not_exposed_to_supabase_data_api_roles() -> None:
+    for revision in ("0014_bootstrap_contexts_read.py", "0042_m10_renter_context.py"):
+        migration = (MIGRATIONS / revision).read_text()
+        for role in ("anon", "authenticated", "service_role"):
+            assert role in migration
+        assert "REVOKE EXECUTE ON FUNCTION public.app_bootstrap_contexts(text)" in migration

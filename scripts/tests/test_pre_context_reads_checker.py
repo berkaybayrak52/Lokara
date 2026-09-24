@@ -87,8 +87,8 @@ class _Catalog:
     )
     app_directly_inherits_bootstrap: bool = False
     app_effectively_inherits_bootstrap: bool = False
-    # granted role, member role, whether the member can log in
-    bootstrap_role_membership_edges: tuple[tuple[str, str, bool], ...] = ()
+    # granted, member, member-login, grantor, admin, inherit, set
+    bootstrap_role_membership_edges: tuple[tuple[str, str, bool, str, bool, bool, bool], ...] = ()
     # USAGE, CREATE on schema public
     bootstrap_schema_privileges: tuple[bool, bool] = (True, False)
     app_schema_create: bool = False
@@ -232,7 +232,7 @@ class _Connection:
                 return _Result(
                     [
                         (granted,)
-                        for granted, member, _can_login in (
+                        for granted, member, _can_login, _grantor, _admin, _inherit, _set in (
                             self.catalog.bootstrap_role_membership_edges
                         )
                         if member == BOOTSTRAP_ROLE
@@ -242,7 +242,7 @@ class _Connection:
                 return _Result(
                     [
                         (member, can_login)
-                        for granted, member, can_login in (
+                        for granted, member, can_login, _grantor, _admin, _inherit, _set in (
                             self.catalog.bootstrap_role_membership_edges
                         )
                         if granted == BOOTSTRAP_ROLE
@@ -432,7 +432,17 @@ class TestCatalogMutations:
     def test_bootstrap_role_is_not_a_member_of_any_role(self) -> None:
         catalog = replace(
             _Catalog(),
-            bootstrap_role_membership_edges=(("ambient_identity_reader", BOOTSTRAP_ROLE, False),),
+            bootstrap_role_membership_edges=(
+                (
+                    "ambient_identity_reader",
+                    BOOTSTRAP_ROLE,
+                    False,
+                    "postgres",
+                    False,
+                    True,
+                    True,
+                ),
+            ),
         )
         problems = _catalog_problems(catalog)
         report = _joined(problems)
@@ -442,12 +452,46 @@ class TestCatalogMutations:
     def test_no_login_role_is_a_member_of_bootstrap_role(self) -> None:
         catalog = replace(
             _Catalog(),
-            bootstrap_role_membership_edges=((BOOTSTRAP_ROLE, "batch_login", True),),
+            bootstrap_role_membership_edges=(
+                (BOOTSTRAP_ROLE, "batch_login", True, "postgres", False, True, True),
+            ),
         )
         problems = _catalog_problems(catalog)
         report = _joined(problems)
         assert BOOTSTRAP_ROLE in report
         assert "batch_login" in report
+
+    def test_supabase_platform_admin_edge_is_inert_and_allowed(self) -> None:
+        catalog = replace(
+            _Catalog(),
+            bootstrap_role_membership_edges=(
+                (
+                    BOOTSTRAP_ROLE,
+                    "postgres",
+                    True,
+                    "supabase_admin",
+                    True,
+                    False,
+                    False,
+                ),
+            ),
+        )
+        assert not _catalog_problems(catalog)
+
+    @pytest.mark.parametrize(
+        "edge",
+        [
+            (BOOTSTRAP_ROLE, "postgres", True, "supabase_admin", True, True, False),
+            (BOOTSTRAP_ROLE, "postgres", True, "supabase_admin", True, False, True),
+            (BOOTSTRAP_ROLE, "postgres", True, "supabase_admin", False, False, False),
+            (BOOTSTRAP_ROLE, "postgres", True, "other_grantor", True, False, False),
+        ],
+    )
+    def test_modified_supabase_platform_edge_is_red(
+        self, edge: tuple[str, str, bool, str, bool, bool, bool]
+    ) -> None:
+        catalog = replace(_Catalog(), bootstrap_role_membership_edges=(edge,))
+        assert "unsafe role-membership" in _joined(_catalog_problems(catalog))
 
     def test_public_execute_is_red(self) -> None:
         catalog = replace(
