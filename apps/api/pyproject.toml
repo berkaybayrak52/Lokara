@@ -18,6 +18,8 @@ dependencies = [
   "lokara-matching-engine",
   "lokara-investment-engine",
   "lokara-afa-engine",
+  "lokara-guard-engine",
+  "lokara-uvi-engine",
   "lokara-export-engine",
   "lokara-rules-store",
   "lokara-adapters",
@@ -35,6 +37,8 @@ lokara-heating-engine = { workspace = true }
 lokara-matching-engine = { workspace = true }
 lokara-investment-engine = { workspace = true }
 lokara-afa-engine = { workspace = true }
+lokara-guard-engine = { workspace = true }
+lokara-uvi-engine = { workspace = true }
 lokara-export-engine = { workspace = true }
 lokara-rules-store = { workspace = true }
 lokara-adapters = { workspace = true }

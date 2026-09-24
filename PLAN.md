@@ -11,6 +11,34 @@ before UI. Dates are communication events, not planning inputs.
 
 ## Current state
 
+### Staging deployment recovery plan — saved 23.09.2026
+
+Scope: make the invite-only Supabase integration work as a technical staging deployment. This does
+not clear any recorded legal or production blocker.
+
+1. **Repair the existing Python CI failure.** Make the demo-building timestamps deterministic so
+   `Musterstraße 12` remains the canonical first building; verify the complete suite against a
+   fresh database and push the repair to PR #1. TypeScript CI is already green.
+2. **Prepare the FastAPI deployment.** Add the missing production container/process and HTTPS
+   configuration. Do not create paid Hetzner resources without Emir's separate approval.
+3. **Initialize Supabase Postgres.** Create the restricted `lokara_app` runtime role without
+   exposing its password, run Alembic through the owner-only direct connection and verify RLS/FK
+   gates. Owner credentials never become runtime credentials.
+4. **Deploy the backend as staging.** Configure ES256 issuer/JWKS verification, disabled dev-token
+   and demo-seed switches, the restricted session-pooler runtime URL, the direct migration URL and
+   `WEB_ORIGIN=https://lokara-web.vercel.app`. Require a public HTTPS `/health` response.
+5. **Repair Vercel.** Set server-only `API_BACKEND_URL` to the deployed backend, keep database URLs
+   out of Vercel, redeploy the preview and verify invite confirmation, refresh, `/me` and sign-out.
+6. **Merge only when green.** Require Python CI, TypeScript CI and the Vercel preview to pass before
+   merging PR #1 into `main`.
+7. **Preserve UI-04.** Do not pull or merge into the dirty `slice/adjustments-closure` worktree.
+   Reconcile that work separately before updating its branch.
+
+Current blockers: the Python CI repair and Render container are locally green but remain
+uncommitted and unpushed, so PR #1 still reports the earlier failure; Vercel fails intentionally
+while `API_BACKEND_URL` is absent; the local UI-04 branch has uncommitted work and no tracking
+branch.
+
 - **M10-F technically complete and review-clean locally (17.09.2026).** HEAD is `b93dc24` on
   `slice/m10-f-closure`; all closure changes remain uncommitted. Final fast, full and non-fresh demo
   gates pass `2335` Python and `271` web tests; RLS covers `81` tables and FK isolation covers `163`
