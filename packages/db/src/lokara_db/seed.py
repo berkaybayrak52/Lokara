@@ -975,6 +975,7 @@ def seed_demo(session: Session) -> None:
             street="Musterstraße 12",
             postal_code="60311",
             city="Frankfurt am Main",
+            created_at=_RECORDED_AT,
         )
     )
     for unit_id, label, area in _UNITS:
@@ -987,7 +988,14 @@ def seed_demo(session: Session) -> None:
                 area_sqm_x100=area,
             )
         )
-    for building_id, name, street, postal_code, city, building_type in _PORTFOLIO_BUILDINGS:
+    for (
+        building_id,
+        name,
+        street,
+        postal_code,
+        city,
+        building_type,
+    ) in _PORTFOLIO_BUILDINGS:
         session.merge(
             Building(
                 id=building_id,
@@ -997,6 +1005,7 @@ def seed_demo(session: Session) -> None:
                 postal_code=postal_code,
                 city=city,
                 building_type=building_type,
+                created_at=_RECORDED_AT + timedelta(seconds=1),
             )
         )
     for unit_id, building_id, label, area, _usage_type in _PORTFOLIO_UNITS:

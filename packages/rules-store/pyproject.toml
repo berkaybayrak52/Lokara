@@ -3,7 +3,7 @@ name = "lokara-rules-store"
 version = "0.1.0"
 description = "Versioned legal rules with as-of law dates (HKVO, CO2 Stufenmodell, degree days)"
 requires-python = ">=3.12"
-dependencies = ["lokara-domain"]
+dependencies = ["lokara-domain", "lokara-uvi-engine"]
 
 [build-system]
 requires = ["hatchling"]
@@ -17,3 +17,4 @@ packages = ["src/lokara_rules_store"]
 
 [tool.uv.sources]
 lokara-domain = { workspace = true }
+lokara-uvi-engine = { workspace = true }

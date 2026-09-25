@@ -260,9 +260,10 @@ def _create_renter_bootstrap_function() -> None:
         $function$
         """
     )
-    op.execute("ALTER FUNCTION public.app_bootstrap_contexts(text) OWNER TO lokara_bootstrap")
     op.execute("REVOKE ALL ON FUNCTION public.app_bootstrap_contexts(text) FROM PUBLIC")
+    _revoke_supabase_api_execute()
     op.execute("GRANT EXECUTE ON FUNCTION public.app_bootstrap_contexts(text) TO lokara_app")
+    _transfer_bootstrap_function_ownership()
 
 
 def _create_membership_bootstrap_function() -> None:
@@ -299,9 +300,54 @@ def _create_membership_bootstrap_function() -> None:
         $function$
         """
     )
-    op.execute("ALTER FUNCTION public.app_bootstrap_contexts(text) OWNER TO lokara_bootstrap")
     op.execute("REVOKE ALL ON FUNCTION public.app_bootstrap_contexts(text) FROM PUBLIC")
+    _revoke_supabase_api_execute()
     op.execute("GRANT EXECUTE ON FUNCTION public.app_bootstrap_contexts(text) TO lokara_app")
+    _transfer_bootstrap_function_ownership()
+
+
+def _revoke_supabase_api_execute() -> None:
+    """Keep the bootstrap read out of Supabase's public Data API roles."""
+    op.execute(
+        """
+        DO $revoke_supabase_api_roles$
+        DECLARE
+            role_name text;
+        BEGIN
+            FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role']
+            LOOP
+                IF EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = role_name
+                ) THEN
+                    EXECUTE format(
+                        'REVOKE EXECUTE ON FUNCTION public.app_bootstrap_contexts(text) FROM %I',
+                        role_name
+                    );
+                END IF;
+            END LOOP;
+        END
+        $revoke_supabase_api_roles$
+        """
+    )
+
+
+def _transfer_bootstrap_function_ownership() -> None:
+    """Transfer ownership through Supabase's managed non-superuser owner."""
+    op.execute(
+        """
+        GRANT lokara_bootstrap TO CURRENT_USER
+        WITH INHERIT FALSE, SET TRUE
+        """
+    )
+    op.execute("GRANT CREATE ON SCHEMA public TO lokara_bootstrap")
+    op.execute("ALTER FUNCTION public.app_bootstrap_contexts(text) OWNER TO lokara_bootstrap")
+    op.execute("REVOKE CREATE ON SCHEMA public FROM lokara_bootstrap")
+    op.execute(
+        """
+        REVOKE lokara_bootstrap FROM CURRENT_USER
+        GRANTED BY CURRENT_USER
+        """
+    )
 
 
 def upgrade() -> None:
